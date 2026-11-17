@@ -76,3 +76,15 @@ def test_avanzar_toma_conserva_comentarios(repo):
     assert len(ant) == len(des)
     assert [i for i, (a, b) in enumerate(zip(ant, des)) if a != b] == [
         i for i, l in enumerate(ant) if "contador:" in l]
+
+
+def test_avanzar_toma_conserva_crlf(repo):
+    ruta = repo / "marca.yml"
+    crudo = ruta.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+    ruta.write_bytes(crudo)
+    assert registro.contador_toma(repo) == 1
+    assert registro.avanzar_toma(repo) == 2
+    nuevo = ruta.read_bytes()
+    assert nuevo.count(b"\r\n") == crudo.count(b"\r\n")
+    assert nuevo.count(b"\n") == nuevo.count(b"\r\n")
+    assert nuevo.replace(b"contador: 2", b"contador: 1") == crudo

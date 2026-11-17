@@ -11,3 +11,12 @@ salida/
 __pycache__/
 .venv/
 .pytest_cache/
+
+# Secretos
+.env
+.env.*
+*.pem
+*.key
+credentials*.json
+client_secret*.json
+token*.json

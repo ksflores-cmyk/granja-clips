@@ -261,3 +261,49 @@ def test_cli_sale_1_con_errores(repo):
 def test_yaml_roto_es_error(repo):
     (repo / "temporada.yml").write_text("a: [", encoding="utf-8")
     assert hay(repo, "YAML inválido")
+
+
+# ---- ronda 1 ----
+
+@pytest.mark.parametrize("rel", ["temporada.yml", "marca.yml", "config/horarios.yml",
+                                 "config/modo.yml", "config/canales.yml", "fuentes.yml"])
+@pytest.mark.parametrize("contenido", ["", "# sólo comentarios\n"])
+def test_yaml_vacio_es_error(repo, rel, contenido):
+    (repo / rel).write_text(contenido, encoding="utf-8")
+    assert any(rel in e and "vacío" in e for e in errores(repo))
+
+
+def test_fuentes_no_lista_es_error(repo):
+    (repo / "fuentes.yml").write_text("a: 1\n", encoding="utf-8")
+    assert hay(repo, "debe ser una lista")
+
+
+def test_fuentes_lista_vacia_es_aviso(repo):
+    (repo / "fuentes.yml").write_text("[]\n", encoding="utf-8")
+    inf = validar.validar(repo)
+    assert inf.errores == []
+    assert any("sin fuentes" in a for a in inf.avisos)
+
+
+@pytest.mark.parametrize("estado", ["vencida", "pausada", "vetada"])
+def test_estado_no_vigente_publicable_da_aviso(repo, editar_yaml, estado):
+    ficha(repo, editar_yaml, estado=estado)
+    inf = validar.validar(repo)
+    assert inf.errores == []
+    assert any("exigirá estado vigente" in a for a in inf.avisos)
+
+
+def test_vigente_publicable_sin_aviso(repo):
+    assert validar.validar(repo).avisos == []
+
+
+def test_clave_en_archivo_no_utf8_se_detecta(repo):
+    clave = "ghp_" + "e" * 36
+    (repo / "latin.txt").write_bytes(b"caf\xe9 " + clave.encode() + b"\n")
+    assert hay(repo, "clave expuesta")
+
+
+def test_binarios_conocidos_se_omiten(repo):
+    clave = "ghp_" + "e" * 36
+    (repo / "x.png").write_bytes(clave.encode())
+    assert errores(repo) == []

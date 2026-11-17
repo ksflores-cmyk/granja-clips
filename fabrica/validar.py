@@ -24,6 +24,7 @@ USOS = {"produccion", "muestras"}
 PLATAFORMAS = {"shorts", "tiktok", "reels"}
 SERVICIOS = {"shorts": "youtube", "tiktok": "tiktok", "reels": "instagram"}
 MODOS = {"ensayo", "vivo"}
+EXT_BINARIAS = {".ttf", ".otf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".ico"}
 EXT_MEDIA = {".mp4", ".mov", ".mkv", ".webm", ".m4a", ".wav", ".mp3"}
 IGNORAR_DIRS = {".git", "__pycache__", ".pytest_cache", ".venv"}
 RE_ID = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -60,10 +61,13 @@ def _cargar(raiz: Path, rel: str, inf: Informe):
         inf.error(f"{rel}: no existe")
         return None
     try:
-        return yaml.safe_load(ruta.read_text(encoding="utf-8"))
+        dato = yaml.safe_load(ruta.read_text(encoding="utf-8"))
     except yaml.YAMLError as e:
         inf.error(f"{rel}: YAML inválido ({e})")
         return None
+    if dato is None:
+        inf.error(f"{rel}: está vacío o sólo tiene comentarios")
+    return dato
 
 
 def _claves(dato, rel: str, claves: list[str], inf: Informe) -> bool:
@@ -102,8 +106,11 @@ def validar_temporada(t, inf: Informe) -> None:
 
 def validar_fuentes(f, inf: Informe) -> None:
     rel = "fuentes.yml"
-    if not isinstance(f, list) or not f:
-        inf.error(f"{rel}: debe ser una lista con al menos una ficha")
+    if not isinstance(f, list):
+        inf.error(f"{rel}: debe ser una lista de fichas")
+        return
+    if not f:
+        inf.aviso(f"{rel}: sin fuentes: la fábrica no tendrá qué publicar")
         return
     vistos: set = set()
     for i, ficha in enumerate(f):
@@ -158,6 +165,10 @@ def validar_fuentes(f, inf: Informe) -> None:
                 inf.error(f"{et}: tipo D sólo con pilar informativa")
             if ficha.get("campana") is not None:
                 inf.error(f"{et}: tipo D exige campana null")
+        if ficha.get("estado") in ESTADOS and ficha.get("estado") != "vigente" \
+                and ficha.get("publicable") is True:
+            inf.aviso(f"{et}: estado {ficha['estado']} con publicable true; "
+                      "la puerta de N3 exigirá estado vigente para descargar o publicar")
         vence = ficha.get("vence")
         if ficha.get("estado") == "vigente" and isinstance(vence, date) and vence < _hoy():
             inf.aviso(f"{et}: ficha vigente con vence {vence} ya pasado; debe pasar a vencida")
@@ -280,9 +291,11 @@ def validar_sin_media(raiz: Path, inf: Informe) -> None:
 def validar_sin_claves(raiz: Path, inf: Informe) -> None:
     for p in _archivos(raiz):
         rel = p.relative_to(raiz)
+        if p.suffix.lower() in EXT_BINARIAS:
+            continue
         try:
-            texto = p.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
+            texto = p.read_bytes().decode("utf-8", errors="ignore")
+        except OSError:
             continue
         en_pruebas = rel.parts[0] == "pruebas"
         for n, linea in enumerate(texto.splitlines(), 1):

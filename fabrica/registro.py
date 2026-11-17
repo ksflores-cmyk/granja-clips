@@ -47,6 +47,7 @@ _LINEA_CONTADOR = re.compile(r"^(\s+contador:\s*)(\d+)(.*)$")
 
 
 def _localizar_contador(lineas: list[str]) -> int:
+    lineas = [l.rstrip("\r") for l in lineas]
     """Índice de la línea `contador:` dentro del bloque `toma:`."""
     dentro = False
     for i, linea in enumerate(lineas):
@@ -69,11 +70,15 @@ def contador_toma(raiz=None) -> int:
 def avanzar_toma(raiz=None) -> int:
     """Sube toma.contador en 1 cambiando sólo esa línea. Devuelve el nuevo valor."""
     ruta = raiz_repo(raiz) / "marca.yml"
-    texto = ruta.read_text(encoding="utf-8")
+    # newline="" conserva los fines de línea originales (LF o CRLF).
+    with open(ruta, encoding="utf-8", newline="") as f:
+        texto = f.read()
     lineas = texto.split("\n")
     i = _localizar_contador(lineas)
-    m = _LINEA_CONTADOR.match(lineas[i])
+    cr = "\r" if lineas[i].endswith("\r") else ""
+    m = _LINEA_CONTADOR.match(lineas[i][: len(lineas[i]) - len(cr)])
     nuevo = int(m.group(2)) + 1
-    lineas[i] = f"{m.group(1)}{nuevo}{m.group(3)}"
-    ruta.write_text("\n".join(lineas), encoding="utf-8")
+    lineas[i] = f"{m.group(1)}{nuevo}{m.group(3)}{cr}"
+    with open(ruta, "w", encoding="utf-8", newline="") as f:
+        f.write("\n".join(lineas))
     return nuevo
