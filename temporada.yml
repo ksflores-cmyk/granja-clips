@@ -1,0 +1,28 @@
+# Temporada vigente. Los datos de fecha salen de hechos.md.
+id: gta6
+nombre: "GTA 6"
+nombre_twitch: "Grand Theft Auto VI"
+fecha_estreno: 2026-11-19
+plataformas_juego: [PS5, "Xbox Series X|S"]
+desbloqueo: "medianoche local del 19 nov 2026 en todas las regiones"
+ventana_estreno:
+  inicio: "2026-11-18T05:00:00-06:00"
+  fin: "2026-11-20T23:59:00-06:00"
+palabras_evitar:        # spoilers y trama: si aparecen, el clip se descarta
+  - final
+  - epílogo
+  - créditos finales
+  - muere
+  - muerte de
+  - traición
+  - giro
+  - jefe final
+  - última misión
+cupos:
+  por_dia_por_plataforma: 3
+  estreno_max_por_dia_por_plataforma: 8
+pilares:                # sección 6 del playbook
+  primeras_veces: 0.6
+  momentos: 0.2
+  dato_util: 0.1
+  informativa: 0.1      # máximo

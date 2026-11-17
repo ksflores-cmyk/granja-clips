@@ -1,0 +1,28 @@
+name: puerta
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: puerta-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  puerta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Validar configuración
+        run: python -m fabrica.validar
+      - name: Pruebas
+        run: python -m pytest -q

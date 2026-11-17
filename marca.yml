@@ -1,0 +1,36 @@
+# Sistema visual [Guion] (sección 5B). La fábrica no lleva colores ni fuentes escritos a mano.
+nombre: "Guion Vivo"
+usuario: "guionvivo"
+confirmado: false            # Kevin aún no lo confirma; cambiar a true cuando lo haga
+direccion: guion
+lienzo: pagina               # pagina de guion 1080x1920 con el video dentro
+resolucion: [1080, 1920]
+colores:
+  papel: "#F2EDE3"
+  tinta: "#151515"
+  lapiz_rojo: "#D4261C"
+fuente:
+  familia: "Courier Prime"     # licencia abierta SIL OFL 1.1, uso comercial permitido
+  estilos: [regular, bold, italic]
+toma:
+  contador: 1                   # sube en 1 con cada clip publicado
+movimiento:
+  transiciones: ninguna         # sólo corte seco
+  zoom_automatico: false
+sonido:
+  musica_de_biblioteca: false
+  sello_sonoro: opcional        # propio, de menos de 0.4 s
+encabezado_max_palabras: 6
+subtitulo_max_lineas: 2
+mosca: {esquina: inferior_derecha, texto: "GUION VIVO"}
+prohibido:
+  - subtítulos palabra por palabra con una palabra en amarillo
+  - emojis dentro del video
+  - voz generada por IA
+  - imágenes o miniaturas generadas por IA
+  - degradados neón morado y rosa
+  - barras de progreso
+  - stickers de stock
+  - marcas de agua de herramientas
+  - ganchos genéricos (NO VAS A CREER, ESTO CAMBIA TODO, EL FINAL TE SORPRENDERÁ)
+  - tipografías de plantilla (sans gruesa con borde negro)

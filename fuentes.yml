@@ -1,0 +1,50 @@
+# Lista blanca (sección 3 del playbook). Sin ficha vigente no se descarga ni se publica.
+- id: propio-tipografico
+  tipo: C
+  creador: "@guionvivo"
+  origen: propio
+  canal_id: null
+  permiso_url: null
+  permiso_leido: 2026-11-17
+  reglas:
+    duracion_s: [7, 30]
+    plataformas: [shorts, tiktok, reels]
+    etiquetas_obligatorias: []
+    divulgacion: "ninguna"
+    audiencia: "sin restricción"
+  pilares: [informativa]
+  campana: null            # sin cobro, a propósito
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: null
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: "Publicaciones tipográficas propias (sin metraje ajeno). Datos sólo de hechos.md."
+
+# Ejemplo de ficha tipo A (no es una fuente real; no descomentar sin brief leído):
+# - id: ejemplo-campana-001
+#   tipo: A                      # A, B, C o D
+#   creador: "@usuario"
+#   origen: twitch               # twitch, youtube, kick, drive, propio, web
+#   canal_id: "123456"
+#   permiso_url: "https://..."
+#   permiso_leido: 2026-11-17
+#   reglas:
+#     duracion_s: [10, 60]
+#     plataformas: [tiktok, shorts, reels]
+#     etiquetas_obligatorias: ["@usuario", "#ejemplo"]
+#     divulgacion: "la que pida el brief"
+#     audiencia: "sin restricción"   # o el requisito de países del brief
+#   pilares: [primeras_veces, momentos]
+#   campana: "nombre de la campaña"
+#   tarifa_usd_por_mil: 1.0
+#   minimo_por_clip_usd: 5
+#   tope_por_clip_usd: 250
+#   presupuesto_restante: "por leer"
+#   vence: 2026-12-15
+#   estado: vigente                # vigente, vencida, pausada, vetada
+#   uso: produccion                # produccion o muestras
+#   publicable: true

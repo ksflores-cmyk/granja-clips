@@ -1,0 +1,6 @@
+# Una sola prueba al día (sección 13). Variables permitidas:
+#   redaccion_encabezado, duracion, hora, largo_del_texto, linea_de_escena (con o sin)
+# El sistema visual no entra en pruebas durante los primeros 30 días.
+fecha: null
+variable: null
+valor: null

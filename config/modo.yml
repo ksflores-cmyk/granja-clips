@@ -1,0 +1,5 @@
+# valores de modo: ensayo, vivo
+# A1 lo cambia a vivo el 18 nov a las 11:00 si las puertas están en verde
+modo: ensayo
+# valores: shorts, tiktok, reels
+plataformas_activas: []

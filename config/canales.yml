@@ -1,0 +1,3 @@
+shorts: {servicio: youtube, nombre_esperado: guionvivo, buffer_channel_id: null}
+tiktok: {servicio: tiktok, nombre_esperado: guionvivo, buffer_channel_id: null}
+reels: {servicio: instagram, nombre_esperado: guionvivo, buffer_channel_id: null}
