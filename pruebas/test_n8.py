@@ -106,3 +106,449 @@ def test_validar_rechaza_sin_musica_no_booleano_y_juego_vacio(repo, editar_yaml)
     assert any("sin_musica" in x for x in e)
     e = _con_ficha(repo, editar_yaml, lambda f: f.update(juego=""))
     assert any("juego debe ser texto" in x for x in e)
+
+
+# ---------------------------------------------------------------- utilidades de render (video sintético)
+
+import json
+import shutil
+import subprocess
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from fabrica import ojos
+from fabrica.detectar import Candidato
+from fabrica.editar import componer as mod_componer
+from fabrica.editar import estilo, toma as mod_toma
+from fabrica.editar.componer import Linea
+from fabrica.editar.lienzo import Toma
+from fabrica.editar.marca import Marca
+
+AHORA = datetime(2026, 11, 18, 22, 0, tzinfo=ZoneInfo("America/Guatemala"))
+DATOS = RAIZ_REAL / "pruebas" / "datos" / "gemini"
+
+
+@pytest.fixture(scope="session")
+def marca():
+    return Marca.cargar(RAIZ_REAL)
+
+
+@pytest.fixture(scope="session")
+def temporada():
+    return yaml.safe_load((RAIZ_REAL / "temporada.yml").read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="session")
+def video(tmp_path_factory):
+    """Video sintético de 20 s, 1280x720, con audio (el audio es un tono: sirve para comparar)."""
+    ruta = tmp_path_factory.mktemp("sintetico-n8") / "fuente.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                    "testsrc2=size=1280x720:rate=30:duration=20", "-f", "lavfi", "-i",
+                    "sine=frequency=440:duration=20", "-c:v", "libx264", "-preset", "ultrafast",
+                    "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(ruta)], check=True)
+    return ruta
+
+
+def toma_de_prueba() -> tuple[Toma, list[Linea]]:
+    t = Toma(numero=1, gancho="Sebas ficha al delantero", palabra_lapiz="DELANTERO", lapiz="círculo",
+             escena="INT. STREAM DE SEBASBERON — MINUTO 4", credito="Con: SEBASBERON")
+    return t, [Linea(t0=0.5, t1=4.0, nombre="SEBASBERON", frase="Por fin ficho al delantero.")]
+
+
+def render(marca, tmp, video, ficha, nombre):
+    t, lineas = toma_de_prueba()
+    carpeta = tmp / nombre
+    carpeta.mkdir()
+    mp4 = carpeta / "t.mp4"
+    plan = mod_componer.componer(marca, t, lineas, mp4, duracion=12.0, trabajo=carpeta / "w", fuente_video=video,
+                                 inicio=2.0, plan_salida=carpeta / "t.plan.json", ficha=ficha)
+    return mp4, plan
+
+
+def sin_agua(ficha):
+    f = copy.deepcopy(ficha)
+    f.pop("marca_agua")
+    return f
+
+
+@pytest.fixture(scope="module")
+def con_logo(marca, video, tmp_path_factory):
+    return render(marca, tmp_path_factory.mktemp("logo"), video, ficha_real(), "a")
+
+
+@pytest.fixture(scope="module")
+def sin_logo(marca, video, tmp_path_factory):
+    return render(marca, tmp_path_factory.mktemp("limpio"), video, sin_agua(ficha_real()), "a")
+
+
+def punto(puntos, nombre):
+    return next((ok, det) for n, ok, det in puntos if n.endswith(nombre))
+
+
+# ---------------------------------------------------------------- criterio 2: juego por ficha
+
+def test_juego_de_usa_la_ficha_y_si_no_la_temporada(temporada):
+    assert ojos.juego_de(ficha_real(), temporada) == "Football Manager 27"
+    assert ojos.juego_de({"id": "x"}, temporada) == temporada["nombre"] == "GTA 6"
+    assert ojos.juego_de(None, temporada) == "GTA 6"
+
+
+def test_la_instruccion_pide_el_juego_de_la_ficha_y_el_recorte_de_la_ficha(marca, temporada):
+    t = ojos.temporada_de(ficha_real(), temporada)
+    ins = ojos.instruccion(marca, t, 20.0, ojos.juego_de(ficha_real(), temporada),
+                           ojos.nota_de_ficha(ficha_real()), ojos.rango_recorte(ficha_real()))
+    assert "Football Manager 27" in ins and "GTA" not in ins
+    assert "de 10 a 30 segundos" in ins and "{{" not in ins
+    assert "no añadas música" in ins and "gameplay" in ins
+
+
+def test_un_clip_de_fm27_no_se_descarta_por_no_ser_gta6(marca, temporada):
+    datos = json.loads((DATOS / "fm27_valida.json").read_text(encoding="utf-8"))
+    f = ficha_real()
+    ok, motivos = ojos.validar_respuesta(datos, marca, ojos.temporada_de(f, temporada), duracion=20.0,
+                                         juego=ojos.juego_de(f, temporada), recorte=ojos.rango_recorte(f))
+    assert ok, motivos
+    datos["juego_correcto"] = False
+    ok, motivos = ojos.validar_respuesta(datos, marca, ojos.temporada_de(f, temporada), duracion=20.0,
+                                         juego=ojos.juego_de(f, temporada), recorte=ojos.rango_recorte(f))
+    assert not ok and any("Football Manager 27" in m and "GTA" not in m for m in motivos)
+
+
+def test_sin_juego_en_la_ficha_se_sigue_usando_la_temporada(marca, temporada):
+    datos = json.loads((DATOS / "valida.json").read_text(encoding="utf-8"))
+    datos["juego_correcto"] = False
+    ok, motivos = ojos.validar_respuesta(datos, marca, temporada, duracion=20.0, juego=ojos.juego_de({}, temporada))
+    assert not ok and any("GTA 6" in m for m in motivos)
+
+
+def test_los_spoilers_de_gta_no_aplican_a_una_ficha_con_otro_juego(marca, temporada):
+    f = ficha_real()
+    assert ojos.temporada_de(f, temporada)["palabras_evitar"] == []
+    datos = json.loads((DATOS / "fm27_valida.json").read_text(encoding="utf-8"))
+    datos["gancho"] = "Final de copa para Sebas"
+    datos["palabra_lapiz"] = "COPA"
+    assert ojos.validar_respuesta(datos, marca, ojos.temporada_de(f, temporada), duracion=20.0)[0]
+    assert not ojos.validar_respuesta(datos, marca, temporada, duracion=20.0)[0]   # con la temporada, sí es spoiler
+
+
+# ---------------------------------------------------------------- criterio 4: duración por ficha
+
+def test_recorte_de_8_s_se_rechaza_con_la_ficha_de_10_a_30(marca, temporada):
+    f = ficha_real()
+    datos = json.loads((DATOS / "fm27_valida.json").read_text(encoding="utf-8"))
+    datos["recorte"] = {"inicio": 3.0, "fin": 11.0}
+    datos["lineas"] = datos["lineas"][:1]
+    t = ojos.temporada_de(f, temporada)
+    ok, m = ojos.validar_respuesta(datos, marca, t, duracion=20.0, recorte=ojos.rango_recorte(f))
+    assert not ok and any("de 10 a 30 s" in x for x in m)
+    assert ojos.validar_respuesta(datos, marca, t, duracion=20.0)[0]      # sin ficha, 8 s vale (mínimo 7)
+
+
+def test_rango_de_recorte_nunca_sale_del_formato():
+    assert ojos.rango_recorte({"reglas": {"duracion_s": [10, 30]}}) == (10.0, 30.0)
+    assert ojos.rango_recorte({"reglas": {"duracion_s": [3, 90]}}) == (7.0, 30.0)
+    assert ojos.rango_recorte(None) == (7.0, 30.0)
+
+
+def test_la_puerta_de_estilo_usa_la_duracion_de_la_ficha(marca, sin_logo):
+    mp4, plan = sin_logo                              # dura 12 s
+    f = sin_agua(ficha_real())
+    ok, _ = punto(estilo.revisar(mp4, plan, marca, ficha=f), "Duración de 10 a 30 s")
+    assert ok
+    f["reglas"]["duracion_s"] = [15, 30]
+    ok, det = punto(estilo.revisar(mp4, plan, marca, ficha=f), "Duración de 15 a 30 s")
+    assert not ok and "12.0" in det
+
+
+# ---------------------------------------------------------------- criterio 3: marca de agua por ficha
+
+def test_el_plan_declara_la_capa_y_el_logo_esta_en_el_lugar_de_marca_yml(marca, con_logo):
+    mp4, plan = con_logo
+    m = plan["campana"]["marca_agua"]
+    cuerpo = plan["geometria"]["cuerpo"]
+    cfg = marca.marca_agua
+    assert m["archivo"] == "marca/campanas/fm27/logo.png"
+    assert cfg["posicion"] == "cuerpo_inferior_derecha"
+    # esquina inferior derecha del cuerpo, a `margen` del borde, y dentro de él
+    assert m["caja"]["x"] + m["caja"]["ancho"] == cuerpo["x"] + cuerpo["ancho"] - cfg["margen"]
+    assert m["caja"]["y"] + m["caja"]["alto"] == cuerpo["y"] + cuerpo["alto"] - cfg["margen"]
+    # nunca sobre la cabecera, el diálogo ni la mosca
+    assert m["caja"]["y"] >= plan["geometria"]["y_contenido"]
+    assert m["caja"]["y"] + m["caja"]["alto"] <= plan["geometria"]["y_dialogo"]
+
+
+def test_la_puerta_acepta_el_logo_si_la_ficha_lo_declara(marca, con_logo):
+    mp4, plan = con_logo
+    puntos = estilo.revisar(mp4, plan, marca, ficha=ficha_real())
+    ok, det = punto(puntos, "Marca de agua de la campaña")
+    assert ok, det
+    malos = [n for n, o, d in puntos if not o]
+    assert malos == [], malos
+
+
+def test_la_puerta_rechaza_la_capa_si_la_ficha_no_la_declara(marca, con_logo):
+    mp4, plan = con_logo
+    puntos = estilo.revisar(mp4, plan, marca, ficha=sin_agua(ficha_real()))
+    ok, det = punto(puntos, "Marca de agua de la campaña")
+    assert not ok and "no declara" in det
+    assert not punto(estilo.revisar(mp4, plan, marca, ficha=None), "Marca de agua de la campaña")[0]
+
+
+def test_un_logo_extra_sin_declarar_sigue_en_rojo(marca, con_logo):
+    mp4, plan = con_logo
+    plan_sin = {k: v for k, v in plan.items() if k != "campana"}      # el MP4 lleva el logo; el plan no lo dice
+    puntos = estilo.revisar(mp4, plan_sin, marca, ficha=sin_agua(ficha_real()))
+    ok, det = punto(puntos, "Sin logos extra no declarados")
+    assert not ok, det
+
+
+def test_sin_logo_y_sin_declaracion_la_puerta_sigue_en_verde(marca, sin_logo):
+    mp4, plan = sin_logo
+    puntos = estilo.revisar(mp4, plan, marca, ficha=sin_agua(ficha_real()))
+    assert [n for n, o, d in puntos if not o] == []
+    assert punto(puntos, "Sin logos extra no declarados")[0]
+
+
+def test_la_ficha_declara_el_logo_pero_no_aparece_en_el_video(marca, con_logo, sin_logo):
+    mp4_limpio, _ = sin_logo
+    _, plan = con_logo
+    ok, det = punto(estilo.revisar(mp4_limpio, plan, marca, ficha=ficha_real()), "Marca de agua de la campaña")
+    assert not ok and "no aparece" in det
+
+
+def test_la_ficha_declara_el_logo_y_el_plan_no_lo_trae(marca, sin_logo):
+    mp4, plan = sin_logo
+    ok, det = punto(estilo.revisar(mp4, plan, marca, ficha=ficha_real()), "Marca de agua de la campaña")
+    assert not ok and "el plan no la trae" in det
+
+
+def test_componer_sin_ficha_no_pone_capa_ni_campana(marca, sin_logo):
+    _, plan = sin_logo
+    assert plan["campana"]["marca_agua"] is None
+
+
+def test_marca_yml_valida_la_seccion_marca_agua(repo, editar_yaml):
+    editar_yaml(repo, "marca.yml", lambda m: m["marca_agua"].update(posicion="centro"))
+    assert any("marca_agua.posicion" in e for e in validar.validar(repo).errores)
+    editar_yaml(repo, "marca.yml", lambda m: {k: v for k, v in m.items() if k != "marca_agua"})
+    assert any("falta la sección marca_agua" in e for e in validar.validar(repo).errores)
+
+
+# ---------------------------------------------------------------- criterio 5: textos por campaña
+
+from fabrica import publicar
+from fabrica.publicar import Descartada, textos
+
+TOMA_FM = {"numero": 7, "gancho": "Sebas ficha al delantero", "pilar": "momentos", "campana": "SEGA FM27 (Clipping Culture)"}
+REDES = ("reels", "tiktok", "shorts")
+
+
+@pytest.mark.parametrize("creador", list(CREADORES))
+@pytest.mark.parametrize("red", REDES)
+def test_texto_de_campana_por_red_y_por_creador(creador, red):
+    f = ficha_real()
+    tx = textos({**TOMA_FM, "creador": creador}, f, red)
+    etiqueta = CREADORES[creador][RED[red]]
+    lineas = tx["texto"].split("\n")
+    assert lineas[0] == "Toma 007. Sebas ficha al delantero" and lineas[1] == ""
+    # @footballmanager, la etiqueta del creador de esa red y #Publicidad: en ese orden, sin líneas en medio
+    assert lineas[2:5] == ["@footballmanager", etiqueta, "#Publicidad"]
+    assert lineas[5].split()[0].startswith("#") and 1 <= len(lineas[5].split()) <= 3
+    assert len(lineas) == 6
+    assert "🎥" not in tx["texto"] and tx["credito"] == etiqueta
+    assert tx["etiquetas"][:2] == ["@footballmanager", "#Publicidad"]
+    hashtags = [w for w in tx["texto"].split() if w.startswith("#")]
+    assert hashtags[0] == "#Publicidad" and len(hashtags) <= 4
+    assert (tx["titulo"] is not None) == (red == "shorts")
+
+
+def test_daro_en_tiktok_y_shorts_es_el_texto_literal_y_en_reels_su_usuario():
+    for red, esperado in (("tiktok", "Credit to Dario Zenz"), ("shorts", "Credit to Dario Zenz"),
+                          ("reels", "@darizenz")):
+        assert esperado in textos({**TOMA_FM, "creador": "DARO"}, ficha_real(), red)["texto"].split("\n")
+
+
+def test_tio_pedro_usa_otro_usuario_en_youtube():
+    assert "@ElTioPedro" in textos({**TOMA_FM, "creador": "TIO PEDRO"}, ficha_real(), "shorts")["texto"]
+    assert "@eltiopedro_fut" in textos({**TOMA_FM, "creador": "TIO PEDRO"}, ficha_real(), "tiktok")["texto"]
+
+
+def test_sebasberon_en_tiktok_es_sebasclips():
+    assert "@sebasclips" in textos({**TOMA_FM, "creador": "SEBASBERON"}, ficha_real(), "tiktok")["texto"]
+
+
+def test_creador_sin_etiqueta_no_se_publica():
+    with pytest.raises(Descartada, match="sin etiqueta del creador"):
+        textos({**TOMA_FM, "creador": "NADIE"}, ficha_real(), "tiktok")
+    with pytest.raises(Descartada, match="sin etiqueta del creador"):
+        textos({**TOMA_FM, "creador": ""}, ficha_real(), "tiktok")
+
+
+def test_los_hashtags_de_la_toma_van_primero_sin_pasar_de_tres_ni_repetir_publicidad():
+    tx = textos({**TOMA_FM, "creador": "DARO", "etiquetas": ["#publicidad", "#Barça", "#Liga", "#Otro", "#Mas"]},
+                ficha_real(), "tiktok")
+    ultima = tx["texto"].split("\n")[-1]
+    assert ultima == "#Barça #Liga #Otro"
+    assert tx["texto"].lower().count("#publicidad") == 1
+
+
+def test_una_ficha_sin_campana_sigue_con_el_formato_de_siempre():
+    f = {"id": "propio", "creador": "@guionvivo", "reglas": {"etiquetas_obligatorias": [], "divulgacion": "ninguna"}}
+    tx = textos({"numero": 1, "gancho": "Algo pasa", "pilar": "momentos"}, f, "tiktok")
+    assert "🎥 @guionvivo" in tx["texto"]
+
+
+def test_la_divulgacion_debe_ser_un_hashtag():
+    f = copy.deepcopy(ficha_real())
+    f["reglas"]["divulgacion"] = "colaboración pagada"
+    with pytest.raises(Descartada, match="divulgación"):
+        textos({**TOMA_FM, "creador": "DARO"}, f, "reels")
+
+
+# ---------------------------------------------------------------- criterio 6: sin música
+
+def test_con_sin_musica_el_audio_es_el_original(marca, con_logo):
+    mp4, plan = con_logo
+    assert plan["campana"]["sin_musica"] is True and plan["campana"]["audio"] == "original"
+    ok, det = estilo.audio_original(mp4, plan)
+    assert ok, det
+    assert punto(estilo.revisar(mp4, plan, marca, ficha=ficha_real()), "Audio sólo el original (sin música)")[0]
+
+
+def test_la_orden_de_ffmpeg_no_mezcla_audio_nuevo(marca, video, tmp_path):
+    t, lineas = toma_de_prueba()
+    cmds = []
+    real = subprocess.run
+    import fabrica.editar.componer as comp
+    comp_run = comp.subprocess.run
+
+    def espia(cmd, *a, **k):
+        cmds.append(cmd)
+        return comp_run(cmd, *a, **k)
+    comp.subprocess.run = espia
+    try:
+        mod_componer.componer(marca, t, lineas, tmp_path / "t.mp4", duracion=12.0, trabajo=tmp_path / "w",
+                              fuente_video=video, inicio=2.0, ficha=ficha_real())
+    finally:
+        comp.subprocess.run = comp_run
+    orden = cmds[0]
+    assert orden[orden.index("-map", orden.index("-map") + 1) + 1] == "1:a"      # el audio es el de la fuente
+    assert "amix" not in ";".join(orden) and "anullsrc" not in orden
+
+
+def test_el_audio_de_otro_origen_se_detecta(marca, video, tmp_path, con_logo):
+    mp4, plan = con_logo
+    otro = tmp_path / "otro.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                    "testsrc2=size=1280x720:rate=30:duration=20", "-f", "lavfi", "-i",
+                    "anoisesrc=d=20:c=pink:a=0.3", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", "-shortest", str(otro)], check=True)
+    plan2 = copy.deepcopy(plan)
+    plan2["origen"]["archivo"] = str(otro)          # la fuente "declarada" no es de la que salió el audio
+    ok, det = estilo.audio_original(mp4, plan2)
+    assert not ok, det
+
+
+def test_fuente_sin_audio_deja_silencio_y_nada_mas(marca, tmp_path):
+    mudo = tmp_path / "mudo.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                    "testsrc2=size=1280x720:rate=30:duration=20", "-c:v", "libx264", "-preset", "ultrafast",
+                    "-pix_fmt", "yuv420p", str(mudo)], check=True)
+    mp4, plan = render(marca, tmp_path, mudo, sin_agua(ficha_real()), "m")
+    assert plan["campana"]["audio"] == "silencio"
+    assert estilo.audio_original(mp4, plan)[0]
+
+
+# ---------------------------------------------------------------- criterio 7: registro del envío manual
+
+from datetime import timedelta, timezone
+from fabrica import envios_campana
+from fabrica.publicar import ClienteBuffer, Publicador, hueco_a_utc
+from fabrica.simulacion import BufferSimulado, _json
+
+AHORA_UTC = datetime(2026, 11, 18, 12, 0, tzinfo=timezone.utc)
+
+
+class BufferConUrl(BufferSimulado):
+    """Como el simulado, pero `Post` expone `externalLink` y el post enviado la trae (o no)."""
+
+    def __init__(self, url="https://www.tiktok.com/@guionvivo/video/123", expone=True, status="sent", **kw):
+        super().__init__(**kw)
+        self.url, self.expone, self.status = url, expone, status
+
+    def __call__(self, metodo, u, encabezados, cuerpo=None, tiempo=60):
+        q = json.loads(cuerpo.decode("utf-8"))["query"]
+        if '__type(name: "Post")' in q:
+            campos = ["id", "status", "dueAt", "text"] + (["externalLink"] if self.expone else [])
+            return _json(200, {"data": {"__type": {"fields": [{"name": n} for n in campos]}}})
+        if "post(" in q and "posts(" not in q:
+            self.consultas.append(q)
+            nodo = {"id": "post-ejemplo-001", "status": self.status, "dueAt": "2026-11-18T17:00:00.000Z"}
+            if self.url and "externalLink" in q:
+                nodo["externalLink"] = self.url
+            return _json(200, {"data": {"post": nodo}})
+        return super().__call__(metodo, u, encabezados, cuerpo, tiempo)
+
+
+def publicador(tmp_path, sim):
+    c = ClienteBuffer("bfr_clave-inventada-n8", sim, tmp_path, dormir=lambda s: None, ahora=lambda: AHORA_UTC)
+    ids = {"shorts": "canal-yt-001", "tiktok": "canal-tt-001", "reels": "canal-ig-001"}
+    return Publicador(c, None, tmp_path, "vivo", lambda: AHORA_UTC, ids)
+
+
+def programar_de_campana(tmp_path, sim, red="tiktok"):
+    shutil.copy(RAIZ_REAL / "marcador.csv", tmp_path / "marcador.csv")
+    pub = publicador(tmp_path, sim)
+    toma = {**TOMA_FM, "creador": "DARO", "fuente_id": "sega-fm27", "duracion_s": 12.0}
+    tx = textos(toma, ficha_real(), red)
+    pub.programar(red, toma, "https://x.invalid/v.mp4", tx, hueco_a_utc(date(2026, 11, 18), "11:00"),
+                  None, ficha_real())
+    return pub
+
+
+def test_al_programar_un_clip_de_campana_se_anota_para_el_envio_manual(tmp_path):
+    programar_de_campana(tmp_path, BufferConUrl())
+    filas = json.loads((tmp_path / "estado" / "envios-campana.json").read_text(encoding="utf-8"))
+    assert len(filas) == 1
+    f = filas[0]
+    assert (f["plataforma"], f["post_id"], f["campana"]) == ("tiktok", "post-ejemplo-001", "SEGA FM27 (Clipping Culture)")
+    assert f["hora"] == "2026-11-18T11:00:00-06:00"
+    assert f["estado"] == "programado" and f["url"] is None
+
+
+def test_un_clip_sin_campana_no_se_anota(tmp_path):
+    pub = publicador(tmp_path, BufferConUrl())
+    toma = {"numero": 3, "gancho": "Algo pasa", "pilar": "momentos", "fuente_id": "propio"}
+    f = {"id": "propio", "creador": "@guionvivo", "reglas": {"etiquetas_obligatorias": [], "divulgacion": "ninguna"}}
+    pub.programar("tiktok", toma, "https://x.invalid/v.mp4", textos(toma, f, "tiktok"),
+                  hueco_a_utc(date(2026, 11, 18), "11:00"), None, f)
+    assert not (tmp_path / "estado" / "envios-campana.json").exists()
+
+
+def test_con_post_sent_y_url_de_buffer_se_escribe_la_url(tmp_path):
+    pub = programar_de_campana(tmp_path, BufferConUrl())
+    assert envios_campana.completar(tmp_path, pub) == 1
+    f = envios_campana.leer(tmp_path)[0]
+    assert f["estado"] == "enviado" and f["url"] == "https://www.tiktok.com/@guionvivo/video/123"
+    assert f["nota"] == envios_campana.PEGAR
+    assert envios_campana.completar(tmp_path, pub) == 0            # no se vuelve a consultar lo cerrado
+
+
+def test_si_buffer_no_da_la_url_queda_pendiente_de_copiar_desde_la_app(tmp_path):
+    pub = programar_de_campana(tmp_path, BufferConUrl(expone=False))
+    envios_campana.completar(tmp_path, pub)
+    f = envios_campana.leer(tmp_path)[0]
+    assert f["estado"] == "enviado" and f["url"] is None
+    assert f["nota"] == "pendiente: copiar el enlace desde la app"
+
+
+def test_con_el_post_aun_programado_no_se_escribe_nada(tmp_path):
+    pub = programar_de_campana(tmp_path, BufferConUrl(status="scheduled"))
+    assert envios_campana.completar(tmp_path, pub) == 0
+    assert envios_campana.leer(tmp_path)[0]["estado"] == "programado"
+
+
+def test_limpiar_enviados_completa_los_enlaces_en_cada_ciclo(tmp_path):
+    pub = programar_de_campana(tmp_path, BufferConUrl())
+    pub.limpiar_enviados()
+    assert envios_campana.leer(tmp_path)[0]["url"].startswith("https://www.tiktok.com/")
