@@ -17,11 +17,13 @@ import re
 import sys
 import tempfile
 import time
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from . import red
+from .candado import candado
 from .config import cargar_yaml, raiz_repo
 from .pausa import ZONA, crear_pausa, esta_pausada
 
@@ -42,7 +44,7 @@ Q_ORGANIZACIONES = "query { account { organizations { id name } } }"
 Q_CANALES = ("query { channels(input: { organizationId: %s }) "
              "{ id name displayName service isQueuePaused } }")
 M_CREAR = ("mutation($input: CreatePostInput!) { createPost(input: $input) { "
-           "... on PostActionSuccess { post { id status dueAt } } "
+           "__typename ... on PostActionSuccess { post { id status dueAt } } "
            "... on MutationError { message } } }")
 M_BORRAR = ("mutation($input: DeletePostInput!) { deletePost(input: $input) { "
             "__typename ... on MutationError { message } } }")
@@ -188,7 +190,10 @@ class ClienteBuffer:
         if r.get("errors"):
             msgs = "; ".join(str(e.get("message", e)) if isinstance(e, dict) else str(e)
                              for e in r["errors"])
-            raise ErrorBuffer("GraphQL: " + red.ocultar(msgs, [self._clave])[:400])
+            msg = "GraphQL: " + red.ocultar(msgs, [self._clave])[:400]
+            if mutacion:
+                raise ErrorIncierto(msg + "; el resultado de la mutación es incierto, no se repite")
+            raise ErrorBuffer(msg)
         return r.get("data") or {}
 
     # ---- lecturas ----
@@ -575,6 +580,8 @@ class ResultadoIncierto(Exception):
 
 RE_EXITO_BORRADO = re.compile(r"^\w*Success$")
 ESTADOS_ABIERTOS = ("enviando", "incierto")
+PAGINAS_MAX, TAM_PAGINA = 5, 50
+HORAS_ABANDONO = 24
 
 
 class Publicador:
@@ -599,6 +606,7 @@ class Publicador:
         self.canales = canales or {}
         self.orgs = orgs or {}
         self._esquema = esquema
+        self._prof = 0
 
     @property
     def esquema(self) -> dict:
@@ -606,44 +614,79 @@ class Publicador:
             self._esquema = self.cliente.introspeccion()
         return self._esquema
 
-    # ---- libro de envíos ----
+    # ---- libro de envíos (con candado entre procesos) ----
 
     def _ruta_libro(self) -> Path:
         return _ruta_estado(self.raiz, "buffer-envios.json")
 
+    @contextmanager
+    def _candado(self):
+        """Candado del libro: lectura, comprobación, reserva y toda escritura. Reentrante en el proceso."""
+        if self._prof:
+            self._prof += 1
+            try:
+                yield
+            finally:
+                self._prof -= 1
+            return
+        with candado(self._ruta_libro()):
+            self._prof = 1
+            try:
+                yield
+            finally:
+                self._prof = 0
+
     def _libro(self) -> list:
-        return _leer_json(self._ruta_libro(), [])
+        libro = _leer_json(self._ruta_libro(), [])
+        return [_normalizar_envio(e) for e in libro if isinstance(e, dict)]
 
     def _guardar_libro(self, libro: list) -> None:
-        _escribir_json(self._ruta_libro(), libro)
+        with self._candado():
+            _escribir_json(self._ruta_libro(), libro)
 
     def _marcar(self, id_envio: str, **cambios) -> None:
-        libro = self._libro()
-        for e in libro:
-            if e["id"] == id_envio:
-                e.update(cambios)
-        self._guardar_libro(libro)
+        with self._candado():
+            libro = self._libro()
+            for e in libro:
+                if e["id"] == id_envio:
+                    e.update(cambios)
+            self._guardar_libro(libro)
 
     # ---- createPost ----
 
     def _crear(self, carga: dict, canal_id: str) -> dict:
-        """createPost sin reintento. Descartada si Buffer lo rechaza; ErrorIncierto si no se sabe."""
+        """createPost sin reintento y con resultado estricto.
+
+        Éxito: `createPost.post.id`. Rechazo (Descartada): sólo un `MutationError` explícito con mensaje.
+        Cualquier otra cosa en un 200 (null, sin post.id, __typename inesperado, `errors`) es
+        ErrorIncierto: no se sabe si Buffer lo creó.
+        """
         if self.modo == "ensayo":
             raise ErrorBuffer("createPost no está permitido en ensayo")
         if self.modo == "borrador" and carga.get("saveToDraft") is not True:
             raise ErrorBuffer("en borrador createPost sólo se manda con saveToDraft")
         data = self.cliente.consulta(M_CREAR, {"input": carga}, canal=canal_id, mutacion=True)
-        r = data.get("createPost") or {}
-        if "post" not in r:
-            motivo = red.ocultar(str(r.get("message", "sin motivo")), [self.cliente._clave])
-            raise Descartada(f"Buffer rechazó la publicación: {motivo}")
-        return r["post"]
+        r = data.get("createPost")
+        incierto = ErrorIncierto("createPost devolvió una respuesta incompleta o inesperada; "
+                                 "el resultado es incierto, no se repite")
+        if not isinstance(r, dict):
+            raise incierto
+        tipo = r.get("__typename")
+        post = r.get("post")
+        if isinstance(post, dict) and post.get("id") and tipo in (None, "PostActionSuccess"):
+            return post
+        mensaje = r.get("message")
+        if "post" not in r and isinstance(mensaje, str) and mensaje.strip() and tipo in (None, "MutationError"):
+            raise Descartada("Buffer rechazó la publicación: "
+                             + red.ocultar(mensaje, [self.cliente._clave]))
+        raise incierto
 
     def programar(self, plataforma: str, toma: dict, url_video: str, textos: dict, cuando: datetime,
                   ruta_almacen: str | None = None, ficha: dict | None = None) -> dict:
         """createPost con hora explícita (customScheduled, nunca addToQueue). Devuelve {id, dueAt}.
 
-        Lanza Descartada (rechazo definitivo) o ResultadoIncierto (no se repite; se reconcilia después).
+        Lanza Descartada (rechazo explícito o envío ya existente) o ResultadoIncierto. Un envío incierto
+        NUNCA se vuelve a enviar: ese hueco se pierde; un hueco perdido es mejor que un duplicado.
         """
         if self.modo != "vivo":
             raise ErrorBuffer("programar sólo se usa en modo vivo")
@@ -656,18 +699,20 @@ class Publicador:
         self.reconciliar()
         due = iso_utc(cuando)
         id_envio = f"{plataforma}|{toma.get('numero')}|{due}"
-        libro = self._libro()
-        previo = next((e for e in libro if e["id"] == id_envio), None)
-        if previo and previo["estado"] in ESTADOS_ABIERTOS + ("creado",):
-            raise Descartada(f"ya hay un envío {previo['estado']} para {plataforma} toma "
-                             f"{toma.get('numero')} a las {due}: no se repite")
-        libro = [e for e in libro if e["id"] != id_envio]
         entrada = {"id": id_envio, "plataforma": plataforma, "toma": toma.get("numero"), "dueAt": due,
                    "canal": canal, "ruta": ruta_almacen, "estado": "enviando", "post_id": None,
                    "registrado": False, "texto": textos["texto"],
                    "datos": {"toma": toma, "textos": textos, "ficha_id": (ficha or {}).get("id")}}
-        libro.append(entrada)
-        self._guardar_libro(libro)          # si falla, no se envía nada
+        with self._candado():                       # lectura, comprobación y reserva, de una vez
+            libro = self._libro()
+            previo = next((e for e in libro if e["estado"] != "rechazado" and e["plataforma"] == plataforma
+                           and (str(e.get("toma")) == str(toma.get("numero")) or e.get("dueAt") == due)), None)
+            if previo:
+                raise Descartada(f"ya hay un envío {previo['estado']} para {plataforma} (toma "
+                                 f"{previo.get('toma')}, {previo.get('dueAt')}): no se repite")
+            libro = [e for e in libro if e["id"] != id_envio]   # sólo quedaba un `rechazado`
+            libro.append(entrada)
+            self._guardar_libro(libro)              # si falla, no se envía nada
         try:
             post = self._crear(carga, canal)
         except ErrorIncierto as e:
@@ -691,12 +736,16 @@ class Publicador:
             pass
 
     def _cerrar_creado(self, entrada: dict, post: dict) -> None:
-        """Pasa el envío a `creado` y escribe el marcador y el registro de textos (una sola vez)."""
-        self._marcar(entrada["id"], estado="creado", post_id=post["id"])
-        d = entrada["datos"]
-        self._registrar(entrada["plataforma"], d["toma"], d["textos"], _a_utc(entrada["dueAt"]), post,
-                        entrada.get("ruta"), {"id": d.get("ficha_id")})
-        self._marcar(entrada["id"], registrado=True)
+        """Pasa el envío a `creado` y escribe el marcador y el registro de textos, una sola vez."""
+        with self._candado():
+            actual = next((e for e in self._libro() if e["id"] == entrada["id"]), None)
+            if actual is None or (actual["estado"] == "creado" and actual.get("registrado")):
+                return
+            self._marcar(entrada["id"], estado="creado", post_id=post["id"])
+            d = entrada["datos"]
+            self._registrar(entrada["plataforma"], d["toma"], d["textos"], _a_utc(entrada["dueAt"]), post,
+                            entrada.get("ruta"), {"id": d.get("ficha_id")})
+            self._marcar(entrada["id"], registrado=True)
 
     def _registrar(self, plataforma, toma, textos, cuando, post, ruta_almacen, ficha) -> None:
         local = cuando.astimezone(ZONA)
@@ -726,51 +775,78 @@ class Publicador:
         campos = {f["name"] for f in t.get("fields") or []}
         return campos or {"id", "status", "dueAt"}
 
-    def _posts_del_canal(self, canal: str, org: str, campos: set) -> list[dict]:
+    def _posts_del_canal(self, canal: str, org: str, campos: set, buscado=None):
+        """Posts del canal, paginados (`first`/`after`, hasta PAGINAS_MAX). Devuelve (posts, concluyente).
+
+        Concluyente = se leyó hasta la última página, o se encontró `buscado` (función de un post).
+        """
         sel = " ".join(c for c in ("id", "status", "dueAt", "text") if c in campos)
-        q = ("query { posts(input: { organizationId: %s, filter: { channelIds: [%s] } }) "
-             "{ edges { node { %s } } } }" % (_lit(org), _lit(canal), sel))
-        data = self.cliente.consulta(q, canal=canal).get("posts") or {}
-        nodos = [e["node"] for e in data.get("edges") or []] if isinstance(data, dict) else list(data)
-        return nodos
+        posts, cursor = [], None
+        for _ in range(PAGINAS_MAX):
+            despues = f", after: {_lit(cursor)}" if cursor else ""
+            q = ("query { posts(input: { organizationId: %s, filter: { channelIds: [%s] } }, first: %d%s) "
+                 "{ edges { node { %s } } pageInfo { hasNextPage endCursor } } }"
+                 % (_lit(org), _lit(canal), TAM_PAGINA, despues, sel))
+            data = self.cliente.consulta(q, canal=canal).get("posts") or {}
+            if isinstance(data, dict):
+                posts += [e["node"] for e in data.get("edges") or []]
+                info = data.get("pageInfo") or {}
+            else:
+                posts += list(data)
+                info = {}
+            if buscado and any(buscado(p) for p in posts):
+                return posts, True
+            if not info.get("hasNextPage"):
+                return posts, True
+            cursor = info.get("endCursor")
+            if not cursor:
+                return posts, False
+        return posts, False
 
     def reconciliar(self) -> dict:
         """Resuelve los envíos `enviando` o `incierto` mirando los posts del canal (dueAt y texto).
 
-        Encontrado: `creado` (y se registra en el marcador). No encontrado: `no_creado`, que ya puede
-        reintentarse. También completa el registro de los `creado` que quedaron sin marcador.
-        Devuelve {id_envio: nuevo estado}.
+        Sólo hay dos salidas: el listado muestra el post y el envío pasa a `creado` (se registra en el
+        marcador), o no aparece y el envío SIGUE `incierto` hasta 24 h después de su `dueAt`, cuando queda
+        `abandonado`. Nunca se vuelve a enviar nada. Si la lectura no es concluyente (error, o más de
+        PAGINAS_MAX páginas sin encontrarlo) no cambia nada. También completa el marcador de los `creado`
+        que quedaron sin registrar. Devuelve {id_envio: nuevo estado}.
         """
         resultado = {}
-        libro = self._libro()
-        for e in libro:
-            if e["estado"] == "creado" and not e.get("registrado") and e.get("post_id"):
+        for e in self._libro():
+            if e["estado"] == "creado" and not e.get("registrado") and e.get("post_id") and e.get("datos"):
                 try:
                     self._cerrar_creado(e, {"id": e["post_id"]})
                     resultado[e["id"]] = "creado"
-                except OSError:
+                except Exception:
                     pass
-        abiertos = [e for e in self._libro() if e["estado"] in ESTADOS_ABIERTOS]
+        abiertos = [e for e in self._libro() if e["estado"] in ESTADOS_ABIERTOS and e.get("canal")]
         if not abiertos:
             return resultado
-        campos = self._campos_post()
-        org_defecto = None
-        por_canal: dict[str, list] = {}
+        try:
+            campos = self._campos_post()
+            por_canal: dict[str, tuple] = {}
+            for e in abiertos:
+                if e["canal"] not in por_canal:
+                    org = next((o for p, o in self.orgs.items() if self.canales.get(p) == e["canal"] and o), None)
+                    org = org or self.cliente.organizaciones()[0]["id"]
+                    por_canal[e["canal"]] = self._posts_del_canal(
+                        e["canal"], org, campos, lambda p, canal=e["canal"]: any(
+                            _mismo_post(p, x) for x in abiertos if x["canal"] == canal))
+        except ErrorBuffer:
+            return resultado                      # lectura no concluyente: no cambia nada
         for e in abiertos:
-            if e["canal"] not in por_canal:
-                org = next((o for p, o in self.orgs.items() if self.canales.get(p) == e["canal"] and o), None)
-                if not org:
-                    org_defecto = org_defecto or self.cliente.organizaciones()[0]["id"]
-                    org = org_defecto
-                por_canal[e["canal"]] = self._posts_del_canal(e["canal"], org, campos)
-        for e in abiertos:
-            hallado = next((p for p in por_canal[e["canal"]] if _mismo_post(p, e)), None)
+            posts, concluyente = por_canal[e["canal"]]
+            hallado = next((p for p in posts if _mismo_post(p, e)), None)
             if hallado:
-                self._cerrar_creado(e, hallado)
-                resultado[e["id"]] = "creado"
-            else:
-                self._marcar(e["id"], estado="no_creado")
-                resultado[e["id"]] = "no_creado"
+                try:
+                    self._cerrar_creado(e, hallado)
+                    resultado[e["id"]] = "creado"
+                except Exception:
+                    pass
+            elif concluyente and self.ahora().astimezone(timezone.utc) > _a_utc(e["dueAt"]) + timedelta(hours=HORAS_ABANDONO):
+                self._marcar(e["id"], estado="abandonado")
+                resultado[e["id"]] = "abandonado"
         return resultado
 
     # ---- estado de un post ----
@@ -799,13 +875,14 @@ class Publicador:
         """Borra del almacén los videos cuyos posts ya están en `sent` (o que no tienen ningún envío vivo).
 
         Función pública: N6 la llama en cada ciclo. Un video se conserva mientras algún envío suyo esté
-        `enviando`, `incierto` o `creado` sin `sent`. Devuelve las rutas borradas.
+        `enviando`, `incierto` o `creado` sin `sent`; se libera con `sent` o cuando el envío queda
+        `rechazado` o `abandonado`. Devuelve las rutas borradas.
         """
         self.reconciliar()
         libro = self._libro()
         por_ruta: dict[str, list] = {}
         for e in libro:
-            if e.get("ruta"):
+            if e.get("ruta") and not e.get("ruta_borrada"):
                 por_ruta.setdefault(e["ruta"], []).append(e)
         borradas = []
         for r, envios in por_ruta.items():
@@ -816,7 +893,13 @@ class Publicador:
                 self.almacen.borrar(r)
                 borradas.append(r)
         if borradas:
-            self._guardar_libro([e for e in libro if e.get("ruta") not in borradas])
+            # Las entradas se quedan (memoria de lo enviado: impiden repetir un hueco); sólo se marca el video.
+            with self._candado():
+                actual = self._libro()
+                for e in actual:
+                    if e.get("ruta") in borradas:
+                        e["ruta_borrada"] = True
+                self._guardar_libro(actual)
         return borradas
 
     def soltar_si_huerfano(self, ruta: str) -> bool:
@@ -857,6 +940,20 @@ class Publicador:
         else:
             out["motivo"] = "deletePost no confirmó el borrado con un tipo de éxito"
         return out
+
+
+def _normalizar_envio(e: dict) -> dict:
+    """Entradas del formato anterior (sin `estado`): se leen como `creado` y ya registradas."""
+    e = dict(e)
+    if e.get("estado") == "no_creado":      # estado retirado: nunca da permiso para reintentar
+        e["estado"] = "incierto"
+    if "estado" not in e:
+        e["estado"] = "creado"
+        e.setdefault("registrado", True)
+    e.setdefault("plataforma", "")
+    e.setdefault("dueAt", None)
+    e.setdefault("id", f"{e['plataforma']}|{e.get('toma')}|{e['dueAt']}")
+    return e
 
 
 def _a_utc(iso: str) -> datetime:

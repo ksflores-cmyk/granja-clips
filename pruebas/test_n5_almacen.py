@@ -253,3 +253,20 @@ def test_validar_rechaza_almacen_malo(repo, editar_yaml, cambio, fragmento):
 def test_validar_exige_el_archivo_de_almacen(repo):
     (repo / "config" / "almacen.yml").unlink()
     assert any("almacen.yml" in e for e in validar.validar(repo).errores)
+
+
+@pytest.mark.parametrize("estado,cuerpo", [
+    (404, "<html>404 Not Found</html>"),
+    (404, '{"statusCode":"404","error":"Bucket not found","message":"Bucket not found"}'),
+    (400, "[]"), (404, "")])
+def test_html_o_bucket_no_encontrado_no_cuentan_como_objeto_ausente(estado, cuerpo):
+    a, _ = almacen([F.resp(estado, cuerpo)])
+    with pytest.raises(ErrorAlmacen, match="no se pudo confirmar"):
+        a.confirmar_ausente(URL_PUBLICA + "ab12cd34.mp4")
+
+
+@pytest.mark.parametrize("cuerpo", ['{"statusCode":"404","error":"not_found","message":"Object not found"}',
+                                    '{"error":"Object not found"}'])
+def test_el_json_de_objeto_no_encontrado_de_storage_si_cuenta(cuerpo):
+    a, _ = almacen([F.resp(404, cuerpo)])
+    a.confirmar_ausente(URL_PUBLICA + "ab12cd34.mp4")

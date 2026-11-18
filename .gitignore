@@ -21,3 +21,4 @@ credentials*.json
 client_secret*.json
 token*.json
 marca.yml.lock
+estado/*.lock

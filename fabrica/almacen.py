@@ -126,8 +126,7 @@ class Almacen:
                                          dormir=self.dormir)
         if estado in (200, 206):
             raise ErrorAlmacen(f"GET {red.ruta_de(url)}: sigue respondiendo tras borrar")
-        cuerpo = datos.decode("utf-8", errors="ignore").lower()
-        if estado in (400, 404) and ("not found" in cuerpo or "not_found" in cuerpo):
+        if estado in (400, 404) and _es_objeto_no_encontrado(datos):
             return
         raise ErrorAlmacen(f"GET {red.ruta_de(url)}: código {estado}; no se pudo confirmar que el "
                            "objeto desapareció")
@@ -153,6 +152,18 @@ class Almacen:
                 self.borrar(ruta)
             self.confirmar_ausente(url)
         return {"subida": True, "url_comprobada": True, "borrado": True, "bytes": peso}
+
+
+def _es_objeto_no_encontrado(datos: bytes) -> bool:
+    """Cuerpo JSON de Storage que dice que el OBJETO no existe (no un HTML, ni 'Bucket not found')."""
+    try:
+        cuerpo = json.loads(datos.decode("utf-8"))
+    except ValueError:
+        return False
+    if not isinstance(cuerpo, dict):
+        return False
+    texto = f"{cuerpo.get('error', '')} {cuerpo.get('message', '')}".lower()
+    return "bucket" not in texto and ("object not found" in texto or str(cuerpo.get("error", "")).lower() == "not_found")
 
 
 def crear_mp4_de_prueba(destino) -> Path:

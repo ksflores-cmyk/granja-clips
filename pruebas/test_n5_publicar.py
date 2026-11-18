@@ -575,7 +575,8 @@ def test_limpiar_borra_del_almacen_lo_que_ya_esta_sent(tmp_path):
     alm, supa = almacen_con_video(tmp_path, ruta)
     pub = Publicador(cliente(tmp_path), alm, tmp_path, "vivo", lambda: AHORA, {})
     assert pub.limpiar_enviados() == [ruta] and supa.objetos == {}
-    assert json.loads((tmp_path / "estado" / "buffer-envios.json").read_text(encoding="utf-8")) == []
+    libro = json.loads((tmp_path / "estado" / "buffer-envios.json").read_text(encoding="utf-8"))
+    assert libro[0]["ruta_borrada"] is True and libro[0]["estado"] == "creado"   # la memoria del envío se queda
 
 
 def test_limpiar_conserva_el_video_si_el_post_aun_no_esta_sent(tmp_path):
@@ -768,17 +769,6 @@ def test_un_500_tras_una_creacion_real_no_duplica_y_se_reconcilia(tmp_path, monk
     assert libro[0]["estado"] == "creado" and libro[0]["post_id"] == "post-ejemplo-001"
     filas = list(csv.DictReader(open(tmp_path / "marcador.csv", newline="", encoding="utf-8")))
     assert len(filas) == 1 and filas[0]["notas"].endswith("buffer:post-ejemplo-001")
-
-
-def test_un_incierto_que_no_aparece_en_buffer_pasa_a_no_creado_y_puede_reintentarse(tmp_path, monkeypatch):
-    monkeypatch.delattr(registro, "anotar_clip", raising=False)
-    (tmp_path / "marcador.csv").write_text(",".join(registro.CABECERA_MARCADOR) + "\n", encoding="utf-8")
-    t = con_posts(Transporte503Luego200(), "", vacio=True)
-    pub, programar = programar_una_vez(tmp_path, t)
-    with pytest.raises(publicar.ResultadoIncierto):
-        programar()
-    r = programar()      # reconcilia (el listado viene vacío: no se creó) y reintenta
-    assert r["id"] == "post-ejemplo-001" and t.creaciones == 2
 
 
 def test_la_intencion_se_anota_antes_de_enviar(tmp_path, monkeypatch):
@@ -986,3 +976,240 @@ def test_ensayo_captura_el_error_de_red_del_almacen(repo):
                             transporte_almacen=cae, ahora=lambda: AHORA)
     assert cod == 1 and any("ERROR del almacén" in s for s in sal)
     assert SUPA_CLAVE not in "\n".join(sal)
+
+
+# ================= ronda 2: un incierto no se reenvía nunca =================
+
+LIBRO = lambda tmp: tmp / "estado" / "buffer-envios.json"
+
+
+def leer_libro(tmp):
+    return json.loads(LIBRO(tmp).read_text(encoding="utf-8"))
+
+
+class Listado:
+    """Transporte: createPost responde 503 la primera vez; el listado de posts se sirve por páginas."""
+
+    def __init__(self, paginas):
+        self.sim = BufferSimulado()
+        self.paginas = paginas          # lista de listas de nodos; el índice es la página
+        self.creaciones = 0
+        self.lecturas = 0
+
+    def __call__(self, metodo, url, cab, cuerpo=None, tiempo=60):
+        q = json.loads(cuerpo.decode())["query"]
+        if "createPost" in q:
+            self.creaciones += 1
+            return (503, {}, b"{}") if self.creaciones == 1 else self.sim(metodo, url, cab, cuerpo, tiempo)
+        if "posts(" in q and "first:" in q and "status: [sent]" not in q:
+            self.lecturas += 1
+            i = 0
+            if "after:" in q:
+                i = int(q.split('after: "p')[1].split('"')[0])
+            sig = i + 1 < len(self.paginas)
+            return F.resp(200, {"data": {"posts": {
+                "edges": [{"node": n} for n in self.paginas[i]],
+                "pageInfo": {"hasNextPage": sig, "endCursor": f"p{i + 1}" if sig else None}}}})
+        return self.sim(metodo, url, cab, cuerpo, tiempo)
+
+
+def nodo(texto):
+    return {"id": "post-ejemplo-001", "status": "scheduled", "dueAt": "2026-11-18T17:00:00.000Z", "text": texto}
+
+
+def incierto_listo(tmp_path, paginas, monkeypatch, ahora=AHORA):
+    monkeypatch.delattr(registro, "anotar_clip", raising=False)
+    (tmp_path / "marcador.csv").write_text(",".join(registro.CABECERA_MARCADOR) + "\n", encoding="utf-8")
+    tx = textos(TOMA, FICHA_LIMPIA, "shorts")
+    t = Listado([[nodo(tx["texto"])] if p == "post" else [] if p == "vacia" else p for p in paginas])
+    pub, programar = programar_una_vez(tmp_path, t, tx)
+    with pytest.raises(publicar.ResultadoIncierto):
+        programar()
+    return t, pub, programar, tx
+
+
+def test_post_no_visible_en_la_primera_pagina_se_encuentra_en_la_segunda(tmp_path, monkeypatch):
+    t, pub, programar, tx = incierto_listo(tmp_path, ["vacia", "post"], monkeypatch)
+    assert pub.reconciliar() and leer_libro(tmp_path)[0]["estado"] == "creado"
+    assert t.lecturas == 2 and t.creaciones == 1
+
+
+def test_un_incierto_que_no_aparece_sigue_incierto_y_nunca_se_reenvia(tmp_path, monkeypatch):
+    t, pub, programar, tx = incierto_listo(tmp_path, ["vacia"], monkeypatch)
+    assert pub.reconciliar() == {}
+    assert leer_libro(tmp_path)[0]["estado"] == "incierto"
+    with pytest.raises(Descartada, match="ya hay un envío incierto"):
+        programar()
+    assert t.creaciones == 1
+
+
+def test_un_post_que_aparece_tarde_pasa_a_creado(tmp_path, monkeypatch):
+    t, pub, programar, tx = incierto_listo(tmp_path, ["vacia"], monkeypatch)
+    pub.reconciliar()
+    assert leer_libro(tmp_path)[0]["estado"] == "incierto"
+    t.paginas = [[nodo(tx["texto"])]]
+    pub.reconciliar()
+    e = leer_libro(tmp_path)[0]
+    assert e["estado"] == "creado" and e["post_id"] == "post-ejemplo-001" and e["registrado"] is True
+    assert t.creaciones == 1
+
+
+def test_pasadas_24_horas_del_dueat_queda_abandonado_y_sigue_sin_reenviarse(tmp_path, monkeypatch):
+    t, pub, programar, tx = incierto_listo(tmp_path, ["vacia"], monkeypatch)
+    pub.ahora = lambda: datetime(2026, 11, 19, 17, 1, tzinfo=timezone.utc)   # 24 h y 1 min después
+    assert pub.reconciliar() == {"shorts|12|2026-11-18T17:00:00.000Z": "abandonado"}
+    assert leer_libro(tmp_path)[0]["estado"] == "abandonado"
+    pub.ahora = lambda: AHORA
+    with pytest.raises(Descartada, match="abandonado"):
+        programar()
+    # tampoco para otra toma en el mismo hueco
+    otra = {**TOMA, "numero": 13, "gancho": "Otro gancho distinto"}
+    with pytest.raises(Descartada, match="ya hay un envío"):
+        pub.programar("shorts", otra, "https://x.invalid/v.mp4", textos(otra, FICHA_LIMPIA, "shorts"),
+                      hueco_a_utc(HOY, "11:00"))
+    assert t.creaciones == 1
+
+
+def test_antes_de_las_24_horas_no_se_abandona(tmp_path, monkeypatch):
+    t, pub, programar, tx = incierto_listo(tmp_path, ["vacia"], monkeypatch)
+    pub.ahora = lambda: datetime(2026, 11, 19, 16, 59, tzinfo=timezone.utc)
+    pub.reconciliar()
+    assert leer_libro(tmp_path)[0]["estado"] == "incierto"
+
+
+def test_lectura_no_concluyente_no_cambia_nada(tmp_path, monkeypatch):
+    llenas = [[{"id": f"otro-{i}", "status": "sent", "dueAt": "2026-11-10T10:00:00.000Z", "text": "x"}]
+              for i in range(8)]
+    t, pub, programar, tx = incierto_listo(tmp_path, llenas, monkeypatch)
+    pub.ahora = lambda: datetime(2026, 11, 25, 0, 0, tzinfo=timezone.utc)     # mucho después de 24 h
+    assert pub.reconciliar() == {}
+    assert leer_libro(tmp_path)[0]["estado"] == "incierto"
+    assert t.lecturas == publicar.PAGINAS_MAX
+
+
+def test_un_error_de_lectura_no_cambia_nada(tmp_path, monkeypatch):
+    t, pub, programar, tx = incierto_listo(tmp_path, ["vacia"], monkeypatch)
+    pub.cliente.transporte = lambda *a, **k: (500, {}, b"{}")
+    pub.ahora = lambda: datetime(2026, 11, 25, tzinfo=timezone.utc)
+    assert pub.reconciliar() == {}
+    assert leer_libro(tmp_path)[0]["estado"] == "incierto"
+
+
+def test_el_video_de_un_incierto_no_se_borra_hasta_creado_y_sent_o_abandonado(tmp_path, monkeypatch):
+    t, pub, programar, tx = incierto_listo(tmp_path, ["vacia"], monkeypatch)
+    supa = SupabaseSimulado()
+    ruta = "tomas/2026-11-18/toma-012-ab12cd34.mp4"
+    supa.objetos["/storage/v1/object/public/clips/" + ruta] = b"x"
+    pub.almacen = Almacen("https://simulado.invalid", "k", CONFIG_ALMACEN, supa)
+    assert pub.limpiar_enviados() == [] and len(supa.objetos) == 1
+    pub.ahora = lambda: datetime(2026, 11, 19, 17, 1, tzinfo=timezone.utc)
+    assert pub.limpiar_enviados() == [ruta] and supa.objetos == {}      # abandonado: libera el video
+    assert leer_libro(tmp_path)[0]["estado"] == "abandonado"             # y la memoria se queda
+
+
+# ---- resultado incompleto = incierto; sólo MutationError cierra como rechazado ----
+
+@pytest.mark.parametrize("archivo", ["createpost_nulo.json", "createpost_sin_id.json",
+                                     "createpost_tipo_raro.json", "createpost_vacio.json",
+                                     "createpost_con_errors.json"])
+def test_un_200_incompleto_es_incierto_no_rechazado(tmp_path, monkeypatch, archivo):
+    monkeypatch.delattr(registro, "anotar_clip", raising=False)
+    pub, _ = vivo(tmp_path, crear=archivo)
+    with pytest.raises(publicar.ResultadoIncierto):
+        pub.programar("shorts", TOMA, "https://x.invalid/v.mp4", textos(TOMA, FICHA_LIMPIA, "shorts"),
+                      hueco_a_utc(HOY, "11:00"), "tomas/2026-11-18/toma-012-ab12cd34.mp4")
+    assert leer_libro(tmp_path)[0]["estado"] == "incierto"
+
+
+@pytest.mark.parametrize("archivo", ["createpost_error.json", "createpost_mutationerror.json"])
+def test_sólo_un_mutationerror_con_mensaje_es_rechazado(tmp_path, archivo):
+    pub, _ = vivo(tmp_path, crear=archivo)
+    with pytest.raises(Descartada, match="rechazó"):
+        pub.programar("shorts", TOMA, "https://x.invalid/v.mp4", textos(TOMA, FICHA_LIMPIA, "shorts"),
+                      hueco_a_utc(HOY, "11:00"))
+    assert leer_libro(tmp_path)[0]["estado"] == "rechazado"
+
+
+def test_vivo_con_respuesta_incompleta_conserva_el_video(repo, editar_yaml):
+    entrada = vivo_listo(repo, editar_yaml)
+    supa = SupabaseSimulado()
+    cod, sal = correr_vivo(repo, entrada, BufferSimulado(crear="createpost_nulo.json"), supa)
+    assert cod == 1 and len(supa.objetos) == 1 and any("INCIERTO" in s for s in sal)
+
+
+# ---- candado entre procesos ----
+
+SCRIPT_PROCESO = r'''
+import sys, time, json
+from datetime import datetime, timezone
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from fabrica import publicar
+from fabrica.simulacion import BufferSimulado
+raiz, contador, arranque = Path(sys.argv[2]), Path(sys.argv[3]), float(sys.argv[4])
+sim = BufferSimulado()
+def transporte(m, u, c, cuerpo=None, t=60):
+    q = json.loads(cuerpo.decode())["query"]
+    if "createPost" in q:
+        with open(contador, "a") as f:
+            f.write("x\n")
+        time.sleep(0.6)
+    return sim(m, u, c, cuerpo, t)
+AHORA = datetime(2026, 11, 18, 12, 0, tzinfo=timezone.utc)
+cli = publicar.ClienteBuffer("clave-inventada", transporte, raiz / ("cuota" + sys.argv[5]), ahora=lambda: AHORA)
+pub = publicar.Publicador(cli, None, raiz, "vivo", lambda: AHORA, {"shorts": "canal-yt-001"})
+ficha = {"id": "propio", "creador": "@guionvivo", "reglas": {}}
+toma = {"numero": 12, "gancho": "Primera vez en el mapa", "pilar": "momentos"}
+tx = publicar.textos(toma, ficha, "shorts")
+_libro = pub._libro
+def libro_lento():            # ensancha la ventana entre leer y reservar para provocar la carrera
+    datos = _libro()
+    time.sleep(0.3)
+    return datos
+pub._libro = libro_lento
+while time.time() < arranque:
+    pass
+try:
+    pub.programar("shorts", toma, "https://x.invalid/v.mp4", tx, publicar.hueco_a_utc(AHORA.date(), "11:00"))
+    print("PROGRAMADA")
+except publicar.Descartada as e:
+    print("DESCARTADA")
+'''
+
+
+def test_dos_procesos_sobre_el_mismo_envio_hacen_un_solo_createpost(tmp_path):
+    import subprocess
+    import sys
+    import time
+    raiz_repo_ = F.DATOS.parent.parent
+    (tmp_path / "marcador.csv").write_text(",".join(registro.CABECERA_MARCADOR) + "\n", encoding="utf-8")
+    contador = tmp_path / "createpost.txt"
+    script = tmp_path / "proceso.py"
+    script.write_text(SCRIPT_PROCESO, encoding="utf-8")
+    arranque = time.time() + 2.0
+    procs = [subprocess.Popen([sys.executable, str(script), str(raiz_repo_), str(tmp_path), str(contador),
+                               str(arranque), str(i)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+             for i in (1, 2)]
+    salidas = [p.communicate(timeout=60) for p in procs]
+    assert all(p.returncode == 0 for p in procs), salidas
+    assert sorted(o[0].strip() for o in salidas) == ["DESCARTADA", "PROGRAMADA"], salidas
+    assert contador.read_text().count("x") == 1
+    assert [e["estado"] for e in leer_libro(tmp_path)] == ["creado"]
+    filas = list(csv.DictReader(open(tmp_path / "marcador.csv", newline="", encoding="utf-8")))
+    assert len(filas) == 1
+
+
+# ---- formato anterior del libro ----
+
+def test_entradas_del_formato_anterior_se_leen_como_creadas_y_registradas(tmp_path):
+    ruta = "tomas/2026-11-18/toma-012-ab12cd34.mp4"
+    supa = SupabaseSimulado()
+    supa.objetos["/storage/v1/object/public/clips/" + ruta] = b"x"
+    alm = Almacen("https://simulado.invalid", "k", CONFIG_ALMACEN, supa)
+    publicar._escribir_json(LIBRO(tmp_path), [{"post_id": "post-ejemplo-001", "plataforma": "shorts",
+                                              "ruta": ruta, "canal": "canal-yt-001"}])
+    pub = Publicador(cliente(tmp_path), alm, tmp_path, "vivo", lambda: AHORA, {"shorts": "canal-yt-001"})
+    e = pub._libro()[0]
+    assert e["estado"] == "creado" and e["registrado"] is True and e["id"]
+    assert pub.reconciliar() == {}
+    assert pub.limpiar_enviados() == [ruta]          # sin KeyError; su post está en sent
