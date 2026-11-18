@@ -1,0 +1,25 @@
+name: Instalar ffmpeg
+description: >
+  ffmpeg desde apt con tope de tiempo. Si el espejo de Ubuntu se cuelga
+  (pasó el 18 nov 2026: 6 min sin terminar), usa la compilación estática
+  de BtbN publicada en GitHub.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -u
+        apt_opts="-o Acquire::Retries=2 -o Acquire::http::Timeout=20"
+        if timeout 150 sudo apt-get $apt_opts update -q \
+           && timeout 210 sudo apt-get $apt_opts install -y -q --no-install-recommends ffmpeg; then
+          echo "ffmpeg desde apt: $(ffmpeg -version | head -1)"
+          exit 0
+        fi
+        echo "::warning::apt no terminó a tiempo; uso la compilación estática de BtbN"
+        d=$(mktemp -d)
+        curl -fsSL --retry 3 --max-time 180 -o "$d/f.tar.xz" \
+          https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+        tar -xJf "$d/f.tar.xz" -C "$d"
+        sudo install -m 755 "$d"/ffmpeg-*/bin/ffmpeg "$d"/ffmpeg-*/bin/ffprobe /usr/local/bin/
+        hash -r
+        echo "ffmpeg estático: $(ffmpeg -version | head -1)"
