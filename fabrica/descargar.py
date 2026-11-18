@@ -12,6 +12,7 @@ Dos caminos, sin más:
 """
 from __future__ import annotations
 
+import math
 import shutil
 import subprocess
 import tempfile
@@ -219,6 +220,8 @@ def descargar(raiz, candidato, ficha: dict | None, hoy: date, *, abrir=None, eje
         # `reglas.duracion_s` es la duración del clip PUBLICADO: Gemini elige un recorte dentro de ese rango.
         # A la fuente sólo se le exige que alcance el mínimo y que no pase de TOPE_FUENTE_S.
         minimo = ((ficha.get("reglas") or {}).get("duracion_s") or [0])[0]
+        if not math.isfinite(duracion) or duracion <= 0:
+            raise ErrorDescarga("ffprobe devolvió una duración no válida")
         if duracion < float(minimo):
             raise ErrorDescarga(f"el archivo dura {duracion:.1f} s, menos que el mínimo de {minimo} s del clip")
         if duracion > TOPE_FUENTE_S:

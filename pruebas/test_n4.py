@@ -440,6 +440,13 @@ def test_fuente_mas_larga_que_el_clip_pasa_porque_el_recorte_lo_elige_gemini(rep
         assert d.duracion == pytest.approx(20, abs=0.5)
 
 
+def test_duracion_nan_se_descarta(repo, carpetas, video20, monkeypatch):
+    monkeypatch.setattr(mod_descargar, "sondear_video", lambda ruta: {"duracion": "nan"})
+    with pytest.raises(mod_descargar.ErrorDescarga, match="no válida"):
+        with mod_descargar.descargar(repo, candidato(), ficha_propia(), HOY, abrir=abrir_con(video20)):
+            pass
+
+
 def test_fuente_mas_larga_que_el_tope_se_descarta(repo, carpetas, video20, monkeypatch):
     monkeypatch.setattr(mod_descargar, "TOPE_FUENTE_S", 15.0)
     with pytest.raises(mod_descargar.ErrorDescarga, match="tope de una fuente"):
