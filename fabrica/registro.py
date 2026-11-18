@@ -2,7 +2,12 @@
 from __future__ import annotations
 
 import csv
+import fcntl
+import os
 import re
+import tempfile
+from contextlib import contextmanager
+from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -36,10 +41,20 @@ def anotar_registro(raiz, texto: str) -> str:
     sello = datetime.now(ZONA).strftime("%Y-%m-%d %H:%M")
     linea = f"- {sello} GT · {' '.join(str(texto).split())}"
     ruta = raiz_repo(raiz) / "registro.md"
-    actual = ruta.read_text(encoding="utf-8") if ruta.exists() else ""
-    if actual and not actual.endswith("\n"):
-        actual += "\n"
-    ruta.write_text(actual + linea + "\n", encoding="utf-8")
+    # Modo anexado: cada línea se escribe de una vez al final; dos corridas no se pisan.
+    with open(ruta, "a+b") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            tam = f.seek(0, os.SEEK_END)
+            prefijo = b""
+            if tam:
+                f.seek(-1, os.SEEK_END)
+                if f.read(1) != b"\n":
+                    prefijo = b"\n"
+            f.write(prefijo + (linea + "\n").encode("utf-8"))
+            f.flush()
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
     return linea
 
 
@@ -67,18 +82,45 @@ def contador_toma(raiz=None) -> int:
     return int(_LINEA_CONTADOR.match(lineas[_localizar_contador(lineas)]).group(2))
 
 
+@contextmanager
+def _candado(ruta: Path):
+    """Candado exclusivo entre procesos (fcntl; el runner es Linux) sobre un archivo aparte."""
+    with open(ruta.with_name(ruta.name + ".lock"), "a+b") as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lk, fcntl.LOCK_UN)
+
+
 def avanzar_toma(raiz=None) -> int:
-    """Sube toma.contador en 1 cambiando sólo esa línea. Devuelve el nuevo valor."""
+    """Sube toma.contador en 1 cambiando sólo esa línea. Devuelve el nuevo valor.
+
+    Lee, incrementa y sustituye bajo un candado de archivo; la sustitución es atómica (os.replace).
+    """
     ruta = raiz_repo(raiz) / "marca.yml"
-    # newline="" conserva los fines de línea originales (LF o CRLF).
-    with open(ruta, encoding="utf-8", newline="") as f:
-        texto = f.read()
-    lineas = texto.split("\n")
-    i = _localizar_contador(lineas)
-    cr = "\r" if lineas[i].endswith("\r") else ""
-    m = _LINEA_CONTADOR.match(lineas[i][: len(lineas[i]) - len(cr)])
-    nuevo = int(m.group(2)) + 1
-    lineas[i] = f"{m.group(1)}{nuevo}{m.group(3)}{cr}"
-    with open(ruta, "w", encoding="utf-8", newline="") as f:
-        f.write("\n".join(lineas))
+    with _candado(ruta):
+        # newline="" conserva los fines de línea originales (LF o CRLF).
+        with open(ruta, encoding="utf-8", newline="") as f:
+            texto = f.read()
+        lineas = texto.split("\n")
+        i = _localizar_contador(lineas)
+        cr = "\r" if lineas[i].endswith("\r") else ""
+        m = _LINEA_CONTADOR.match(lineas[i][: len(lineas[i]) - len(cr)])
+        nuevo = int(m.group(2)) + 1
+        lineas[i] = f"{m.group(1)}{nuevo}{m.group(3)}{cr}"
+        fd, tmp = tempfile.mkstemp(dir=ruta.parent, prefix=".marca-", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+                f.write("\n".join(lineas))
+                f.flush()
+                os.fsync(f.fileno())
+            try:
+                os.chmod(tmp, os.stat(ruta).st_mode & 0o777)
+            except OSError:
+                pass
+            os.replace(tmp, ruta)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
     return nuevo

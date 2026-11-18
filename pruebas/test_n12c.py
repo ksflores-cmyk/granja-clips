@@ -260,3 +260,86 @@ def test_la_puerta_avisa_si_un_texto_no_cabe(marca):
     ok, det = estilo.textos_caben(plan, marca)
     assert not ok and "escena" in det and "frase 1" in det
     assert estilo.textos_caben({"toma": TOMA, "lineas": []}, marca)[0]
+
+
+# ---------------------------------------------------------------- M2: el validador no lanza TypeError
+from fabrica import validar
+
+
+def _hay(repo, fragmento):
+    return any(fragmento in e for e in validar.validar(repo).errores)
+
+
+def _tocar_ficha(repo, editar_yaml, **cambios):
+    def f(datos):
+        datos[0].update(cambios)
+        return datos
+    editar_yaml(repo, "fuentes.yml", f)
+
+
+def test_validar_tipo_como_lista_da_error_claro(repo, editar_yaml):
+    _tocar_ficha(repo, editar_yaml, tipo=["A", "B"])
+    assert _hay(repo, "tipo debe ser A, B, C o D")
+
+
+def test_validar_ventana_con_zonas_mezcladas_se_normaliza(repo, editar_yaml):
+    def f(t):
+        t["ventana_estreno"] = {"inicio": "2026-11-18T05:00:00", "fin": "2026-11-20T23:59:00-06:00"}
+        return t
+    editar_yaml(repo, "temporada.yml", f)
+    assert not any("ventana_estreno" in e for e in validar.validar(repo).errores)
+
+    def g(t):
+        t["ventana_estreno"] = {"inicio": "2026-11-20T23:59:00-06:00", "fin": "2026-11-18T05:00:00"}
+        return t
+    editar_yaml(repo, "temporada.yml", g)
+    assert _hay(repo, "inicio debe ser anterior a fin")
+
+
+def test_validar_vence_entre_comillas_se_lee_y_avisa_si_pasó(repo, editar_yaml):
+    _tocar_ficha(repo, editar_yaml, vence="2020-01-01")
+    inf = validar.validar(repo)
+    assert any("vence 2020-01-01 ya pasado" in a for a in inf.avisos), inf.avisos
+    assert not any("vence" in e for e in inf.errores)
+
+
+def test_validar_vence_ilegible_da_error(repo, editar_yaml):
+    _tocar_ficha(repo, editar_yaml, vence="pronto")
+    assert _hay(repo, "vence ilegible")
+
+
+def test_validar_grano_vacio_da_error_de_claves(repo, editar_yaml):
+    def f(m):
+        m["maqueta"]["grano"] = {}
+        return m
+    editar_yaml(repo, "marca.yml", f)
+    assert _hay(repo, "maqueta.grano: falta la clave 'papel'")
+
+
+# ---------------------------------------------------------------- M3: el registro con dos corridas
+import multiprocessing
+
+from fabrica import registro
+
+
+def _avanzar_diez(raiz, cola):
+    cola.put([registro.avanzar_toma(raiz) for _ in range(10)])
+
+
+def test_dos_procesos_avanzan_toma_sin_repetir_numeros(repo):
+    cola = multiprocessing.Queue()
+    ps = [multiprocessing.Process(target=_avanzar_diez, args=(repo, cola)) for _ in range(2)]
+    for p in ps:
+        p.start()
+    numeros = cola.get(timeout=60) + cola.get(timeout=60)
+    for p in ps:
+        p.join(30)
+    assert len(numeros) == 20 and len(set(numeros)) == 20
+    assert registro.contador_toma(repo) == max(numeros)
+
+
+def test_anotar_registro_anexa_sin_reescribir(repo):
+    (repo / "registro.md").write_text("# Registro\n- vieja\n", encoding="utf-8")
+    registro.anotar_registro(repo, "nueva")
+    texto = (repo / "registro.md").read_text(encoding="utf-8")
+    assert texto.startswith("# Registro\n- vieja\n") and texto.rstrip().endswith("nueva")
