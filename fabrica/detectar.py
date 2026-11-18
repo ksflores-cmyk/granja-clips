@@ -198,6 +198,7 @@ def detectar_con_motivos(raiz, ahora: datetime, cliente: ClienteTwitch | None = 
                 x.pilar = pilar
             lista.sort(key=lambda x: x.vistas_por_hora, reverse=True)
             candidatos.extend(lista)
+    candidatos.sort(key=lambda x: x.vistas_por_hora, reverse=True)   # estable: el material del brief (0) va al final
     return candidatos, saltos
 
 

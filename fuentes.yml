@@ -94,6 +94,7 @@
     divulgacion: "#Publicidad"
     audiencia: "vistas pagadas sólo de México y Argentina"
     sin_musica: true
+    hashtags: ["#FootballManager", "#FM27", "#FootballManager27"]   # hasta 3 relacionados, después de #Publicidad
   pilares: [momentos]
   marca_agua: marca/campanas/fm27/logo.png
   material:
