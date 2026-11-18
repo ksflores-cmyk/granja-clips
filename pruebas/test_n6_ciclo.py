@@ -890,6 +890,8 @@ def test_workflow_instala_ffmpeg_con_reintentos_y_tope(wf):
     # apt con tope propio, segundo espejo firmado y verificación de los dos binarios
     assert "timeout --kill-after=10" in accion and "archive.ubuntu.com" in accion
     assert "ffprobe -hide_banner -version" in accion
+    assert "/etc/apt/apt-mirrors.txt" in accion and "--error-on=any" in accion
+    assert "pkill" not in accion
     assert "curl" not in accion and "tar " not in accion  # nada de binarios sin firma
 
 
