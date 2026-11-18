@@ -74,13 +74,18 @@ def completar(raiz, publicador) -> int:
     Las consultas a Buffer van sin candado; la fusión se hace bajo candado sobre la versión vigente del archivo
     (así no pisa filas que otra corrida añadió mientras tanto)."""
     cierres: dict[str, tuple[str | None, str]] = {}
+    fallos: dict[str, str] = {}
     for e in leer(raiz):
         if e.get("estado") == "enviado":          # cerrado: con URL, o con la nota de copiarla desde la app
             continue
-        estado, url = publicador.estado_y_url(e["post_id"])
+        try:
+            estado, url = publicador.estado_y_url(e["post_id"])
+        except Exception as x:  # noqa: BLE001 (un envío con error no frena a los demás)
+            fallos[e["post_id"]] = f"error al consultar Buffer: {type(x).__name__}: {x}"
+            continue
         if estado == "sent":
             cierres[e["post_id"]] = (url, PEGAR if url else PENDIENTE)
-    if not cierres:
+    if not cierres and not fallos:
         return 0
     cambios = 0
     with candado(_ruta(raiz)):
@@ -89,7 +94,10 @@ def completar(raiz, publicador) -> int:
             if e.get("post_id") in cierres and e.get("estado") != "enviado":
                 url, nota = cierres[e["post_id"]]
                 e.update(estado="enviado", url=url, nota=nota)
+                e.pop("error", None)
                 cambios += 1
-        if cambios:
+            elif e.get("post_id") in fallos and e.get("estado") != "enviado":
+                e["error"] = fallos[e["post_id"]]
+        if cambios or fallos:
             _guardar(raiz, datos)
     return cambios

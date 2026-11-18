@@ -198,7 +198,9 @@ def detectar_con_motivos(raiz, ahora: datetime, cliente: ClienteTwitch | None = 
                 x.pilar = pilar
             lista.sort(key=lambda x: x.vistas_por_hora, reverse=True)
             candidatos.extend(lista)
-    candidatos.sort(key=lambda x: x.vistas_por_hora, reverse=True)   # estable: el material del brief (0) va al final
+    # El material de una campaña pagada (tipo A con campaña) va primero; el resto, por vistas por hora.
+    pagadas = {f["id"] for f in fichas if f.get("tipo") == "A" and f.get("campana") and f.get("material")}
+    candidatos.sort(key=lambda x: (x.fuente_id not in pagadas or x.origen != "brief", -x.vistas_por_hora))
     return candidatos, saltos
 
 

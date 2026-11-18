@@ -223,7 +223,7 @@ def test_sin_juego_en_la_ficha_se_sigue_usando_la_temporada(marca, temporada):
 
 def test_los_spoilers_de_gta_no_aplican_a_una_ficha_con_otro_juego(marca, temporada):
     f = ficha_real()
-    assert ojos.temporada_de(f, temporada)["palabras_evitar"] == []
+    assert ojos.temporada_de(f, temporada)["palabras_evitar"] == ["filtración", "filtrado", "leak", "pirata", "crack", "gratis"]
     datos = json.loads((DATOS / "fm27_valida.json").read_text(encoding="utf-8"))
     datos["gancho"] = "Final de copa para Sebas"
     datos["palabra_lapiz"] = "COPA"
@@ -299,7 +299,7 @@ def test_un_logo_extra_sin_declarar_sigue_en_rojo(marca, con_logo):
     plan_sin = {k: v for k, v in plan.items() if k != "campana"}      # el MP4 lleva el logo; el plan no lo dice
     puntos = estilo.revisar(mp4, plan_sin, marca, ficha=sin_agua(ficha_real()))
     rojos = [n for n, ok, _ in puntos if not ok]
-    assert any(n.endswith(("Sin logos extra no declarados", "Cuerpo coincide con el origen")) for n in rojos), rojos
+    assert "[fotograma] Sin logos extra no declarados" in rojos, rojos
 
 
 def test_sin_logo_y_sin_declaracion_la_puerta_sigue_en_verde(marca, sin_logo):
@@ -732,8 +732,60 @@ def test_hashtag_en_el_gancho_no_antecede_a_publicidad(red):
     assert tx["texto"].split()[tx["texto"].split().index("#Publicidad")] == "#Publicidad"
 
 
-def test_hashtag_en_el_valor_de_reels_se_quita_y_en_el_gancho_solo_hashtags_descarta():
-    tx = textos({**TOMA_FM, "creador": "DARO", "valor": ["Frase uno #Ad.", "#Solo"]}, ficha_real(), "reels")
-    assert "#" not in tx["texto"].split("\n#Publicidad")[0] and "Frase uno" in tx["texto"]
+def test_el_valor_de_la_toma_ya_no_entra_al_texto_de_campana():
+    tx = textos({**TOMA_FM, "creador": "DARO", "valor": ["Frase uno #Ad."]}, ficha_real(), "reels")
+    assert "Frase uno" not in tx["texto"] and "#" not in tx["texto"].split("\n#Publicidad")[0]
+
+
+def test_palabras_de_filtracion_en_el_gancho_se_descartan(marca, temporada):
+    f = ficha_real()
+    datos = json.loads((DATOS / "fm27_valida.json").read_text(encoding="utf-8"))
+    datos["gancho"] = "Leak del fichaje de Sebas"
+    datos["palabra_lapiz"] = "FICHAJE"
+    ok, m = ojos.validar_respuesta(datos, marca, ojos.temporada_de(f, temporada), duracion=20.0)
+    assert not ok and any("palabra a evitar 'leak'" in x for x in m)
+
+
+def test_el_material_de_la_campana_va_primero_y_luego_twitch_por_vistas(repo, editar_yaml):
+    sys_path = str(Path(__file__).parent)
+    import sys
+    sys.path.insert(0, sys_path)
+    import test_n3 as N3
+    editar_yaml(repo, "fuentes.yml", lambda d: d + [N3.base()])
+    cands = detectar.detectar(repo, N3.AHORA, N3.cliente())
+    ids = [c.fuente_id for c in cands]
+    primeros = ids[:5]
+    assert primeros == ["sega-fm27"] * 5 and "canal-ejemplo" in ids[5:]
+    resto = [c.vistas_por_hora for c in cands[5:]]
+    assert resto == sorted(resto, reverse=True)
+
+
+def test_completar_sigue_con_los_demas_si_una_consulta_falla(tmp_path):
+    pub = programar_de_campana(tmp_path, BufferConUrl())
+    envios_campana.anotar(tmp_path, "reels", "post-malo", AHORA_UTC, {"campana": "c", "numero": 9})
+
+    class Mixto:
+        def estado_y_url(self, post_id):
+            if post_id == "post-ejemplo-001":
+                raise RuntimeError("caída de red")
+            return "sent", "https://www.instagram.com/reel/abc/"
+    assert envios_campana.completar(tmp_path, Mixto()) == 1
+    filas = {e["post_id"]: e for e in envios_campana.leer(tmp_path)}
+    assert filas["post-malo"]["estado"] == "enviado" and filas["post-malo"]["url"].startswith("https://www.instagram")
+    assert filas["post-ejemplo-001"]["estado"] == "programado" and "caída de red" in filas["post-ejemplo-001"]["error"]
+
+
+@pytest.mark.parametrize("creador", list(CREADORES))
+@pytest.mark.parametrize("red", REDES)
+def test_candidato_fm27_por_toma_dict_y_textos_da_la_etiqueta_de_cada_red(repo, creador, red):
+    from fabrica import ciclo
+    from fabrica.editar.toma import Resultado
+    cand = candidatos_de_fm27(repo)[creador]
+    ficha = next(f for f in fuentes.cargar_fuentes(repo) if f["id"] == "sega-fm27")
+    r = Resultado(True, fila={"toma": 5, "gancho": "Sebas ficha al delantero", "pilar": "momentos",
+                              "duracion_s": 12.0})
+    td = ciclo._toma_dict(r, cand, ficha)
+    tx = textos(td, ficha, red)
+    assert tx["texto"].split("\n")[2:5] == ["@footballmanager", CREADORES[creador][RED[red]], "#Publicidad"]
     with pytest.raises(Descartada, match="sin gancho"):
         textos({**TOMA_FM, "creador": "DARO", "gancho": "#Solo #Hashtags"}, ficha_real(), "tiktok")

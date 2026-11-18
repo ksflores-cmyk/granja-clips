@@ -504,10 +504,6 @@ def _textos_campana(toma: dict, ficha: dict, plataforma: str, raiz=None, hoy: da
     num = f"{int(toma['numero']):03d}" if str(toma.get("numero", "")).isdigit() else str(toma.get("numero", ""))
     primera = f"Toma {num}. {gancho}"
     bloques = [primera]
-    if plataforma == "reels":
-        valor = [v for v in (_sin_hashtags(_limpio(v)) for v in (toma.get("valor") or [])) if v][:2]
-        if valor:
-            bloques.append(" ".join(valor))
     cola = [*obligatorias, etiqueta, divulgacion] + ([" ".join(extras)] if extras else [])
     texto = "\n\n".join(bloques) + "\n\n" + "\n".join(cola)
     if "#" in texto.split("\n" + divulgacion, 1)[0]:
