@@ -13,6 +13,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+from .candado import candado
 from .config import raiz_repo
 from .registro import ZONA
 
@@ -47,31 +48,48 @@ def _guardar(raiz, datos: list[dict]) -> None:
 
 
 def anotar(raiz, plataforma: str, post_id: str, cuando: datetime, toma: dict) -> dict:
-    """Guarda (una sola vez por `post_id`) el post programado de una campaña. Devuelve la fila."""
-    datos = leer(raiz)
-    previa = next((e for e in datos if e.get("post_id") == post_id), None)
-    if previa:
-        return previa
-    fila = {"plataforma": plataforma, "post_id": post_id, "hora": cuando.astimezone(ZONA).isoformat(),
+    """Guarda (una sola vez por `post_id`) el post programado de una campaña. Devuelve la fila.
+
+    Lectura, fusión y escritura completas bajo el candado del archivo: otra corrida no pierde esta fila."""
+    with candado(_ruta(raiz)):
+        datos = leer(raiz)
+        previa = next((e for e in datos if e.get("post_id") == post_id), None)
+        if previa:
+            return previa
+        fila = _fila(plataforma, post_id, cuando, toma)
+        datos.append(fila)
+        _guardar(raiz, datos)
+        return fila
+
+
+def _fila(plataforma, post_id, cuando, toma) -> dict:
+    return {"plataforma": plataforma, "post_id": post_id, "hora": cuando.astimezone(ZONA).isoformat(),
             "campana": toma.get("campana") or "", "toma": toma.get("numero"),
             "estado": "programado", "url": None, "nota": "programado: el enlace se completa cuando Buffer lo marque sent"}
-    datos.append(fila)
-    _guardar(raiz, datos)
-    return fila
 
 
 def completar(raiz, publicador) -> int:
-    """Para cada envío aún sin cerrar: si el post quedó `sent`, escribe la URL (o `PENDIENTE`). Devuelve cuántos cambió."""
-    datos = leer(raiz)
-    cambios = 0
-    for e in datos:
+    """Para cada envío aún sin cerrar: si el post quedó `sent`, escribe la URL (o `PENDIENTE`). Devuelve cuántos cambió.
+
+    Las consultas a Buffer van sin candado; la fusión se hace bajo candado sobre la versión vigente del archivo
+    (así no pisa filas que otra corrida añadió mientras tanto)."""
+    cierres: dict[str, tuple[str | None, str]] = {}
+    for e in leer(raiz):
         if e.get("estado") == "enviado":          # cerrado: con URL, o con la nota de copiarla desde la app
             continue
         estado, url = publicador.estado_y_url(e["post_id"])
-        if estado != "sent":
-            continue
-        e.update(estado="enviado", url=url, nota=PEGAR if url else PENDIENTE)
-        cambios += 1
-    if cambios:
-        _guardar(raiz, datos)
+        if estado == "sent":
+            cierres[e["post_id"]] = (url, PEGAR if url else PENDIENTE)
+    if not cierres:
+        return 0
+    cambios = 0
+    with candado(_ruta(raiz)):
+        datos = leer(raiz)
+        for e in datos:
+            if e.get("post_id") in cierres and e.get("estado") != "enviado":
+                url, nota = cierres[e["post_id"]]
+                e.update(estado="enviado", url=url, nota=nota)
+                cambios += 1
+        if cambios:
+            _guardar(raiz, datos)
     return cambios

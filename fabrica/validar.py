@@ -221,6 +221,8 @@ def _validar_campos_n3(ficha: dict, et: str, inf: Informe) -> None:
         inf.error(f"{et}: reglas.permite_descarga debe ser booleano")
     if "envio" in ficha and ficha["envio"] not in ("manual", "api"):
         inf.error(f"{et}: envio debe ser manual o api")
+    if "brief_url" in ficha and not _es_https(ficha["brief_url"]):
+        inf.error(f"{et}: brief_url debe ser una URL https")
     if "juego" in ficha and not (isinstance(ficha["juego"], str) and ficha["juego"].strip()):
         inf.error(f"{et}: juego debe ser texto no vacío")
     if "marca_agua" in ficha:

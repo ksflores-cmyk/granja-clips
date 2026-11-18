@@ -84,7 +84,8 @@
   creador: "SEGA Football Manager 27 (carpeta oficial de creadores)"
   origen: drive
   canal_id: null
-  permiso_url: "https://whop.com/"   # por confirmar: enlace exacto de la campaña en Content Rewards (Clipping Culture)
+  permiso_url: "https://contentrewards.com/c/campaigns/affff4f9-30b5-4dea-841f-69ef3f8f9c50"   # Kevin se unió el 18 nov 2026 a las 00:30 GT
+  brief_url: "https://docs.google.com/document/d/1oBJA-xEJs1HrH7thU8QYcSLt5oki1f7qlsfd-fo9_ts/edit"
   permiso_leido: 2026-11-18
   juego: "Football Manager 27"
   reglas:
@@ -123,7 +124,7 @@
   minimo_por_clip_usd: 2
   tope_por_clip_usd: 600
   presupuesto_restante: 5000
-  vence: 2026-12-31            # provisional: el brief no da fecha de cierre; por confirmar con Kevin
+  vence: 2026-12-31            # revisar cada semana: la campaña cierra al agotar el presupuesto (sin fecha de cierre); presupuesto_restante: 0 cierra la ficha
   estado: vigente
   uso: produccion
   publicable: true

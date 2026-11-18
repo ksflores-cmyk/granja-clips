@@ -465,6 +465,12 @@ def es_de_campana(ficha: dict) -> bool:
 
 
 MAX_HASHTAGS_EXTRA = 3
+_HASHTAG = re.compile(r"#\S*")
+
+
+def _sin_hashtags(t: str) -> str:
+    """Quita los hashtags incrustados (el único `#` antes de la divulgación sería un error de brief)."""
+    return " ".join(_HASHTAG.sub("", t).split())
 
 
 def _textos_campana(toma: dict, ficha: dict, plataforma: str, raiz=None, hoy: date | None = None) -> dict:
@@ -482,7 +488,7 @@ def _textos_campana(toma: dict, ficha: dict, plataforma: str, raiz=None, hoy: da
     etiqueta = etiqueta_creador(ficha, creador, plataforma)
     if not etiqueta:
         raise Descartada(f"sin etiqueta del creador {creador or '(vacío)'} para {plataforma}: no se publica")
-    gancho = _limpio(toma.get("gancho"))
+    gancho = _sin_hashtags(_limpio(toma.get("gancho")))
     if not gancho:
         raise Descartada("sin gancho")
     obligatorias = [str(e).strip() for e in reglas.get("etiquetas_obligatorias") or [] if str(e).strip()]
@@ -499,11 +505,13 @@ def _textos_campana(toma: dict, ficha: dict, plataforma: str, raiz=None, hoy: da
     primera = f"Toma {num}. {gancho}"
     bloques = [primera]
     if plataforma == "reels":
-        valor = [_limpio(v) for v in (toma.get("valor") or [])][:2]
+        valor = [v for v in (_sin_hashtags(_limpio(v)) for v in (toma.get("valor") or [])) if v][:2]
         if valor:
             bloques.append(" ".join(valor))
     cola = [*obligatorias, etiqueta, divulgacion] + ([" ".join(extras)] if extras else [])
     texto = "\n\n".join(bloques) + "\n\n" + "\n".join(cola)
+    if "#" in texto.split("\n" + divulgacion, 1)[0]:
+        raise Descartada("hay un # antes de la divulgación: #Publicidad debe ser el primer hashtag")
     if contar_emojis(texto) > 1:
         raise Descartada("el texto lleva más de un emoji")
     if len(texto) > MAX_TEXTO:

@@ -659,3 +659,81 @@ def test_un_video_grande_se_mira_en_una_copia_ligera_y_uno_chico_tal_cual(video,
     chico = tmp_path / "chico.mp4"
     chico.write_bytes(b"\x00" * 1024)
     assert mod_toma.copia_para_ojos(chico, RAIZ_REAL, tmp_path) == chico
+
+
+# ---------------------------------------------------------------- ronda 1
+
+def test_silencio_se_mide_de_verdad_un_tono_anadido_sale_en_rojo(marca, tmp_path):
+    mudo = tmp_path / "mudo.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                    "testsrc2=size=1280x720:rate=30:duration=20", "-c:v", "libx264", "-preset", "ultrafast",
+                    "-pix_fmt", "yuv420p", str(mudo)], check=True)
+    mp4, plan = render(marca, tmp_path, mudo, sin_agua(ficha_real()), "m")
+    ok, det = estilo.audio_original(mp4, plan)
+    assert ok, det                                                    # fuente muda y salida silenciosa: verde
+    con_tono = tmp_path / "cancion.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(mp4), "-f", "lavfi", "-i",
+                    "sine=frequency=440:duration=12", "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac",
+                    str(con_tono)], check=True)
+    ok, det = estilo.audio_original(con_tono, plan)
+    assert not ok and "dB" in det                                     # fuente muda y salida con tono: rojo
+
+
+def test_la_ficha_con_presupuesto_cero_se_cierra():
+    f = copy.deepcopy(ficha_real())
+    f["presupuesto_restante"] = 0
+    assert fuentes.es_publicable(f, date(2026, 11, 18)) == (False, "presupuesto agotado")
+
+
+def test_ficha_con_permiso_y_brief_reales():
+    f = ficha_real()
+    assert f["permiso_url"] == "https://contentrewards.com/c/campaigns/affff4f9-30b5-4dea-841f-69ef3f8f9c50"
+    assert f["brief_url"].startswith("https://docs.google.com/document/d/1oBJA-xEJs1HrH7thU8QYcSLt5oki1f7qlsfd-fo9_ts")
+    assert str(f["permiso_leido"]) == "2026-11-18"
+
+
+def test_validar_rechaza_brief_url_no_https(repo, editar_yaml):
+    e = _con_ficha(repo, editar_yaml, lambda f: f.update(brief_url="http://x.org/b"))
+    assert any("brief_url" in x for x in e)
+
+
+def _anotar_en_proceso(args):
+    raiz, i = args
+    envios_campana.anotar(Path(raiz), "tiktok", f"post-{i}", datetime(2026, 11, 18, 17, tzinfo=timezone.utc),
+                          {"campana": "c", "numero": i})
+
+
+def test_dos_procesos_anotando_a_la_vez_no_pierden_filas(tmp_path):
+    import multiprocessing as mp
+    with mp.get_context("spawn").Pool(4) as pool:
+        pool.map(_anotar_en_proceso, [(str(tmp_path), i) for i in range(24)])
+    ids = sorted(e["post_id"] for e in envios_campana.leer(tmp_path))
+    assert ids == sorted(f"post-{i}" for i in range(24))
+
+
+def test_completar_fusiona_sobre_la_version_vigente(tmp_path):
+    pub = programar_de_campana(tmp_path, BufferConUrl())
+
+    class Intruso:
+        """Mientras `completar` consulta Buffer, otra corrida añade su fila."""
+        def estado_y_url(self, post_id):
+            envios_campana.anotar(tmp_path, "reels", "post-otro", AHORA_UTC, {"campana": "c", "numero": 9})
+            return pub.estado_y_url(post_id)
+    assert envios_campana.completar(tmp_path, Intruso()) == 1
+    filas = {e["post_id"]: e for e in envios_campana.leer(tmp_path)}
+    assert filas["post-ejemplo-001"]["estado"] == "enviado" and "post-otro" in filas
+
+
+@pytest.mark.parametrize("red", REDES)
+def test_hashtag_en_el_gancho_no_antecede_a_publicidad(red):
+    tx = textos({**TOMA_FM, "creador": "DARO", "gancho": "#Fichaje Sebas ficha #FM27 al delantero"}, ficha_real(), red)
+    antes = tx["texto"].split("\n#Publicidad")[0]
+    assert "#" not in antes and "Sebas ficha al delantero" in antes
+    assert tx["texto"].split()[tx["texto"].split().index("#Publicidad")] == "#Publicidad"
+
+
+def test_hashtag_en_el_valor_de_reels_se_quita_y_en_el_gancho_solo_hashtags_descarta():
+    tx = textos({**TOMA_FM, "creador": "DARO", "valor": ["Frase uno #Ad.", "#Solo"]}, ficha_real(), "reels")
+    assert "#" not in tx["texto"].split("\n#Publicidad")[0] and "Frase uno" in tx["texto"]
+    with pytest.raises(Descartada, match="sin gancho"):
+        textos({**TOMA_FM, "creador": "DARO", "gancho": "#Solo #Hashtags"}, ficha_real(), "tiktok")

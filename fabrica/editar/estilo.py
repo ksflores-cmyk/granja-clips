@@ -402,13 +402,31 @@ def logo_extra_en_esquina(video: Path, plan: dict, marca: Marca) -> tuple[bool, 
     return d < UMBRAL_LOGO_EXTRA, f"esquina del logo {d:.1f} (máximo {UMBRAL_LOGO_EXTRA:g})"
 
 
+UMBRAL_SILENCIO_DB = -50.0
+
+
+def nivel_medio_db(video: Path) -> float | None:
+    """Nivel medio del audio en dB (volumedetect). El silencio digital marca -91 dB. None si no se pudo medir."""
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(video), "-vn", "-af", "volumedetect",
+                        "-f", "null", "-"], capture_output=True, text=True)
+    m = re.search(r"mean_volume:\s*(-?[0-9.]+|-inf)\s*dB", r.stderr)
+    if not m:
+        return None
+    return float("-inf") if m.group(1) == "-inf" else float(m.group(1))
+
+
 def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
     """Con sin_musica el audio del MP4 es el de la fuente (correlación alta), sin audio añadido."""
     camp = plan.get("campana") or {}
     origen = plan.get("origen") or {}
     if camp.get("audio") == "silencio":
-        a = sondear(Path(video))["audio"]
-        return bool(a), "la fuente no trae audio: el MP4 lleva silencio (nada añadido)"
+        if not sondear(Path(video))["audio"]:
+            return False, "el MP4 no trae pista de audio"
+        nivel = nivel_medio_db(Path(video))
+        if nivel is None:
+            return False, "no se pudo medir el nivel del audio"
+        return nivel <= UMBRAL_SILENCIO_DB, (f"la fuente no trae audio: el MP4 debe ir en silencio; nivel medio "
+                                             f"{nivel:.1f} dB (máximo {UMBRAL_SILENCIO_DB:g} dB)")
     if camp.get("audio") != "original" or not origen:
         return False, f"el plan declara audio {camp.get('audio')!r}, no el original de la fuente"
     dur = float(plan.get("duracion") or 0)
