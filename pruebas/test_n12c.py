@@ -413,9 +413,9 @@ def test_dif_tinta_rechaza_cajas_vacias_o_fuera_del_cuadro(marca):
     papel = lienzo.papel(marca).convert("RGB")
     for caja in [(0, 100, 0, 200), (0, 200, 1080, 200), (0, 1900, 1080, 2100), (-5, 0, 100, 100), (0, 0, 2000, 100)]:
         with pytest.raises(ValueError, match="vacía o fuera"):
-            estilo.dif_tinta(papel, papel, papel, caja)
+            estilo.discrepancia_local(papel, papel, papel, caja)
     with pytest.raises(ValueError):
-        estilo.dif_tinta(Image.new("RGB", (10, 10)), papel, papel, (0, 0, 10, 10))
+        estilo.discrepancia_local(Image.new("RGB", (10, 10)), papel, papel, (0, 0, 10, 10))
 
 
 @necesita_ffmpeg
@@ -430,8 +430,8 @@ def test_tinta_extra_en_el_fotograma_se_detecta(marca):
     papel = lienzo.papel(marca).convert("RGB")
     real = papel.copy()
     real.paste((0, 0, 0), (100, 940, 400, 980))          # texto añadido que el plan no tiene
-    d = estilo.dif_tinta(real, papel, papel, (90, 930, 990, 1014))
-    assert d > estilo.UMBRAL_TINTA
+    d = estilo.discrepancia_local(real, papel, papel, (90, 930, 990, 1014))
+    assert d > estilo.K_BLOQUE
 
 
 @necesita_ffmpeg
@@ -443,3 +443,32 @@ def test_credito_con_texto_extra_sale_en_rojo(vertical, marca, tmp_path):
     corto["toma"]["credito"] = "Con: Blender"
     ok, det = estilo.cierre_visible(mp4, corto, marca)
     assert not ok and "crédito" in det.split("falla:")[1]
+
+
+# ---------------------------------------------------------------- una sola letra (ronda 2, punto 8)
+
+def _con_cambio(vertical, marca, tmp_path, toma=None, frase=None):
+    t = {**TOMA, **(toma or {})}
+    lineas = [componer.Linea(0.5, 2.5, "CHAMÁN", frase or "¿Qué te trae por aquí?"), LINEAS[1]]
+    mp4 = tmp_path / "var.mp4"
+    componer.componer(marca, lienzo.Toma(**t), lineas, mp4, duracion=4.0, trabajo=tmp_path / "w",
+                      fuente_video=vertical["fuente"], inicio=0.0)
+    return mp4
+
+
+@necesita_ffmpeg
+@pytest.mark.parametrize("cambio,punto", [
+    ({"toma": {"credito": "Con: Blender Foundation (CC BY 4.0)"}}, "[fotograma] Cierre visible en el video (CORTE. y crédito)"),
+    ({"toma": {"escena": "INT. CABAÑA — NOCHF"}}, "[fotograma] Cabecera en el video"),
+    ({"toma": {"gancho": "Ella buscs a un dragón"}}, "[fotograma] Cabecera en el video"),
+    ({"frase": "¿Qué te trae por aquí!"}, "[fotograma] Diálogo en el video"),
+])
+def test_un_cambio_de_una_letra_sale_en_rojo(vertical, marca, tmp_path, cambio, punto):
+    mp4 = _con_cambio(vertical, marca, tmp_path, **cambio)
+    assert punto in malos(estilo.revisar(mp4, vertical["plan"], marca))
+
+
+@necesita_ffmpeg
+def test_el_video_correcto_no_da_discrepancias(vertical, marca):
+    puntos = estilo.revisar(vertical["mp4"], vertical["plan"], marca)
+    assert malos(puntos) == []

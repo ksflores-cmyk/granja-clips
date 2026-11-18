@@ -16,7 +16,7 @@ import unicodedata
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 from . import cierre as mod_cierre
 from . import dialogo as mod_dialogo
@@ -25,14 +25,17 @@ from .lienzo import Toma, _limpia, partir
 from .marca import Marca
 
 # Tolerancias de la puerta (compresión H.264); no son medidas de la marca.
-# Diferencia media por canal (0 a 255) dentro de la máscara de tinta de la página esperada.
-UMBRAL_TINTA = 15.0
-# Diferencia media en gris entre miniaturas de 64 px del cuerpo del MP4 y de la fuente.
-UMBRAL_CUERPO = 8.0
+# Diferencia media en gris entre miniaturas de 64 px del cuerpo del MP4 y de la fuente. Calibrada:
+# el cuerpo correcto da 0.3 a 1.3 (Sintel y BBB); con la fuente desfasada 0.5, 1 y -1 s da 1.8 a 49,
+# y el menor con desfase de 1 s es 4.6 (Sintel, -1 s). Tolerancia 2.5.
+UMBRAL_CUERPO = 2.5
 # La tinta es donde la página esperada difiere del papel en más de este valor (canal máximo).
 DIF_TINTA = 48
 DILATAR_TINTA_PX = 2
 MINIATURA_ANCHO = 64
+PIXEL_DISCREPANTE = 40      # |fotograma - esperado| en gris (tras 1 px de desenfoque) que cuenta como discrepancia
+BLOQUE_PX = 24              # tamaño de una letra de la marca
+K_BLOQUE = 30               # píxeles discrepantes en un bloque que ponen el punto en rojo
 T_CABECERA_S = 0.5
 # La duración real (ffprobe) debe coincidir con la del plan: un fotograma más un margen pequeño.
 TOL_DURACION_S = 1 / 30 + 0.1
@@ -117,14 +120,20 @@ def _dilatar(mascara: np.ndarray, px: int) -> np.ndarray:
     return out
 
 
-def dif_tinta(real: Image.Image, esperado: Image.Image, papel: Image.Image,
-              caja: tuple[int, int, int, int]) -> float:
-    """Diferencia media del fotograma contra lo esperado, sólo en los píxeles de tinta.
+def discrepancia_local(real: Image.Image, esperado: Image.Image, papel: Image.Image,
+                       caja: tuple[int, int, int, int]) -> int:
+    """Máximo de píxeles discrepantes dentro de un bloque de BLOQUE_PX x BLOQUE_PX.
 
-    La máscara une la tinta esperada y la tinta real (píxeles que difieren del papel en más de
-    DIF_TINTA, canal máximo), dilatada DILATAR_TINTA_PX; así el texto añadido también cuenta. Si
-    ninguna tiene tinta, mide toda la región. ValueError si la caja es vacía o sale del cuadro, o
-    si el resultado no es un número finito.
+    Mapa en gris de |fotograma - esperado| tras un desenfoque de 1 px (quita el ruido de H.264),
+    mayor que PIXEL_DISCREPANTE, sobre la unión de la tinta esperada y la tinta real (dilatada).
+    Una letra cambiada deja un bloque lleno; el ruido de compresión no.
+
+    Calibración (3 muestras reales, MP4 de la propia fábrica): los videos correctos dan 0 en cierre,
+    cabecera y diálogo. Cambios de una sola letra, medidos contra el plan original de Sintel: crédito
+    "3.0" a "4.0" 299; escena NOCHE a DÍA 392 y NOCHE a NOCHF 77 (el menor); frase "?" por "!" 203 y
+    "guardianes" a "guardiapes" 262; gancho "busca" a "buscs" 403 y "dragón" a "dragon" 397.
+    K_BLOQUE = 30 queda entre 0 y 77. ValueError si la caja es
+    vacía o sale del cuadro.
     """
     x0, y0, x1, y1 = (int(c) for c in caja)
     ancho, alto = esperado.size
@@ -132,16 +141,20 @@ def dif_tinta(real: Image.Image, esperado: Image.Image, papel: Image.Image,
         raise ValueError(f"región vacía o fuera del cuadro {ancho}x{alto}: {caja}")
     if real.size != esperado.size:
         raise ValueError(f"tamaño {real.size} distinto de {esperado.size}")
-    a = np.asarray(real.convert("RGB"), dtype=np.int16)[y0:y1, x0:x1]
-    b = np.asarray(esperado.convert("RGB"), dtype=np.int16)[y0:y1, x0:x1]
-    p = np.asarray(papel.convert("RGB"), dtype=np.int16)[y0:y1, x0:x1]
-    tinta = (np.abs(b - p).max(axis=2) > DIF_TINTA) | (np.abs(a - p).max(axis=2) > DIF_TINTA)
-    mascara = _dilatar(tinta, DILATAR_TINTA_PX)
-    d = np.abs(a - b)
-    r = float(d[mascara].mean()) if mascara.any() else float(d.mean())
-    if not np.isfinite(r):
-        raise ValueError("la comparación no dio un número finito")
-    return r
+
+    def gris(img):
+        return np.asarray(img.convert("RGB").filter(ImageFilter.GaussianBlur(1)).convert("L"),
+                          dtype=np.int16)[y0:y1, x0:x1]
+    a, b = gris(real), gris(esperado)
+    rgb = lambda img: np.asarray(img.convert("RGB"), dtype=np.int16)[y0:y1, x0:x1]
+    p = rgb(papel)
+    tinta = (np.abs(rgb(esperado) - p).max(axis=2) > DIF_TINTA) | (np.abs(rgb(real) - p).max(axis=2) > DIF_TINTA)
+    disc = (np.abs(a - b) > PIXEL_DISCREPANTE) & _dilatar(tinta, DILATAR_TINTA_PX)
+    h, w = disc.shape
+    bl = min(BLOQUE_PX, h, w)
+    ii = np.pad(disc.astype(np.int64).cumsum(0).cumsum(1), ((1, 0), (1, 0)))
+    sumas = ii[bl:, bl:] - ii[:-bl, bl:] - ii[bl:, :-bl] + ii[:-bl, :-bl]
+    return int(sumas.max())
 
 
 def cierre_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
@@ -168,11 +181,11 @@ def cierre_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     regiones = {"CORTE.": (x0, corte_y, x1, credito_y),
                 "crédito": (x0, credito_y, x1, int(credito_y + 2 * marca.m("tam_credito")))}
     try:
-        difs = {n: dif_tinta(real, esperado, papel, caja) for n, caja in regiones.items()}
+        difs = {n: discrepancia_local(real, esperado, papel, caja) for n, caja in regiones.items()}
     except ValueError as e:
         return False, str(e)
-    fallan = [n for n, d in difs.items() if not d < UMBRAL_TINTA]
-    det = ", ".join(f"{n} {d:.1f}" for n, d in difs.items()) + f" (tolerancia {UMBRAL_TINTA:.0f})"
+    fallan = [n for n, d in difs.items() if not d < K_BLOQUE]
+    det = ", ".join(f"{n} {d}" for n, d in difs.items()) + f" (máximo {K_BLOQUE} px por bloque)"
     if fallan:
         det += "; falla: " + " y ".join(fallan)
     return not fallan, det
@@ -191,10 +204,10 @@ def cabecera_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     if real.size != esperado.size:
         return False, f"tamaño {real.size} distinto de {esperado.size}"
     try:
-        d = dif_tinta(real, esperado, lienzo.papel(marca), (0, 0, marca.ancho, int(y_cont)))
+        d = discrepancia_local(real, esperado, lienzo.papel(marca), (0, 0, marca.ancho, int(y_cont)))
     except ValueError as e:
         return False, str(e)
-    return d < UMBRAL_TINTA, f"diferencia media {d:.1f} (tolerancia {UMBRAL_TINTA:.0f})"
+    return d < K_BLOQUE, f"{d} px discrepantes en un bloque (máximo {K_BLOQUE})"
 
 
 def _geometria(plan: dict, marca: Marca) -> dict | None:
@@ -242,16 +255,16 @@ def dialogo_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
             fallos.append(f"línea {i + 1}: no se pudo leer el fotograma en {t:.2f} s")
             continue
         try:
-            d = dif_tinta(real, esperado, papel, (0, y0, marca.ancho, y1))
+            d = discrepancia_local(real, esperado, papel, (0, y0, marca.ancho, y1))
         except ValueError as e:
             fallos.append(f"línea {i + 1}: {e}")
             continue
-        detalle.append(f"{d:.1f}")
-        if not d < UMBRAL_TINTA:
-            fallos.append(f"línea {i + 1} distinta en {t:.2f} s (diferencia {d:.1f})")
+        detalle.append(str(d))
+        if not d < K_BLOQUE:
+            fallos.append(f"línea {i + 1} distinta en {t:.2f} s ({d} px discrepantes)")
     if fallos:
-        return False, "; ".join(fallos) + f" (tolerancia {UMBRAL_TINTA:.0f})"
-    return True, f"diferencias {', '.join(detalle)} (tolerancia {UMBRAL_TINTA:.0f})"
+        return False, "; ".join(fallos) + f" (máximo {K_BLOQUE} px por bloque)"
+    return True, f"diferencias {', '.join(detalle)} (máximo {K_BLOQUE} px por bloque)"
 
 
 def _miniatura_gris(img: Image.Image, ancho: int, alto: int) -> np.ndarray:
@@ -294,7 +307,7 @@ def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
         b = _miniatura_gris(fuente, MINIATURA_ANCHO, alto_min)
         difs.append(float(np.abs(a - b).mean()))
     return max(difs) < UMBRAL_CUERPO, \
-        f"diferencias {', '.join(f'{d:.1f}' for d in difs)} (tolerancia {UMBRAL_CUERPO:.0f})"
+        f"diferencias {', '.join(f'{d:.1f}' for d in difs)} (tolerancia {UMBRAL_CUERPO:.1f})"
 
 
 def textos_caben(plan: dict, marca: Marca) -> tuple[bool, str]:
