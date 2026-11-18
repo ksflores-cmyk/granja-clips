@@ -69,20 +69,27 @@ def _vistos(raiz) -> set[str]:
 
 
 def anotar_visto(raiz, id_origen: str) -> None:
+    from .candado import candado
     _vistos(raiz)  # asegura que exista
-    with open(raiz_repo(raiz) / "estado" / "vistos.txt", "a", encoding="utf-8") as f:
+    ruta = raiz_repo(raiz) / "estado" / "vistos.txt"
+    with candado(ruta), open(ruta, "a", encoding="utf-8") as f:
         f.write(id_origen + "\n")
 
 
 def quitar_visto(raiz, id_origen: str) -> None:
-    """Deshace `anotar_visto` cuando el descarte fue de la máquina (Gemini caído), no de la fuente."""
+    """Deshace la ÚLTIMA `anotar_visto` de esa fuente (la reserva de la toma fallida) cuando el descarte fue de
+    la máquina (Gemini caído), no de la fuente. Bajo el mismo candado que `anotar_visto`."""
+    from .candado import candado
     ruta = raiz_repo(raiz) / "estado" / "vistos.txt"
     if not ruta.exists():
         return
-    lineas = ruta.read_text(encoding="utf-8").splitlines()
-    quedan = [x for x in lineas if x.strip() != id_origen]
-    if len(quedan) != len(lineas):
-        ruta.write_text("".join(x + "\n" for x in quedan), encoding="utf-8")
+    with candado(ruta):
+        lineas = ruta.read_text(encoding="utf-8").splitlines()
+        for i in range(len(lineas) - 1, -1, -1):
+            if lineas[i].strip() == id_origen:
+                del lineas[i]
+                ruta.write_text("".join(x + "\n" for x in lineas), encoding="utf-8")
+                return
 
 
 def _filas_marcador(raiz) -> list[dict]:

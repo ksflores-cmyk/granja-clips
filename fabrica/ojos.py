@@ -217,6 +217,8 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
             return mirada
         if estado == 404:
             mirada.intentos.append(f"{modelo}: HTTP 404, no existe; se prueba el siguiente")
+            if mirada.pasajero:          # ya se gastó el único respaldo por una caída: no se sigue probando
+                return mirada
             continue
         if estado != 200:
             mirada.motivo = f"Gemini respondió HTTP {estado} con {modelo}"

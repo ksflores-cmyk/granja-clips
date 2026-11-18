@@ -234,11 +234,17 @@ def test_un_timeout_y_luego_respuesta_valida(tmp_path):
     assert m.datos is not None and not m.pasajero and len(t.llamadas) == 2
 
 
-def test_quitar_visto_deshace_anotar_visto(repo):
+def test_quitar_visto_deshace_solo_la_ultima_marca(repo):
     from fabrica import puertas as p
-    p.anotar_visto(repo, "a"); p.anotar_visto(repo, "b")
+    p.anotar_visto(repo, "a"); p.anotar_visto(repo, "b"); p.anotar_visto(repo, "a")
     p.quitar_visto(repo, "a"); p.quitar_visto(repo, "zzz")
-    assert (repo / "estado" / "vistos.txt").read_text(encoding="utf-8").split() == ["b"]
+    assert (repo / "estado" / "vistos.txt").read_text(encoding="utf-8").split() == ["a", "b"]
+
+
+def test_tras_una_caida_un_404_del_respaldo_no_abre_un_tercer_modelo(tmp_path):
+    t = Transporte((503, "x"), (503, "x"), (404, "{}"), (200, sobre(respuesta_grabada("valida"))))
+    m = mirar(tmp_path, t)
+    assert m.datos is None and m.pasajero and len(t.llamadas) == 3
 
 
 def test_json_roto_se_descarta_con_motivo(tmp_path):
