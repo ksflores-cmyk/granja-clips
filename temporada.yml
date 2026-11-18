@@ -2,6 +2,7 @@
 id: gta6
 nombre: "GTA 6"
 nombre_twitch: "Grand Theft Auto VI"
+twitch_game_id: "1867279146"   # diagnóstico del 17 nov 2026 23:18 GT
 fecha_estreno: 2026-11-19
 plataformas_juego: [PS5, "Xbox Series X|S"]
 desbloqueo: "medianoche local del 19 nov 2026 en todas las regiones"

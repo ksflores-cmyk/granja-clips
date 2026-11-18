@@ -1,3 +1,5 @@
-shorts: {servicio: youtube, nombre_esperado: guionvivo, buffer_channel_id: null, buffer_org_id: null}
-tiktok: {servicio: tiktok, nombre_esperado: guionvivo, buffer_channel_id: null, buffer_org_id: null}
-reels: {servicio: instagram, nombre_esperado: guionvivo, buffer_channel_id: null, buffer_org_id: null}
+# Canales confirmados el 17 nov 2026 23:18 GT por la API de Buffer (organización "My organization").
+# El publicador vuelve a comprobar servicio, nombre e ids antes de programar.
+shorts: {servicio: youtube, nombre_esperado: "Guion Vivo", buffer_channel_id: "6afd248cece6dfde5f047187", buffer_org_id: "6afd22e4dfdc69bf66537a76"}
+tiktok: {servicio: tiktok, nombre_esperado: guionvivo, buffer_channel_id: "6afd2436ece6dfde5f046c7f", buffer_org_id: "6afd22e4dfdc69bf66537a76"}
+reels: {servicio: instagram, nombre_esperado: guionvivo, buffer_channel_id: "6afd2350ece6dfde5f045b08", buffer_org_id: "6afd22e4dfdc69bf66537a76"}

@@ -1,7 +1,7 @@
 # Sistema visual [Guion] (sección 5B). La fábrica no lleva colores ni fuentes escritos a mano.
 nombre: "Guion Vivo"
 usuario: "guionvivo"
-confirmado: false            # Kevin aún no lo confirma; cambiar a true cuando lo haga
+confirmado: true             # Kevin lo confirmó el 17 nov 2026 23:17 GT
 direccion: guion
 lienzo: pagina               # pagina de guion 1080x1920 con el video dentro
 resolucion: [1080, 1920]

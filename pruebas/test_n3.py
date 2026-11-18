@@ -295,6 +295,10 @@ def test_puerta_juego_pasa_falla_y_brief(repo_n3):
 
 
 def test_id_juego_resuelto_por_nombre_cuando_no_hay_id_guardado(repo):
+    # El repo real ya guarda el id; esta prueba lo quita para probar la consulta por nombre.
+    tmp = repo / "temporada.yml"
+    tmp.write_text("\n".join(l for l in tmp.read_text(encoding="utf-8").splitlines()
+                             if not l.startswith("twitch_game_id")) + "\n", encoding="utf-8")
     assert puertas.id_juego_temporada(repo, None) is None
     assert puertas.id_juego_temporada(repo, cliente()) == "777001"
 
@@ -498,6 +502,7 @@ def test_detector_salta_twitch_por_fallo_de_red_y_conserva_brief(repo_twitch, ed
 
 def test_fallo_de_helix_no_aborta_lote_de_brief(repo_twitch, editar_yaml):
     repo = repo_twitch
+    editar_yaml(repo, "temporada.yml", lambda d: d.pop("twitch_game_id", None) and None)
     editar_yaml(repo, "fuentes.yml", lambda d: d + [base(
         id="brief", origen="web", twitch_login=None, tipo="B", material=["https://example.invalid/a.mp4"])])
     c = cliente(Falso({"/helix/games": (500, "{}")}))

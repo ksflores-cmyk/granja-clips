@@ -19,6 +19,20 @@ SUPA_URL = "https://proyecto-falso.supabase.invalid"
 SUPA_CLAVE = "sb_secret_inventada-n5"  # EJEMPLO-FALSO
 AHORA = datetime(2026, 11, 18, 12, 0, tzinfo=timezone.utc)     # 06:00 en Guatemala
 HOY = date(2026, 11, 18)
+CANALES_BASE = (
+    "shorts: {servicio: youtube, nombre_esperado: guionvivo, buffer_channel_id: null, buffer_org_id: null}\n"
+    "tiktok: {servicio: tiktok, nombre_esperado: guionvivo, buffer_channel_id: null, buffer_org_id: null}\n"
+    "reels: {servicio: instagram, nombre_esperado: guionvivo, buffer_channel_id: null, buffer_org_id: null}\n")
+
+
+@pytest.fixture(autouse=True)
+def _canales_de_prueba(request):
+    """El repo real ya guarda los canales confirmados de Kevin; estas pruebas parten de canales sin confirmar."""
+    if "repo" in request.fixturenames:
+        repo = request.getfixturevalue("repo")
+        (repo / "config" / "canales.yml").write_text(CANALES_BASE, encoding="utf-8")
+
+
 CANALES_CFG = {"shorts": {"servicio": "youtube", "nombre_esperado": "guionvivo"},
                "tiktok": {"servicio": "tiktok", "nombre_esperado": "guionvivo"},
                "reels": {"servicio": "instagram", "nombre_esperado": "guionvivo"}}
