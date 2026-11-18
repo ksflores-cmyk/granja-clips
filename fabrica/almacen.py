@@ -23,6 +23,16 @@ from .pausa import ZONA
 TOPE_BYTES_PLAN = 52428800  # 50 MB: límite de archivo del plan gratis
 
 
+def normalizar_url(url: str) -> str:
+    """Base del proyecto (https://<ref>.supabase.co). El panel de Supabase muestra también la URL de la API
+    REST (…/rest/v1/); si el secreto se copió así, se quita ese final para no pedir /rest/v1/storage/…"""
+    base = str(url).strip().rstrip("/")
+    for final in ("/rest/v1", "/storage/v1", "/auth/v1"):
+        if base.lower().endswith(final):
+            base = base[: -len(final)].rstrip("/")
+    return base
+
+
 class ErrorAlmacen(Exception):
     """Fallo del almacén. El mensaje dice ruta y código, nunca la clave."""
 
@@ -31,7 +41,7 @@ class Almacen:
     def __init__(self, url, clave, config, transporte=None, dormir=time.sleep):
         if not url or not clave:
             raise ErrorAlmacen("falta SUPABASE_URL o SUPABASE_SERVICE_KEY")
-        self.url = url.rstrip("/")
+        self.url = normalizar_url(url)
         self._clave = clave
         self.bucket = config["bucket"]
         self.max_bytes = int(config["max_mb"]) * 1024 * 1024
