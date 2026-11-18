@@ -79,7 +79,7 @@ def _filas_marcador(raiz) -> list[dict]:
         return list(csv.DictReader(f))
 
 
-RE_ORIGEN = re.compile(r"origen:(\S+)")
+RE_ORIGEN = re.compile(r"origen:([^\s;,]+)")
 
 
 def _ultimo_tramo(url: str) -> str:
