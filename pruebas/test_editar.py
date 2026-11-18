@@ -323,6 +323,7 @@ def test_cierre_ausente_dice_no(marca, tmp_path):
     assert ok is False, detalle
 
 
+@pytest.mark.slow
 def test_cierre_con_otro_credito_dice_no(marca, mp4_sintetico):
     ok, detalle = estilo.cierre_visible(mp4_sintetico, plan_con(marca, credito="Con: @otro_creador_distinto"), marca)
     assert ok is False, detalle
@@ -335,6 +336,7 @@ def test_estilo_plan_valido_todo_si(marca, mp4_sintetico):
     assert all(ok for _, ok, _ in puntos), [p for p in puntos if not p[1]]
 
 
+@pytest.mark.slow
 @necesita_ffmpeg
 def test_estilo_gancho_generico_dice_no(marca, mp4_sintetico):
     puntos = estilo.revisar(mp4_sintetico, plan_con(marca, gancho="Esto cambia todo", palabra_lapiz="TODO"), marca)
@@ -344,6 +346,7 @@ def test_estilo_gancho_generico_dice_no(marca, mp4_sintetico):
     assert "[fotograma] Cabecera en el video" in malos
 
 
+@pytest.mark.slow
 @necesita_ffmpeg
 def test_estilo_detecta_emoji_credito_vacio_y_gancho_largo(marca, mp4_sintetico):
     puntos = dict((n, ok) for n, ok, _ in estilo.revisar(mp4_sintetico, plan_con(marca, credito="  "), marca))
@@ -364,6 +367,7 @@ def test_estilo_detecta_video_fuera_de_formato(marca, tmp_path):
     assert "[fotograma] Resolución 1080x1920" in malos and "[fotograma] Duración de 7 a 30 s" in malos
 
 
+@pytest.mark.slow
 @necesita_ffmpeg
 def test_estilo_cli_sale_0_y_1(marca, mp4_sintetico, tmp_path):
     bueno = tmp_path / "bueno.json"
@@ -374,6 +378,7 @@ def test_estilo_cli_sale_0_y_1(marca, mp4_sintetico, tmp_path):
     assert estilo.main([str(mp4_sintetico), str(malo)]) == 1
 
 
+@pytest.mark.slow
 @necesita_ffmpeg
 def test_render_completo_de_una_toma_sin_video(marca, tmp_path):
     t = toma(gancho="GTA 6 llega esta medianoche", palabra_lapiz="MEDIANOCHE", lapiz="circulo")

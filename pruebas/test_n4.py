@@ -264,7 +264,7 @@ def test_respuesta_valida_pasa(marca, temporada):
     ("spoiler", "spoiler"),
     ("desnudez", "desnudez"),
     ("cinematica", "cinemática"),
-    ("juego_incorrecto", "juego de la temporada"),
+    ("juego_incorrecto", "juego esperado"),
     ("recorte_fuera", "recorte"),
     ("frase_imposible", "no cabe"),
 ])
@@ -465,7 +465,9 @@ def test_clip_de_twitch_usa_ytdlp_sin_cookies_ni_listas(repo, carpetas, video20)
     o = ordenes[0]
     assert o[0] == "yt-dlp" and "--no-playlist" in o and "--no-cookies" in o and "--ignore-config" in o
     assert "--cookies" not in o and "--cookies-from-browser" not in o
-    assert "duration<=120" in o and "height<=1080" in o[o.index("-f") + 1]
+    assert "duration<=120" in o
+    alternativas = o[o.index("-f") + 1].split("/")
+    assert len(alternativas) >= 2 and all("height<=1080" in a for a in alternativas)
     assert o[-2:] == ["--", "https://clips.twitch.tv/AbcDef"]
     assert not any(c.exists() for c in carpetas)
 
@@ -510,6 +512,7 @@ def correr(repo, nombre, tmp_path, video, **kw):
                            entorno={"GEMINI_API_KEY": "clave-de-prueba"}, espera=lambda s: None, **kw)
 
 
+@pytest.mark.slow
 def test_hacer_toma_de_punta_a_punta_pasa_la_puerta_de_estilo(repo, tmp_path, video20, carpetas):
     antes = registro.contador_toma(repo)
     r = correr(repo, "valida", tmp_path, video20)
@@ -527,6 +530,7 @@ def test_hacer_toma_de_punta_a_punta_pasa_la_puerta_de_estilo(repo, tmp_path, vi
     assert r.mp4.with_suffix(".plan.json").is_file()
 
 
+@pytest.mark.slow
 def test_hacer_toma_con_spoiler_es_descarte_con_su_motivo(repo, tmp_path, video20, carpetas):
     r = correr(repo, "spoiler", tmp_path, video20)
     assert not r.ok and r.mp4 is None
@@ -547,6 +551,7 @@ def test_hacer_toma_con_descarga_negada(repo, tmp_path):
     assert not r.ok and "descarga" in r.motivos[0] and "estado" in r.motivos[0]
 
 
+@pytest.mark.slow
 def test_hacer_toma_con_frase_larga_partida_pasa_la_puerta(repo, tmp_path, video20):
     r = correr(repo, "frase_larga_partible", tmp_path, video20)
     assert r.ok, r.motivos
@@ -612,6 +617,7 @@ def render_tipografico(tmp_path_factory, marca):
     return mp4, plan, d
 
 
+@pytest.mark.slow
 def test_cierre_con_los_ultimos_tres_fotogramas_en_negro_da_rojo(render_tipografico, marca, tmp_path):
     mp4, plan, _ = render_tipografico
     assert estilo.cierre_visible(mp4, plan, marca)[0]
@@ -636,6 +642,7 @@ def render_con_cuerpo(tmp_path_factory, marca, video20):
     return mp4, plan
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("campo,valor,fragmento", [
     ("duracion", float("nan"), "finito"),
     ("duracion", float("inf"), "finito"),
@@ -656,6 +663,7 @@ def test_cuerpo_coincide_rechaza_origen_duracion_erronea(render_con_cuerpo, marc
     assert not ok and fragmento in det, det
 
 
+@pytest.mark.slow
 def test_render_correcto_con_fuente_sintetica_de_60_fps_y_mucho_movimiento_pasa(marca, tmp_path):
     src = tmp_path / "f60.mp4"
     subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
@@ -685,6 +693,7 @@ def test_prueba_ojos_rechaza_salida_dentro_del_repo():
     assert prueba_ojos.main(["--salida", str(RAIZ_REAL / "salida-x")]) == 2
 
 
+@pytest.mark.slow
 def test_prueba_ojos_con_respuesta_grabada_deja_mp4_png_json_e_informe(tmp_path, video20, monkeypatch):
     from fabrica.editar import muestras, prueba_ojos
     monkeypatch.setattr(muestras, "descargar", lambda url, esperado, destino: shutil.copy(video20, destino) and destino)
@@ -696,3 +705,157 @@ def test_prueba_ojos_con_respuesta_grabada_deja_mp4_png_json_e_informe(tmp_path,
     assert any(n.endswith(".png") for n in nombres)
     assert "clave-de-prueba" not in "".join((tmp_path / "o" / n).read_text(encoding="utf-8", errors="ignore")
                                             for n in ("gemini.json", "informe.md"))
+
+
+# ---------------------------------------------------------------- ronda 1 de corrección
+
+def test_el_opener_no_sigue_redirecciones():
+    import urllib.request as ur
+    h = mod_descargar._SinRedirecciones()
+    req = ur.Request("https://ejemplo.invalid/a.mp4")
+    assert h.redirect_request(req, None, 302, "Found", {}, "http://otro.invalid/b.mp4") is None
+
+
+@pytest.mark.parametrize("destino", ["http://ejemplo.invalid/b.mp4", "https://otro-host.invalid/b.mp4"])
+def test_redireccion_a_otro_host_o_a_http_se_rechaza_sin_descargar(repo, carpetas, monkeypatch, destino):
+    import urllib.request as ur
+    import urllib.response as resp
+
+    class Falso(ur.HTTPSHandler):
+        visitas: list[str] = []
+
+        def https_open(self, req):
+            Falso.visitas.append(req.full_url)
+            r = resp.addinfourl(io.BytesIO(b""), {"Location": destino}, req.full_url, 302)
+            r.msg = "Found"
+            return r
+
+    monkeypatch.setattr(mod_descargar, "_opener", lambda: ur.build_opener(mod_descargar._SinRedirecciones, Falso))
+    with pytest.raises(mod_descargar.ErrorDescarga, match="redirección"):
+        with mod_descargar.descargar(repo, candidato(), ficha_propia(), HOY):
+            pass
+    assert Falso.visitas == [URL]                       # sólo se abrió la URL autorizada
+    assert not any(c.exists() for c in carpetas)
+
+
+def test_instruccion_de_la_muestra_pide_el_juego_esperado_y_no_gta(marca, temporada):
+    from fabrica.editar import prueba_ojos
+    texto = ojos.instruccion(marca, temporada, 52.0, prueba_ojos.JUEGO_MUESTRA)
+    assert "Sintel" in texto and "GTA 6" not in texto
+
+
+def test_validar_respuesta_nombra_el_juego_esperado(marca, temporada):
+    d = cargar_dato("juego_incorrecto")
+    ok, m = ojos.validar_respuesta(d, marca, temporada, duracion=20.0, juego="Sintel, cortometraje de Blender")
+    assert not ok and any("Sintel" in x for x in m)
+
+
+def test_prueba_ojos_manda_a_gemini_la_instruccion_de_la_muestra(tmp_path, video20, monkeypatch):
+    from fabrica.editar import muestras, prueba_ojos
+    monkeypatch.setattr(muestras, "descargar", lambda url, esperado, destino: shutil.copy(video20, destino) and destino)
+    t = transporte_con("juego_incorrecto")
+    prueba_ojos.correr(tmp_path / "o", entorno={"GEMINI_API_KEY": "clave-de-prueba"}, transporte=t)
+    texto = json.loads(t.llamadas[0][2])["contents"][0]["parts"][1]["text"]
+    assert "Sintel" in texto and "GTA 6" not in texto
+
+
+def test_el_tope_se_mide_sobre_el_json_serializado(tmp_path, monkeypatch):
+    monkeypatch.setattr(ojos, "TOPE_PETICION_BYTES", 3000)
+    t = Transporte()
+    m = mirar(tmp_path, t, video_bytes=b"\x00" * 2500)          # 2.5 KB crudos, más de 3 KB en base64
+    assert m.datos is None and "serializada" in m.motivo and t.llamadas == []
+
+
+def test_config_ojos_baja_a_14_mb():
+    cfg = yaml.safe_load((RAIZ_REAL / "config" / "ojos.yml").read_text(encoding="utf-8"))
+    assert cfg["max_mb_en_linea"] == 14
+    assert cfg["max_mb_en_linea"] * 1024 * 1024 * 4 / 3 < ojos.TOPE_PETICION_BYTES
+
+
+def test_anotar_clip_es_idempotente_tras_un_fallo_entre_las_dos_escrituras(repo, monkeypatch):
+    c = candidato(id_origen="clip-reintento")
+    original = puertas.anotar_visto
+    monkeypatch.setattr(puertas, "anotar_visto", lambda *a: (_ for _ in ()).throw(OSError("disco lleno")))
+    with pytest.raises(OSError):
+        registro.anotar_clip(repo, c, {"toma": 9, "plataforma": "shorts"})
+    monkeypatch.setattr(puertas, "anotar_visto", original)
+    registro.anotar_clip(repo, c, {"toma": 9, "plataforma": "shorts"})
+    filas = [f for f in puertas._filas_marcador(repo) if f["id_clip"] == "clip-reintento"]
+    assert len(filas) == 1
+    assert "clip-reintento" in (repo / "estado" / "vistos.txt").read_text(encoding="utf-8").split()
+    registro.anotar_clip(repo, c, {"toma": 9, "plataforma": "tiktok"})     # otra plataforma, otra fila
+    assert len([f for f in puertas._filas_marcador(repo) if f["id_clip"] == "clip-reintento"]) == 2
+
+
+# ---------------------------------------------------------------- ronda 1: hallazgos de Haiku
+
+def test_excepcion_inesperada_es_descarte_y_la_carpeta_propia_se_borra(repo, monkeypatch):
+    import tempfile as tf
+    creadas = []
+    real = toma.tempfile.mkdtemp
+    monkeypatch.setattr(toma.tempfile, "mkdtemp", lambda *a, **k: creadas.append(real(*a, **k)) or creadas[-1])
+
+    def rota(*a, **k):
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "inválido")
+    monkeypatch.setattr(toma.mod_descargar, "descargar", rota)
+    r = toma.hacer_toma(repo, candidato(), ficha_propia(), AHORA)
+    assert not r.ok and "error inesperado: UnicodeDecodeError" in r.motivos[0]
+    assert creadas and not any(Path(c).exists() for c in creadas)
+
+
+def test_incomplete_read_durante_la_descarga_no_sube(repo):
+    import http.client
+
+    class Cortada(Resp):
+        def read(self, n=-1):
+            raise http.client.IncompleteRead(b"abc")
+    r = toma.hacer_toma(repo, candidato(), ficha_propia(), AHORA, abrir=lambda u: Cortada(b"x"),
+                        entorno={"GEMINI_API_KEY": "x"})
+    assert not r.ok and r.motivos
+
+
+def test_redireccion_real_de_un_servidor_local_se_rechaza(tmp_path, monkeypatch):
+    import http.server
+    import threading
+    visitas = []
+
+    class Destino(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            visitas.append(self.path)
+            self.send_response(200); self.send_header("Content-Type", "video/mp4"); self.end_headers()
+            self.wfile.write(b"x" * 100)
+
+        def log_message(self, *a):
+            pass
+
+    destino = http.server.HTTPServer(("127.0.0.1", 0), Destino)
+
+    class Origen(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(302)
+            self.send_header("Location", f"http://127.0.0.1:{destino.server_address[1]}/robado.mp4")
+            self.end_headers()
+
+        def log_message(self, *a):
+            pass
+
+    origen = http.server.HTTPServer(("127.0.0.1", 0), Origen)
+    hilos = [threading.Thread(target=s.serve_forever, daemon=True) for s in (destino, origen)]
+    for h in hilos:
+        h.start()
+    try:
+        monkeypatch.setattr(mod_descargar, "_es_https", lambda u: True)     # el servidor local no habla TLS
+        with pytest.raises(mod_descargar.ErrorDescarga, match="redirección"):
+            mod_descargar.bajar_https(f"http://127.0.0.1:{origen.server_address[1]}/a.mp4", tmp_path / "a.mp4")
+    finally:
+        for s in (destino, origen):
+            s.shutdown(); s.server_close()
+    assert visitas == [] and not (tmp_path / "a.mp4").exists()
+
+
+def test_respuesta_de_sintel_con_juego_incorrecto_se_descarta_y_la_propia_pasa(marca, temporada):
+    from fabrica.editar import prueba_ojos
+    juego = prueba_ojos.JUEGO_MUESTRA
+    ok, m = ojos.validar_respuesta(cargar_dato("sintel_juego_incorrecto"), marca, temporada, duracion=60.0, juego=juego)
+    assert not ok and any("Sintel" in x for x in m)
+    assert ojos.validar_respuesta(cargar_dato("sintel_valida"), marca, temporada, duracion=60.0, juego=juego) == (True, [])

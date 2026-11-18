@@ -178,6 +178,7 @@ def test_puerta_en_verde_con_video_de_fuente(vertical, marca):
     assert any(x == "[plan] Textos caben en sus márgenes" for x, _, _ in puntos)
 
 
+@pytest.mark.slow
 @necesita_ffmpeg
 def test_cabecera_con_otro_gancho_sale_en_rojo(vertical, marca):
     plan = json.loads(json.dumps(vertical["plan"]))
@@ -186,6 +187,7 @@ def test_cabecera_con_otro_gancho_sale_en_rojo(vertical, marca):
     assert "[fotograma] Cabecera en el video" in malos(estilo.revisar(vertical["mp4"], plan, marca))
 
 
+@pytest.mark.slow
 @necesita_ffmpeg
 def test_cuerpo_de_otra_fuente_con_cierre_valido_sale_en_rojo(vertical, marca):
     otra = fuente_sintetica(vertical["base"] / "otra.mp4", 1080, 1920, 4, patron="smptebars")
@@ -208,6 +210,7 @@ def test_origen_que_falta_o_cambia_no_se_salta(vertical, marca, tmp_path):
     assert not estilo.cuerpo_coincide(vertical["mp4"], plan, marca)[0]
 
 
+@pytest.mark.slow
 @necesita_ffmpeg
 def test_dialogo_distinto_sale_en_rojo(vertical, marca):
     plan = json.loads(json.dumps(vertical["plan"]))
@@ -215,6 +218,7 @@ def test_dialogo_distinto_sale_en_rojo(vertical, marca):
     assert "[fotograma] Diálogo en el video" in malos(estilo.revisar(vertical["mp4"], plan, marca))
 
 
+@pytest.mark.slow
 def test_la_fuente_del_plan_debe_coincidir_con_marca(marca, vertical):
     plan = json.loads(json.dumps(vertical["plan"]))
     plan["fuente"]["archivos"]["bold"] = "marca/fuentes/otra.ttf"
@@ -222,6 +226,7 @@ def test_la_fuente_del_plan_debe_coincidir_con_marca(marca, vertical):
         estilo.revisar(vertical["mp4"], plan, marca))
 
 
+@pytest.mark.slow
 @necesita_ffmpeg
 def test_cierre_correcto_pasa_corte_sin_credito_falla_y_credito_distinto_falla(vertical, marca, tmp_path):
     plan = vertical["plan"]
@@ -377,6 +382,7 @@ def test_plan_con_cuerpo_sin_origen_sale_en_rojo(vertical, marca):
     assert estilo.cuerpo_coincide(vertical["mp4"], p4, marca)[0]
 
 
+@pytest.mark.slow
 @necesita_ffmpeg
 def test_mp4_alargado_despues_del_cierre_sale_en_rojo(vertical, marca, tmp_path):
     largo = tmp_path / "largo.mp4"
@@ -434,6 +440,7 @@ def test_tinta_extra_en_el_fotograma_se_detecta(marca):
     assert d > estilo.K_BLOQUE
 
 
+@pytest.mark.slow
 @necesita_ffmpeg
 def test_credito_con_texto_extra_sale_en_rojo(vertical, marca, tmp_path):
     mp4 = tmp_path / "extra.mp4"
@@ -463,11 +470,13 @@ def _con_cambio(vertical, marca, tmp_path, toma=None, frase=None):
     ({"toma": {"gancho": "Ella buscs a un dragón"}}, "[fotograma] Cabecera en el video"),
     ({"frase": "¿Qué te trae por aquí!"}, "[fotograma] Diálogo en el video"),
 ])
+@pytest.mark.slow
 def test_un_cambio_de_una_letra_sale_en_rojo(vertical, marca, tmp_path, cambio, punto):
     mp4 = _con_cambio(vertical, marca, tmp_path, **cambio)
     assert punto in malos(estilo.revisar(mp4, vertical["plan"], marca))
 
 
+@pytest.mark.slow
 @necesita_ffmpeg
 def test_el_video_correcto_no_da_discrepancias(vertical, marca):
     puntos = estilo.revisar(vertical["mp4"], vertical["plan"], marca)
