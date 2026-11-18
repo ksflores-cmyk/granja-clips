@@ -360,6 +360,25 @@ def validar_modo(m, inf: Informe) -> None:
         inf.error(f"{rel}: plataformas_activas debe ser una lista dentro de shorts, tiktok, reels")
 
 
+def validar_ojos(o, inf: Informe) -> None:
+    rel = "config/ojos.yml"
+    if not _claves(o, rel, ["modelo", "modelos_respaldo", "max_mb_en_linea", "temperatura"], inf):
+        return
+    if not (isinstance(o["modelo"], str) and o["modelo"].strip()):
+        inf.error(f"{rel}: modelo debe ser texto")
+    r = o["modelos_respaldo"]
+    if not (isinstance(r, list) and all(isinstance(x, str) and x.strip() for x in r)):
+        inf.error(f"{rel}: modelos_respaldo debe ser una lista de nombres de modelo")
+    elif o["modelo"] in r or len(set(r)) != len(r):
+        inf.error(f"{rel}: modelos_respaldo no puede repetir modelos")
+    mb = o["max_mb_en_linea"]
+    if isinstance(mb, bool) or not isinstance(mb, (int, float)) or not 0 < mb <= 20:
+        inf.error(f"{rel}: max_mb_en_linea debe ser un número mayor que 0 y de 20 como máximo")
+    t = o["temperatura"]
+    if isinstance(t, bool) or not isinstance(t, (int, float)) or not 0 <= t <= 2:
+        inf.error(f"{rel}: temperatura debe ser un número de 0 a 2")
+
+
 def validar_canales(c, inf: Informe) -> None:
     rel = "config/canales.yml"
     if not isinstance(c, dict):
@@ -446,6 +465,9 @@ def validar(raiz=None) -> Informe:
         validar_modo(datos["modo"], inf)
     if datos["canales"] is not None:
         validar_canales(datos["canales"], inf)
+    ojos = _cargar(raiz, "config/ojos.yml", inf)
+    if ojos is not None:
+        validar_ojos(ojos, inf)
     validar_pausa(raiz, inf)
     validar_csv(raiz, "marcador.csv", CABECERA_MARCADOR, inf)
     validar_csv(raiz, "envios-pendientes.csv", CABECERA_ENVIOS, inf)
