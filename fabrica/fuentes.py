@@ -74,7 +74,8 @@ def puede_descargar(ficha: dict) -> tuple[bool, str]:
     return False, f"tipo {tipo!r} desconocido"
 
 
-def autoriza_descarga(ficha: dict | None, hoy: date, uso: str, url: str | None = None) -> tuple[bool, str]:
+def autoriza_descarga(ficha: dict | None, hoy: date, uso: str, url: str | None = None,
+                      pilar: str | None = None) -> tuple[bool, str]:
     """Puerta única ANTES de abrir una conexión. El motivo nombra la condición que falló."""
     if not isinstance(ficha, dict):
         return False, "ficha ausente: la fuente no está registrada en fuentes.yml"
@@ -91,12 +92,12 @@ def autoriza_descarga(ficha: dict | None, hoy: date, uso: str, url: str | None =
     if not ok:
         return False, f"no descargable: {motivo}"
     if uso == "produccion":
-        ok, motivo = es_publicable(ficha, hoy)
+        ok, motivo = es_publicable(ficha, hoy, None, pilar)
         if not ok:
             return False, f"uso produccion no autorizado: {motivo}"
     elif uso == "muestras":
         if ficha.get("uso") != "muestras":
-            ok, motivo = es_publicable(ficha, hoy)
+            ok, motivo = es_publicable(ficha, hoy, None, pilar)
             if not ok:
                 return False, f"uso muestras no autorizado: la ficha no es de muestras ni publicable ({motivo})"
     else:
