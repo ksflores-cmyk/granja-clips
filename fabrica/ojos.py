@@ -70,12 +70,14 @@ def _sin_acentos(t: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", str(t).lower()) if unicodedata.category(c) != "Mn")
 
 
-def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: str | None = None) -> str:
+def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: str | None = None,
+                nota: str | None = None) -> str:
     """Arma la instrucción desde `ojos_prompt.md` con la duración, el juego y las listas de marca y temporada."""
     texto = RUTA_PROMPT.read_text(encoding="utf-8")
     cambios = {
         "{{DURACION}}": f"{duracion:.1f}" if duracion else "desconocida",
         "{{JUEGO}}": str(juego or temporada.get("nombre", "")),
+        "{{NOTA_ESPECIAL}}": nota or "",
         "{{GANCHOS_PROHIBIDOS}}": ", ".join(marca.ganchos_prohibidos()),
         "{{PALABRAS_EVITAR}}": ", ".join(str(p) for p in temporada.get("palabras_evitar", [])),
     }
@@ -126,7 +128,7 @@ def _texto_de_respuesta(texto_http: str) -> str:
 
 def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracion: float | None = None,
           transporte=None, espera=time.sleep, entorno=None, config: dict | None = None,
-          juego: str | None = None) -> Mirada:
+          juego: str | None = None, nota: str | None = None) -> Mirada:
     """Le pide a Gemini el análisis del clip. Reintenta una vez ante 429 o 5xx; ante 404 prueba el modelo siguiente."""
     env = os.environ if entorno is None else entorno
     clave = env.get("GEMINI_API_KEY", "")
@@ -139,7 +141,7 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
     if tam > tope:
         return Mirada(None, motivo=f"el video pesa {tam / 1048576:.1f} MB y el máximo en línea es "
                                    f"{cfg['max_mb_en_linea']} MB")
-    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego), ruta_video.read_bytes(),
+    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego, nota), ruta_video.read_bytes(),
                              float(cfg["temperatura"]))
     if len(cuerpo) > TOPE_PETICION_BYTES:     # el base64 infla un tercio: se mide lo que de verdad se envía
         return Mirada(None, motivo=f"la petición serializada pesa {len(cuerpo) / 1048576:.1f} MB y el tope es "

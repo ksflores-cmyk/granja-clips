@@ -27,6 +27,13 @@ from .marca import Marca
 ID_MUESTRA = "dialogo-sintel"
 JUEGO_MUESTRA = "Sintel, cortometraje de Blender (no es un videojuego: aquí juego_correcto significa que es Sintel)"
 
+NOTA_MUESTRA = (
+    "NOTA PARA ESTA MUESTRA (anula lo anterior sólo en este punto): el video es una muestra autorizada, un "
+    "cortometraje con licencia CC BY. Aquí `cinematica` se evalúa como \"escena sin transformación editorial\": un "
+    "fragmento de diálogo del corto NO cuenta como cinemática aislada, así que pon `cinematica: false` salvo que "
+    "sea una escena sin diálogo ni acción que aporte contexto. El resto de las reglas sigue igual."
+)
+
 
 def correr(salida: Path, *, entorno=None, transporte=None) -> int:
     env = os.environ if entorno is None else entorno
@@ -52,7 +59,7 @@ def correr(salida: Path, *, entorno=None, transporte=None) -> int:
         ruta = muestras.descargar(vid["url"], vid["sha256"], tmp / Path(vid["url"]).name)
         dur_src = sondear_video(ruta)["duracion"]
         mirada = ojos.mirar(ruta, marca, temporada, duracion=dur_src, entorno=env, transporte=transporte,
-                       juego=JUEGO_MUESTRA)
+                       juego=JUEGO_MUESTRA, nota=NOTA_MUESTRA)
         informe += [f"- Modelo que respondió: {mirada.modelo}", *[f"- Intento: {i}" for i in mirada.intentos]]
         if mirada.datos is None:
             informe += ["", f"RESULTADO: sin datos de Gemini ({mirada.motivo})."]

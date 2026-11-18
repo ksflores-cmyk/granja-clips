@@ -41,7 +41,7 @@ def anotar_clip(raiz, candidato, fila: dict) -> dict:
 
     El id de origen va en `id_clip` y como `origen:<id>` en `notas`, que son los lugares donde
     `puertas.ids_en_marcador` lo busca; además `puertas.anotar_visto` lo apunta en estado/vistos.txt.
-    Así las dos defensas contra repetidos no se pueden olvidar. Devuelve la fila escrita.
+    Así las dos defensas contra repetidos no se pueden olvidar. Devuelve la fila persistida (la ya guardada si era un reintento).
     Si la fila es inválida (columnas desconocidas) no se anota nada. Es idempotente: si ya hay una fila con ese id
     y plataforma no escribe otra, y anota el visto igualmente (reintento tras un fallo entre las dos escrituras).
     """
@@ -54,12 +54,14 @@ def anotar_clip(raiz, candidato, fila: dict) -> dict:
     fila["id_clip"] = id_origen
     fila["notas"] = f"origen:{id_origen}" + (f"; {previas}" if previas else "")
     plataforma = str(fila.get("plataforma") or "")
-    existe = any((f.get("id_clip") or "").strip() == id_origen and (f.get("plataforma") or "") == plataforma
-                 for f in puertas._filas_marcador(raiz))
-    if not existe:                      # idempotente: un reintento tras un fallo no duplica la fila
-        anotar_fila(raiz, fila)
+    with _candado(raiz_repo(raiz) / "marcador.csv"):      # búsqueda y alta bajo el mismo candado
+        previa = next((f for f in puertas._filas_marcador(raiz)
+                       if (f.get("id_clip") or "").strip() == id_origen and (f.get("plataforma") or "") == plataforma),
+                      None)
+        if previa is None:              # idempotente: un reintento tras un fallo no duplica la fila
+            anotar_fila(raiz, fila)
     puertas.anotar_visto(raiz, id_origen)
-    return fila
+    return dict(previa) if previa is not None else fila
 
 
 def _bloquear(f) -> None:

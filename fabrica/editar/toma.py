@@ -86,14 +86,15 @@ def hacer_toma(raiz, candidato, ficha: dict | None, ahora: datetime, *, salida: 
     (en cualquier descarte o error se borra). Cualquier excepción inesperada es un descarte con su motivo.
     """
     propia = salida is None
-    carpeta = Path(salida) if salida is not None else Path(tempfile.mkdtemp(prefix="granja-toma-"))
+    carpeta: Path | None = None
     r = None
     try:
+        carpeta = Path(salida) if salida is not None else Path(tempfile.mkdtemp(prefix="granja-toma-"))
         r = _hacer_toma(raiz, candidato, ficha, ahora, carpeta, abrir, ejecutor, transporte, espera, entorno)
     except Exception as e:  # noqa: BLE001 (nada debe subir sin control: es un descarte)
         r = Resultado(False, [f"error inesperado: {type(e).__name__}: {e}"])
     finally:
-        if propia and not (r is not None and r.ok):
+        if propia and carpeta is not None and not (r is not None and r.ok):
             shutil.rmtree(carpeta, ignore_errors=True)
     return r
 

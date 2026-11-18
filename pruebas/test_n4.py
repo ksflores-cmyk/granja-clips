@@ -859,3 +859,40 @@ def test_respuesta_de_sintel_con_juego_incorrecto_se_descarta_y_la_propia_pasa(m
     ok, m = ojos.validar_respuesta(cargar_dato("sintel_juego_incorrecto"), marca, temporada, duracion=60.0, juego=juego)
     assert not ok and any("Sintel" in x for x in m)
     assert ojos.validar_respuesta(cargar_dato("sintel_valida"), marca, temporada, duracion=60.0, juego=juego) == (True, [])
+
+
+# ---------------------------------------------------------------- ronda 2
+
+def test_prompt_de_la_muestra_aclara_cinematica_y_el_de_produccion_conserva_el_veto(marca, temporada):
+    from fabrica.editar import prueba_ojos
+    muestra = ojos.instruccion(marca, temporada, 52.0, prueba_ojos.JUEGO_MUESTRA, prueba_ojos.NOTA_MUESTRA)
+    prod = ojos.instruccion(marca, temporada, 52.0)
+    assert "escena sin transformación editorial" in muestra and "NO cuenta como cinemática aislada" in muestra
+    assert "CC BY" in muestra and "cinemática aislada" in muestra
+    assert "sin transformación editorial" not in prod and "{{" not in prod and "{{" not in muestra
+    assert "una cinemática aislada" in prod and "GTA 6" in prod
+
+
+def test_prueba_ojos_envia_la_nota_de_la_muestra(tmp_path, video20, monkeypatch):
+    from fabrica.editar import muestras, prueba_ojos
+    monkeypatch.setattr(muestras, "descargar", lambda url, esperado, destino: shutil.copy(video20, destino) and destino)
+    t = transporte_con("juego_incorrecto")
+    prueba_ojos.correr(tmp_path / "o", entorno={"GEMINI_API_KEY": "clave-de-prueba"}, transporte=t)
+    assert "escena sin transformación editorial" in json.loads(t.llamadas[0][2])["contents"][0]["parts"][1]["text"]
+
+
+def test_mkdtemp_que_falla_da_resultado_no_ok(repo, monkeypatch):
+    def falla(*a, **k):
+        raise OSError("sin espacio")
+    monkeypatch.setattr(toma.tempfile, "mkdtemp", falla)
+    r = toma.hacer_toma(repo, candidato(), ficha_propia(), AHORA)
+    assert not r.ok and "error inesperado: OSError" in r.motivos[0]
+
+
+def test_anotar_clip_devuelve_la_fila_persistida_en_un_reintento_con_otros_datos(repo):
+    c = candidato(id_origen="clip-persistida")
+    registro.anotar_clip(repo, c, {"toma": 9, "plataforma": "shorts"})
+    devuelta = registro.anotar_clip(repo, c, {"toma": 10, "plataforma": "shorts"})
+    filas = [f for f in puertas._filas_marcador(repo) if f["id_clip"] == "clip-persistida"]
+    assert len(filas) == 1 and filas[0]["toma"] == "9" and str(devuelta["toma"]) == "9"
+    assert devuelta["id_clip"] == "clip-persistida" and devuelta["notas"] == "origen:clip-persistida"

@@ -16,3 +16,5 @@ Qué debes decidir
 Palabras que NO pueden aparecer en el gancho, en la escena ni en las líneas (son spoilers): {{PALABRAS_EVITAR}}.
 
 Voz del canal: español claro, seco y con humor, frases cortas. Sin emojis. Sin mayúsculas gritadas en las frases. Responde únicamente con el JSON.
+
+{{NOTA_ESPECIAL}}
