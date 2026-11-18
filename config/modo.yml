@@ -1,5 +1,6 @@
 # valores de modo: ensayo, vivo
-# A1 lo cambia a vivo el 18 nov a las 11:00 si las puertas están en verde
-modo: ensayo
+# Vivo desde el 18 nov 2026 a las 4:40 a. m.: Kevin pidió que los clips salgan antes de las 11:00 y
+# las puertas, el almacén y el borrador real de Buffer quedaron en verde (corrida 44286045765).
+modo: vivo
 # valores: shorts, tiktok, reels
-plataformas_activas: []
+plataformas_activas: [shorts, tiktok, reels]
