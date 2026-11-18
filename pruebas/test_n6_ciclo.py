@@ -794,7 +794,7 @@ def wf():
 
 def test_workflow_cron_y_disparo_manual(wf):
     on = wf[True]
-    assert on["schedule"] == [{"cron": "7 * * * *"}]
+    assert on["schedule"] == [{"cron": "7 */1 * * *"}]   # cada hora, minuto 7
     entrada = on["workflow_dispatch"]["inputs"]["ensayo_forzado"]
     assert entrada["type"] == "boolean" and entrada["default"] is False
 

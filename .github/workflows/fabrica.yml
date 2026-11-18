@@ -4,7 +4,7 @@ name: fabrica
 # Con PAUSA, `decidir` dice trabajo=no en menos de un minuto y `producir` se salta.
 on:
   schedule:
-    - cron: "7 * * * *"
+    - cron: "7 */1 * * *"
   workflow_dispatch:
     inputs:
       ensayo_forzado:
