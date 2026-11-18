@@ -1,0 +1,60 @@
+name: ojos-prueba
+
+# Prueba manual de los ojos (Gemini) con la muestra dialogo-sintel (CC BY, sólo muestras).
+# No publica nada y no escribe en ninguna rama. Sin el secreto GEMINI_API_KEY lo dice y sale en verde.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ojos-prueba-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ojos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - name: Comprobar la clave
+        id: clave
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "tiene=no" >> "$GITHUB_OUTPUT"
+            echo "sin GEMINI_API_KEY: no hay secreto en este repo, la prueba de los ojos no hace nada." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "tiene=si" >> "$GITHUB_OUTPUT"
+            echo "GEMINI_API_KEY presente (el valor no se muestra)."
+          fi
+      - uses: actions/checkout@v4
+        if: steps.clave.outputs.tiene == 'si'
+      - uses: actions/setup-python@v5
+        if: steps.clave.outputs.tiene == 'si'
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalar ffmpeg
+        if: steps.clave.outputs.tiene == 'si'
+        timeout-minutes: 6
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update -q
+          sudo apt-get -o Acquire::Retries=3 install -y -q --no-install-recommends ffmpeg
+      - if: steps.clave.outputs.tiene == 'si'
+        run: pip install -r requirements.txt
+      - name: Pedirle a Gemini el JSON y renderizar la toma
+        if: steps.clave.outputs.tiene == 'si'
+        run: python -m fabrica.editar.prueba_ojos --salida "$RUNNER_TEMP/ojos"
+      - name: Resumen
+        if: always() && steps.clave.outputs.tiene == 'si'
+        run: cat "$RUNNER_TEMP/ojos/informe.md" >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Subir MP4, PNG, JSON de Gemini e informe
+        if: always() && steps.clave.outputs.tiene == 'si'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ojos
+          path: ${{ runner.temp }}/ojos
+          retention-days: 3
+          if-no-files-found: error
