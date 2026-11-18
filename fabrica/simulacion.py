@@ -78,6 +78,11 @@ class SupabaseSimulado:
                 return _json(200, {"id": "clips"}) if self.bucket else _json(404, {"error": "Bucket not found"})
             self.bucket = True
             return _json(200, {"name": "clips"})
+        if ruta.startswith("/storage/v1/object/info/") and metodo == "GET":
+            publica = ruta.replace("/object/info/", "/object/public/", 1)
+            if publica in self.objetos:
+                return _json(200, {"name": publica.rsplit("/", 1)[-1]})
+            return _json(400, {"statusCode": "404", "error": "not_found", "message": "Object not found"})
         if ruta.startswith("/storage/v1/object/public/"):
             if ruta in self.objetos:
                 return 206, {"content-type": "video/mp4"}, b"\x00"
