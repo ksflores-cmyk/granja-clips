@@ -162,8 +162,12 @@ def _es_objeto_no_encontrado(datos: bytes) -> bool:
         return False
     if not isinstance(cuerpo, dict):
         return False
-    texto = f"{cuerpo.get('error', '')} {cuerpo.get('message', '')}".lower()
-    return "bucket" not in texto and ("object not found" in texto or str(cuerpo.get("error", "")).lower() == "not_found")
+    error, mensaje = cuerpo.get("error", ""), cuerpo.get("message", "")
+    if not (isinstance(error, str) and isinstance(mensaje, str)):
+        return False
+    texto = f"{error} {mensaje}".lower()
+    # Indicación explícita de OBJETO: "Route not found" o "Bucket not found" no valen.
+    return "bucket" not in texto and ("object not found" in mensaje.lower() or "object not found" in error.lower())
 
 
 def crear_mp4_de_prueba(destino) -> Path:
