@@ -437,6 +437,83 @@ def _archivos(raiz: Path):
             yield p
 
 
+def _sin_acentos_may(t: str) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", str(t)) if unicodedata.category(c) != "Mn").upper()
+
+
+def _ganchos_genericos(marca) -> list[str]:
+    """Los ganchos prohibidos que `marca.yml` lista en `prohibido` ("ganchos genéricos (A, B, C)")."""
+    out: list[str] = []
+    for item in (marca or {}).get("prohibido") or [] if isinstance(marca, dict) else []:
+        m = re.search(r"ganchos gen[eé]ricos\s*\((.*)\)", str(item), re.I)
+        if m:
+            out += [x.strip() for x in m.group(1).split(",") if x.strip()]
+    return out
+
+
+def validar_informativas(datos, marca, inf: Informe) -> None:
+    rel = "informativas.yml"
+    lista = datos.get("informativas") if isinstance(datos, dict) else None
+    if not isinstance(lista, list) or not lista:
+        inf.error(f"{rel}: debe traer `informativas:` con al menos una entrada")
+        return
+    genericos = [_sin_acentos_may(g) for g in _ganchos_genericos(marca)]
+    vistos: set[str] = set()
+    for i, e in enumerate(lista, 1):
+        if not isinstance(e, dict):
+            inf.error(f"{rel}: la entrada {i} debe ser un diccionario")
+            continue
+        et = f"{rel}: entrada {e.get('id', i)}"
+        faltan = [c for c in ("id", "gancho", "palabra_lapiz", "titular", "datos", "fuente_url",
+                              "verificado_el", "vigente_desde", "vigente_hasta", "usada") if c not in e]
+        if faltan:
+            inf.error(f"{et}: faltan las claves {', '.join(faltan)}")
+            continue
+        if not (isinstance(e["id"], str) and RE_ID.match(e["id"])):
+            inf.error(f"{et}: id inválido (minúsculas, números y guiones)")
+        elif e["id"] in vistos:
+            inf.error(f"{et}: id repetido")
+        vistos.add(str(e["id"]))
+        gancho = e["gancho"]
+        if not (isinstance(gancho, str) and gancho.strip()):
+            inf.error(f"{et}: gancho vacío")
+        else:
+            if len(gancho.split()) > 6:
+                inf.error(f"{et}: el gancho pasa de 6 palabras")
+            g = _sin_acentos_may(gancho)
+            if any(x and x in g for x in genericos):
+                inf.error(f"{et}: gancho genérico prohibido por marca.yml")
+            lapiz = _sin_acentos_may(e["palabra_lapiz"]).strip(".,;:¿?¡!\"'()")
+            if not lapiz or lapiz not in [w.strip(".,;:¿?¡!\"'()") for w in g.split()]:
+                inf.error(f"{et}: palabra_lapiz debe ser una palabra del gancho")
+        if not (isinstance(e["titular"], str) and e["titular"].strip()):
+            inf.error(f"{et}: titular vacío")
+        d = e["datos"]
+        if not (isinstance(d, list) and 2 <= len(d) <= 3 and all(isinstance(x, str) and x.strip() for x in d)):
+            inf.error(f"{et}: datos debe ser una lista de 2 o 3 viñetas de texto")
+        elif any(len(x) > 70 for x in d):
+            inf.error(f"{et}: cada viñeta de datos debe ser corta (70 caracteres como máximo)")
+        u = e["fuente_url"]
+        if not (isinstance(u, str) and u.startswith("https://") and len(u) > 8):
+            inf.error(f"{et}: fuente_url debe ser https")
+        if _a_fecha(e["verificado_el"]) is None:
+            inf.error(f"{et}: verificado_el no es una fecha")
+        ts = []
+        for c in ("vigente_desde", "vigente_hasta"):
+            try:
+                dt = e[c] if isinstance(e[c], datetime) else datetime.fromisoformat(str(e[c]))
+                if dt.tzinfo is None:
+                    raise ValueError("sin zona")
+                ts.append(dt)
+            except ValueError:
+                inf.error(f"{et}: {c} debe ser una fecha ISO con zona horaria")
+        if len(ts) == 2 and ts[0] >= ts[1]:
+            inf.error(f"{et}: vigente_desde debe ser anterior a vigente_hasta")
+        if not isinstance(e["usada"], bool):
+            inf.error(f"{et}: usada debe ser true o false")
+
+
 def validar_sin_media(raiz: Path, inf: Informe) -> None:
     for p in _archivos(raiz):
         if p.suffix.lower() in EXT_MEDIA:
@@ -484,6 +561,9 @@ def validar(raiz=None) -> Informe:
     almacen = _cargar(raiz, "config/almacen.yml", inf)
     if almacen is not None:
         validar_almacen(almacen, inf)
+    informativas = _cargar(raiz, "informativas.yml", inf)
+    if informativas is not None:
+        validar_informativas(informativas, datos["marca"], inf)
     validar_pausa(raiz, inf)
     validar_csv(raiz, "marcador.csv", CABECERA_MARCADOR, inf)
     validar_csv(raiz, "envios-pendientes.csv", CABECERA_ENVIOS, inf)

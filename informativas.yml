@@ -1,0 +1,17 @@
+# Banco de Informativas tipográficas (sin metraje). Cada entrada es un dato verificado en una fuente oficial.
+# Una entrada se usa una sola vez (`usada: true` la marca la fábrica cuando se publica en vivo) y sólo dentro
+# de su vigencia. No se añade ningún dato que no esté en `fuente_url`.
+informativas:
+  - id: gta6-desbloqueo-medianoche
+    gancho: "GTA 6 llega esta medianoche"
+    palabra_lapiz: "MEDIANOCHE"
+    titular: "se desbloquea a la medianoche local"
+    datos:
+      - "Medianoche local del 19 de noviembre."
+      - "En todas las regiones."
+      - "En PS5 y Xbox Series X|S."
+    fuente_url: https://support.rockstargames.com/articles/29jV3Cv2cCgvwM1XgtMO5o/grand-theft-auto-vi-regional-pre-load-and-release-times-on-playstation-5-and-xbox-series-x-or-s
+    verificado_el: 2026-11-17      # soporte de Rockstar, leído el 17 nov 2026
+    vigente_desde: "2026-11-17T12:00:00-06:00"
+    vigente_hasta: "2026-11-18T23:59:00-06:00"
+    usada: false
