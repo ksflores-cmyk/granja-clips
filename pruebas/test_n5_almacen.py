@@ -65,10 +65,14 @@ def test_subida_correcta_ruta_url_y_encabezados(tmp_path):
     assert c["cuerpo"] == mp4.read_bytes()
 
 
-def test_archivo_de_mas_de_50_mb_se_rechaza_antes_de_subir(tmp_path):
-    mp4 = mp4_falso(tmp_path, b"x")
-    a, esp = almacen([F.resp(200, "{}")], config={**CONFIG, "max_mb": 1})
-    mp4.write_bytes(b"x" * (1024 * 1024 + 1))
+def test_archivo_de_mas_de_50_mb_se_rechaza_antes_de_subir_con_el_tope_real(tmp_path):
+    from fabrica.config import cargar_yaml
+    real = cargar_yaml("config/almacen.yml")
+    assert real["max_mb"] == 50
+    mp4 = tmp_path / "grande.mp4"
+    with open(mp4, "wb") as f:               # archivo disperso: pesa 50 MB + 1 byte sin ocupar disco
+        f.truncate(50 * 1024 * 1024 + 1)
+    a, esp = almacen([F.resp(200, "{}")], config=real)
     with pytest.raises(ErrorAlmacen, match="no se sube"):
         a.subir(mp4, 1)
     assert esp.llamadas == []
@@ -81,8 +85,9 @@ def test_archivo_de_exactamente_el_tope_si_sube(tmp_path):
     assert len(esp.llamadas) == 1
 
 
-def test_url_publica_200_con_video_pasa():
-    a, esp = almacen([F.resp(206, b"\x00", "video/mp4")])
+@pytest.mark.parametrize("estado", [200, 206])
+def test_url_publica_con_video_pasa_con_200_y_con_206(estado):
+    a, esp = almacen([F.resp(estado, b"\x00", "video/mp4")])
     a.comprobar(URL_PUBLICA + "ab12cd34.mp4")
     c = esp.llamadas[0]
     assert c["metodo"] == "GET" and c["encabezados"]["Range"] == "bytes=0-0"

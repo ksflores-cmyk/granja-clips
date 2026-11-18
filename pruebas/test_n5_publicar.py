@@ -70,11 +70,43 @@ def test_confirmar_canales_devuelve_los_ids_ignorando_el_ajeno(tmp_path):
     assert ids == {"shorts": "canal-yt-001", "tiktok": "canal-tt-001", "reels": "canal-ig-001"}
 
 
-def test_confirmar_acepta_arroba_y_mayusculas_y_displayname():
-    api = [{"id": "x1", "name": "otro", "displayName": "@GuionVivo", "service": "youtube", "isQueuePaused": False}]
-    cfg = {"shorts": CANALES_CFG["shorts"]}
-    assert confirmar_canales(api, {"shorts": {**cfg["shorts"], "nombre_esperado": "@guionVIVO"}},
-                             None, ["shorts"], escribir=False) == {"shorts": "x1"}
+def test_confirmar_acepta_arroba_y_mayusculas_en_name():
+    api = [{"id": "x1", "name": "GuionVivo", "displayName": "Otro Nombre", "service": "youtube",
+            "isQueuePaused": False}]
+    cfg = {"shorts": {**CANALES_CFG["shorts"], "nombre_esperado": "@guionVIVO"}}
+    assert confirmar_canales(api, cfg, None, ["shorts"], escribir=False) == {"shorts": "x1"}
+
+
+def test_name_ajeno_con_displayname_igual_es_alerta_roja(repo):
+    sin_pausa(repo)
+    api = [{"id": "x1", "name": "cuenta_de_otro", "displayName": "guionvivo", "service": "youtube",
+            "isQueuePaused": False}]
+    with pytest.raises(AlertaRoja, match="no confirmado"):
+        confirmar_canales(api, {"shorts": CANALES_CFG["shorts"]}, repo, ["shorts"])
+    assert (repo / "PAUSA").exists()
+
+
+def test_id_guardado_distinto_al_de_la_api_es_alerta_roja():
+    api = [{"id": "x1", "name": "guionvivo", "service": "youtube", "isQueuePaused": False, "_org": "o1"}]
+    cfg = {"shorts": {**CANALES_CFG["shorts"], "buffer_channel_id": "otro-id", "buffer_org_id": "o1"}}
+    with pytest.raises(AlertaRoja, match="no es el confirmado"):
+        confirmar_canales(api, cfg, None, ["shorts"], escribir=False)
+
+
+def test_organizacion_distinta_a_la_guardada_es_alerta_roja():
+    api = [{"id": "x1", "name": "guionvivo", "service": "youtube", "isQueuePaused": False, "_org": "o2"}]
+    cfg = {"shorts": {**CANALES_CFG["shorts"], "buffer_channel_id": "x1", "buffer_org_id": "o1"}}
+    with pytest.raises(AlertaRoja, match="otra organización"):
+        confirmar_canales(api, cfg, None, ["shorts"], escribir=False)
+
+
+def test_exigir_guardado_sin_ids_lanza_sin_confirmar_y_con_ids_pasa():
+    api = [{"id": "x1", "name": "guionvivo", "service": "youtube", "isQueuePaused": False, "_org": "o1"}]
+    with pytest.raises(publicar.SinConfirmar, match="ensayo con claves"):
+        confirmar_canales(api, {"shorts": CANALES_CFG["shorts"]}, None, ["shorts"], escribir=False,
+                          exigir_guardado=True)
+    cfg = {"shorts": {**CANALES_CFG["shorts"], "buffer_channel_id": "x1", "buffer_org_id": "o1"}}
+    assert confirmar_canales(api, cfg, None, ["shorts"], escribir=False, exigir_guardado=True) == {"shorts": "x1"}
 
 
 def test_canal_ajeno_crea_pausa_con_su_motivo_y_la_alerta_para_n6(repo):
@@ -105,9 +137,11 @@ def test_dos_canales_iguales_no_se_adivinan(tmp_path):
 
 
 def test_guardar_ids_cambia_solo_buffer_channel_id(repo):
-    publicar.guardar_ids_de_canales(repo, {"shorts": "canal-yt-001", "reels": "canal-ig-001"})
+    publicar.guardar_ids_de_canales(repo, {"shorts": "canal-yt-001", "reels": "canal-ig-001"},
+                                    {"shorts": "org-ejemplo-001", "reels": "org-ejemplo-001"})
     datos = yaml.safe_load((repo / "config" / "canales.yml").read_text(encoding="utf-8"))
     assert datos["shorts"]["buffer_channel_id"] == "canal-yt-001"
+    assert datos["shorts"]["buffer_org_id"] == "org-ejemplo-001" and datos["tiktok"]["buffer_org_id"] is None
     assert datos["reels"]["buffer_channel_id"] == "canal-ig-001"
     assert datos["tiktok"]["buffer_channel_id"] is None
     assert datos["shorts"]["nombre_esperado"] == "guionvivo"
@@ -360,7 +394,7 @@ def test_cuota_por_canal_y_resumen(tmp_path):
     q = Cuota(tmp_path, lambda: AHORA)
     for _ in range(800):
         q.registrar("canal-yt-001")
-    # el día ya va por 480 (80 % de 600): se detiene por el día antes que por el canal
+    # 800 llamadas: el día (tope 600, 80 % = 480) se detiene antes que el canal (tope 1000)
     with pytest.raises(ErrorCuota, match="dia"):
         Cuota(tmp_path, lambda: AHORA + timedelta(hours=1)).comprobar("canal-yt-001")
     assert Cuota(tmp_path, lambda: AHORA + timedelta(days=1)).resumen()["dia"] == "0/600"
@@ -530,7 +564,9 @@ def almacen_con_video(tmp_path, ruta):
     alm = Almacen("https://simulado.invalid", "k", CONFIG_ALMACEN, supa)
     supa.objetos["/storage/v1/object/public/clips/" + ruta] = b"x"
     publicar._escribir_json(tmp_path / "estado" / "buffer-envios.json", [
-        {"post_id": "post-ejemplo-001", "plataforma": "shorts", "ruta": ruta, "canal": "canal-yt-001"}])
+        {"id": "shorts|12|2026-11-18T17:00:00.000Z", "post_id": "post-ejemplo-001", "plataforma": "shorts",
+         "ruta": ruta, "canal": "canal-yt-001", "estado": "creado", "registrado": True,
+         "dueAt": "2026-11-18T17:00:00.000Z", "texto": "t", "datos": {}}])
     return alm, supa
 
 
@@ -552,8 +588,15 @@ def test_limpiar_conserva_el_video_si_el_post_aun_no_esta_sent(tmp_path):
 
 # ---------------- vivo de punta a punta (simulado) ----------------
 
+def confirmar_en_config(repo):
+    publicar.guardar_ids_de_canales(
+        repo, {"shorts": "canal-yt-001", "tiktok": "canal-tt-001", "reels": "canal-ig-001"},
+        dict.fromkeys(("shorts", "tiktok", "reels"), "org-ejemplo-001"))
+
+
 def test_vivo_solo_en_plataformas_activas_y_registra(repo, editar_yaml):
     sin_pausa(repo)
+    confirmar_en_config(repo)
     editar_yaml(repo, "config/modo.yml", lambda d: {**d, "modo": "vivo", "plataformas_activas": ["shorts"]})
     mp4 = repo / "v.bin"
     mp4.write_bytes(b"video-inventado")
@@ -627,3 +670,319 @@ def test_ninguna_clave_en_la_salida_del_ensayo_ni_en_el_repo(repo):
 def test_sin_clave_el_cliente_no_se_construye():
     with pytest.raises(ErrorBuffer, match="falta BUFFER_API_KEY"):
         ClienteBuffer("")
+
+
+# ================= ronda 1: mutaciones sin reintento, reconciliación, orden de subida, borrador =================
+
+class Transporte503Luego200:
+    """createPost: 503 la primera vez y 200 después; el resto lo sirve BufferSimulado. Cuenta createPost."""
+
+    def __init__(self, creado_de_verdad=True):
+        self.sim = BufferSimulado()
+        self.creaciones = 0
+        self.libro_al_enviar = None
+        self.ruta_libro = None
+
+    def __call__(self, metodo, url, cab, cuerpo=None, tiempo=60):
+        q = json.loads(cuerpo.decode())["query"]
+        if "createPost" in q:
+            self.creaciones += 1
+            if self.ruta_libro is not None and self.ruta_libro.exists():
+                self.libro_al_enviar = json.loads(self.ruta_libro.read_text(encoding="utf-8"))
+            return (503, {}, b"{}") if self.creaciones == 1 else self.sim(metodo, url, cab, cuerpo, tiempo)
+        return self.sim(metodo, url, cab, cuerpo, tiempo)
+
+
+def test_503_seguido_de_200_envia_un_solo_createpost(tmp_path):
+    t = Transporte503Luego200()
+    c = ClienteBuffer(CLAVE, t, tmp_path, dormir=lambda s: None)
+    with pytest.raises(publicar.ErrorIncierto):
+        c.consulta(publicar.M_CREAR, {"input": {}}, mutacion=True)
+    assert t.creaciones == 1
+
+
+def test_una_lectura_si_se_reintenta_pero_una_mutacion_con_429_no(tmp_path):
+    esp = F.Espia([F.resp(429, "{}"), F.resp(200, "{}")])
+    with pytest.raises(ErrorBuffer, match="429"):
+        ClienteBuffer(CLAVE, esp, tmp_path, dormir=lambda s: None).consulta(publicar.M_CREAR, mutacion=True)
+    assert len(esp.llamadas) == 1
+
+
+@pytest.mark.parametrize("respuesta", [F.resp(502, "{}"), F.resp(200, "esto no es json")])
+def test_resultado_ilegible_o_5xx_de_una_mutacion_es_incierto(tmp_path, respuesta):
+    esp = F.Espia([respuesta])
+    with pytest.raises(publicar.ErrorIncierto):
+        ClienteBuffer(CLAVE, esp, tmp_path, dormir=lambda s: None).consulta(publicar.M_CREAR, mutacion=True)
+    assert len(esp.llamadas) == 1
+
+
+def test_un_timeout_de_una_mutacion_es_incierto(tmp_path):
+    from fabrica import red
+
+    def corta(*a, **k):
+        raise red.ErrorRed("POST /: sin respuesta (TimeoutError)")
+    with pytest.raises(publicar.ErrorIncierto, match="incierto"):
+        ClienteBuffer(CLAVE, corta, tmp_path).consulta(publicar.M_CREAR, mutacion=True)
+
+
+def programar_una_vez(tmp_path, t, tx=None, toma=TOMA):
+    c = ClienteBuffer(CLAVE, t, tmp_path, dormir=lambda s: None, ahora=lambda: AHORA)
+    ids = {"shorts": "canal-yt-001", "tiktok": "canal-tt-001", "reels": "canal-ig-001"}
+    pub = Publicador(c, None, tmp_path, "vivo", lambda: AHORA, ids, orgs={"shorts": "org-ejemplo-001"})
+    tx = tx or textos(toma, FICHA_LIMPIA, "shorts")
+    return pub, lambda: pub.programar("shorts", {**toma, "fuente_id": "propio"}, "https://x.invalid/v.mp4", tx,
+                                      hueco_a_utc(HOY, "11:00"), "tomas/2026-11-18/toma-012-ab12cd34.mp4")
+
+
+def con_posts(t, texto, vacio=False):
+    """Hace que el listado de posts del canal incluya el post que Buffer sí creó (o venga vacío)."""
+    posts = F.leer("buffer", "posts_del_canal.json").replace("__TEXTO__", texto.replace("\n", "\\n"))
+    if vacio:
+        posts = '{"data": {"posts": {"edges": []}}}'
+    original = t.sim.__call__
+
+    def llamar(metodo, url, cab, cuerpo=None, tiempo=60):
+        q = json.loads(cuerpo.decode())["query"]
+        if "posts(" in q and "channelIds" in q and "status: [sent]" not in q:
+            return F.resp(200, posts)
+        return original(metodo, url, cab, cuerpo, tiempo)
+    t.sim = type("S", (), {"__call__": staticmethod(llamar), "hubo": t.sim.hubo, "consultas": t.sim.consultas})()
+    return t
+
+
+def test_un_500_tras_una_creacion_real_no_duplica_y_se_reconcilia(tmp_path, monkeypatch):
+    monkeypatch.delattr(registro, "anotar_clip", raising=False)
+    (tmp_path / "marcador.csv").write_text(",".join(registro.CABECERA_MARCADOR) + "\n", encoding="utf-8")
+    tx = textos(TOMA, FICHA_LIMPIA, "shorts")
+    t = con_posts(Transporte503Luego200(), tx["texto"])
+    pub, programar = programar_una_vez(tmp_path, t, tx)
+    with pytest.raises(publicar.ResultadoIncierto):
+        programar()
+    libro = json.loads((tmp_path / "estado" / "buffer-envios.json").read_text(encoding="utf-8"))
+    assert [e["estado"] for e in libro] == ["incierto"]
+    # corrida siguiente: reconcilia (el post existe) y NO vuelve a enviar
+    with pytest.raises(Descartada, match="ya hay un envío creado"):
+        programar()
+    assert t.creaciones == 1
+    libro = json.loads((tmp_path / "estado" / "buffer-envios.json").read_text(encoding="utf-8"))
+    assert libro[0]["estado"] == "creado" and libro[0]["post_id"] == "post-ejemplo-001"
+    filas = list(csv.DictReader(open(tmp_path / "marcador.csv", newline="", encoding="utf-8")))
+    assert len(filas) == 1 and filas[0]["notas"].endswith("buffer:post-ejemplo-001")
+
+
+def test_un_incierto_que_no_aparece_en_buffer_pasa_a_no_creado_y_puede_reintentarse(tmp_path, monkeypatch):
+    monkeypatch.delattr(registro, "anotar_clip", raising=False)
+    (tmp_path / "marcador.csv").write_text(",".join(registro.CABECERA_MARCADOR) + "\n", encoding="utf-8")
+    t = con_posts(Transporte503Luego200(), "", vacio=True)
+    pub, programar = programar_una_vez(tmp_path, t)
+    with pytest.raises(publicar.ResultadoIncierto):
+        programar()
+    r = programar()      # reconcilia (el listado viene vacío: no se creó) y reintenta
+    assert r["id"] == "post-ejemplo-001" and t.creaciones == 2
+
+
+def test_la_intencion_se_anota_antes_de_enviar(tmp_path, monkeypatch):
+    monkeypatch.delattr(registro, "anotar_clip", raising=False)
+    (tmp_path / "marcador.csv").write_text(",".join(registro.CABECERA_MARCADOR) + "\n", encoding="utf-8")
+    t = Transporte503Luego200()
+    t.ruta_libro = tmp_path / "estado" / "buffer-envios.json"
+    pub, programar = programar_una_vez(tmp_path, t)
+    with pytest.raises(publicar.ResultadoIncierto):
+        programar()
+    e = t.libro_al_enviar[0]
+    assert e["estado"] == "enviando" and e["plataforma"] == "shorts" and e["toma"] == 12
+    assert e["dueAt"] == "2026-11-18T17:00:00.000Z"
+
+
+def test_si_falla_la_escritura_local_tras_un_exito_el_post_queda_creado_en_la_siguiente(tmp_path, monkeypatch):
+    monkeypatch.delattr(registro, "anotar_clip", raising=False)
+    (tmp_path / "marcador.csv").write_text(",".join(registro.CABECERA_MARCADOR) + "\n", encoding="utf-8")
+    tx = textos(TOMA, FICHA_LIMPIA, "shorts")
+    t = con_posts(Transporte503Luego200(), tx["texto"])
+    t.creaciones = 1          # la creación ya "falló" una vez: ahora responde bien
+    pub, programar = programar_una_vez(tmp_path, t, tx)
+    original = Publicador._cerrar_creado
+    monkeypatch.setattr(Publicador, "_cerrar_creado",
+                        lambda self, *a: (_ for _ in ()).throw(OSError("disco lleno")))
+    r = programar()                       # no lanza: el post se creó
+    assert r["id"] == "post-ejemplo-001"
+    libro = json.loads((tmp_path / "estado" / "buffer-envios.json").read_text(encoding="utf-8"))
+    assert libro[0]["estado"] == "enviando"
+    monkeypatch.setattr(Publicador, "_cerrar_creado", original)
+    assert pub.reconciliar() == {libro[0]["id"]: "creado"}
+    filas = list(csv.DictReader(open(tmp_path / "marcador.csv", newline="", encoding="utf-8")))
+    assert len(filas) == 1
+
+
+def test_si_el_marcador_falla_tras_un_createpost_correcto_no_se_pierde(tmp_path, monkeypatch):
+    llamadas = []
+
+    def anota(raiz, fila):
+        llamadas.append(fila)
+        if len(llamadas) == 1:
+            raise ValueError("columna rara")
+    monkeypatch.setattr(registro, "anotar_clip", anota, raising=False)
+    t = Transporte503Luego200()
+    t.creaciones = 1
+    pub, programar = programar_una_vez(tmp_path, t)
+    assert programar()["id"] == "post-ejemplo-001"          # la excepción no sale
+    libro = json.loads((tmp_path / "estado" / "buffer-envios.json").read_text(encoding="utf-8"))
+    assert libro[0]["estado"] == "creado" and libro[0]["registrado"] is False
+    pub.reconciliar()
+    libro = json.loads((tmp_path / "estado" / "buffer-envios.json").read_text(encoding="utf-8"))
+    assert libro[0]["registrado"] is True and len(llamadas) == 2
+
+
+# ---- vivo: validar antes de subir, no dejar huérfanos ----
+
+def vivo_listo(repo, editar_yaml, **entrada_extra):
+    sin_pausa(repo)
+    confirmar_en_config(repo)
+    editar_yaml(repo, "config/modo.yml", lambda d: {**d, "modo": "vivo", "plataformas_activas": ["shorts"]})
+    mp4 = repo / "v.bin"
+    mp4.write_bytes(b"video-inventado")
+    entrada = {"mp4": str(mp4), "fuente_id": "propio-tipografico", "fecha": "2026-11-18", "hueco": "11:00",
+               "toma": {"numero": 7, "pilar": "informativa", "titular": "Llega el 19 de noviembre",
+                        "datos": ["Sale en PS5"], "duracion_s": 15}}
+    entrada.update(entrada_extra)
+    (repo / "entrada.json").write_text(json.dumps(entrada), encoding="utf-8")
+    return str(repo / "entrada.json")
+
+
+def correr_vivo(repo, entrada, sim=None, supa=None, ahora=AHORA):
+    sal = []
+    cod = publicar.ejecutar(repo, entrada=entrada, env=entorno_real(), salida=sal.append,
+                            transporte_buffer=sim or BufferSimulado(), transporte_almacen=supa or SupabaseSimulado(),
+                            ahora=lambda: ahora)
+    return cod, sal
+
+
+def subidas(supa):
+    return [x for x in supa.llamadas if x[0] == "POST" and "/object/" in x[1]]
+
+
+def test_vivo_sin_id_guardado_no_programa_ni_sube(repo, editar_yaml):
+    entrada = vivo_listo(repo, editar_yaml)
+    texto = (repo / "config" / "canales.yml").read_text(encoding="utf-8")
+    (repo / "config" / "canales.yml").write_text(
+        texto.replace("buffer_channel_id: canal-yt-001", "buffer_channel_id: null"), encoding="utf-8")
+    sim, supa = BufferSimulado(), SupabaseSimulado()
+    cod, sal = correr_vivo(repo, entrada, sim, supa)
+    assert cod == 1 and "ensayo con claves" in "\n".join(sal)
+    assert not sim.hubo("createPost") and subidas(supa) == []
+
+
+def test_vivo_con_id_guardado_distinto_es_alerta_roja_y_no_programa(repo, editar_yaml):
+    entrada = vivo_listo(repo, editar_yaml)
+    texto = (repo / "config" / "canales.yml").read_text(encoding="utf-8")
+    (repo / "config" / "canales.yml").write_text(
+        texto.replace("buffer_channel_id: canal-yt-001", "buffer_channel_id: canal-de-otro"), encoding="utf-8")
+    sim, supa = BufferSimulado(), SupabaseSimulado()
+    cod, _ = correr_vivo(repo, entrada, sim, supa)
+    assert cod == 3 and not sim.hubo("createPost") and subidas(supa) == []
+    assert (repo / "PAUSA").exists()
+
+
+def test_vivo_con_hueco_pasado_no_sube_nada(repo, editar_yaml):
+    entrada = vivo_listo(repo, editar_yaml, hueco="05:00")
+    sim, supa = BufferSimulado(), SupabaseSimulado()
+    cod, sal = correr_vivo(repo, entrada, sim, supa)
+    assert cod == 0 and subidas(supa) == [] and not sim.hubo("createPost")
+    assert any("antes de subir" in s for s in sal)
+
+
+def test_vivo_con_texto_invalido_no_sube_nada(repo, editar_yaml):
+    entrada = vivo_listo(repo, editar_yaml, toma={"numero": 7, "pilar": "informativa"})
+    supa = SupabaseSimulado()
+    cod, sal = correr_vivo(repo, entrada, supa=supa)
+    assert cod == 0 and subidas(supa) == [] and any("antes de subir" in s for s in sal)
+
+
+def test_vivo_con_carga_que_el_esquema_rechaza_no_sube_nada(repo, editar_yaml):
+    entrada = vivo_listo(repo, editar_yaml)
+    supa = SupabaseSimulado()
+    cod, _ = correr_vivo(repo, entrada, BufferSimulado(esquema="esquema_falta_obligatorio.json"), supa)
+    assert cod == 0 and subidas(supa) == []
+
+
+def test_vivo_si_todos_los_destinos_se_rechazan_borra_el_video(repo, editar_yaml):
+    entrada = vivo_listo(repo, editar_yaml)
+    supa = SupabaseSimulado()
+    cod, sal = correr_vivo(repo, entrada, BufferSimulado(crear="createpost_error.json"), supa)
+    assert cod == 0 and len(subidas(supa)) == 1 and supa.objetos == {}
+    assert any("se borró del almacén" in s for s in sal)
+
+
+def test_vivo_con_resultado_incierto_conserva_el_video(repo, editar_yaml):
+    entrada = vivo_listo(repo, editar_yaml)
+    t = Transporte503Luego200()
+    supa = SupabaseSimulado()
+    cod, sal = correr_vivo(repo, entrada, t, supa)
+    assert cod == 1 and len(supa.objetos) == 1 and t.creaciones == 1
+    assert any("INCIERTO" in s for s in sal)
+
+
+def test_soltar_si_huerfano_respeta_los_envios_vivos(tmp_path):
+    supa = SupabaseSimulado()
+    alm = Almacen("https://simulado.invalid", "k", CONFIG_ALMACEN, supa)
+    pub = Publicador(cliente(tmp_path), alm, tmp_path, "vivo", lambda: AHORA, {})
+    ruta = "tomas/2026-11-18/toma-001-aaaaaaaa.mp4"
+    supa.objetos["/storage/v1/object/public/clips/" + ruta] = b"x"
+    publicar._escribir_json(tmp_path / "estado" / "buffer-envios.json", [{"id": "a", "ruta": ruta, "estado": "incierto"}])
+    assert pub.soltar_si_huerfano(ruta) is False and len(supa.objetos) == 1
+    publicar._escribir_json(tmp_path / "estado" / "buffer-envios.json", [{"id": "a", "ruta": ruta, "estado": "rechazado"}])
+    assert pub.soltar_si_huerfano(ruta) is True and supa.objetos == {}
+
+
+def test_limpiar_enviados_es_publica_y_conserva_lo_incierto(tmp_path, monkeypatch):
+    monkeypatch.setattr(Publicador, "reconciliar", lambda self: {})
+    ruta = "tomas/2026-11-18/toma-012-ab12cd34.mp4"
+    alm, supa = almacen_con_video(tmp_path, ruta)
+    libro = json.loads((tmp_path / "estado" / "buffer-envios.json").read_text(encoding="utf-8"))
+    libro[0].update(estado="incierto", post_id=None)
+    publicar._escribir_json(tmp_path / "estado" / "buffer-envios.json", libro)
+    sim = BufferSimulado()
+    pub = Publicador(cliente(tmp_path, sim), alm, tmp_path, "vivo", lambda: AHORA,
+                     {"shorts": "canal-yt-001"}, orgs={"shorts": "org-ejemplo-001"})
+    assert "limpiar_enviados" in Publicador.__doc__ and pub.limpiar_enviados() == [] and len(supa.objetos) == 1
+
+
+# ---- borrador: el borrado exige un tipo de éxito ----
+
+@pytest.mark.parametrize("archivo", ["deletepost_nulo.json", "deletepost_sin_tipo.json",
+                                     "deletepost_error.json", "deletepost_tipo_raro.json"])
+def test_borrador_sin_tipo_de_exito_no_cuenta_como_borrado(repo, archivo):
+    sin_pausa(repo)
+    sal = []
+    cod = publicar.ejecutar(repo, con_borrador=True, env={"BUFFER_API_KEY": CLAVE}, salida=sal.append,
+                            transporte_buffer=BufferSimulado(borrar=archivo), ahora=lambda: AHORA)
+    assert cod == 1
+    assert any("BORRADOR SIN BORRAR" in s and "post-ejemplo-001" in s for s in sal)
+    assert not any("creado y borrado" in s for s in sal)
+
+
+def test_borrador_devuelve_borrado_false_y_conserva_el_id(tmp_path):
+    pub = Publicador(cliente(tmp_path, BufferSimulado(borrar="deletepost_nulo.json")), None, tmp_path,
+                     "borrador", lambda: AHORA, {"shorts": "canal-yt-001"})
+    r = pub.borrador("shorts", "https://x.invalid/v.mp4", AHORA + timedelta(days=1))
+    assert r["borrado"] is False and r["id"] == "post-ejemplo-001" and r["motivo"]
+
+
+def test_borrador_con_exito_explicito_si_cuenta(tmp_path):
+    pub = Publicador(cliente(tmp_path), None, tmp_path, "borrador", lambda: AHORA, {"shorts": "canal-yt-001"})
+    assert pub.borrador("shorts", "https://x.invalid/v.mp4", AHORA + timedelta(days=1))["borrado"] is True
+
+
+# ---- ensayo: un error de red del almacén no es un traceback ----
+
+def test_ensayo_captura_el_error_de_red_del_almacen(repo):
+    from fabrica import red
+    sin_pausa(repo)
+
+    def cae(*a, **k):
+        raise red.ErrorRed("POST /storage/v1/bucket: sin respuesta (TimeoutError)")
+    sal = []
+    cod = publicar.ejecutar(repo, env=entorno_real(), salida=sal.append, transporte_buffer=BufferSimulado(),
+                            transporte_almacen=cae, ahora=lambda: AHORA)
+    assert cod == 1 and any("ERROR del almacén" in s for s in sal)
+    assert SUPA_CLAVE not in "\n".join(sal)
