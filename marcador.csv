@@ -1,1 +1,4 @@
 id_clip,toma,fecha,hora,plataforma,pilar,fuente_id,campana,gancho,duracion_s,credito,url,vistas_12h,vistas_24h,vistas_72h,likes,compartidos,comentarios,guardados,seguidores,prueba,estado_campana,motivo_rechazo,pago_usd,notas
+toma-001-shorts,1,2026-11-18,07:00,shorts,informativa,propio-tipografico,,GTA 6 llega esta medianoche,11.0,🎥 @RockstarGames,,,,,,,,,,,,,,origen:toma-001-shorts; origen:propio-tipografico buffer:6afd99c13cc95fb47cee3a00
+toma-001-tiktok,1,2026-11-18,07:00,tiktok,informativa,propio-tipografico,,GTA 6 llega esta medianoche,11.0,🎥 @RockstarGames,,,,,,,,,,,,,,origen:toma-001-tiktok; origen:propio-tipografico buffer:6afd99c203c6b6e75e08b9cc
+toma-001-reels,1,2026-11-18,07:00,reels,informativa,propio-tipografico,,GTA 6 llega esta medianoche,11.0,🎥 @RockstarGames,,,,,,,,,,,,,,origen:toma-001-reels; origen:propio-tipografico buffer:6afd99c303c6b6e75e08ba34

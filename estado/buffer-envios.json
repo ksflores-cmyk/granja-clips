@@ -1,0 +1,137 @@
+[
+ {
+  "id": "shorts|1|2026-11-18T13:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 1,
+  "dueAt": "2026-11-18T13:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-18/toma-001-18bfa2a2.mp4",
+  "estado": "creado",
+  "post_id": "6afd99c13cc95fb47cee3a00",
+  "intento": "eee558c0e6dc410ba514eb0a64f2d645",
+  "registrado": true,
+  "texto": "GTA 6: se desbloquea a la medianoche local\n\n- Medianoche local del 19 de noviembre.\n- En todas las regiones.\n- En PS5 y Xbox Series X|S.\n\n🎥 @RockstarGames\n#GTA6 #Gaming #Clips",
+  "datos": {
+   "toma": {
+    "numero": 1,
+    "gancho": "GTA 6 llega esta medianoche",
+    "pilar": "informativa",
+    "titular": "se desbloquea a la medianoche local",
+    "datos": [
+     "Medianoche local del 19 de noviembre.",
+     "En todas las regiones.",
+     "En PS5 y Xbox Series X|S."
+    ],
+    "fuente_id": "propio-tipografico",
+    "campana": "",
+    "duracion_s": 11.0,
+    "etiquetas": [
+     "#GTA6",
+     "#Gaming",
+     "#Clips"
+    ]
+   },
+   "textos": {
+    "texto": "GTA 6: se desbloquea a la medianoche local\n\n- Medianoche local del 19 de noviembre.\n- En todas las regiones.\n- En PS5 y Xbox Series X|S.\n\n🎥 @RockstarGames\n#GTA6 #Gaming #Clips",
+    "titulo": "GTA 6: se desbloquea a la medianoche local",
+    "credito": "🎥 @RockstarGames",
+    "etiquetas": [
+     "#GTA6",
+     "#Gaming",
+     "#Clips"
+    ]
+   },
+   "ficha_id": "propio-tipografico"
+  }
+ },
+ {
+  "id": "tiktok|1|2026-11-18T13:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 1,
+  "dueAt": "2026-11-18T13:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-18/toma-001-18bfa2a2.mp4",
+  "estado": "creado",
+  "post_id": "6afd99c203c6b6e75e08b9cc",
+  "intento": "d6b6dc4b1a514968a99abb2019e88be5",
+  "registrado": true,
+  "texto": "GTA 6: se desbloquea a la medianoche local\n\n- Medianoche local del 19 de noviembre.\n- En todas las regiones.\n- En PS5 y Xbox Series X|S.\n\n🎥 @RockstarGames\n#GTA6 #Gaming #Clips",
+  "datos": {
+   "toma": {
+    "numero": 1,
+    "gancho": "GTA 6 llega esta medianoche",
+    "pilar": "informativa",
+    "titular": "se desbloquea a la medianoche local",
+    "datos": [
+     "Medianoche local del 19 de noviembre.",
+     "En todas las regiones.",
+     "En PS5 y Xbox Series X|S."
+    ],
+    "fuente_id": "propio-tipografico",
+    "campana": "",
+    "duracion_s": 11.0,
+    "etiquetas": [
+     "#GTA6",
+     "#Gaming",
+     "#Clips"
+    ]
+   },
+   "textos": {
+    "texto": "GTA 6: se desbloquea a la medianoche local\n\n- Medianoche local del 19 de noviembre.\n- En todas las regiones.\n- En PS5 y Xbox Series X|S.\n\n🎥 @RockstarGames\n#GTA6 #Gaming #Clips",
+    "titulo": null,
+    "credito": "🎥 @RockstarGames",
+    "etiquetas": [
+     "#GTA6",
+     "#Gaming",
+     "#Clips"
+    ]
+   },
+   "ficha_id": "propio-tipografico"
+  }
+ },
+ {
+  "id": "reels|1|2026-11-18T13:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 1,
+  "dueAt": "2026-11-18T13:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-18/toma-001-18bfa2a2.mp4",
+  "estado": "creado",
+  "post_id": "6afd99c303c6b6e75e08ba34",
+  "intento": "213cda4d02e341ada47ff47ee77b9c92",
+  "registrado": true,
+  "texto": "GTA 6: se desbloquea a la medianoche local\n\n- Medianoche local del 19 de noviembre.\n- En todas las regiones.\n- En PS5 y Xbox Series X|S.\n\n🎥 @RockstarGames\n#GTA6 #Gaming #Clips",
+  "datos": {
+   "toma": {
+    "numero": 1,
+    "gancho": "GTA 6 llega esta medianoche",
+    "pilar": "informativa",
+    "titular": "se desbloquea a la medianoche local",
+    "datos": [
+     "Medianoche local del 19 de noviembre.",
+     "En todas las regiones.",
+     "En PS5 y Xbox Series X|S."
+    ],
+    "fuente_id": "propio-tipografico",
+    "campana": "",
+    "duracion_s": 11.0,
+    "etiquetas": [
+     "#GTA6",
+     "#Gaming",
+     "#Clips"
+    ]
+   },
+   "textos": {
+    "texto": "GTA 6: se desbloquea a la medianoche local\n\n- Medianoche local del 19 de noviembre.\n- En todas las regiones.\n- En PS5 y Xbox Series X|S.\n\n🎥 @RockstarGames\n#GTA6 #Gaming #Clips",
+    "titulo": null,
+    "credito": "🎥 @RockstarGames",
+    "etiquetas": [
+     "#GTA6",
+     "#Gaming",
+     "#Clips"
+    ]
+   },
+   "ficha_id": "propio-tipografico"
+  }
+ }
+]
