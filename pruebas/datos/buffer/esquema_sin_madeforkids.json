@@ -1,0 +1,363 @@
+{
+ "tipos": {
+  "CreatePostInput": {
+   "name": "CreatePostInput",
+   "inputFields": [
+    {
+     "name": "channelId",
+     "defaultValue": null,
+     "type": {
+      "kind": "NON_NULL",
+      "name": null,
+      "ofType": {
+       "kind": "SCALAR",
+       "name": "ID",
+       "ofType": null
+      }
+     }
+    },
+    {
+     "name": "text",
+     "defaultValue": null,
+     "type": {
+      "kind": "SCALAR",
+      "name": "String",
+      "ofType": null
+     }
+    },
+    {
+     "name": "schedulingType",
+     "defaultValue": null,
+     "type": {
+      "kind": "NON_NULL",
+      "name": null,
+      "ofType": {
+       "kind": "ENUM",
+       "name": "SchedulingType",
+       "ofType": null
+      }
+     }
+    },
+    {
+     "name": "mode",
+     "defaultValue": null,
+     "type": {
+      "kind": "NON_NULL",
+      "name": null,
+      "ofType": {
+       "kind": "ENUM",
+       "name": "ShareMode",
+       "ofType": null
+      }
+     }
+    },
+    {
+     "name": "dueAt",
+     "defaultValue": null,
+     "type": {
+      "kind": "SCALAR",
+      "name": "DateTime",
+      "ofType": null
+     }
+    },
+    {
+     "name": "assets",
+     "defaultValue": null,
+     "type": {
+      "kind": "LIST",
+      "name": null,
+      "ofType": {
+       "kind": "NON_NULL",
+       "name": null,
+       "ofType": {
+        "kind": "INPUT_OBJECT",
+        "name": "AssetInput",
+        "ofType": null
+       }
+      }
+     }
+    },
+    {
+     "name": "metadata",
+     "defaultValue": null,
+     "type": {
+      "kind": "INPUT_OBJECT",
+      "name": "PostInputMetaData",
+      "ofType": null
+     }
+    },
+    {
+     "name": "saveToDraft",
+     "defaultValue": null,
+     "type": {
+      "kind": "SCALAR",
+      "name": "Boolean",
+      "ofType": null
+     }
+    },
+    {
+     "name": "source",
+     "defaultValue": null,
+     "type": {
+      "kind": "SCALAR",
+      "name": "String",
+      "ofType": null
+     }
+    }
+   ]
+  },
+  "PostInputMetaData": {
+   "name": "PostInputMetaData",
+   "inputFields": [
+    {
+     "name": "youtube",
+     "defaultValue": null,
+     "type": {
+      "kind": "INPUT_OBJECT",
+      "name": "YoutubePostMetadataInput",
+      "ofType": null
+     }
+    },
+    {
+     "name": "instagram",
+     "defaultValue": null,
+     "type": {
+      "kind": "INPUT_OBJECT",
+      "name": "InstagramPostMetadataInput",
+      "ofType": null
+     }
+    },
+    {
+     "name": "tiktok",
+     "defaultValue": null,
+     "type": {
+      "kind": "INPUT_OBJECT",
+      "name": "TikTokPostMetadataInput",
+      "ofType": null
+     }
+    }
+   ]
+  },
+  "YoutubePostMetadataInput": {
+   "name": "YoutubePostMetadataInput",
+   "inputFields": [
+    {
+     "name": "title",
+     "defaultValue": null,
+     "type": {
+      "kind": "NON_NULL",
+      "name": null,
+      "ofType": {
+       "kind": "SCALAR",
+       "name": "String",
+       "ofType": null
+      }
+     }
+    },
+    {
+     "name": "categoryId",
+     "defaultValue": null,
+     "type": {
+      "kind": "NON_NULL",
+      "name": null,
+      "ofType": {
+       "kind": "SCALAR",
+       "name": "String",
+       "ofType": null
+      }
+     }
+    },
+    {
+     "name": "privacy",
+     "defaultValue": null,
+     "type": {
+      "kind": "ENUM",
+      "name": "YoutubePrivacy",
+      "ofType": null
+     }
+    },
+    {
+     "name": "notifySubscribers",
+     "defaultValue": null,
+     "type": {
+      "kind": "SCALAR",
+      "name": "Boolean",
+      "ofType": null
+     }
+    }
+   ]
+  },
+  "InstagramPostMetadataInput": {
+   "name": "InstagramPostMetadataInput",
+   "inputFields": [
+    {
+     "name": "type",
+     "defaultValue": null,
+     "type": {
+      "kind": "ENUM",
+      "name": "InstagramPostType",
+      "ofType": null
+     }
+    },
+    {
+     "name": "shouldShareToFeed",
+     "defaultValue": null,
+     "type": {
+      "kind": "SCALAR",
+      "name": "Boolean",
+      "ofType": null
+     }
+    },
+    {
+     "name": "firstComment",
+     "defaultValue": null,
+     "type": {
+      "kind": "SCALAR",
+      "name": "String",
+      "ofType": null
+     }
+    }
+   ]
+  },
+  "TikTokPostMetadataInput": {
+   "name": "TikTokPostMetadataInput",
+   "inputFields": [
+    {
+     "name": "title",
+     "defaultValue": null,
+     "type": {
+      "kind": "SCALAR",
+      "name": "String",
+      "ofType": null
+     }
+    }
+   ]
+  },
+  "AssetInput": {
+   "name": "AssetInput",
+   "inputFields": [
+    {
+     "name": "video",
+     "defaultValue": null,
+     "type": {
+      "kind": "INPUT_OBJECT",
+      "name": "VideoAssetInput",
+      "ofType": null
+     }
+    },
+    {
+     "name": "image",
+     "defaultValue": null,
+     "type": {
+      "kind": "INPUT_OBJECT",
+      "name": "ImageAssetInput",
+      "ofType": null
+     }
+    }
+   ]
+  },
+  "VideoAssetInput": {
+   "name": "VideoAssetInput",
+   "inputFields": [
+    {
+     "name": "url",
+     "defaultValue": null,
+     "type": {
+      "kind": "NON_NULL",
+      "name": null,
+      "ofType": {
+       "kind": "SCALAR",
+       "name": "String",
+       "ofType": null
+      }
+     }
+    },
+    {
+     "name": "thumbnailUrl",
+     "defaultValue": null,
+     "type": {
+      "kind": "SCALAR",
+      "name": "String",
+      "ofType": null
+     }
+    }
+   ]
+  },
+  "ImageAssetInput": {
+   "name": "ImageAssetInput",
+   "inputFields": [
+    {
+     "name": "url",
+     "defaultValue": null,
+     "type": {
+      "kind": "NON_NULL",
+      "name": null,
+      "ofType": {
+       "kind": "SCALAR",
+       "name": "String",
+       "ofType": null
+      }
+     }
+    }
+   ]
+  },
+  "DeletePostInput": {
+   "name": "DeletePostInput",
+   "inputFields": [
+    {
+     "name": "id",
+     "defaultValue": null,
+     "type": {
+      "kind": "NON_NULL",
+      "name": null,
+      "ofType": {
+       "kind": "SCALAR",
+       "name": "ID",
+       "ofType": null
+      }
+     }
+    }
+   ]
+  }
+ },
+ "Query": {
+  "fields": [
+   {
+    "name": "account",
+    "args": []
+   },
+   {
+    "name": "channels",
+    "args": [
+     {
+      "name": "input"
+     }
+    ]
+   },
+   {
+    "name": "posts",
+    "args": [
+     {
+      "name": "input"
+     }
+    ]
+   },
+   {
+    "name": "post",
+    "args": [
+     {
+      "name": "input"
+     }
+    ]
+   },
+   {
+    "name": "dailyPostingLimits",
+    "args": [
+     {
+      "name": "input"
+     }
+    ]
+   }
+  ]
+ }
+}

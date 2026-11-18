@@ -1,0 +1,12 @@
+{
+ "data": {
+  "account": {
+   "organizations": [
+    {
+     "id": "org-ejemplo-001",
+     "name": "Guion Vivo"
+    }
+   ]
+  }
+ }
+}

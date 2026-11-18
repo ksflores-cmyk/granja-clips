@@ -1,0 +1,34 @@
+{
+ "data": {
+  "channels": [
+   {
+    "id": "canal-yt-001",
+    "name": "guionvivo",
+    "displayName": "Guion Vivo",
+    "service": "youtube",
+    "isQueuePaused": false
+   },
+   {
+    "id": "canal-tt-001",
+    "name": "guionvivo",
+    "displayName": "Guion Vivo",
+    "service": "tiktok",
+    "isQueuePaused": false
+   },
+   {
+    "id": "canal-ig-001",
+    "name": "guionvivo",
+    "displayName": "Guion Vivo",
+    "service": "instagram",
+    "isQueuePaused": false
+   },
+   {
+    "id": "canal-ajeno-001",
+    "name": "cocina_de_ana",
+    "displayName": "Cocina de Ana",
+    "service": "instagram",
+    "isQueuePaused": false
+   }
+  ]
+ }
+}
