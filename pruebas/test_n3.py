@@ -21,6 +21,18 @@ HOY = AHORA.astimezone(ZoneInfo("America/Guatemala")).date()
 CLAVE_FALSA = "secreto-inventado"                          # EJEMPLO-FALSO
 
 
+@pytest.fixture(autouse=True)
+def _sin_campanas_reales(request):
+    """El repo real ya trae la ficha de la campaña SEGA FM27 (publicable, con 5 videos de material). Estas pruebas
+    cuentan los candidatos de sus propias fichas, así que parten del repo sin esa ficha."""
+    if "repo" in request.fixturenames:
+        repo = request.getfixturevalue("repo")
+        ruta = repo / "fuentes.yml"
+        fichas = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+        ruta.write_text(yaml.safe_dump([f for f in fichas if f.get("id") != "sega-fm27"], allow_unicode=True),
+                        encoding="utf-8")
+
+
 def leer(nombre):
     return (DATOS / nombre).read_text(encoding="utf-8")
 

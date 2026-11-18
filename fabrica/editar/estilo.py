@@ -383,6 +383,8 @@ def logo_extra_en_esquina(video: Path, plan: dict, marca: Marca) -> tuple[bool, 
     cuerpo = geo.get("cuerpo")
     if not origen or not cuerpo:
         return True, "no aplica"
+    if not cuerpo_coincide(video, plan, marca)[0]:      # si el cuerpo ya está en rojo, ese punto lo dice; no se duplica
+        return True, "no aplica (el cuerpo ya sale en rojo en su propio punto)"
     cfg = marca.marca_agua
     w = int(cfg["ancho"]) + 2 * int(cfg["placa"])
     h = int(round(w * 0.4))

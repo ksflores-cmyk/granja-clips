@@ -53,3 +53,14 @@ python -m pytest -q
 - Las versiones de `requirements.txt` están fijadas a las instaladas al construir (PyYAML 6.0.3, pytest 9.1.1, tzdata 2025.2).
 - Los commits llevan la atribución indicada por la sesión (Claude Sonnet 5.5), que difiere de la mencionada en la especificación (Opus 5.5).
 - No se hizo push ni se creó remoto; la fusión a `main` la hace el jefe.
+
+## N8: campaña con brief (SEGA Football Manager 27)
+
+- La ficha `sega-fm27` de `fuentes.yml` es la primera campaña pagada. Su `material` es una lista de `{url, creador, etiquetas: {shorts, tiktok, reels}}` (también valen URL sueltas); `fabrica.validar` revisa cada entrada.
+- `juego`: lo que Gemini debe ver (si falta, el de `temporada.yml`). Con `juego` propio, los spoilers de `temporada.yml` no aplican; valen `reglas.palabras_evitar` de la ficha.
+- `reglas.duracion_s` manda en el recorte de Gemini y en la puerta de estilo (siempre dentro del formato de 7 a 30 s).
+- `marca_agua`: PNG que `componer` pega en la esquina del cuerpo que fija la clave `marca_agua` de `marca.yml`. La puerta de estilo la acepta sólo si la ficha la declara y comprueba en el fotograma que aparece; sin declaración, un logo en esa esquina sale en rojo.
+- `reglas.sin_musica`: el audio es el de la fuente (la puerta lo compara) y nunca se añade música ni voz.
+- Textos (`publicar.textos`): `Toma nnn. gancho`, `@footballmanager`, etiqueta del creador de esa red, `#Publicidad` en su línea y hasta 3 hashtags más (`reglas.hashtags`).
+- `estado/envios-campana.json`: cada clip de campaña programado queda anotado (plataforma, `post_id`, hora, campaña). Cuando Buffer lo marca `sent`, `limpiar_enviados` escribe la URL si Buffer la da (`externalLink`); si no, queda "pendiente: copiar el enlace desde la app" y Kevin lo pega en Content Rewards.
+- Un video de más de 12.6 MB se mira en una copia ligera de 360p; el MP4 final sale siempre de la fuente.

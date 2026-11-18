@@ -6,7 +6,9 @@ todos sus motivos. La puerta de estilo corre mientras el video de origen sigue e
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -38,6 +40,27 @@ class Resultado:
     modelo: str | None = None
     puntos: list = field(default_factory=list)   # (punto, ok, detalle) de la puerta de estilo
     fila: dict | None = None            # fila futura del marcador: N5 la pasa a registro.anotar_clip
+
+
+def _nombre_seguro(id_origen: str) -> str:
+    """El id del origen como parte de un nombre de archivo. Una URL (material del brief) no sirve tal cual."""
+    if re.fullmatch(r"[A-Za-z0-9_-]{1,60}", str(id_origen)):
+        return str(id_origen)
+    return hashlib.sha256(str(id_origen).encode("utf-8")).hexdigest()[:10]
+
+
+def copia_para_ojos(ruta: Path, raiz, carpeta: Path) -> Path:
+    """Si el video pesa más de lo que Gemini acepta en línea (`max_mb_en_linea`), una copia ligera sólo para
+    que Gemini lo mire (360p, 15 fps, audio de 48 kb/s). Los tiempos son los mismos; el MP4 final sale de la fuente."""
+    tope = float(cargar_yaml("config/ojos.yml", raiz)["max_mb_en_linea"]) * 1024 * 1024
+    if Path(ruta).stat().st_size <= tope * 0.9:       # el base64 infla un tercio y ya hay un margen de prompt
+        return Path(ruta)
+    destino = Path(carpeta) / "para-ojos.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(ruta), "-vf", "scale=-2:360,fps=15",
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "34", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", "-b:a", "48k", "-ac", "1", "-movflags", "+faststart", str(destino)],
+                   check=True, capture_output=True)
+    return destino
 
 
 def lapiz_de(numero: int) -> str:
@@ -113,9 +136,11 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             temporada = ojos.temporada_de(ficha, temporada)
             juego = ojos.juego_de(ficha, temporada)          # el de la ficha si lo declara (FM27, no GTA 6)
             recorte = ojos.rango_recorte(ficha)              # reglas.duracion_s de la ficha
-            mirada = ojos.mirar(d.ruta, marca, temporada, raiz=raiz, duracion=d.duracion,
-                                transporte=transporte, espera=espera, entorno=entorno, juego=juego,
-                                nota=ojos.nota_de_ficha(ficha) or None, recorte=recorte)
+            with tempfile.TemporaryDirectory(prefix="ojos-toma-") as carpeta_ojos:
+                video_ojos = copia_para_ojos(d.ruta, raiz, Path(carpeta_ojos))
+                mirada = ojos.mirar(video_ojos, marca, temporada, raiz=raiz, duracion=d.duracion,
+                                    transporte=transporte, espera=espera, entorno=entorno, juego=juego,
+                                    nota=ojos.nota_de_ficha(ficha) or None, recorte=recorte)
             if mirada.datos is None:
                 return Resultado(False, [f"ojos: {mirada.motivo}"], modelo=mirada.modelo)
             ok, motivos = ojos.validar_respuesta(mirada.datos, marca, temporada, duracion=d.duracion,
@@ -126,7 +151,7 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             entrada = fuentes.entrada_material(ficha, url=candidato.url)
             toma, lineas, inicio, dur = armar(mirada.datos, marca, ficha, numero,
                                               entrada["creador"] if entrada else None)
-            mp4 = salida / f"toma-{numero:03d}-{candidato.id_origen}.mp4"
+            mp4 = salida / f"toma-{numero:03d}-{_nombre_seguro(candidato.id_origen)}.mp4"
             plan_ruta = mp4.with_suffix(".plan.json")
             try:
                 with tempfile.TemporaryDirectory(prefix="trabajo-toma-") as trabajo:
