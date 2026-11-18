@@ -126,8 +126,11 @@ def test_gancho_de_7_palabras_falla(marca):
 
 def test_gancho_que_no_cabe_en_2_lineas_falla(marca):
     g = "ANTICONSTITUCIONALMENTE desproporcionadamente electroencefalografista"
-    with pytest.raises(ValueError, match="2 líneas"):
+    with pytest.raises(ValueError, match="no cabe"):      # la palabra sola ya excede el ancho
         lienzo.cabecera(marca, toma(gancho=g, palabra_lapiz="ANTICONSTITUCIONALMENTE"))
+    g3 = "DESPROPORCIONADAMENTE ANTICONSTITUCIONAL ELECTROENCEFALO"   # cada palabra cabe; salen 3 líneas
+    with pytest.raises(ValueError, match="2 líneas"):
+        lienzo.cabecera(marca, toma(gancho=g3, palabra_lapiz="ANTICONSTITUCIONAL"))
 
 
 def test_palabra_del_lapiz_ausente_falla(marca):
@@ -336,18 +339,20 @@ def test_estilo_plan_valido_todo_si(marca, mp4_sintetico):
 def test_estilo_gancho_generico_dice_no(marca, mp4_sintetico):
     puntos = estilo.revisar(mp4_sintetico, plan_con(marca, gancho="Esto cambia todo", palabra_lapiz="TODO"), marca)
     malos = [n for n, ok, _ in puntos if not ok]
-    assert malos == ["Sin ganchos genéricos prohibidos"]
+    assert "[plan] Sin ganchos genéricos prohibidos" in malos
+    # el plan ya no coincide con el video: la cabecera del MP4 es otra, y la puerta lo ve
+    assert "[fotograma] Cabecera en el video" in malos
 
 
 @necesita_ffmpeg
 def test_estilo_detecta_emoji_credito_vacio_y_gancho_largo(marca, mp4_sintetico):
     puntos = dict((n, ok) for n, ok, _ in estilo.revisar(mp4_sintetico, plan_con(marca, credito="  "), marca))
-    assert puntos["Crédito presente y no vacío"] is False
+    assert puntos["[plan] Crédito presente y no vacío"] is False
     puntos = dict((n, ok) for n, ok, _ in estilo.revisar(mp4_sintetico, plan_con(marca, escena="INT. 🎮 CASA"), marca))
-    assert puntos["Sin emojis"] is False
+    assert puntos["[plan] Sin emojis"] is False
     largo = "uno dos tres cuatro cinco seis siete"
     puntos = dict((n, ok) for n, ok, _ in estilo.revisar(mp4_sintetico, plan_con(marca, gancho=largo, palabra_lapiz="UNO"), marca))
-    assert puntos["Gancho de 6 palabras o menos"] is False
+    assert puntos["[plan] Gancho de 6 palabras o menos"] is False
 
 
 @necesita_ffmpeg
@@ -356,7 +361,7 @@ def test_estilo_detecta_video_fuera_de_formato(marca, tmp_path):
     subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
                     "testsrc=size=640x360:rate=25:duration=3", "-pix_fmt", "yuv420p", str(corto)], check=True)
     malos = [n for n, ok, _ in estilo.revisar(corto, plan_con(marca), marca) if not ok]
-    assert "Resolución 1080x1920" in malos and "Duración de 7 a 30 s" in malos
+    assert "[fotograma] Resolución 1080x1920" in malos and "[fotograma] Duración de 7 a 30 s" in malos
 
 
 @necesita_ffmpeg

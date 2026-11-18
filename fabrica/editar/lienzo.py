@@ -25,10 +25,15 @@ class Toma:
 
 
 def partir(texto: str, f: ImageFont.FreeTypeFont, ancho_max: float) -> list[str]:
-    """Parte el texto en líneas que caben en `ancho_max` píxeles (por palabras)."""
+    """Parte el texto en líneas que caben en `ancho_max` píxeles (por palabras).
+
+    ValueError si una palabra sola excede el ancho: no hay forma de partirla sin salirse.
+    """
     lineas: list[str] = []
     actual = ""
     for p in texto.split():
+        if f.getlength(p) > ancho_max:
+            raise ValueError(f"la palabra {p!r} no cabe en {ancho_max:.0f} px de ancho")
         prueba = (actual + " " + p).strip()
         if f.getlength(prueba) <= ancho_max:
             actual = prueba

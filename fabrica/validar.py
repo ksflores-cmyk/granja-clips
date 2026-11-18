@@ -233,7 +233,7 @@ CLAVES_MAQUETA = [
     "alto_linea_gancho", "espacio_tras_gancho", "regla_grosor", "espacio_tras_regla", "tam_escena",
     "alto_escena", "espacio_tras_escena", "tam_nombre", "alto_nombre", "tam_acotacion",
     "alto_acotacion", "tam_frase", "alto_linea_frase", "espacio_video_dialogo",
-    "alto_dialogo_sin_video", "tam_corte", "corte_y", "tam_credito", "credito_y", "cierre_s",
+    "alto_dialogo_sin_video", "margen_inferior", "tam_corte", "corte_y", "tam_credito", "credito_y", "cierre_s",
     "opacidad_mosca", "grano", "circulo", "subrayado",
 ]
 ESQUINAS = {"superior_derecha", "superior_izquierda"}

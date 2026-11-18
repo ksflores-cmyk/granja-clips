@@ -49,6 +49,7 @@ maqueta:                        # todas las medidas de la página de guion, en p
   tam_frase: 50
   alto_linea_frase: 64
   espacio_video_dialogo: 64     # entre el video y el diálogo
+  margen_inferior: 320          # franja libre al pie del cuadro (botones y texto de las apps)
   alto_dialogo_sin_video: 260   # separación del diálogo bajo la línea de escena si no hay video
   tam_corte: 76
   corte_y: 820
