@@ -1,0 +1,5 @@
+# Almacén temporal de videos (Supabase Storage). Buffer baja el video de la URL pública
+# cuando publica, así que el archivo vive hasta que el post queda en `sent` y luego se borra.
+bucket: clips
+max_mb: 50        # tope por archivo del plan gratis
+prefijo: tomas
