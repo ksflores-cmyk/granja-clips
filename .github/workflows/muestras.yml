@@ -1,0 +1,44 @@
+name: muestras
+
+# Renderiza las 3 muestras de estilo en la nube y las deja como artefacto (3 días).
+# No escribe en ninguna rama: el video nunca entra al repo ni a la PC de Kevin.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/**", "main"]
+    paths:
+      - "marca/**"
+      - "fabrica/editar/**"
+      - ".github/workflows/muestras.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muestras-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  muestras:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalar ffmpeg
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      - run: pip install -r requirements.txt
+      - name: Renderizar muestras fuera del repo
+        run: python -m fabrica.editar.muestras --salida "$RUNNER_TEMP/muestras"
+      - name: Resumen de la puerta de estilo
+        run: cat "$RUNNER_TEMP/muestras/puerta-estilo-auto.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Subir muestras como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: muestras
+          path: ${{ runner.temp }}/muestras
+          retention-days: 3
+          if-no-files-found: error

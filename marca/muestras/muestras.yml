@@ -1,0 +1,65 @@
+# Las 3 muestras de la puerta de estilo. Frases y datos exactos de la especificación N2.
+# Los tiempos de las líneas son segundos relativos al recorte. `original` sólo va al manifiesto.
+muestras:
+  - id: dialogo-sintel
+    pilar: primeras_veces          # demostración del diálogo traducido
+    fuente_id: sintel-cc-by
+    video:
+      url: https://raw.githubusercontent.com/mdn/shared-assets/main/videos/sintel-short.mp4
+      sha256: 358447f332663e6f3794816e32b8072526fcba8bf8744dc7fb3387afb5b2fceb
+    subtitulos:
+      url: https://raw.githubusercontent.com/mdn/shared-assets/main/misc/sintel-en.vtt
+      sha256: 82da8127b0620ec080d99b99f1954783389482add071a896c3251bb88a42c600
+    licencia: "CC BY 3.0, © Blender Foundation (durian.blender.org)"
+    enlace_licencia: https://creativecommons.org/licenses/by/3.0/
+    recorte: {inicio: 39.6, duracion: 17.0}
+    toma:
+      numero: 3
+      gancho: "Ella busca a un dragón"
+      palabra_lapiz: "DRAGÓN"
+      lapiz: círculo
+      escena: "INT. CABAÑA DEL CHAMÁN — NOCHE"
+      credito: "Con: Blender Foundation (CC BY 3.0)"
+    lineas:
+      - {t0: 0.8, t1: 5.2, nombre: "CHAMÁN", frase: "¿Qué te trae a la tierra de los guardianes?", original: "What brings you to the land of the gatekeepers?"}
+      - {t0: 6.4, t1: 8.9, nombre: "SINTEL", frase: "Busco a alguien.", original: "I'm searching for someone."}
+      - {t0: 9.4, t1: 13.6, nombre: "CHAMÁN", frase: "¿Alguien muy querido? ¿Un alma gemela?", original: "Someone very dear? A kindred spirit?"}
+      - {t0: 14.8, t1: 16.4, nombre: "SINTEL", frase: "Un dragón.", original: "A dragon."}
+
+  - id: momento-bbb
+    pilar: momentos
+    fuente_id: bbb-cc-by
+    video:
+      url: https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4
+      sha256: 543a4ad9fef4c9e0004ec9482cb7225c2574b0f889291e8270b1c4d61dbc1ab8
+    licencia: "CC BY 3.0, © Blender Foundation (peach.blender.org)"
+    enlace_licencia: https://creativecommons.org/licenses/by/3.0/
+    recorte: {inicio: 40.0, duracion: 14.0}
+    toma:
+      numero: 2
+      gancho: "El conejo sale a la luz"
+      palabra_lapiz: "LUZ"
+      lapiz: subrayado
+      escena: "EXT. PRADERA — MAÑANA"
+      credito: "Con: Blender Foundation (CC BY 3.0)"
+    lineas:
+      - {t0: 7.5, t1: 13.4, acotacion: "(sale sin prisa)"}
+
+  - id: informativa-gta6
+    pilar: informativa
+    fuente_id: propio-tipografico
+    video: null                     # sin metraje
+    licencia: "propio (tipográfico)"
+    enlace_licencia: null
+    duracion: 11.0
+    toma:
+      numero: 1
+      gancho: "GTA 6 llega esta medianoche"
+      palabra_lapiz: "MEDIANOCHE"
+      lapiz: círculo
+      escena: "INT. TU CONSOLA — 18 DE NOVIEMBRE, NOCHE"
+      credito: "Fuente: Rockstar Games Support"
+    lineas:
+      - {t0: 0.0, t1: 3.6, nombre: "EL DATO", acotacion: "según el soporte de Rockstar", frase: "Medianoche local del 19 de noviembre."}
+      - {t0: 3.6, t1: 7.0, nombre: "EL DATO", frase: "En todas las regiones, en PS5 y Xbox Series X|S."}
+      - {t0: 7.0, t1: 10.5, nombre: "TU RELOJ", acotacion: "en Guatemala", frase: "Jueves 19, 12:00 a. m."}

@@ -24,6 +24,56 @@
   publicable: true
   notas: "Publicaciones tipográficas propias (sin metraje ajeno). Datos sólo de hechos.md."
 
+- id: sintel-cc-by
+  tipo: B
+  creador: "Blender Foundation (Sintel)"
+  origen: web
+  canal_id: null
+  permiso_url: "https://creativecommons.org/licenses/by/3.0/"
+  permiso_leido: 2026-11-17
+  reglas:
+    duracion_s: [7, 30]
+    plataformas: [shorts, tiktok, reels]
+    etiquetas_obligatorias: []
+    divulgacion: "atribución CC BY 3.0: © Blender Foundation, durian.blender.org"
+    audiencia: "sin restricción"
+  pilares: [primeras_veces]
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: null
+  estado: vigente
+  uso: muestras
+  publicable: false
+  notas: "Sólo muestras de estilo, nunca se publica. Archivo: https://raw.githubusercontent.com/mdn/shared-assets/main/videos/sintel-short.mp4 (sha256 358447f332663e6f3794816e32b8072526fcba8bf8744dc7fb3387afb5b2fceb)."
+
+- id: bbb-cc-by
+  tipo: B
+  creador: "Blender Foundation (Big Buck Bunny)"
+  origen: web
+  canal_id: null
+  permiso_url: "https://creativecommons.org/licenses/by/3.0/"
+  permiso_leido: 2026-11-17
+  reglas:
+    duracion_s: [7, 30]
+    plataformas: [shorts, tiktok, reels]
+    etiquetas_obligatorias: []
+    divulgacion: "atribución CC BY 3.0: © Blender Foundation, peach.blender.org"
+    audiencia: "sin restricción"
+  pilares: [momentos]
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: null
+  estado: vigente
+  uso: muestras
+  publicable: false
+  notas: "Sólo muestras de estilo, nunca se publica. Archivo: https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4 (sha256 543a4ad9fef4c9e0004ec9482cb7225c2574b0f889291e8270b1c4d61dbc1ab8)."
+
 # Ejemplo de ficha tipo A (no es una fuente real; no descomentar sin brief leído):
 # - id: ejemplo-campana-001
 #   tipo: A                      # A, B, C o D

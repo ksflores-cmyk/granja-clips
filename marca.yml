@@ -11,7 +11,12 @@ colores:
   lapiz_rojo: "#D4261C"
 fuente:
   familia: "Courier Prime"     # licencia abierta SIL OFL 1.1, uso comercial permitido
-  estilos: [regular, bold, italic]
+  estilos: [regular, bold, italic, bolditalic]
+  archivos:                     # los 4 TTF viven en el repo (marca/fuentes/, OFL.txt al lado)
+    regular: marca/fuentes/CourierPrime-Regular.ttf
+    bold: marca/fuentes/CourierPrime-Bold.ttf
+    italic: marca/fuentes/CourierPrime-Italic.ttf
+    bolditalic: marca/fuentes/CourierPrime-BoldItalic.ttf
 toma:
   contador: 1                   # sube en 1 con cada clip publicado
 movimiento:
@@ -22,7 +27,38 @@ sonido:
   sello_sonoro: opcional        # propio, de menos de 0.4 s
 encabezado_max_palabras: 6
 subtitulo_max_lineas: 2
-mosca: {esquina: inferior_derecha, texto: "GUION VIVO"}
+mosca: {esquina: superior_derecha, texto: "GUION VIVO"}   # abajo la tapan los botones y el texto de las apps
+maqueta:                        # todas las medidas de la página de guion, en píxeles sobre 1080x1920
+  margen: 90                    # margen izquierdo y derecho de la página
+  columna_dialogo: [120, 960]   # columna del diálogo, fuera de los botones laterales de las apps
+  fila_superior_y: 178          # fila superior: TOMA nnn y mosca
+  tam_fila: 34
+  gancho_y: 238
+  tam_gancho: 66
+  alto_linea_gancho: 82
+  espacio_tras_gancho: 22       # entre el gancho y la regla
+  regla_grosor: 3
+  espacio_tras_regla: 26
+  tam_escena: 36
+  alto_escena: 50
+  espacio_tras_escena: 30
+  tam_nombre: 42
+  alto_nombre: 58
+  tam_acotacion: 38
+  alto_acotacion: 54
+  tam_frase: 50
+  alto_linea_frase: 64
+  espacio_video_dialogo: 64     # entre el video y el diálogo
+  alto_dialogo_sin_video: 260   # separación del diálogo bajo la línea de escena si no hay video
+  tam_corte: 76
+  corte_y: 820
+  tam_credito: 42
+  credito_y: 930
+  cierre_s: 0.5                 # el cierre ocupa el último medio segundo
+  opacidad_mosca: 0.80
+  grano: {papel: 2.2, fibra: 1.2, bloque_fibra: 4, semilla: 7}
+  circulo: {margen_x: 28, margen_y: 20, irregularidad: 0.06, sobrepaso_grados: [15, 35], grosor: [5, 8]}
+  subrayado: {grosor: [6, 9], sobresale: [12, 24]}
 prohibido:
   - subtítulos palabra por palabra con una palabra en amarillo
   - emojis dentro del video

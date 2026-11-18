@@ -204,6 +204,78 @@ def validar_marca(m, inf: Informe) -> None:
     s = m["subtitulo_max_lineas"]
     if not (_es_int(s) and 1 <= s <= 2):
         inf.error(f"{rel}: subtitulo_max_lineas debe ser entero de 1 a 2")
+    validar_maqueta(m, inf)
+
+
+CLAVES_MAQUETA = [
+    "margen", "columna_dialogo", "fila_superior_y", "tam_fila", "gancho_y", "tam_gancho",
+    "alto_linea_gancho", "espacio_tras_gancho", "regla_grosor", "espacio_tras_regla", "tam_escena",
+    "alto_escena", "espacio_tras_escena", "tam_nombre", "alto_nombre", "tam_acotacion",
+    "alto_acotacion", "tam_frase", "alto_linea_frase", "espacio_video_dialogo",
+    "alto_dialogo_sin_video", "tam_corte", "corte_y", "tam_credito", "credito_y", "cierre_s",
+    "opacidad_mosca", "grano", "circulo", "subrayado",
+]
+ESQUINAS = {"superior_derecha", "superior_izquierda"}
+ESTILOS_FUENTE = ("regular", "bold", "italic", "bolditalic")
+
+
+def _positivos(dato, ruta: str, inf: Informe) -> None:
+    """Todo número de la maqueta debe ser positivo (recorre diccionarios y listas)."""
+    rel = "marca.yml: maqueta"
+    if isinstance(dato, dict):
+        for k, v in dato.items():
+            _positivos(v, f"{ruta}.{k}", inf)
+    elif isinstance(dato, list):
+        if not dato:
+            inf.error(f"{rel}: {ruta} no puede ser una lista vacía")
+        for i, v in enumerate(dato):
+            _positivos(v, f"{ruta}[{i}]", inf)
+    elif isinstance(dato, bool) or not isinstance(dato, (int, float)):
+        inf.error(f"{rel}: {ruta} debe ser un número")
+    elif dato <= 0:
+        inf.error(f"{rel}: {ruta} debe ser positivo")
+
+
+def validar_maqueta(m, inf: Informe) -> None:
+    rel = "marca.yml"
+    mosca = m.get("mosca")
+    if not isinstance(mosca, dict):
+        inf.error(f"{rel}: falta mosca")
+    else:
+        if mosca.get("esquina") not in ESQUINAS:
+            inf.error(f"{rel}: mosca.esquina debe ser superior_derecha o superior_izquierda")
+        if not (isinstance(mosca.get("texto"), str) and mosca["texto"].strip()):
+            inf.error(f"{rel}: mosca.texto es obligatorio")
+    maq = m.get("maqueta")
+    if not isinstance(maq, dict):
+        inf.error(f"{rel}: falta la sección maqueta")
+        return
+    for c in CLAVES_MAQUETA:
+        if c not in maq:
+            inf.error(f"{rel}: maqueta: falta la clave '{c}'")
+    _positivos(maq, "maqueta", inf)
+    col = maq.get("columna_dialogo")
+    if isinstance(col, list) and len(col) == 2 and all(isinstance(x, (int, float)) for x in col):
+        if col[0] >= col[1]:
+            inf.error(f"{rel}: maqueta.columna_dialogo debe ser [inicio, fin] con inicio < fin")
+    elif "columna_dialogo" in maq:
+        inf.error(f"{rel}: maqueta.columna_dialogo debe ser [inicio, fin]")
+    op = maq.get("opacidad_mosca")
+    if isinstance(op, (int, float)) and not isinstance(op, bool) and op > 1:
+        inf.error(f"{rel}: maqueta.opacidad_mosca debe estar entre 0 y 1")
+
+
+def validar_archivos_fuente(raiz: Path, m, inf: Informe) -> None:
+    arch = m.get("fuente", {}).get("archivos") if isinstance(m.get("fuente"), dict) else None
+    if not isinstance(arch, dict):
+        inf.error("marca.yml: fuente.archivos debe listar los TTF (regular, bold, italic, bolditalic)")
+        return
+    for estilo in ESTILOS_FUENTE:
+        ruta = arch.get(estilo)
+        if not isinstance(ruta, str):
+            inf.error(f"marca.yml: fuente.archivos.{estilo} falta")
+        elif not (raiz / ruta).is_file():
+            inf.error(f"marca.yml: fuente.archivos.{estilo} apunta a {ruta}, que no existe")
 
 
 def validar_horarios(h, inf: Informe) -> None:
@@ -315,6 +387,8 @@ def validar(raiz=None) -> Informe:
         validar_fuentes(datos["fuentes"], inf)
     if datos["marca"] is not None:
         validar_marca(datos["marca"], inf)
+        if isinstance(datos["marca"], dict):
+            validar_archivos_fuente(raiz, datos["marca"], inf)
     if datos["horarios"] is not None:
         validar_horarios(datos["horarios"], inf)
     if datos["modo"] is not None:
