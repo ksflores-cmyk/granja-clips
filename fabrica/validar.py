@@ -397,6 +397,19 @@ def validar_canales(c, inf: Informe) -> None:
         inf.error(f"{rel}: canal desconocido '{extra}'")
 
 
+def validar_almacen(a, inf: Informe) -> None:
+    rel = "config/almacen.yml"
+    if not _claves(a, rel, ["bucket", "max_mb", "prefijo"], inf):
+        return
+    if not (isinstance(a["bucket"], str) and re.fullmatch(r"[a-z0-9][a-z0-9-]*", a["bucket"])):
+        inf.error(f"{rel}: bucket debe estar en minúsculas, números y guiones")
+    if not (_es_int(a["max_mb"]) and 1 <= a["max_mb"] <= 50):
+        inf.error(f"{rel}: max_mb debe ser entero de 1 a 50 (tope del plan gratis)")
+    p = a["prefijo"]
+    if not (isinstance(p, str) and re.fullmatch(r"[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*", p)):
+        inf.error(f"{rel}: prefijo debe ser una ruta sin espacios ni barras en los extremos")
+
+
 def validar_pausa(raiz: Path, inf: Informe) -> None:
     ruta = raiz / "PAUSA"
     if ruta.exists():
@@ -468,6 +481,9 @@ def validar(raiz=None) -> Informe:
     ojos = _cargar(raiz, "config/ojos.yml", inf)
     if ojos is not None:
         validar_ojos(ojos, inf)
+    almacen = _cargar(raiz, "config/almacen.yml", inf)
+    if almacen is not None:
+        validar_almacen(almacen, inf)
     validar_pausa(raiz, inf)
     validar_csv(raiz, "marcador.csv", CABECERA_MARCADOR, inf)
     validar_csv(raiz, "envios-pendientes.csv", CABECERA_ENVIOS, inf)

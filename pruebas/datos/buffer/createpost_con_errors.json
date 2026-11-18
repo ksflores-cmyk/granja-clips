@@ -1,0 +1,10 @@
+{
+ "data": {
+  "createPost": null
+ },
+ "errors": [
+  {
+   "message": "Internal server error"
+  }
+ ]
+}

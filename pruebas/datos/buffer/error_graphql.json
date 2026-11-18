@@ -1,0 +1,13 @@
+{
+ "errors": [
+  {
+   "message": "Cannot query field \"madeForKids\" on type \"YoutubePostMetadataInput\".",
+   "locations": [
+    {
+     "line": 1,
+     "column": 10
+    }
+   ]
+  }
+ ]
+}
