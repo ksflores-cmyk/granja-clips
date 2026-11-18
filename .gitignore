@@ -22,3 +22,5 @@ client_secret*.json
 token*.json
 marca.yml.lock
 estado/*.lock
+*.md.lock
+*.csv.lock

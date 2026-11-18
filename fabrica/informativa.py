@@ -26,6 +26,7 @@ FICHA_ID = "propio-tipografico"
 DURACION_S = 11.0
 CIERRE_PERDIDO_S = 0.5            # el último medio segundo es el cierre
 NOMBRE_DATO = "EL DATO"
+ETIQUETAS = ("#GTA6", "#Gaming", "#Clips")    # Instagram pide de 3 a 5; no llevan datos
 CREDITO = "Fuente: Rockstar Games Support"
 ESCENA = "INT. TU CONSOLA — NOCHE"
 TOPE_PORCENTAJE = 0.10
@@ -97,7 +98,7 @@ def toma_dict(entrada: dict, numero: int) -> dict:
     """La toma tal como la espera `publicar.textos` (pilar informativa, titular y datos)."""
     return {"numero": numero, "gancho": entrada["gancho"], "pilar": "informativa",
             "titular": entrada["titular"], "datos": list(entrada["datos"]),
-            "fuente_id": FICHA_ID, "campana": "", "duracion_s": DURACION_S}
+            "fuente_id": FICHA_ID, "campana": "", "duracion_s": DURACION_S, "etiquetas": list(ETIQUETAS)}
 
 
 def _lineas(entrada: dict) -> list[Linea]:
