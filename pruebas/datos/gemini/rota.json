@@ -1,0 +1,21 @@
+{
+  "apto": true,
+  "motivos": [],
+  "spoiler": false,
+  "desnudez": false,
+  "cinematica": false,
+  "juego_correcto": true,
+  "idioma_original": "inglés",
+  "lineas": [
+    {
+      "t0": 2.5,
+      "t1": 6.0,
+      "hablante": "KAI",
+      "original": "Okay, I'm finally in the city.",
+      "es": "Por fin estoy en la ciudad."
+    },
+    {
+      "t0": 7.0,
+      "t1": 11.0,
+      "hablante": "KAI",
+      "original": 

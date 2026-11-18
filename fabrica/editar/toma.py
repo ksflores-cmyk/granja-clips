@@ -1,0 +1,123 @@
+"""Editor de punta a punta: `hacer_toma` descarga, mira, valida, compone y pasa la puerta de estilo.
+
+Nunca publica ni sube el contador de `marca.yml`: usa el número actual. Cualquier NO es un descarte con
+todos sus motivos. La puerta de estilo corre mientras el video de origen sigue en la carpeta temporal
+(compara el cuerpo con la fuente); el plan guarda su `sha256`.
+"""
+from __future__ import annotations
+
+import json
+import subprocess
+import tempfile
+import time
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+
+from .. import descargar as mod_descargar
+from .. import ojos
+from ..config import cargar_yaml, raiz_repo
+from ..registro import ZONA, contador_toma
+from . import estilo
+from .componer import Linea, componer
+from .lienzo import Toma
+from .marca import Marca
+
+MIN_LINEA_S = 0.3        # una línea más corta que esto tras ajustarla al recorte se descarta
+INICIO_ACOTACION_S = 0.8
+
+
+@dataclass
+class Resultado:
+    ok: bool
+    motivos: list[str] = field(default_factory=list)
+    mp4: Path | None = None
+    plan: dict | None = None
+    gemini: dict | None = None          # la respuesta cruda de Gemini (para informes)
+    modelo: str | None = None
+    puntos: list = field(default_factory=list)   # (punto, ok, detalle) de la puerta de estilo
+    fila: dict | None = None            # fila futura del marcador: N5 la pasa a registro.anotar_clip
+
+
+def lapiz_de(numero: int) -> str:
+    """Alterna: número impar, círculo; par, subrayado (como las muestras: 1 y 3 círculo, 2 subrayado)."""
+    return "círculo" if numero % 2 else "subrayado"
+
+
+def armar(datos: dict, marca: Marca, ficha: dict, numero: int) -> tuple[Toma, list[Linea], float, float]:
+    """(Toma, líneas relativas al recorte, inicio, duración) a partir de una respuesta ya validada."""
+    ini, fin = float(datos["recorte"]["inicio"]), float(datos["recorte"]["fin"])
+    dur = round(fin - ini, 3)
+    toma = Toma(numero=numero, gancho=datos["gancho"].strip(), palabra_lapiz=datos["palabra_lapiz"].strip(),
+                lapiz=lapiz_de(numero), escena=datos["escena"].strip().upper(),
+                credito=f"Con: {ficha['creador']}")
+    tope = dur - float(marca.m("cierre_s"))      # el último medio segundo es el cierre
+    lineas: list[Linea] = []
+    for ln in ojos.partir_lineas(datos, marca):
+        t0, t1 = max(0.0, round(ln["t0"] - ini, 3)), min(tope, round(ln["t1"] - ini, 3))
+        if t1 - t0 < MIN_LINEA_S:
+            continue
+        lineas.append(Linea(t0=t0, t1=t1, nombre=ln["hablante"].strip().upper(), frase=ln["es"].strip(),
+                            original=ln["original"]))
+    acot = datos["acotacion"].strip()
+    if acot:
+        if lineas:
+            lineas[0].acotacion = acot
+        else:
+            lineas.append(Linea(t0=INICIO_ACOTACION_S, t1=max(INICIO_ACOTACION_S + MIN_LINEA_S, tope - 0.2),
+                                acotacion=acot))
+    return toma, lineas, ini, dur
+
+
+def fila_marcador(candidato, ficha: dict, toma: Toma, dur: float, ahora: datetime) -> dict:
+    """Fila futura del marcador (sin id_clip ni notas: `registro.anotar_clip` los pone)."""
+    local = ahora.astimezone(ZONA)
+    return {"toma": toma.numero, "fecha": local.date().isoformat(), "hora": local.strftime("%H:%M"),
+            "pilar": candidato.pilar or "", "fuente_id": ficha.get("id"), "campana": ficha.get("campana"),
+            "gancho": toma.gancho, "duracion_s": round(dur, 2), "credito": toma.credito}
+
+
+def hacer_toma(raiz, candidato, ficha: dict | None, ahora: datetime, *, salida: Path | None = None,
+               abrir=None, ejecutor=None, transporte=None, espera=time.sleep, entorno=None) -> Resultado:
+    """Descarga → ojos → validar_respuesta → componer → puerta de estilo. Nunca publica.
+
+    `salida`: carpeta del MP4 (por defecto una temporal nueva que queda al cuidado de quien llama).
+    """
+    raiz = raiz_repo(raiz)
+    salida = Path(salida) if salida is not None else Path(tempfile.mkdtemp(prefix="granja-toma-"))
+    salida.mkdir(parents=True, exist_ok=True)
+    marca = Marca.cargar(raiz)
+    temporada = cargar_yaml("temporada.yml", raiz)
+    hoy = ahora.astimezone(ZONA).date()
+    try:
+        with mod_descargar.descargar(raiz, candidato, ficha, hoy, abrir=abrir, ejecutor=ejecutor) as d:
+            mirada = ojos.mirar(d.ruta, marca, temporada, raiz=raiz, duracion=d.duracion,
+                                transporte=transporte, espera=espera, entorno=entorno)
+            if mirada.datos is None:
+                return Resultado(False, [f"ojos: {mirada.motivo}"], modelo=mirada.modelo)
+            ok, motivos = ojos.validar_respuesta(mirada.datos, marca, temporada, duracion=d.duracion)
+            if not ok:
+                return Resultado(False, [f"ojos: {x}" for x in motivos], gemini=mirada.datos, modelo=mirada.modelo)
+            numero = contador_toma(raiz)
+            toma, lineas, inicio, dur = armar(mirada.datos, marca, ficha, numero)
+            mp4 = salida / f"toma-{numero:03d}-{candidato.id_origen}.mp4"
+            plan_ruta = mp4.with_suffix(".plan.json")
+            try:
+                with tempfile.TemporaryDirectory(prefix="trabajo-toma-") as trabajo:
+                    plan = componer(marca, toma, lineas, mp4, duracion=dur, trabajo=Path(trabajo),
+                                    fuente_video=d.ruta, inicio=inicio, plan_salida=plan_ruta)
+                puntos = estilo.revisar(mp4, plan, marca)
+            except (ValueError, subprocess.SubprocessError, OSError) as e:
+                mp4.unlink(missing_ok=True)
+                return Resultado(False, [f"editor: {type(e).__name__}: {e}"], gemini=mirada.datos,
+                                 modelo=mirada.modelo)
+            rojos = [f"puerta de estilo: {n}" + (f" ({det})" if det else "") for n, ok_p, det in puntos if not ok_p]
+            if rojos:
+                mp4.unlink(missing_ok=True)
+                return Resultado(False, rojos, None, plan, mirada.datos, mirada.modelo, puntos)
+            plan["gemini"] = {"modelo": mirada.modelo, "idioma_original": mirada.datos["idioma_original"]}
+            plan_ruta.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+            return Resultado(True, [], mp4, plan, mirada.datos, mirada.modelo, puntos,
+                             fila_marcador(candidato, ficha, toma, dur, ahora))
+    except mod_descargar.ErrorDescarga as e:
+        return Resultado(False, [f"descarga: {e}"])

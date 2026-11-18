@@ -1,0 +1,33 @@
+{
+  "apto": true,
+  "motivos": [],
+  "spoiler": false,
+  "desnudez": false,
+  "cinematica": false,
+  "juego_correcto": true,
+  "idioma_original": "inglés",
+  "lineas": [
+    {
+      "t0": 2.5,
+      "t1": 6.8,
+      "hablante": "KAI",
+      "original": "Okay, I'm finally in the city.",
+      "es": "Esta ciudad es enorme y no termina nunca. Todavía no entiendo cómo llegué hasta aquí."
+    },
+    {
+      "t0": 7.0,
+      "t1": 11.0,
+      "hablante": "KAI",
+      "original": "Look at this view.",
+      "es": "Mira esta vista."
+    }
+  ],
+  "gancho": "Kai llega a la ciudad",
+  "palabra_lapiz": "CIUDAD",
+  "escena": "INT. STREAM DE KAI — MINUTO 12",
+  "acotacion": "(se ríe)",
+  "recorte": {
+    "inicio": 2.0,
+    "fin": 14.0
+  }
+}

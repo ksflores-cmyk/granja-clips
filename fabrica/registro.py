@@ -36,6 +36,27 @@ def anotar_fila(raiz, fila: dict) -> None:
         w.writerow(["" if fila.get(c) is None else fila.get(c) for c in CABECERA_MARCADOR])
 
 
+def anotar_clip(raiz, candidato, fila: dict) -> dict:
+    """Escribe la fila del marcador de un clip y lo anota como visto, en el mismo paso.
+
+    El id de origen va en `id_clip` y como `origen:<id>` en `notas`, que son los lugares donde
+    `puertas.ids_en_marcador` lo busca; además `puertas.anotar_visto` lo apunta en estado/vistos.txt.
+    Así las dos defensas contra repetidos no se pueden olvidar. Devuelve la fila escrita.
+    Si la fila es inválida (columnas desconocidas) no se anota nada.
+    """
+    from . import puertas   # import tardío: puertas importa este módulo
+    id_origen = str(candidato.id_origen).strip()
+    if not id_origen:
+        raise ValueError("el candidato no tiene id_origen")
+    fila = dict(fila)
+    previas = str(fila.get("notas") or "").strip()
+    fila["id_clip"] = id_origen
+    fila["notas"] = f"origen:{id_origen}" + (f"; {previas}" if previas else "")
+    anotar_fila(raiz, fila)
+    puertas.anotar_visto(raiz, id_origen)
+    return fila
+
+
 def _bloquear(f) -> None:
     """Candado exclusivo sobre el archivo abierto: fcntl en POSIX, msvcrt.locking en Windows."""
     try:
