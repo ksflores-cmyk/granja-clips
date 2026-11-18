@@ -11,12 +11,22 @@ import re
 import struct
 import subprocess
 import sys
+import tempfile
 import unicodedata
 from pathlib import Path
 
+import numpy as np
+from PIL import Image
+
+from . import cierre as mod_cierre
 from . import dialogo as mod_dialogo
-from .lienzo import _limpia, partir
+from .lienzo import Toma, _limpia, partir
 from .marca import Marca
+
+# Tolerancia de la comparación del cierre: diferencia media por canal (0 a 255) en la zona de
+# CORTE. y crédito entre el fotograma final y la página de cierre esperada. Es la tolerancia de
+# la puerta (compresión H.264), no una medida de la marca.
+UMBRAL_CIERRE = 8.0
 
 RE_EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿⬀-⯿️‍⃣\U0001F1E6-\U0001F1FF]")
 
@@ -68,6 +78,40 @@ def _textos(plan: dict) -> list[str]:
     return [x for x in textos if x]
 
 
+def cierre_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
+    """Demuestra en el video, no en el plan, que el cierre trae CORTE. y el crédito.
+
+    Saca el fotograma de duración − 0.2 s y compara la zona de CORTE. y crédito con la página de
+    cierre que corresponde al plan. Si el video no tiene cierre o le falta el crédito, la
+    diferencia sube muy por encima de la tolerancia.
+    """
+    t = plan.get("toma", {})
+    dur = float(plan.get("duracion") or 0)
+    if dur <= 0:
+        return False, "el plan no trae la duración"
+    esperado = mod_cierre.pagina_cierre(marca, Toma(
+        numero=int(t.get("numero", 0)), gancho=str(t.get("gancho", "")),
+        palabra_lapiz=str(t.get("palabra_lapiz", "")), lapiz=str(t.get("lapiz", "subrayado")),
+        escena=str(t.get("escena", "")), credito=str(t.get("credito", ""))))
+    with tempfile.TemporaryDirectory(prefix="cierre-") as tmp:
+        png = Path(tmp) / "fin.png"
+        r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{max(0.0, dur - 0.2):.3f}",
+                            "-i", str(video), "-frames:v", "1", str(png)], capture_output=True)
+        if r.returncode != 0 or not png.is_file():
+            return False, "no se pudo leer el fotograma final"
+        real = Image.open(png).convert("RGB")
+        real.load()
+    if real.size != esperado.size:
+        return False, f"tamaño {real.size} distinto de {esperado.size}"
+    y0 = int(marca.m("corte_y"))
+    y1 = int(marca.m("credito_y") + 2 * marca.m("tam_credito"))
+    x0, x1 = int(marca.m("margen")), int(marca.ancho - marca.m("margen"))
+    a = np.asarray(real, dtype=np.int16)[y0:y1, x0:x1]
+    b = np.asarray(esperado, dtype=np.int16)[y0:y1, x0:x1]
+    dif = float(np.abs(a - b).mean())
+    return dif < UMBRAL_CIERRE, f"diferencia media {dif:.1f} (tolerancia {UMBRAL_CIERRE:.0f})"
+
+
 def revisar(video: Path, plan: dict, marca: Marca) -> list[tuple[str, bool, str]]:
     """Lista de (punto, ok, detalle)."""
     res: list[tuple[str, bool, str]] = []
@@ -108,6 +152,8 @@ def revisar(video: Path, plan: dict, marca: Marca) -> list[tuple[str, bool, str]
     punto(f"Frases de {marca.max_lineas_frase} líneas o menos en la columna", not malas, "; ".join(malas))
 
     punto("Crédito presente y no vacío", bool(str(t.get("credito", "")).strip()), str(t.get("credito", "")))
+    ok_cierre, det_cierre = cierre_visible(Path(video), plan, marca)
+    punto("Cierre visible en el video (CORTE. y crédito)", ok_cierre, det_cierre)
 
     col = plan.get("colores", {})
     colores_ok = all(str(col.get(k, "")).lower() == str(marca.datos["colores"][k]).lower()

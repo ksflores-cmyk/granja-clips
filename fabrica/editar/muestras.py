@@ -24,7 +24,8 @@ from .config_ruta import RAIZ
 from .lienzo import Toma
 from .marca import Marca
 
-CUADROS = (0.15, 0.50, 0.95)
+CUADROS = (0.15, 0.50)
+FIN_S = 0.2   # el último fotograma se saca 0.2 s antes del final, ya dentro del cierre
 
 
 def sha256(ruta: Path) -> str:
@@ -66,9 +67,10 @@ def _dentro_del_repo(salida: Path) -> bool:
 
 def fotogramas(mp4: Path, duracion: float, salida: Path, base: str) -> list[str]:
     nombres = []
-    for p in CUADROS:
-        nombre = f"{base}-{int(p * 100):02d}.png"
-        subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{duracion * p:.3f}",
+    tiempos = [(f"{int(p * 100):02d}", duracion * p) for p in CUADROS] + [("fin", max(0.0, duracion - FIN_S))]
+    for etiqueta, seg in tiempos:
+        nombre = f"{base}-{etiqueta}.png"
+        subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{seg:.3f}",
                         "-i", str(mp4), "-frames:v", "1", str(salida / nombre)], check=True)
         nombres.append(nombre)
     return nombres

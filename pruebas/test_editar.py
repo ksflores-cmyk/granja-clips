@@ -280,6 +280,7 @@ PLAN = {
     "toma": {"numero": 1, "gancho": "GTA 6 llega esta medianoche", "palabra_lapiz": "MEDIANOCHE",
              "lapiz": "circulo", "escena": "INT. TU CONSOLA", "credito": "Fuente: Rockstar Games Support"},
     "lineas": [{"t0": 0, "t1": 3.6, "nombre": "EL DATO", "frase": "Medianoche local del 19 de noviembre."}],
+    "duracion": 8.0,
 }
 
 
@@ -293,16 +294,35 @@ def plan_con(marca, **cambios_toma):
 
 @pytest.fixture(scope="module")
 def mp4_sintetico(tmp_path_factory):
+    """Toma tipográfica de 8 s hecha con componer: trae la página de cierre del PLAN."""
     if not hay_ffmpeg:
         pytest.skip("ffmpeg no está instalado")
-    ruta = tmp_path_factory.mktemp("sint") / "sint.mp4"
+    base = tmp_path_factory.mktemp("sint")
+    ruta = base / "sint.mp4"
+    m = Marca.cargar()
+    t = lienzo.Toma(**PLAN["toma"])
+    ln = [componer.Linea(0.0, 3.6, "EL DATO", "Medianoche local del 19 de noviembre.")]
+    componer.componer(m, t, ln, ruta, duracion=8.0, trabajo=base / "w")
+    return ruta
+
+
+def test_cierre_ausente_dice_no(marca, tmp_path):
+    if not hay_ffmpeg:
+        pytest.skip("ffmpeg no está instalado")
+    sin_cierre = tmp_path / "sin.mp4"
     subprocess.run([
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
         "-f", "lavfi", "-i", "testsrc=size=1080x1920:rate=30:duration=8",
         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", "8",
         "-c:v", "libx264", "-preset", "ultrafast", "-profile:v", "high", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-movflags", "+faststart", str(ruta)], check=True)
-    return ruta
+        "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-movflags", "+faststart", str(sin_cierre)], check=True)
+    ok, detalle = estilo.cierre_visible(sin_cierre, plan_con(marca), marca)
+    assert ok is False, detalle
+
+
+def test_cierre_con_otro_credito_dice_no(marca, mp4_sintetico):
+    ok, detalle = estilo.cierre_visible(mp4_sintetico, plan_con(marca, credito="Con: @otro_creador_distinto"), marca)
+    assert ok is False, detalle
 
 
 @necesita_ffmpeg
