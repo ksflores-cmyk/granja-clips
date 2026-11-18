@@ -22,9 +22,10 @@ class BufferSimulado:
     """Transporte GraphQL que enruta por el texto de la consulta. Guarda las consultas recibidas."""
 
     def __init__(self, esquema="esquema.json", canales="canales.json", crear="createpost_ok.json",
-                 estado_post="post_enviado.json", datos: Path = DATOS):
+                 estado_post="post_enviado.json", borrar="deletepost_ok.json", datos: Path = DATOS):
         self.dir = Path(datos) / "buffer"
-        self.archivos = {"esquema": esquema, "canales": canales, "crear": crear, "estado": estado_post}
+        self.archivos = {"esquema": esquema, "canales": canales, "crear": crear, "estado": estado_post,
+                         "borrar": borrar}
         self.consultas: list[str] = []
         self.variables: list[dict] = []
 
@@ -41,10 +42,12 @@ class BufferSimulado:
             return _json(200, {"data": {"__type": esquema.get(v.get("n"))}})
         if "__type(name: \"Query\")" in q:
             return _json(200, {"data": {"__type": self._leer(self.archivos["esquema"])["Query"]}})
+        if "__type(name: \"Post\")" in q:
+            return _json(200, {"data": {"__type": {"fields": [{"name": n} for n in ("id", "status", "dueAt", "text")]}}})
         if "createPost" in q:
             return _json(200, self._leer(self.archivos["crear"]))
         if "deletePost" in q:
-            return _json(200, self._leer("deletepost_ok.json"))
+            return _json(200, self._leer(self.archivos["borrar"]))
         if "organizations" in q:
             return _json(200, self._leer("organizacion.json"))
         if "channels(" in q:

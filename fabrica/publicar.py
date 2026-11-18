@@ -48,11 +48,20 @@ M_BORRAR = ("mutation($input: DeletePostInput!) { deletePost(input: $input) { "
             "__typename ... on MutationError { message } } }")
 Q_TIPO = ("query($n: String!) { __type(name: $n) { name inputFields { name defaultValue "
           "type { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } } }")
+Q_CAMPOS_POST = 'query { __type(name: "Post") { fields { name } } }'
 Q_CONSULTAS = "query { __type(name: \"Query\") { fields { name args { name } } } }"
 
 
 class ErrorBuffer(Exception):
     """Fallo de la API de Buffer (red, código o `errors` de GraphQL)."""
+
+
+class ErrorIncierto(ErrorBuffer):
+    """Una mutación pudo haberse aplicado (5xx, tiempo agotado o respuesta ilegible): no se repite."""
+
+
+class SinConfirmar(ErrorBuffer):
+    """Falta el id de canal u organización guardado en config/canales.yml: hace falta un ensayo con claves."""
 
 
 class ErrorCuota(ErrorBuffer):
@@ -142,8 +151,12 @@ class ClienteBuffer:
         self.dormir = dormir
         self.cuota = Cuota(raiz, ahora)
 
-    def consulta(self, query: str, variables: dict | None = None, canal: str | None = None) -> dict:
-        """Una llamada GraphQL. Devuelve `data`; los `errors` lanzan ErrorBuffer."""
+    def consulta(self, query: str, variables: dict | None = None, canal: str | None = None,
+                 mutacion: bool = False) -> dict:
+        """Una llamada GraphQL. Devuelve `data`; los `errors` lanzan ErrorBuffer.
+
+        Una mutación (createPost, deletePost) NUNCA se reintenta: repetirla podría duplicar la publicación.
+        Si el resultado es incierto (5xx, tiempo agotado, respuesta ilegible) lanza ErrorIncierto."""
         cuerpo = json.dumps({"query": query, "variables": variables or {}}).encode("utf-8")
         cab = {"Authorization": f"Bearer {self._clave}", "Content-Type": "application/json",
                "Accept": "application/json"}
@@ -152,14 +165,24 @@ class ClienteBuffer:
             self.cuota.comprobar(canal)
             self.cuota.registrar(canal)
 
-        estado, _, datos = red.solicitar(self.transporte, "POST", ENDPOINT, cab, cuerpo,
-                                         dormir=self.dormir, alerta=contar)
+        try:
+            estado, _, datos = red.solicitar(self.transporte, "POST", ENDPOINT, cab, cuerpo,
+                                             dormir=self.dormir, alerta=contar, reintentar=not mutacion)
+        except red.ErrorRed as e:
+            if mutacion:
+                raise ErrorIncierto(f"{e}; el resultado es incierto, no se repite") from None
+            raise ErrorBuffer(str(e)) from None
         if estado != 200:
-            raise ErrorBuffer(f"POST {red.ruta_de(ENDPOINT)}: código {estado}")
+            msg = f"POST {red.ruta_de(ENDPOINT)}: código {estado}"
+            if mutacion and estado >= 500:
+                raise ErrorIncierto(msg + "; el resultado es incierto, no se repite")
+            raise ErrorBuffer(msg)
         try:
             r = json.loads(datos.decode("utf-8"))
         except ValueError:
-            raise ErrorBuffer(f"POST {red.ruta_de(ENDPOINT)}: la respuesta no es JSON") from None
+            msg = f"POST {red.ruta_de(ENDPOINT)}: la respuesta no es JSON"
+            raise (ErrorIncierto(msg + "; el resultado es incierto, no se repite") if mutacion
+                   else ErrorBuffer(msg)) from None
         if not isinstance(r, dict):
             raise ErrorBuffer(f"POST {red.ruta_de(ENDPOINT)}: respuesta inesperada")
         if r.get("errors"):
@@ -341,11 +364,16 @@ def _alerta(raiz, motivo: str, escribir: bool) -> None:
 
 
 def confirmar_canales(canales_api: list[dict], canales_cfg: dict, raiz=None, plataformas=None,
-                      escribir: bool = True) -> dict:
-    """Para cada plataforma debe haber exactamente un canal con su servicio y su nombre esperado.
+                      escribir: bool = True, exigir_guardado: bool = False) -> dict:
+    """Para cada plataforma debe haber exactamente un canal con su `service` y su `name` esperado.
 
+    `name` se compara sin @ y sin distinguir mayúsculas; `displayName` es sólo informativo y nunca basta.
     Devuelve {plataforma: id}. Si algo no coincide, o la cola está pausada, es alerta roja: crea PAUSA
     (si `escribir`), deja `estado/alerta-roja.json` para N6 y lanza AlertaRoja. No programa nada.
+
+    Si config/canales.yml ya guarda `buffer_channel_id` o `buffer_org_id`, deben ser iguales a los de la API
+    (si no, alerta roja). Con `exigir_guardado` (modo vivo), que falte alguno lanza SinConfirmar: primero
+    hace falta un ensayo con claves que los confirme.
     """
     plataformas = list(plataformas if plataformas is not None else PLATAFORMAS)
     ids = {}
@@ -353,26 +381,44 @@ def confirmar_canales(canales_api: list[dict], canales_cfg: dict, raiz=None, pla
         ficha = canales_cfg[plat]
         esperado, servicio = _norm(ficha["nombre_esperado"]), str(ficha["servicio"]).lower()
         coinciden = [c for c in canales_api
-                     if str(c.get("service", "")).lower() == servicio
-                     and esperado in (_norm(c.get("name")), _norm(c.get("displayName")))]
+                     if str(c.get("service", "")).lower() == servicio and _norm(c.get("name")) == esperado]
         if len(coinciden) != 1:
             _alerta(raiz, f"canal de {plat} no confirmado: se esperaba exactamente un canal "
                           f"'{ficha['nombre_esperado']}' de {servicio} y hay {len(coinciden)}", escribir)
-        if coinciden[0].get("isQueuePaused"):
+        canal = coinciden[0]
+        if canal.get("isQueuePaused"):
             _alerta(raiz, f"la cola del canal de {plat} ('{ficha['nombre_esperado']}') está pausada "
                           "en Buffer", escribir)
-        ids[plat] = coinciden[0]["id"]
+        guardado_canal, guardado_org = ficha.get("buffer_channel_id"), ficha.get("buffer_org_id")
+        if exigir_guardado and not (guardado_canal and guardado_org):
+            raise SinConfirmar(f"{plat}: falta buffer_channel_id o buffer_org_id en config/canales.yml; "
+                               "primero hace falta un ensayo con claves que los confirme")
+        if guardado_canal and guardado_canal != canal["id"]:
+            _alerta(raiz, f"el canal de {plat} que devuelve Buffer no es el confirmado en config/canales.yml",
+                    escribir)
+        if guardado_org and canal.get("_org") is not None and guardado_org != canal["_org"]:
+            _alerta(raiz, f"el canal de {plat} está en otra organización que la confirmada en "
+                          "config/canales.yml", escribir)
+        ids[plat] = canal["id"]
     return ids
 
 
-def guardar_ids_de_canales(raiz, ids: dict) -> None:
-    """Escribe buffer_channel_id en config/canales.yml cambiando sólo esos valores."""
+def organizaciones_de(canales_api: list[dict], ids: dict) -> dict:
+    """{plataforma: id de la organización} de los canales confirmados."""
+    por_id = {c["id"]: c.get("_org") for c in canales_api}
+    return {plat: por_id.get(i) for plat, i in ids.items()}
+
+
+def guardar_ids_de_canales(raiz, ids: dict, orgs: dict | None = None) -> None:
+    """Escribe buffer_channel_id y buffer_org_id en config/canales.yml cambiando sólo esos valores."""
     ruta = raiz_repo(raiz) / "config" / "canales.yml"
     lineas = ruta.read_text(encoding="utf-8").splitlines(keepends=True)
     for i, linea in enumerate(lineas):
         m = re.match(r"^(\w+):", linea)
         if m and m.group(1) in ids:
             lineas[i] = re.sub(r"buffer_channel_id:\s*[^,}\s]*", f"buffer_channel_id: {ids[m.group(1)]}", linea)
+            if orgs and orgs.get(m.group(1)):
+                lineas[i] = re.sub(r"buffer_org_id:\s*[^,}\s]*", f"buffer_org_id: {orgs[m.group(1)]}", lineas[i])
     ruta.write_text("".join(lineas), encoding="utf-8")
 
 
@@ -523,16 +569,35 @@ def _anotar(raiz, fila: dict) -> None:
 
 # ---------------------------------------------------------------- publicador
 
+class ResultadoIncierto(Exception):
+    """El createPost pudo haberse aplicado: no se repitió. El envío queda `incierto` hasta reconciliarlo."""
+
+
+RE_EXITO_BORRADO = re.compile(r"^\w*Success$")
+ESTADOS_ABIERTOS = ("enviando", "incierto")
+
+
 class Publicador:
-    """`modo`: ensayo (nunca createPost), borrador (createPost con saveToDraft y deletePost) o vivo."""
+    """`modo`: ensayo (nunca createPost), borrador (createPost con saveToDraft y deletePost) o vivo.
+
+    Libro de envíos `estado/buffer-envios.json`: antes de cada createPost se anota la intención
+    (`enviando`); luego queda `creado`, `rechazado`, `incierto` (5xx, tiempo agotado o respuesta ilegible)
+    o `no_creado` (la reconciliación no lo encontró en Buffer). Un incierto NUNCA se repite a ciegas:
+    `reconciliar()` consulta los posts del canal (por `dueAt` y texto) antes de volver a intentar.
+
+    `limpiar_enviados()` es pública: N6 la llama en cada ciclo para borrar del almacén los videos cuyos
+    posts ya están en `sent`. `estado/alerta-roja.json` (alerta de canal) lo consume N6 para abrir el issue.
+    """
 
     def __init__(self, cliente: ClienteBuffer, almacen=None, raiz=None, modo: str = "ensayo",
-                 ahora=None, canales: dict | None = None, esquema: dict | None = None):
+                 ahora=None, canales: dict | None = None, esquema: dict | None = None,
+                 orgs: dict | None = None):
         if modo not in ("ensayo", "borrador", "vivo"):
             raise ValueError(f"modo desconocido: {modo}")
         self.cliente, self.almacen, self.raiz, self.modo = cliente, almacen, raiz, modo
         self.ahora = ahora or (lambda: datetime.now(timezone.utc))
         self.canales = canales or {}
+        self.orgs = orgs or {}
         self._esquema = esquema
 
     @property
@@ -541,20 +606,45 @@ class Publicador:
             self._esquema = self.cliente.introspeccion()
         return self._esquema
 
+    # ---- libro de envíos ----
+
+    def _ruta_libro(self) -> Path:
+        return _ruta_estado(self.raiz, "buffer-envios.json")
+
+    def _libro(self) -> list:
+        return _leer_json(self._ruta_libro(), [])
+
+    def _guardar_libro(self, libro: list) -> None:
+        _escribir_json(self._ruta_libro(), libro)
+
+    def _marcar(self, id_envio: str, **cambios) -> None:
+        libro = self._libro()
+        for e in libro:
+            if e["id"] == id_envio:
+                e.update(cambios)
+        self._guardar_libro(libro)
+
+    # ---- createPost ----
+
     def _crear(self, carga: dict, canal_id: str) -> dict:
+        """createPost sin reintento. Descartada si Buffer lo rechaza; ErrorIncierto si no se sabe."""
         if self.modo == "ensayo":
             raise ErrorBuffer("createPost no está permitido en ensayo")
         if self.modo == "borrador" and carga.get("saveToDraft") is not True:
             raise ErrorBuffer("en borrador createPost sólo se manda con saveToDraft")
-        data = self.cliente.consulta(M_CREAR, {"input": carga}, canal=canal_id)
+        data = self.cliente.consulta(M_CREAR, {"input": carga}, canal=canal_id, mutacion=True)
         r = data.get("createPost") or {}
         if "post" not in r:
-            raise Descartada(f"Buffer rechazó la publicación: {red.ocultar(str(r.get('message', 'sin motivo')), [self.cliente._clave])}")
+            motivo = red.ocultar(str(r.get("message", "sin motivo")), [self.cliente._clave])
+            raise Descartada(f"Buffer rechazó la publicación: {motivo}")
         return r["post"]
 
     def programar(self, plataforma: str, toma: dict, url_video: str, textos: dict, cuando: datetime,
                   ruta_almacen: str | None = None, ficha: dict | None = None) -> dict:
-        """createPost con hora explícita (customScheduled, nunca addToQueue). Devuelve {id, dueAt}."""
+        """createPost con hora explícita (customScheduled, nunca addToQueue). Devuelve {id, dueAt}.
+
+        Lanza Descartada (rechazo definitivo) o ResultadoIncierto (no se repite; se reconcilia después).
+        """
         if self.modo != "vivo":
             raise ErrorBuffer("programar sólo se usa en modo vivo")
         canal = self.canales.get(plataforma)
@@ -563,9 +653,50 @@ class Publicador:
         validar_futuro(cuando, self.ahora())
         carga, anot = armar_carga(plataforma, canal, textos["texto"], textos.get("titulo"),
                                   url_video, cuando, self.esquema)
-        post = self._crear(carga, canal)
-        self._registrar(plataforma, toma, textos, cuando, post, ruta_almacen, ficha)
+        self.reconciliar()
+        due = iso_utc(cuando)
+        id_envio = f"{plataforma}|{toma.get('numero')}|{due}"
+        libro = self._libro()
+        previo = next((e for e in libro if e["id"] == id_envio), None)
+        if previo and previo["estado"] in ESTADOS_ABIERTOS + ("creado",):
+            raise Descartada(f"ya hay un envío {previo['estado']} para {plataforma} toma "
+                             f"{toma.get('numero')} a las {due}: no se repite")
+        libro = [e for e in libro if e["id"] != id_envio]
+        entrada = {"id": id_envio, "plataforma": plataforma, "toma": toma.get("numero"), "dueAt": due,
+                   "canal": canal, "ruta": ruta_almacen, "estado": "enviando", "post_id": None,
+                   "registrado": False, "texto": textos["texto"],
+                   "datos": {"toma": toma, "textos": textos, "ficha_id": (ficha or {}).get("id")}}
+        libro.append(entrada)
+        self._guardar_libro(libro)          # si falla, no se envía nada
+        try:
+            post = self._crear(carga, canal)
+        except ErrorIncierto as e:
+            self._intentar_marcar(id_envio, estado="incierto")
+            raise ResultadoIncierto(str(e)) from None
+        except (Descartada, ErrorBuffer):
+            self._intentar_marcar(id_envio, estado="rechazado")
+            raise
+        try:
+            self._cerrar_creado(entrada, post)
+        except Exception:
+            # Falló el libro o el marcador tras un createPost correcto: no se pierde ni se repite. El envío
+            # queda `enviando` o `creado` sin registrar y la próxima reconciliación lo termina.
+            pass
         return {"id": post["id"], "dueAt": post.get("dueAt"), "anotaciones": anot}
+
+    def _intentar_marcar(self, id_envio: str, **cambios) -> None:
+        try:
+            self._marcar(id_envio, **cambios)
+        except OSError:
+            pass
+
+    def _cerrar_creado(self, entrada: dict, post: dict) -> None:
+        """Pasa el envío a `creado` y escribe el marcador y el registro de textos (una sola vez)."""
+        self._marcar(entrada["id"], estado="creado", post_id=post["id"])
+        d = entrada["datos"]
+        self._registrar(entrada["plataforma"], d["toma"], d["textos"], _a_utc(entrada["dueAt"]), post,
+                        entrada.get("ruta"), {"id": d.get("ficha_id")})
+        self._marcar(entrada["id"], registrado=True)
 
     def _registrar(self, plataforma, toma, textos, cuando, post, ruta_almacen, ficha) -> None:
         local = cuando.astimezone(ZONA)
@@ -575,20 +706,72 @@ class Publicador:
             "id_clip": f"toma-{num}-{plataforma}", "toma": toma.get("numero"),
             "fecha": local.date().isoformat(), "hora": local.strftime("%H:%M"),
             "plataforma": plataforma, "pilar": toma.get("pilar", ""), "fuente_id": fuente_id,
-            "campana": toma.get("campana") or (ficha or {}).get("campana") or "",
+            "campana": toma.get("campana") or "",
             "gancho": toma.get("gancho", ""), "duracion_s": toma.get("duracion_s", ""),
             "credito": textos.get("credito", ""), "url": "", "estado_campana": "",
             "notas": f"origen:{fuente_id} buffer:{post['id']}"})
-        textos_previos = _leer_json(_ruta_estado(self.raiz, "buffer-textos.json"), [])
-        textos_previos.append({"fecha": self.ahora().astimezone(ZONA).date().isoformat(),
-                               "plataforma": plataforma,
-                               "huella": hashlib.sha256(_cuerpo_sin_toma(textos["texto"]).encode()).hexdigest()})
-        _escribir_json(_ruta_estado(self.raiz, "buffer-textos.json"), textos_previos[-300:])
-        if ruta_almacen:
-            envios = _leer_json(_ruta_estado(self.raiz, "buffer-envios.json"), [])
-            envios.append({"post_id": post["id"], "plataforma": plataforma, "ruta": ruta_almacen,
-                           "canal": self.canales.get(plataforma)})
-            _escribir_json(_ruta_estado(self.raiz, "buffer-envios.json"), envios)
+        previos = _leer_json(_ruta_estado(self.raiz, "buffer-textos.json"), [])
+        previos.append({"fecha": self.ahora().astimezone(ZONA).date().isoformat(),
+                        "plataforma": plataforma,
+                        "huella": hashlib.sha256(_cuerpo_sin_toma(textos["texto"]).encode()).hexdigest()})
+        _escribir_json(_ruta_estado(self.raiz, "buffer-textos.json"), previos[-300:])
+
+    # ---- reconciliación ----
+
+    def _campos_post(self) -> set:
+        try:
+            t = self.cliente.consulta(Q_CAMPOS_POST).get("__type") or {}
+        except ErrorBuffer:
+            t = {}
+        campos = {f["name"] for f in t.get("fields") or []}
+        return campos or {"id", "status", "dueAt"}
+
+    def _posts_del_canal(self, canal: str, org: str, campos: set) -> list[dict]:
+        sel = " ".join(c for c in ("id", "status", "dueAt", "text") if c in campos)
+        q = ("query { posts(input: { organizationId: %s, filter: { channelIds: [%s] } }) "
+             "{ edges { node { %s } } } }" % (_lit(org), _lit(canal), sel))
+        data = self.cliente.consulta(q, canal=canal).get("posts") or {}
+        nodos = [e["node"] for e in data.get("edges") or []] if isinstance(data, dict) else list(data)
+        return nodos
+
+    def reconciliar(self) -> dict:
+        """Resuelve los envíos `enviando` o `incierto` mirando los posts del canal (dueAt y texto).
+
+        Encontrado: `creado` (y se registra en el marcador). No encontrado: `no_creado`, que ya puede
+        reintentarse. También completa el registro de los `creado` que quedaron sin marcador.
+        Devuelve {id_envio: nuevo estado}.
+        """
+        resultado = {}
+        libro = self._libro()
+        for e in libro:
+            if e["estado"] == "creado" and not e.get("registrado") and e.get("post_id"):
+                try:
+                    self._cerrar_creado(e, {"id": e["post_id"]})
+                    resultado[e["id"]] = "creado"
+                except OSError:
+                    pass
+        abiertos = [e for e in self._libro() if e["estado"] in ESTADOS_ABIERTOS]
+        if not abiertos:
+            return resultado
+        campos = self._campos_post()
+        org_defecto = None
+        por_canal: dict[str, list] = {}
+        for e in abiertos:
+            if e["canal"] not in por_canal:
+                org = next((o for p, o in self.orgs.items() if self.canales.get(p) == e["canal"] and o), None)
+                if not org:
+                    org_defecto = org_defecto or self.cliente.organizaciones()[0]["id"]
+                    org = org_defecto
+                por_canal[e["canal"]] = self._posts_del_canal(e["canal"], org, campos)
+        for e in abiertos:
+            hallado = next((p for p in por_canal[e["canal"]] if _mismo_post(p, e)), None)
+            if hallado:
+                self._cerrar_creado(e, hallado)
+                resultado[e["id"]] = "creado"
+            else:
+                self._marcar(e["id"], estado="no_creado")
+                resultado[e["id"]] = "no_creado"
+        return resultado
 
     # ---- estado de un post ----
 
@@ -613,46 +796,90 @@ class Publicador:
         return None
 
     def limpiar_enviados(self) -> list[str]:
-        """Borra del almacén los videos cuyos posts ya están en `sent`. Devuelve las rutas borradas."""
-        ruta = _ruta_estado(self.raiz, "buffer-envios.json")
-        envios = _leer_json(ruta, [])
+        """Borra del almacén los videos cuyos posts ya están en `sent` (o que no tienen ningún envío vivo).
+
+        Función pública: N6 la llama en cada ciclo. Un video se conserva mientras algún envío suyo esté
+        `enviando`, `incierto` o `creado` sin `sent`. Devuelve las rutas borradas.
+        """
+        self.reconciliar()
+        libro = self._libro()
         por_ruta: dict[str, list] = {}
-        for e in envios:
-            por_ruta.setdefault(e["ruta"], []).append(e)
-        borradas, restantes = [], []
-        for r, posts in por_ruta.items():
-            if all(self.estado(p["post_id"]) == "sent" for p in posts):
+        for e in libro:
+            if e.get("ruta"):
+                por_ruta.setdefault(e["ruta"], []).append(e)
+        borradas = []
+        for r, envios in por_ruta.items():
+            if any(e["estado"] in ESTADOS_ABIERTOS for e in envios):
+                continue
+            vivos = [e for e in envios if e["estado"] == "creado"]
+            if all(e.get("post_id") and self.estado(e["post_id"]) == "sent" for e in vivos):
                 self.almacen.borrar(r)
                 borradas.append(r)
-            else:
-                restantes += posts
-        _escribir_json(ruta, restantes)
+        if borradas:
+            self._guardar_libro([e for e in libro if e.get("ruta") not in borradas])
         return borradas
+
+    def soltar_si_huerfano(self, ruta: str) -> bool:
+        """Borra el video recién subido si ningún envío lo usa o todos se rechazaron de forma definitiva.
+        Con un envío incierto o abierto, se conserva hasta reconciliarlo."""
+        envios = [e for e in self._libro() if e.get("ruta") == ruta]
+        if any(e["estado"] != "rechazado" for e in envios):
+            return False
+        self.almacen.borrar(ruta)
+        return True
 
     # ---- borrador ----
 
     def borrador(self, plataforma: str, url_video: str, cuando: datetime) -> dict:
-        """createPost con saveToDraft sobre un canal confirmado y deletePost enseguida. No publica nada."""
+        """createPost con saveToDraft sobre un canal confirmado y deletePost enseguida. No publica nada.
+
+        Devuelve {id, borrado, motivo?}. `borrado` es True sólo si deletePost responde con un tipo de éxito
+        explícito (`__typename` terminado en Success). Si no se confirma, `borrado: False` y el id se conserva.
+        """
         if self.modo != "borrador":
             raise ErrorBuffer("borrador sólo se usa en modo borrador")
         canal = self.canales[plataforma]
         carga, anot = armar_carga(plataforma, canal, "Borrador de comprobación (se borra enseguida)",
                                   "Borrador de comprobación", url_video, cuando, self.esquema, borrador=True)
         post = self._crear(carga, canal)
+        out = {"id": post["id"], "borrado": False, "anotaciones": anot}
         try:
             entrada = _validar_tipo("DeletePostInput", {"id": post["id"]}, self.esquema, anot)
-            r = self.cliente.consulta(M_BORRAR, {"input": entrada}, canal=canal)
+            r = self.cliente.consulta(M_BORRAR, {"input": entrada}, canal=canal, mutacion=True)
         except (ErrorBuffer, Descartada) as e:
-            raise ErrorBuffer(f"el borrador {post['id']} se creó pero no se pudo borrar: {e}") from None
-        borrado = (r.get("deletePost") or {})
-        if "message" in borrado:
-            raise ErrorBuffer(f"el borrador {post['id']} no se borró: {borrado['message']}")
-        return {"id": post["id"], "borrado": True, "anotaciones": anot}
+            out["motivo"] = f"no se pudo borrar: {e}"
+            return out
+        borrado = r.get("deletePost")
+        tipo = borrado.get("__typename") if isinstance(borrado, dict) else None
+        if isinstance(borrado, dict) and "message" not in borrado and isinstance(tipo, str) \
+                and RE_EXITO_BORRADO.match(tipo) and tipo != "MutationError":
+            out["borrado"] = True
+        else:
+            out["motivo"] = "deletePost no confirmó el borrado con un tipo de éxito"
+        return out
+
+
+def _a_utc(iso: str) -> datetime:
+    return datetime.fromisoformat(str(iso).replace("Z", "+00:00")).astimezone(timezone.utc)
+
+
+def _mismo_post(post: dict, envio: dict) -> bool:
+    try:
+        if _a_utc(post["dueAt"]) != _a_utc(envio["dueAt"]):
+            return False
+    except (KeyError, ValueError, TypeError):
+        return False
+    if "text" in post and post["text"] is not None:
+        return " ".join(str(post["text"]).split()) == " ".join(envio["texto"].split())
+    return True
 
 
 def _escribir_json(ruta: Path, datos) -> None:
+    """Escritura atómica (archivo temporal y os.replace)."""
     ruta.parent.mkdir(parents=True, exist_ok=True)
-    ruta.write_text(json.dumps(datos, indent=1, ensure_ascii=False), encoding="utf-8")
+    tmp = ruta.with_name(ruta.name + ".tmp")
+    tmp.write_text(json.dumps(datos, indent=1, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, ruta)
 
 
 # ---------------------------------------------------------------- modos y orden de seguridad
@@ -704,7 +931,7 @@ def ensayo(raiz, env, salida=print, transporte_buffer=None, transporte_almacen=N
             c = next(c for c in canales_api if c["id"] == ids[plat])
             salida(f"Canal confirmado: {plat} -> {c['service']} · {c.get('displayName') or c.get('name')}")
         if not sim_b:
-            guardar_ids_de_canales(raiz, ids)
+            guardar_ids_de_canales(raiz, ids, organizaciones_de(canales_api, ids))
         esquema = cliente.introspeccion()
         salida(f"Introspección: {len(esquema['tipos'])} tipo(s) de entrada leídos")
         for plat in PLATAFORMAS:
@@ -732,7 +959,7 @@ def ensayo(raiz, env, salida=print, transporte_buffer=None, transporte_almacen=N
         r = almacen.ida_y_vuelta()
         salida(f"Almacén ida y vuelta: subida {'sí' if r['subida'] else 'no'}, URL pública "
                f"comprobada {'sí' if r['url_comprobada'] else 'no'}, borrado {'sí' if r['borrado'] else 'no'}")
-    except ErrorAlmacen as e:
+    except (ErrorAlmacen, red.ErrorRed) as e:
         salida(f"ERROR del almacén: {e}")
         codigo = COD_ERROR
     if sim_b:
@@ -744,7 +971,9 @@ def ensayo(raiz, env, salida=print, transporte_buffer=None, transporte_almacen=N
 
 
 def borrador(raiz, env, salida=print, transporte_buffer=None, ahora=None) -> int:
-    """--borrador: createPost con saveToDraft y deletePost enseguida. Exige la clave real."""
+    """--borrador: createPost con saveToDraft y deletePost enseguida. Exige la clave real.
+
+    Si un borrador no se confirma como borrado, lo dice con su id y sale con 1 (hay que borrarlo a mano)."""
     if not env.get("BUFFER_API_KEY"):
         salida("sin BUFFER_API_KEY: --borrador necesita la clave real y no se puede simular")
         return COD_ERROR
@@ -753,9 +982,13 @@ def borrador(raiz, env, salida=print, transporte_buffer=None, ahora=None) -> int
         cliente = ClienteBuffer(env["BUFFER_API_KEY"], transporte_buffer, raiz, ahora=ahora)
         canales_api = cliente.todos_los_canales()
         ids = confirmar_canales(canales_api, cargar_yaml("config/canales.yml", raiz), raiz)
-        pub = Publicador(cliente, None, raiz, "borrador", ahora, ids)
+        pub = Publicador(cliente, None, raiz, "borrador", ahora, ids, orgs=organizaciones_de(canales_api, ids))
         for plat in PLATAFORMAS:
             r = pub.borrador(plat, "https://ejemplo.invalid/prueba.mp4", ahora() + timedelta(days=1))
+            if not r["borrado"]:
+                salida(f"BORRADOR SIN BORRAR en {plat}: id {r['id']} ({r.get('motivo', 'sin confirmar')}); "
+                       "bórralo a mano en Buffer")
+                return COD_ERROR
             salida(f"Borrador {plat}: creado y borrado ({r['id']})")
     except AlertaRoja as e:
         salida(f"ALERTA ROJA: {e}")
@@ -799,37 +1032,66 @@ def vivo(raiz, env, entrada: dict, salida=print, transporte_buffer=None, transpo
             salida(f"{plat}: descartada, la ficha no es publicable ({motivo})")
     if not destinos:
         return COD_OK
+    toma.setdefault("campana", ficha.get("campana") or "")
+    ruta = None
+    pub = None
+    incierto = False
     try:
         cliente = ClienteBuffer(env["BUFFER_API_KEY"], transporte_buffer, raiz, ahora=ahora)
-        ids = confirmar_canales(cliente.todos_los_canales(), cargar_yaml("config/canales.yml", raiz),
-                                raiz, plataformas=destinos)
+        canales_api = cliente.todos_los_canales()
+        # Sólo se programa en el canal cuyo id coincide con el guardado en config/canales.yml.
+        ids = confirmar_canales(canales_api, cargar_yaml("config/canales.yml", raiz), raiz,
+                                plataformas=destinos, exigir_guardado=True)
         almacen = Almacen(env["SUPABASE_URL"], env["SUPABASE_SERVICE_KEY"],
                           cargar_yaml("config/almacen.yml", raiz), transporte_almacen)
-        pub = Publicador(cliente, almacen, raiz, "vivo", ahora, ids)
-        almacen.asegurar_bucket()
+        pub = Publicador(cliente, almacen, raiz, "vivo", ahora, ids,
+                         orgs=organizaciones_de(canales_api, ids))
         fecha = entrada.get("fecha") or hoy.isoformat()
+        cuando = hueco_a_utc(date.fromisoformat(fecha), entrada["hueco"],
+                             cargar_yaml("config/horarios.yml", raiz)["zona"])
+        # Todo se valida ANTES de subir: hora, textos, canales y carga contra el esquema.
+        listos = {}
+        for plat in destinos:
+            try:
+                validar_futuro(cuando, ahora())
+                tx = textos(toma, ficha, plat, raiz, hoy)
+                armar_carga(plat, ids[plat], tx["texto"], tx["titulo"],
+                            "https://ejemplo.invalid/previa.mp4", cuando, pub.esquema)
+                listos[plat] = tx
+            except Descartada as e:
+                salida(f"{plat}: descartada antes de subir ({e})")
+        if not listos:
+            return COD_OK
+        almacen.asegurar_bucket()
         try:
             ruta, url = almacen.subir(entrada["mp4"], toma["numero"], fecha)
             almacen.comprobar(url)
         except ErrorAlmacen as e:
             salida(f"subida fallida: se salta el hueco ({e})")
             return COD_OK
-        cuando = hueco_a_utc(date.fromisoformat(fecha), entrada["hueco"],
-                             cargar_yaml("config/horarios.yml", raiz)["zona"])
-        for plat in destinos:
+        for plat, tx in listos.items():
             try:
-                tx = textos(toma, ficha, plat, raiz, hoy)
                 r = pub.programar(plat, toma, url, tx, cuando, ruta, ficha)
                 salida(f"{plat}: programada {r['id']} para {r['dueAt']}")
             except Descartada as e:
                 salida(f"{plat}: descartada ({e})")
+            except ResultadoIncierto as e:
+                incierto = True
+                salida(f"{plat}: resultado INCIERTO, no se repite; el video se conserva hasta reconciliar ({e})")
     except AlertaRoja as e:
         salida(f"ALERTA ROJA: {e}")
         return COD_ALERTA
     except (ErrorBuffer, ErrorAlmacen, red.ErrorRed) as e:
         salida(f"ERROR: {e}")
         return COD_ERROR
-    return COD_OK
+    finally:
+        if ruta and pub is not None:
+            try:
+                if pub.soltar_si_huerfano(ruta):
+                    salida("el video subido no tiene ningún envío vivo: se borró del almacén")
+            except (ErrorAlmacen, ErrorBuffer, red.ErrorRed, OSError) as e:
+                salida(f"AVISO: no se pudo borrar el video huérfano {ruta} ({e})")
+    return COD_ERROR if incierto else COD_OK
 
 
 def ejecutar(raiz=None, ensayo_forzado=False, con_borrador=False, entrada: str | None = None,
