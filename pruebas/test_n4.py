@@ -896,3 +896,12 @@ def test_anotar_clip_devuelve_la_fila_persistida_en_un_reintento_con_otros_datos
     filas = [f for f in puertas._filas_marcador(repo) if f["id_clip"] == "clip-persistida"]
     assert len(filas) == 1 and filas[0]["toma"] == "9" and str(devuelta["toma"]) == "9"
     assert devuelta["id_clip"] == "clip-persistida" and devuelta["notas"] == "origen:clip-persistida"
+
+
+def test_anotar_clip_acepta_la_forma_corta_de_publicar(repo):
+    registro.anotar_clip(repo, {"toma": 3, "plataforma": "shorts"})                       # sin id: sólo la fila
+    registro.anotar_clip(repo, {"toma": 4, "plataforma": "shorts", "id_clip": "clip-corto"})
+    registro.anotar_clip(repo, {"toma": 4, "plataforma": "shorts", "id_clip": "clip-corto"})
+    filas = puertas._filas_marcador(repo)
+    assert [f["toma"] for f in filas] == ["3", "4"] and filas[1]["notas"] == "origen:clip-corto"
+    assert "clip-corto" in (repo / "estado" / "vistos.txt").read_text(encoding="utf-8").split()

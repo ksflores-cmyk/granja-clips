@@ -36,7 +36,7 @@ def anotar_fila(raiz, fila: dict) -> None:
         w.writerow(["" if fila.get(c) is None else fila.get(c) for c in CABECERA_MARCADOR])
 
 
-def anotar_clip(raiz, candidato, fila: dict) -> dict:
+def anotar_clip(raiz, candidato, fila: dict | None = None) -> dict:
     """Escribe la fila del marcador de un clip y lo anota como visto, en el mismo paso.
 
     El id de origen va en `id_clip` y como `origen:<id>` en `notas`, que son los lugares donde
@@ -46,10 +46,19 @@ def anotar_clip(raiz, candidato, fila: dict) -> dict:
     y plataforma no escribe otra, y anota el visto igualmente (reintento tras un fallo entre las dos escrituras).
     """
     from . import puertas   # import tardío: puertas importa este módulo
-    id_origen = str(candidato.id_origen).strip()
-    if not id_origen:
-        raise ValueError("el candidato no tiene id_origen")
-    fila = dict(fila)
+    if fila is None:
+        # Forma corta `anotar_clip(raiz, fila)` (la usa publicar.py): el id sale de la propia fila; sin id,
+        # sólo se escribe la fila, como antes de existir esta función.
+        fila = dict(candidato)
+        if not str(fila.get("id_clip") or "").strip():
+            anotar_fila(raiz, fila)
+            return fila
+        id_origen = str(fila["id_clip"]).strip()
+    else:
+        id_origen = str(candidato.id_origen).strip()
+        if not id_origen:
+            raise ValueError("el candidato no tiene id_origen")
+        fila = dict(fila)
     previas = str(fila.get("notas") or "").strip()
     fila["id_clip"] = id_origen
     fila["notas"] = f"origen:{id_origen}" + (f"; {previas}" if previas else "")
