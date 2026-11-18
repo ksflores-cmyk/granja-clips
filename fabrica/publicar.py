@@ -23,9 +23,10 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import red
+from . import envios_campana, red
 from .candado import candado
 from .config import cargar_yaml, raiz_repo
+from .fuentes import etiqueta_creador
 from .pausa import ZONA, crear_pausa, esta_pausada
 
 ENDPOINT = "https://api.buffer.com"
@@ -458,6 +459,66 @@ def _hashtags(etiquetas) -> list[str]:
     return [e for e in etiquetas if e.startswith("#")]
 
 
+def es_de_campana(ficha: dict) -> bool:
+    """Ficha de campaña con brief: tiene `campana` y su material trae el creador y sus etiquetas por red."""
+    return bool(ficha.get("campana")) and any(isinstance(m, dict) for m in ficha.get("material") or [])
+
+
+MAX_HASHTAGS_EXTRA = 3
+_HASHTAG = re.compile(r"#\S*")
+
+
+def _sin_hashtags(t: str) -> str:
+    """Quita los hashtags incrustados (el único `#` antes de la divulgación sería un error de brief)."""
+    return " ".join(_HASHTAG.sub("", t).split())
+
+
+def _textos_campana(toma: dict, ficha: dict, plataforma: str, raiz=None, hoy: date | None = None) -> dict:
+    """Texto de una campaña con brief (SEGA FM27). Orden fijo:
+
+        Toma nnn. <gancho en español>
+        <blanco>
+        @footballmanager            (etiquetas_obligatorias, tal cual)
+        <etiqueta del creador>      (la de su red; sustituye al crédito propio 🎥)
+        #Publicidad                 (reglas.divulgacion: su propia línea, justo después del texto, primer hashtag)
+        #uno #dos #tres             (hasta 3 hashtags relacionados: los de la toma y luego reglas.hashtags)
+    """
+    reglas = ficha.get("reglas") or {}
+    creador = _limpio(toma.get("creador"))
+    etiqueta = etiqueta_creador(ficha, creador, plataforma)
+    if not etiqueta:
+        raise Descartada(f"sin etiqueta del creador {creador or '(vacío)'} para {plataforma}: no se publica")
+    gancho = _sin_hashtags(_limpio(toma.get("gancho")))
+    if not gancho:
+        raise Descartada("sin gancho")
+    obligatorias = [str(e).strip() for e in reglas.get("etiquetas_obligatorias") or [] if str(e).strip()]
+    divulgacion = str(reglas.get("divulgacion") or "").strip()
+    if not divulgacion.startswith("#"):
+        raise Descartada("la campaña exige una divulgación en hashtag (reglas.divulgacion)")
+    vistos = {divulgacion.lower()}
+    extras = []
+    for e in [str(x).strip() for x in (toma.get("etiquetas") or []) + (reglas.get("hashtags") or [])]:
+        if e.startswith("#") and e.lower() not in vistos and len(extras) < MAX_HASHTAGS_EXTRA:
+            vistos.add(e.lower())
+            extras.append(e)
+    num = f"{int(toma['numero']):03d}" if str(toma.get("numero", "")).isdigit() else str(toma.get("numero", ""))
+    primera = f"Toma {num}. {gancho}"
+    bloques = [primera]
+    cola = [*obligatorias, etiqueta, divulgacion] + ([" ".join(extras)] if extras else [])
+    texto = "\n\n".join(bloques) + "\n\n" + "\n".join(cola)
+    if "#" in texto.split("\n" + divulgacion, 1)[0]:
+        raise Descartada("hay un # antes de la divulgación: #Publicidad debe ser el primer hashtag")
+    if contar_emojis(texto) > 1:
+        raise Descartada("el texto lleva más de un emoji")
+    if len(texto) > MAX_TEXTO:
+        raise Descartada(f"el texto pasa de {MAX_TEXTO} caracteres")
+    titulo = _titulo_youtube(primera) if plataforma == "shorts" else None
+    if raiz is not None:
+        _comprobar_repetido(raiz, texto, plataforma, toma, hoy)
+    return {"texto": texto, "titulo": titulo, "credito": etiqueta,
+            "etiquetas": [*obligatorias, divulgacion, *extras]}
+
+
 def textos(toma: dict, ficha: dict, plataforma: str, raiz=None, hoy: date | None = None) -> dict:
     """Texto de la publicación según el playbook (sección 10).
 
@@ -467,6 +528,8 @@ def textos(toma: dict, ficha: dict, plataforma: str, raiz=None, hoy: date | None
     if plataforma not in SERVICIOS:
         raise Descartada(f"plataforma desconocida: {plataforma}")
     reglas = ficha.get("reglas") or {}
+    if es_de_campana(ficha):
+        return _textos_campana(toma, ficha, plataforma, raiz, hoy)
     informativa = toma.get("pilar") == "informativa"
     creador = "@RockstarGames" if informativa else _limpio(toma.get("creador") or ficha.get("creador"))
     if not creador:
@@ -769,6 +832,8 @@ class Publicador:
         local = cuando.astimezone(ZONA)
         num = f"{int(toma['numero']):03d}" if str(toma.get("numero", "")).isdigit() else str(toma.get("numero"))
         fuente_id = toma.get("fuente_id") or (ficha or {}).get("id") or ""
+        if toma.get("campana"):          # primero: es idempotente por post_id y no depende del marcador
+            envios_campana.anotar(self.raiz, plataforma, post["id"], cuando, toma)
         _anotar(self.raiz, {
             "id_clip": f"toma-{num}-{plataforma}", "toma": toma.get("numero"),
             "fecha": local.date().isoformat(), "hora": local.strftime("%H:%M"),
@@ -893,6 +958,30 @@ class Publicador:
                 return e["node"].get("status")
         return None
 
+    def estado_y_url(self, post_id: str, org_id: str | None = None) -> tuple[str | None, str | None]:
+        """(estado, URL publicada). La URL sale de `externalLink` sólo si la introspección muestra ese campo
+        en `Post` y el post ya está `sent`; si Buffer no la da, es None (nunca se inventa)."""
+        if not hasattr(self, "_campos_cache"):
+            self._campos_cache = self._campos_post()
+        sel = "id status dueAt" + (" externalLink" if "externalLink" in self._campos_cache else "")
+        consultas = self.esquema.get("consultas", {})
+        if "post" in consultas:
+            if "input" in consultas["post"]:
+                q = "query { post(input: { id: %s }) { %s } }" % (_lit(post_id), sel)
+            else:
+                q = "query { post(id: %s) { %s } }" % (_lit(post_id), sel)
+            nodo = self.cliente.consulta(q).get("post") or {}
+        else:
+            org_id = org_id or self.cliente.organizaciones()[0]["id"]
+            ids = ", ".join(_lit(c) for c in self.canales.values())
+            q = ("query { posts(input: { organizationId: %s, filter: { status: [sent], channelIds: [%s] } }) "
+                 "{ edges { node { %s } } } }" % (_lit(org_id), ids, sel))
+            data = self.cliente.consulta(q)
+            nodo = next((e["node"] for e in (data.get("posts") or {}).get("edges") or []
+                         if e["node"]["id"] == post_id), {})
+        url = nodo.get("externalLink")
+        return nodo.get("status"), (url.strip() if isinstance(url, str) and url.strip().startswith("http") else None)
+
     def limpiar_enviados(self) -> list[str]:
         """Borra del almacén los videos cuyos posts ya están en `sent` (o que no tienen ningún envío vivo).
 
@@ -924,6 +1013,10 @@ class Publicador:
                     if e.get("ruta") == r:
                         e["ruta_borrada"] = True
                 self._guardar_libro(actual)
+        try:                      # el ciclo llama a esta función cada vez: aquí se completan los enlaces de campaña
+            envios_campana.completar(self.raiz, self)
+        except (ErrorBuffer, OSError, ValueError):
+            pass
         return borradas
 
     def soltar_si_huerfano(self, ruta: str) -> bool:

@@ -79,6 +79,59 @@
   publicable: false
   notas: "Sólo muestras de estilo, nunca se publica. Archivo: https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4 (sha256 543a4ad9fef4c9e0004ec9482cb7225c2574b0f889291e8270b1c4d61dbc1ab8)."
 
+- id: sega-fm27
+  tipo: A
+  creador: "SEGA Football Manager 27 (carpeta oficial de creadores)"
+  origen: drive
+  canal_id: null
+  permiso_url: "https://contentrewards.com/c/campaigns/affff4f9-30b5-4dea-841f-69ef3f8f9c50"   # Kevin se unió el 18 nov 2026 a las 00:30 GT
+  brief_url: "https://docs.google.com/document/d/1oBJA-xEJs1HrH7thU8QYcSLt5oki1f7qlsfd-fo9_ts/edit"
+  permiso_leido: 2026-11-18
+  juego: "Football Manager 27"
+  reglas:
+    duracion_s: [10, 30]
+    plataformas: [shorts, tiktok, reels]
+    etiquetas_obligatorias: ["@footballmanager"]
+    divulgacion: "#Publicidad"
+    audiencia: "vistas pagadas sólo de México y Argentina"
+    sin_musica: true
+    palabras_evitar: ["filtración", "filtrado", "leak", "pirata", "crack", "gratis"]   # nada de filtraciones ni piratería
+    hashtags: ["#FootballManager", "#FM27", "#FootballManager27"]   # hasta 3 relacionados, después de #Publicidad
+  pilares: [momentos]
+  marca_agua: marca/campanas/fm27/logo.png
+  material:
+    - url: "https://drive.usercontent.google.com/download?id=1Z8QGSsOLahIn15ludN-ItQ56aSJ_Q-hV&export=download&confirm=t"
+      archivo: "Football Manager 27 Spanish Content_SEBASBERON.mp4"
+      creador: SEBASBERON
+      etiquetas: {reels: "@sebasberon", tiktok: "@sebasclips", shorts: "@sebasberon"}
+    - url: "https://drive.usercontent.google.com/download?id=1ZzpMQ5LzOem94pys0KAgmLYSf92YkmEP&export=download&confirm=t"
+      archivo: "DARO.mp4"
+      creador: DARO
+      etiquetas: {reels: "@darizenz", tiktok: "Credit to Dario Zenz", shorts: "Credit to Dario Zenz"}
+    - url: "https://drive.usercontent.google.com/download?id=1pvvTm9uKcrd_BjN1SMF7048FGn1Ni2vH&export=download&confirm=t"
+      archivo: "ERIC ZZETA.mp4"
+      creador: ERIC ZZETA
+      etiquetas: {reels: "@ericzzeta", tiktok: "@ericzzeta", shorts: "@ericzzeta"}
+    - url: "https://drive.usercontent.google.com/download?id=1xo_SFCmZabeXR3afEl3SZkH43R-boMkf&export=download&confirm=t"
+      archivo: "HABEMUS GAMER.mov"
+      creador: HABEMUS GAMER
+      etiquetas: {reels: "@habemusfutbol", tiktok: "@habemusfutbol", shorts: "@habemusfutbol"}
+    - url: "https://drive.usercontent.google.com/download?id=1ZU5eMBd_yl0HuPH_YEyGQ8XqTmbtEHOS&export=download&confirm=t"
+      archivo: "TIO PEDRO.MP4"
+      creador: TIO PEDRO
+      etiquetas: {reels: "@eltiopedro_fut", tiktok: "@eltiopedro_fut", shorts: "@ElTioPedro"}
+  campana: "SEGA FM27 (Clipping Culture)"
+  tarifa_usd_por_mil: 2.0
+  minimo_por_clip_usd: 2
+  tope_por_clip_usd: 600
+  presupuesto_restante: 5000
+  vence: 2026-12-31            # revisar cada semana: la campaña cierra al agotar el presupuesto (sin fecha de cierre); presupuesto_restante: 0 cierra la ficha
+  estado: vigente
+  uso: produccion
+  publicable: true
+  envio: manual
+  notas: "Brief leído el 18 nov 2026. Paga hasta US$2 por mil vistas de México y Argentina. Sólo metraje de la carpeta oficial; sin música de fondo, sin voces IA, sin datos inventados, sin llamar gameplay a un tráiler. Marca de agua: logo FM. Post publicado 30 días, likes visibles. Texto: español, @footballmanager, etiqueta del creador, #Publicidad en su línea y primer hashtag."
+
 # Ejemplo de ficha tipo A (no es una fuente real; no descomentar sin brief leído):
 # - id: ejemplo-campana-001
 #   tipo: A                      # A, B, C o D

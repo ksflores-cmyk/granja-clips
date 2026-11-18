@@ -70,11 +70,46 @@ def _sin_acentos(t: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", str(t).lower()) if unicodedata.category(c) != "Mn")
 
 
+def juego_de(ficha: dict | None, temporada: dict) -> str:
+    """El juego que se espera ver: el de la ficha si lo declara; si no, el de la temporada."""
+    j = (ficha or {}).get("juego")
+    return str(j).strip() if isinstance(j, str) and j.strip() else str(temporada.get("nombre", ""))
+
+
+def temporada_de(ficha: dict | None, temporada: dict) -> dict:
+    """La temporada que vale para esta ficha. Si la ficha declara su propio juego, los spoilers de la temporada
+    (GTA 6) no le aplican: usa `reglas.palabras_evitar` de la ficha (vacío si no hay)."""
+    if not (isinstance((ficha or {}).get("juego"), str) and ficha["juego"].strip()):
+        return temporada
+    return {**temporada, "nombre": ficha["juego"].strip(),
+            "palabras_evitar": list(((ficha.get("reglas") or {}).get("palabras_evitar")) or [])}
+
+
+def rango_recorte(ficha: dict | None) -> tuple[float, float]:
+    """(mínimo, máximo) del recorte en segundos: `reglas.duracion_s` de la ficha dentro del formato (7 a 30 s)."""
+    d = ((ficha or {}).get("reglas") or {}).get("duracion_s")
+    if isinstance(d, (list, tuple)) and len(d) == 2 and all(isinstance(x, (int, float)) for x in d):
+        return max(RECORTE_MIN_S, float(d[0])), min(RECORTE_MAX_S, float(d[1]))
+    return RECORTE_MIN_S, RECORTE_MAX_S
+
+
+def nota_de_ficha(ficha: dict | None) -> str:
+    """Instrucciones extra que salen de las reglas de la campaña (sin música, sin datos inventados)."""
+    r = (ficha or {}).get("reglas") or {}
+    if not r.get("sin_musica"):
+        return ""
+    return ("Campaña con brief: el audio es sólo el del video; no añadas música, voz ni narración. No inventes "
+            "datos (marcadores, fichajes, cifras) que no se vean u oigan. Si el video es un tráiler o una "
+            "presentación, no lo llames gameplay. Ganchos sin exageraciones ni odio. El texto va en español.")
+
+
 def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: str | None = None,
-                nota: str | None = None) -> str:
+                nota: str | None = None, recorte: tuple[float, float] | None = None) -> str:
     """Arma la instrucción desde `ojos_prompt.md` con la duración, el juego y las listas de marca y temporada."""
     texto = RUTA_PROMPT.read_text(encoding="utf-8")
+    lo, hi = recorte or (RECORTE_MIN_S, RECORTE_MAX_S)
     cambios = {
+        "{{RECORTE_MIN}}": f"{lo:g}", "{{RECORTE_MAX}}": f"{hi:g}",
         "{{DURACION}}": f"{duracion:.1f}" if duracion else "desconocida",
         "{{JUEGO}}": str(juego or temporada.get("nombre", "")),
         "{{NOTA_ESPECIAL}}": nota or "",
@@ -128,7 +163,8 @@ def _texto_de_respuesta(texto_http: str) -> str:
 
 def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracion: float | None = None,
           transporte=None, espera=time.sleep, entorno=None, config: dict | None = None,
-          juego: str | None = None, nota: str | None = None) -> Mirada:
+          juego: str | None = None, nota: str | None = None,
+          recorte: tuple[float, float] | None = None) -> Mirada:
     """Le pide a Gemini el análisis del clip. Reintenta una vez ante 429 o 5xx; ante 404 prueba el modelo siguiente."""
     env = os.environ if entorno is None else entorno
     clave = env.get("GEMINI_API_KEY", "")
@@ -141,7 +177,7 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
     if tam > tope:
         return Mirada(None, motivo=f"el video pesa {tam / 1048576:.1f} MB y el máximo en línea es "
                                    f"{cfg['max_mb_en_linea']} MB")
-    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego, nota), ruta_video.read_bytes(),
+    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego, nota, recorte), ruta_video.read_bytes(),
                              float(cfg["temperatura"]))
     if len(cuerpo) > TOPE_PETICION_BYTES:     # el base64 infla un tercio: se mide lo que de verdad se envía
         return Mirada(None, motivo=f"la petición serializada pesa {len(cuerpo) / 1048576:.1f} MB y el tope es "
@@ -228,7 +264,8 @@ def dividir_frase(marca: Marca, frase: str) -> list[str] | None:
 
 
 def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float | None = None,
-                      juego: str | None = None) -> tuple[bool, list[str]]:
+                      juego: str | None = None,
+                      recorte: tuple[float, float] | None = None) -> tuple[bool, list[str]]:
     """(ok, motivos). Tipos y campos; veto del modelo; recorte; líneas; gancho; palabras a evitar; cabida."""
     if not isinstance(datos, dict):
         return False, ["la respuesta no es un objeto JSON"]
@@ -277,8 +314,9 @@ def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float |
         m.append(f"recorte {ini:g}-{fin:g} s fuera de la duración del archivo"
                  + (f" ({duracion:.1f} s)" if duracion is not None else ""))
     largo = fin - ini
-    if not RECORTE_MIN_S - TOL_S <= largo <= RECORTE_MAX_S + TOL_S:
-        m.append(f"recorte de {largo:.1f} s: debe durar de {RECORTE_MIN_S:g} a {RECORTE_MAX_S:g} s")
+    r_min, r_max = recorte or (RECORTE_MIN_S, RECORTE_MAX_S)
+    if not r_min - TOL_S <= largo <= r_max + TOL_S:
+        m.append(f"recorte de {largo:.1f} s: debe durar de {r_min:g} a {r_max:g} s")
 
     # líneas
     previo = None

@@ -58,6 +58,37 @@ def _es_https(u) -> bool:
     return isinstance(u, str) and u.startswith("https://") and len(u) > 8
 
 
+def urls_material(ficha: dict) -> list[str]:
+    """URL del material de la ficha. Cada entrada es el texto de la URL o {url, creador, etiquetas}."""
+    material = ficha.get("material")
+    if not isinstance(material, list):
+        return []
+    return [m.get("url") if isinstance(m, dict) else m for m in material]
+
+
+def entrada_material(ficha: dict, url: str | None = None, creador: str | None = None) -> dict | None:
+    """La entrada de `material` con esa URL (o con ese creador), siempre como diccionario; None si no hay."""
+    for m in ficha.get("material") or []:
+        if not isinstance(m, dict):
+            continue
+        if url is not None and m.get("url") == url:
+            return m
+        if url is None and creador is not None and str(m.get("creador", "")).strip().lower() == creador.strip().lower():
+            return m
+    return None
+
+
+def etiqueta_creador(ficha: dict, creador: str | None, plataforma: str) -> str | None:
+    """Cómo se etiqueta al creador recortado en esa red (`etiquetas` de su entrada de material), o None."""
+    if not creador:
+        return None
+    m = entrada_material(ficha, None, creador)
+    if m is None:
+        return None
+    e = (m.get("etiquetas") or {}).get(plataforma)
+    return str(e).strip() if isinstance(e, str) and e.strip() else None
+
+
 def puede_descargar(ficha: dict) -> tuple[bool, str]:
     tipo = ficha.get("tipo")
     if tipo == "C":
@@ -65,8 +96,8 @@ def puede_descargar(ficha: dict) -> tuple[bool, str]:
     if tipo == "D":
         return False, "tipo D no descarga video"
     if tipo in ("A", "B"):
-        material = ficha.get("material")
-        if isinstance(material, list) and material and all(_es_https(u) for u in material):
+        material = urls_material(ficha)
+        if material and all(_es_https(u) for u in material):
             return True, "la ficha trae material con URL https directas"
         if (ficha.get("reglas") or {}).get("permite_descarga") is True:
             return True, "reglas.permite_descarga es true"
@@ -102,7 +133,7 @@ def autoriza_descarga(ficha: dict | None, hoy: date, uso: str, url: str | None =
                 return False, f"uso muestras no autorizado: la ficha no es de muestras ni publicable ({motivo})"
     else:
         return False, f"uso {uso!r} desconocido (produccion o muestras)"
-    material = ficha.get("material")
+    material = urls_material(ficha) if ficha.get("material") is not None else None
     if material is not None and (url is None or url not in material):
         return False, f"url fuera de material: {url!r}"
     return True, "ok"

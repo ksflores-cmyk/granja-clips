@@ -1,0 +1,1 @@
+﻿Logo oficial de Football Manager 27 (shorthand, versión oscura, 1000x1000), descargado el 18 nov 2026 de https://brand.footballmanager.com/core-logos. Lo exige la campaña SEGA FM27 de Content Rewards (marca de agua obligatoria). Sólo se usa en clips de esa campaña.

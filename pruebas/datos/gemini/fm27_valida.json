@@ -1,0 +1,33 @@
+{
+  "apto": true,
+  "motivos": [],
+  "spoiler": false,
+  "desnudez": false,
+  "cinematica": false,
+  "juego_correcto": true,
+  "idioma_original": "español",
+  "lineas": [
+    {
+      "t0": 3.5,
+      "t1": 7.0,
+      "hablante": "SEBASBERON",
+      "original": "Por fin ficho al delantero que buscaba.",
+      "es": "Por fin ficho al delantero que buscaba."
+    },
+    {
+      "t0": 8.0,
+      "t1": 12.0,
+      "hablante": "SEBASBERON",
+      "original": "Mira la cláusula, es una locura.",
+      "es": "Mira la cláusula, es una locura."
+    }
+  ],
+  "gancho": "Sebas ficha al delantero",
+  "palabra_lapiz": "DELANTERO",
+  "escena": "INT. STREAM DE SEBASBERON — MINUTO 4",
+  "acotacion": "(silencio en el vestuario)",
+  "recorte": {
+    "inicio": 3.0,
+    "fin": 15.0
+  }
+}

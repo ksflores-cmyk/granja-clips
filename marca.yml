@@ -62,6 +62,12 @@ maqueta:                        # todas las medidas de la página de guion, en p
             giro_max_grados: 3, holguras_extra: [4, 8, 14], holgura_letra: 1.0}
   subrayado: {grosor: [6, 9], sobresale: [12, 24], bajo_palabra: 6, alto_extra: 14,
               inclinacion_max: 0.012, amplitud: [1.6, 3.2]}
+marca_agua:                     # logo de una campaña (ficha.marca_agua): lugar fijo, nunca sobre la cabecera, el diálogo ni la mosca
+  posicion: cuerpo_inferior_derecha   # esquina del cuerpo de video (cuerpo_inferior|superior_derecha|izquierda)
+  ancho: 220                    # píxeles del logo sobre 1080 de ancho
+  margen: 24                    # separación al borde del video
+  opacidad: 0.95
+  placa: 10                     # relleno de la placa de papel que da contraste al logo oscuro
 prohibido:
   - subtítulos palabra por palabra con una palabra en amarillo
   - emojis dentro del video

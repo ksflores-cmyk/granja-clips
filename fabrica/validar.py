@@ -44,6 +44,7 @@ class Informe:
     def __init__(self) -> None:
         self.errores: list[str] = []
         self.avisos: list[str] = []
+        self.pendientes: list[tuple[str, str]] = []   # (ficha, ruta) que `validar` comprueba contra la raíz
 
     def error(self, msg: str) -> None:
         self.errores.append(msg)
@@ -204,16 +205,67 @@ def _validar_campos_n3(ficha: dict, et: str, inf: Informe) -> None:
     if tl is not None and not (isinstance(tl, str) and re.fullmatch(r"[A-Za-z0-9_]{1,25}", tl)):
         inf.error(f"{et}: twitch_login debe ser texto (letras, números y guion bajo)")
     mat = ficha.get("material")
-    if mat is not None and not (isinstance(mat, list) and mat
-                                and all(isinstance(u, str) and u.startswith("https://") and len(u) > 8
-                                        for u in mat)):
-        inf.error(f"{et}: material debe ser una lista de URL https")
+    if mat is not None:
+        if not (isinstance(mat, list) and mat):
+            inf.error(f"{et}: material debe ser una lista de URL https")
+        else:
+            for i, u in enumerate(mat):
+                if isinstance(u, dict):
+                    _validar_entrada_material(u, f"{et}: material[{i}]", ficha, inf)
+                elif not _es_https(u):
+                    inf.error(f"{et}: material debe ser una lista de URL https")
+                    break
     reglas = ficha.get("reglas")
     if isinstance(reglas, dict) and "permite_descarga" in reglas \
             and not isinstance(reglas["permite_descarga"], bool):
         inf.error(f"{et}: reglas.permite_descarga debe ser booleano")
     if "envio" in ficha and ficha["envio"] not in ("manual", "api"):
         inf.error(f"{et}: envio debe ser manual o api")
+    if "brief_url" in ficha and not _es_https(ficha["brief_url"]):
+        inf.error(f"{et}: brief_url debe ser una URL https")
+    if "juego" in ficha and not (isinstance(ficha["juego"], str) and ficha["juego"].strip()):
+        inf.error(f"{et}: juego debe ser texto no vacío")
+    if "marca_agua" in ficha:
+        ma = ficha["marca_agua"]
+        if not (isinstance(ma, str) and ma.endswith(".png") and not ma.startswith(("/", "..")) and ".." not in ma):
+            inf.error(f"{et}: marca_agua debe ser la ruta relativa de un PNG dentro del repo")
+        else:
+            inf.pendientes.append((et, ma))
+    if isinstance(reglas, dict):
+        if "sin_musica" in reglas and not isinstance(reglas["sin_musica"], bool):
+            inf.error(f"{et}: reglas.sin_musica debe ser booleano")
+        ob = reglas.get("etiquetas_obligatorias")
+        if ob is not None and not (isinstance(ob, list) and all(isinstance(x, str) and x.strip() for x in ob)):
+            inf.error(f"{et}: reglas.etiquetas_obligatorias debe ser una lista de texto")
+        hs = reglas.get("hashtags")
+        if hs is not None and not (isinstance(hs, list) and all(isinstance(x, str) and x.startswith("#") for x in hs)):
+            inf.error(f"{et}: reglas.hashtags debe ser una lista de hashtags que empiecen con #")
+
+
+def _es_https(u) -> bool:
+    return isinstance(u, str) and u.startswith("https://") and len(u) > 8
+
+
+def _validar_entrada_material(m: dict, et: str, ficha: dict, inf: Informe) -> None:
+    """Entrada con creador y etiquetas por red: {url, creador, etiquetas: {shorts, tiktok, reels}, archivo?}."""
+    if not _es_https(m.get("url")):
+        inf.error(f"{et}: url debe ser https")
+    if not (isinstance(m.get("creador"), str) and m["creador"].strip()):
+        inf.error(f"{et}: creador es obligatorio")
+    etq = m.get("etiquetas")
+    reglas = ficha.get("reglas") if isinstance(ficha.get("reglas"), dict) else {}
+    plats = reglas.get("plataformas") if isinstance(reglas.get("plataformas"), list) else sorted(PLATAFORMAS)
+    if not isinstance(etq, dict):
+        inf.error(f"{et}: etiquetas debe ser un diccionario por red ({', '.join(sorted(PLATAFORMAS))})")
+        return
+    for k in etq:
+        if k not in PLATAFORMAS:
+            inf.error(f"{et}: etiquetas.{k}: red desconocida (permitidas: {', '.join(sorted(PLATAFORMAS))})")
+    for p in plats:
+        if p in PLATAFORMAS and not (isinstance(etq.get(p), str) and etq[p].strip()):
+            inf.error(f"{et}: falta la etiqueta del creador para {p}")
+    if "archivo" in m and not isinstance(m["archivo"], str):
+        inf.error(f"{et}: archivo debe ser texto")
 
 
 def validar_marca(m, inf: Informe) -> None:
@@ -247,6 +299,27 @@ def validar_marca(m, inf: Informe) -> None:
     if not (_es_int(s) and 1 <= s <= 2):
         inf.error(f"{rel}: subtitulo_max_lineas debe ser entero de 1 a 2")
     validar_maqueta(m, inf)
+    validar_marca_agua(m, inf)
+
+
+def validar_marca_agua(m, inf: Informe) -> None:
+    """`marca_agua` de marca.yml: lugar fijo, ancho, margen, opacidad y placa del logo de campaña."""
+    rel = "marca.yml: marca_agua"
+    ma = m.get("marca_agua")
+    if not isinstance(ma, dict):
+        inf.error("marca.yml: falta la sección marca_agua")
+        return
+    if ma.get("posicion") not in POSICIONES_AGUA:
+        inf.error(f"{rel}.posicion debe ser una de {', '.join(POSICIONES_AGUA)}")
+    for k in ("ancho", "margen", "opacidad", "placa"):
+        v = ma.get(k)
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or v <= 0:
+            inf.error(f"{rel}.{k} debe ser un número positivo")
+    if isinstance(ma.get("opacidad"), (int, float)) and not isinstance(ma.get("opacidad"), bool) \
+            and ma["opacidad"] > 1:
+        inf.error(f"{rel}.opacidad debe estar entre 0 y 1")
+    if isinstance(ma.get("ancho"), (int, float)) and not isinstance(ma.get("ancho"), bool) and ma["ancho"] > 540:
+        inf.error(f"{rel}.ancho {ma['ancho']}: el logo no puede pasar de la mitad del ancho (540)")
 
 
 CLAVES_MAQUETA = [
@@ -264,6 +337,8 @@ SUBCLAVES_MAQUETA = {
     "subrayado": ["grosor", "sobresale", "bajo_palabra", "alto_extra", "inclinacion_max", "amplitud"],
 }
 ESQUINAS = {"superior_derecha", "superior_izquierda"}
+POSICIONES_AGUA = ("cuerpo_inferior_derecha", "cuerpo_inferior_izquierda",
+                   "cuerpo_superior_derecha", "cuerpo_superior_izquierda")
 ESTILOS_FUENTE = ("regular", "bold", "italic", "bolditalic")
 
 
@@ -545,6 +620,9 @@ def validar(raiz=None) -> Informe:
         validar_temporada(datos["temporada"], inf)
     if datos["fuentes"] is not None:
         validar_fuentes(datos["fuentes"], inf)
+        for et, ruta in inf.pendientes:
+            if not (raiz / ruta).is_file():
+                inf.error(f"{et}: marca_agua apunta a {ruta}, que no existe")
     if datos["marca"] is not None:
         validar_marca(datos["marca"], inf)
         if isinstance(datos["marca"], dict):

@@ -6,7 +6,9 @@ todos sus motivos. La puerta de estilo corre mientras el video de origen sigue e
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -16,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .. import descargar as mod_descargar
-from .. import ojos
+from .. import fuentes, ojos
 from ..config import cargar_yaml, raiz_repo
 from ..registro import ZONA, contador_toma
 from . import estilo
@@ -40,18 +42,42 @@ class Resultado:
     fila: dict | None = None            # fila futura del marcador: N5 la pasa a registro.anotar_clip
 
 
+def _nombre_seguro(id_origen: str) -> str:
+    """El id del origen como parte de un nombre de archivo. Una URL (material del brief) no sirve tal cual."""
+    if re.fullmatch(r"[A-Za-z0-9_-]{1,60}", str(id_origen)):
+        return str(id_origen)
+    return hashlib.sha256(str(id_origen).encode("utf-8")).hexdigest()[:10]
+
+
+def copia_para_ojos(ruta: Path, raiz, carpeta: Path) -> Path:
+    """Si el video pesa más de lo que Gemini acepta en línea (`max_mb_en_linea`), una copia ligera sólo para
+    que Gemini lo mire (360p, 15 fps, audio de 48 kb/s). Los tiempos son los mismos; el MP4 final sale de la fuente."""
+    tope = float(cargar_yaml("config/ojos.yml", raiz)["max_mb_en_linea"]) * 1024 * 1024
+    if Path(ruta).stat().st_size <= tope * 0.9:       # el base64 infla un tercio y ya hay un margen de prompt
+        return Path(ruta)
+    destino = Path(carpeta) / "para-ojos.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(ruta), "-vf", "scale=-2:360,fps=15",
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "34", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", "-b:a", "48k", "-ac", "1", "-movflags", "+faststart", str(destino)],
+                   check=True, capture_output=True)
+    return destino
+
+
 def lapiz_de(numero: int) -> str:
     """Alterna: número impar, círculo; par, subrayado (como las muestras: 1 y 3 círculo, 2 subrayado)."""
     return "círculo" if numero % 2 else "subrayado"
 
 
-def armar(datos: dict, marca: Marca, ficha: dict, numero: int) -> tuple[Toma, list[Linea], float, float]:
-    """(Toma, líneas relativas al recorte, inicio, duración) a partir de una respuesta ya validada."""
+def armar(datos: dict, marca: Marca, ficha: dict, numero: int,
+          creador: str | None = None) -> tuple[Toma, list[Linea], float, float]:
+    """(Toma, líneas relativas al recorte, inicio, duración) a partir de una respuesta ya validada.
+
+    `creador`: el creador recortado cuando la ficha lo trae por archivo (campañas); si no, el de la ficha."""
     ini, fin = float(datos["recorte"]["inicio"]), float(datos["recorte"]["fin"])
     dur = round(fin - ini, 3)
     toma = Toma(numero=numero, gancho=datos["gancho"].strip(), palabra_lapiz=datos["palabra_lapiz"].strip(),
                 lapiz=lapiz_de(numero), escena=datos["escena"].strip().upper(),
-                credito=f"Con: {ficha['creador']}")
+                credito=f"Con: {creador or ficha['creador']}")
     tope = dur - float(marca.m("cierre_s"))      # el último medio segundo es el cierre
     lineas: list[Linea] = []
     for ln in ojos.partir_lineas(datos, marca):
@@ -107,22 +133,31 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
     hoy = ahora.astimezone(ZONA).date()
     try:
         with mod_descargar.descargar(raiz, candidato, ficha, hoy, abrir=abrir, ejecutor=ejecutor) as d:
-            mirada = ojos.mirar(d.ruta, marca, temporada, raiz=raiz, duracion=d.duracion,
-                                transporte=transporte, espera=espera, entorno=entorno)
+            temporada = ojos.temporada_de(ficha, temporada)
+            juego = ojos.juego_de(ficha, temporada)          # el de la ficha si lo declara (FM27, no GTA 6)
+            recorte = ojos.rango_recorte(ficha)              # reglas.duracion_s de la ficha
+            with tempfile.TemporaryDirectory(prefix="ojos-toma-") as carpeta_ojos:
+                video_ojos = copia_para_ojos(d.ruta, raiz, Path(carpeta_ojos))
+                mirada = ojos.mirar(video_ojos, marca, temporada, raiz=raiz, duracion=d.duracion,
+                                    transporte=transporte, espera=espera, entorno=entorno, juego=juego,
+                                    nota=ojos.nota_de_ficha(ficha) or None, recorte=recorte)
             if mirada.datos is None:
                 return Resultado(False, [f"ojos: {mirada.motivo}"], modelo=mirada.modelo)
-            ok, motivos = ojos.validar_respuesta(mirada.datos, marca, temporada, duracion=d.duracion)
+            ok, motivos = ojos.validar_respuesta(mirada.datos, marca, temporada, duracion=d.duracion,
+                                              juego=juego, recorte=recorte)
             if not ok:
                 return Resultado(False, [f"ojos: {x}" for x in motivos], gemini=mirada.datos, modelo=mirada.modelo)
             numero = contador_toma(raiz)
-            toma, lineas, inicio, dur = armar(mirada.datos, marca, ficha, numero)
-            mp4 = salida / f"toma-{numero:03d}-{candidato.id_origen}.mp4"
+            entrada = fuentes.entrada_material(ficha, url=candidato.url)
+            toma, lineas, inicio, dur = armar(mirada.datos, marca, ficha, numero,
+                                              entrada["creador"] if entrada else None)
+            mp4 = salida / f"toma-{numero:03d}-{_nombre_seguro(candidato.id_origen)}.mp4"
             plan_ruta = mp4.with_suffix(".plan.json")
             try:
                 with tempfile.TemporaryDirectory(prefix="trabajo-toma-") as trabajo:
                     plan = componer(marca, toma, lineas, mp4, duracion=dur, trabajo=Path(trabajo),
-                                    fuente_video=d.ruta, inicio=inicio, plan_salida=plan_ruta)
-                puntos = estilo.revisar(mp4, plan, marca)
+                                    fuente_video=d.ruta, inicio=inicio, plan_salida=plan_ruta, ficha=ficha)
+                puntos = estilo.revisar(mp4, plan, marca, ficha=ficha)
             except (ValueError, subprocess.SubprocessError, OSError) as e:
                 mp4.unlink(missing_ok=True)
                 return Resultado(False, [f"editor: {type(e).__name__}: {e}"], gemini=mirada.datos,
