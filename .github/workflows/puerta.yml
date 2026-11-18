@@ -22,7 +22,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Instalar ffmpeg
-        timeout-minutes: 10
+        timeout-minutes: 12
         uses: ./.github/actions/ffmpeg
       - run: pip install -r requirements.txt
       - name: Validar configuración

@@ -885,22 +885,29 @@ def test_workflow_ensayo_forzado_sube_artefacto_de_3_dias(wf):
 
 def test_workflow_instala_ffmpeg_con_reintentos_y_tope(wf):
     paso = next(p for p in wf["jobs"]["producir"]["steps"] if "ffmpeg" in p.get("name", ""))
-    assert paso["uses"] == "./.github/actions/ffmpeg" and paso["timeout-minutes"] == 10
+    assert paso["uses"] == "./.github/actions/ffmpeg" and paso["timeout-minutes"] == 12
     accion = (RAIZ_REAL / ".github/actions/ffmpeg/action.yml").read_text(encoding="utf-8")
-    # apt con tope propio y respaldo estático si el espejo se cuelga
-    assert "timeout 150 sudo apt-get" in accion and "Acquire::Retries" in accion
-    assert "BtbN/FFmpeg-Builds" in accion and "/usr/local/bin/" in accion
+    # apt con tope propio, segundo espejo firmado y verificación de los dos binarios
+    assert "timeout --kill-after=10" in accion and "archive.ubuntu.com" in accion
+    assert "ffprobe -hide_banner -version" in accion
+    assert "curl" not in accion and "tar " not in accion  # nada de binarios sin firma
+
+
+FLUJOS_CON_FFMPEG = {"fabrica.yml", "muestras.yml", "ojos-prueba.yml", "publicar-ensayo.yml", "puerta.yml"}
 
 
 def test_todos_los_flujos_usan_la_accion_de_ffmpeg():
-    _yaml = yaml
+    con_paso = set()
     for f in sorted((RAIZ_REAL / ".github/workflows").glob("*.yml")):
         texto = f.read_text(encoding="utf-8")
         assert "apt-get" not in texto, f.name
-        for job in (_yaml.safe_load(texto)["jobs"] or {}).values():
+        for job in (yaml.safe_load(texto)["jobs"] or {}).values():
             for paso in job.get("steps", []):
                 if "ffmpeg" in paso.get("name", "").lower():
                     assert paso.get("uses") == "./.github/actions/ffmpeg", f.name
+                    assert paso.get("timeout-minutes") == 12, f.name
+                    con_paso.add(f.name)
+    assert FLUJOS_CON_FFMPEG <= con_paso
 
 
 # ---------------------------------------------------------------- 9. nombres de canal

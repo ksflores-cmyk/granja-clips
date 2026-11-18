@@ -1,25 +1,30 @@
 name: Instalar ffmpeg
 description: >
-  ffmpeg desde apt con tope de tiempo. Si el espejo de Ubuntu se cuelga
-  (pasó el 18 nov 2026: 6 min sin terminar), usa la compilación estática
-  de BtbN publicada en GitHub.
+  ffmpeg desde apt con tope de tiempo. Si el espejo del runner se cuelga
+  (pasó el 18 nov 2026: 6 min sin terminar), repite con archive.ubuntu.com.
+  Siempre paquetes firmados de Ubuntu: nada de binarios sin verificar.
 runs:
   using: composite
   steps:
     - shell: bash
       run: |
         set -u
-        apt_opts="-o Acquire::Retries=2 -o Acquire::http::Timeout=20"
-        if timeout 150 sudo apt-get $apt_opts update -q \
-           && timeout 210 sudo apt-get $apt_opts install -y -q --no-install-recommends ffmpeg; then
-          echo "ffmpeg desde apt: $(ffmpeg -version | head -1)"
-          exit 0
+        apt_opts=(-o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20)
+        instalar() {  # $1 = segundos para update, $2 = segundos para install
+          timeout --kill-after=10 "$1" sudo apt-get "${apt_opts[@]}" update -q \
+            && timeout --kill-after=10 "$2" sudo apt-get "${apt_opts[@]}" install -y -q --no-install-recommends ffmpeg
+        }
+        if ! instalar 120 180; then
+          echo "::warning::el espejo del runner no respondió a tiempo; repito con archive.ubuntu.com"
+          sudo pkill -9 -x apt-get || true
+          sudo pkill -9 -x dpkg || true
+          sudo dpkg --configure -a || true
+          for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            [ -f "$f" ] || continue
+            sudo sed -i -E 's#https?://[a-z0-9.-]*archive\.ubuntu\.com/ubuntu#http://archive.ubuntu.com/ubuntu#g' "$f"
+          done
+          instalar 90 150 || { echo "::error::no se pudo instalar ffmpeg con ningún espejo"; exit 1; }
         fi
-        echo "::warning::apt no terminó a tiempo; uso la compilación estática de BtbN"
-        d=$(mktemp -d)
-        curl -fsSL --retry 3 --max-time 180 -o "$d/f.tar.xz" \
-          https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
-        tar -xJf "$d/f.tar.xz" -C "$d"
-        sudo install -m 755 "$d"/ffmpeg-*/bin/ffmpeg "$d"/ffmpeg-*/bin/ffprobe /usr/local/bin/
-        hash -r
-        echo "ffmpeg estático: $(ffmpeg -version | head -1)"
+        ffmpeg -hide_banner -version | head -1
+        ffprobe -hide_banner -version > /dev/null
+        echo "ffmpeg y ffprobe listos"
