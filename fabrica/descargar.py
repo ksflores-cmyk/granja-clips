@@ -77,22 +77,29 @@ DRIVE = "drive.usercontent.google.com"
 
 def _aviso_drive(url: str, html: str) -> str | None:
     """Si Google Drive devuelve su página de aviso ("no se puede analizar en busca de virus"),
-    arma la URL de confirmación con los campos ocultos del formulario. Sólo para el mismo host
-    y el mismo `id` del archivo autorizado; si no, None."""
+    arma la URL de confirmación con los campos ocultos de ESE formulario. Sólo hacia
+    https://drive.usercontent.google.com/download y con exactamente el mismo `id` autorizado;
+    si no, None. (Las redirecciones ya las rechaza `_abrir_urllib` antes de contactar el destino.)"""
     import html as _html
     import re
     from urllib.parse import parse_qs, urlencode, urlparse
-    orig = parse_qs(urlparse(url).query)
-    accion = re.search(r'<form[^>]+action="([^"]+)"', html)
-    if not accion:
+    ids = parse_qs(urlparse(url).query).get("id") or []
+    if len(ids) != 1:
         return None
-    destino = urlparse(_html.unescape(accion.group(1)))
-    if destino.scheme != "https" or destino.netloc != DRIVE or destino.path != "/download":
-        return None
-    campos = dict(re.findall(r'<input[^>]+type="hidden"[^>]+name="([^"]+)"[^>]+value="([^"]*)"', html))
-    if not campos.get("id") or campos.get("id") != (orig.get("id") or [None])[0]:
-        return None
-    return f"https://{DRIVE}/download?" + urlencode({k: _html.unescape(v) for k, v in campos.items()})
+    for bloque in re.findall(r"<form\b[^>]*>.*?</form>", html, flags=re.S | re.I):
+        accion = re.search(r'action="([^"]+)"', bloque)
+        if not accion:
+            continue
+        destino = urlparse(_html.unescape(accion.group(1)))
+        if destino.scheme != "https" or destino.netloc != DRIVE or destino.path != "/download":
+            continue
+        pares = [(_html.unescape(n), _html.unescape(v)) for n, v in
+                 re.findall(r'<input[^>]+type="hidden"[^>]+name="([^"]+)"[^>]+value="([^"]*)"', bloque)]
+        ids_form = [v for n, v in pares if n == "id"]
+        if len(ids_form) != 1 or ids_form[0] != ids[0]:
+            return None
+        return f"https://{DRIVE}/download?" + urlencode(pares)
+    return None
 
 
 def _titulo(html: str) -> str:
