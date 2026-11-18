@@ -419,8 +419,8 @@ def textos(toma: dict, ficha: dict, plataforma: str, raiz=None, hoy: date | None
     if not creador:
         raise Descartada("sin crédito: no se publica")
     credito = f"🎥 {creador}"
-    obligatorias = [_limpio(e) for e in reglas.get("etiquetas_obligatorias") or []]
-    extra = [_limpio(e) for e in toma.get("etiquetas") or []]
+    obligatorias = [str(e).strip() for e in reglas.get("etiquetas_obligatorias") or []]  # tal cual
+    extra = [str(e).strip() for e in toma.get("etiquetas") or []]
     visto = {e.lower() for e in obligatorias}
     extra = [e for e in extra if not (e.lower() in visto or visto.add(e.lower()))]
     # Shorts y TikTok: pocas etiquetas (hasta 3 hashtags); Instagram: de 3 a 5. Las del brief van siempre.
