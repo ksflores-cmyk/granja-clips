@@ -1,4 +1,5 @@
 zona: America/Guatemala
 huecos_normales: ["11:00", "15:00", "19:00"]
 # Máximo 8, sólo dentro de la ventana_estreno de temporada.yml
-huecos_estreno: ["11:00", "13:00", "15:00", "17:00", "19:00", "21:00", "23:00", "23:45"]
+huecos_estreno: ["07:00", "09:00", "11:00", "13:00", "15:00", "17:00", "19:00", "21:00"]
+# 18 nov 00:43: Kevin pidió que los clips salgan antes de las 11:00, siempre con las puertas en verde.

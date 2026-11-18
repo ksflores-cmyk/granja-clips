@@ -4,6 +4,11 @@ name: publicar-ensayo
 # archivo de prueba de 1 s que sube y borra, y la confirmación de canales). Sin claves, lo simula y sale en verde.
 on:
   workflow_dispatch:
+    inputs:
+      borrador:
+        description: "Además, crear un borrador en cada canal y borrarlo enseguida (nunca publica)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -30,3 +35,6 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Ensayo del publicador
         run: python -m fabrica.publicar --ensayo
+      - name: Borrador y borrado en cada canal (sólo si se pidió)
+        if: ${{ inputs.borrador }}
+        run: python -m fabrica.publicar --borrador
