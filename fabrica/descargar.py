@@ -26,7 +26,8 @@ from urllib.parse import urlparse
 from . import fuentes, puertas
 from .editar.componer import sondear_video
 
-TOPE_BYTES = 300 * 1024 * 1024
+TOPE_BYTES = 800 * 1024 * 1024         # el material de campaña pesa hasta ~550 MB (FM27, 18 nov)
+TOPE_FUENTE_S = 600.0                   # fuente más larga que esto no se mira: Gemini ve la copia ligera
 TOPE_TWITCH_S = 120
 BLOQUE = 1 << 20
 TIEMPO_ESPERA_S = 60
@@ -215,9 +216,13 @@ def descargar(raiz, candidato, ficha: dict | None, hoy: date, *, abrir=None, eje
             duracion = float(sondear_video(ruta)["duracion"])
         except (subprocess.SubprocessError, ValueError, KeyError, StopIteration, OSError) as e:
             raise ErrorDescarga(f"ffprobe no pudo medir el archivo ({type(e).__name__})") from None
-        minimo, maximo = ((ficha.get("reglas") or {}).get("duracion_s") or [0, float("inf")])
-        if not (minimo <= duracion <= maximo):
-            raise ErrorDescarga(f"el archivo dura {duracion:.1f} s y la ficha pide de {minimo} a {maximo} s")
+        # `reglas.duracion_s` es la duración del clip PUBLICADO: Gemini elige un recorte dentro de ese rango.
+        # A la fuente sólo se le exige que alcance el mínimo y que no pase de TOPE_FUENTE_S.
+        minimo = ((ficha.get("reglas") or {}).get("duracion_s") or [0])[0]
+        if duracion < float(minimo):
+            raise ErrorDescarga(f"el archivo dura {duracion:.1f} s, menos que el mínimo de {minimo} s del clip")
+        if duracion > TOPE_FUENTE_S:
+            raise ErrorDescarga(f"el archivo dura {duracion:.1f} s y el tope de una fuente es {TOPE_FUENTE_S:.0f} s")
         yield Descarga(ruta, duracion)
     finally:
         shutil.rmtree(carpeta, ignore_errors=True)

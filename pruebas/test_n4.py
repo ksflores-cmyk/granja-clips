@@ -424,8 +424,8 @@ def test_la_carpeta_temporal_se_borra_aunque_el_cuerpo_falle(repo, carpetas, vid
     assert carpetas and not any(c.exists() for c in carpetas)
 
 
-def test_duracion_fuera_de_la_ficha_se_descarta_y_queda_como_visto(repo, carpetas, video20):
-    ficha = ficha_propia(reglas={"duracion_s": [7, 15], "plataformas": ["shorts"]})
+def test_fuente_mas_corta_que_el_minimo_se_descarta_y_queda_como_visto(repo, carpetas, video20):
+    ficha = ficha_propia(reglas={"duracion_s": [25, 30], "plataformas": ["shorts"]})
     with pytest.raises(mod_descargar.ErrorDescarga, match="dura 20"):
         with mod_descargar.descargar(repo, candidato(), ficha, HOY, abrir=abrir_con(video20)):
             pass
@@ -433,13 +433,27 @@ def test_duracion_fuera_de_la_ficha_se_descarta_y_queda_como_visto(repo, carpeta
     assert "brief-n4-001" in (repo / "estado" / "vistos.txt").read_text(encoding="utf-8").split()
 
 
-def test_tope_de_300_mb_por_cabecera_y_por_streaming(tmp_path):
+def test_fuente_mas_larga_que_el_clip_pasa_porque_el_recorte_lo_elige_gemini(repo, carpetas, video20):
+    # FM27 (18 nov): videos de 66 y 118 s con clips de 10 a 30 s se descartaban por error.
+    ficha = ficha_propia(reglas={"duracion_s": [7, 15], "plataformas": ["shorts"]})
+    with mod_descargar.descargar(repo, candidato(), ficha, HOY, abrir=abrir_con(video20)) as d:
+        assert d.duracion == pytest.approx(20, abs=0.5)
+
+
+def test_fuente_mas_larga_que_el_tope_se_descarta(repo, carpetas, video20, monkeypatch):
+    monkeypatch.setattr(mod_descargar, "TOPE_FUENTE_S", 15.0)
+    with pytest.raises(mod_descargar.ErrorDescarga, match="tope de una fuente"):
+        with mod_descargar.descargar(repo, candidato(), ficha_propia(), HOY, abrir=abrir_con(video20)):
+            pass
+
+
+def test_tope_de_800_mb_por_cabecera_y_por_streaming(tmp_path):
     with pytest.raises(mod_descargar.ErrorDescarga, match="tope"):
         mod_descargar.bajar_https(URL, tmp_path / "a.mp4", abrir=lambda u: Resp(b"x" * 10, largo=999), tope=100)
     with pytest.raises(mod_descargar.ErrorDescarga, match="tope"):
         mod_descargar.bajar_https(URL, tmp_path / "b.mp4", abrir=lambda u: Resp(b"x" * 500), tope=100)
     assert not (tmp_path / "b.mp4").exists()
-    assert mod_descargar.TOPE_BYTES == 300 * 1024 * 1024
+    assert mod_descargar.TOPE_BYTES == 800 * 1024 * 1024
 
 
 def ficha_twitch(**cambios):
