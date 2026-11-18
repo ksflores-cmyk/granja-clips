@@ -14,10 +14,13 @@ import subprocess
 import sys
 import tempfile
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 import yaml
 
+from .. import fuentes as mod_fuentes
+from ..registro import ZONA
 from . import estilo
 from .componer import Linea, componer
 from .config_ruta import RAIZ
@@ -76,7 +79,31 @@ def fotogramas(mp4: Path, duracion: float, salida: Path, base: str) -> list[str]
     return nombres
 
 
-def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path) -> dict:
+def autorizar(m: dict, fichas: list[dict], hoy) -> None:
+    """Lista blanca: consulta fuentes.yml ANTES de abrir cualquier conexión (video y subtítulos).
+
+    Lanza RuntimeError con el motivo si la ficha no autoriza la descarga para muestras.
+    """
+    ficha = next((f for f in fichas if f.get("id") == m["fuente_id"]), None)
+    urls = []
+    if m.get("video"):
+        urls.append(m["video"]["url"])
+        if m.get("subtitulos"):
+            urls.append(m["subtitulos"]["url"])
+    for u in urls:
+        ok, motivo = mod_fuentes.autoriza_descarga(ficha, hoy, "muestras", u)
+        if not ok:
+            raise RuntimeError(f"descarga no autorizada para {m['id']} ({m['fuente_id']}): {motivo}")
+
+
+def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *,
+            fichas: list[dict] | None = None, hoy=None, descargador=descargar) -> dict:
+    if fichas is None:
+        fichas = mod_fuentes.cargar_fuentes()
+    if hoy is None:
+        hoy = datetime.now(ZONA).date()
+    for m in muestras:          # todo se autoriza antes de la primera conexión
+        autorizar(m, fichas, hoy)
     manifiesto = {"muestras": []}
     informe = ["# Puerta de estilo automática", "",
                "Revisión sin LLM (`python -m fabrica.editar.estilo`) sobre cada MP4 y su plan.", ""]
@@ -88,11 +115,11 @@ def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path) -
         ruta_video = None
         extra_src = {}
         if vid:
-            ruta_video = descargar(vid["url"], vid["sha256"], descargas / Path(vid["url"]).name)
+            ruta_video = descargador(vid["url"], vid["sha256"], descargas / Path(vid["url"]).name)
             extra_src = {"url": vid["url"], "sha256": vid["sha256"]}
             subs = m.get("subtitulos")
             if subs:
-                descargar(subs["url"], subs["sha256"], descargas / Path(subs["url"]).name)
+                descargador(subs["url"], subs["sha256"], descargas / Path(subs["url"]).name)
                 extra_src["subtitulos"] = {"url": subs["url"], "sha256": subs["sha256"]}
             inicio, duracion = float(m["recorte"]["inicio"]), float(m["recorte"]["duracion"])
         else:
@@ -150,7 +177,11 @@ def main(argv: list[str] | None = None) -> int:
         if _dentro_del_repo(descargas):
             print("ERROR: las descargas no pueden estar dentro del repo.", file=sys.stderr)
             return 2
-        manifiesto = generar(salida, marca, muestras, descargas)
+        try:
+            manifiesto = generar(salida, marca, muestras, descargas)
+        except RuntimeError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 2
     for m in manifiesto["muestras"]:
         print(f"{m['id']}: {m['archivo']} {m['duracion_s']} s, puerta {'EN VERDE' if m['puerta_estilo']['en_verde'] else 'EN ROJO'}")
     return 0 if manifiesto["puerta_estilo_en_verde"] else 1

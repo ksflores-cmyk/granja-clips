@@ -72,3 +72,36 @@ def puede_descargar(ficha: dict) -> tuple[bool, str]:
             return True, "reglas.permite_descarga es true"
         return False, "sin permite_descarga ni material: sólo enlace, no se descarga"
     return False, f"tipo {tipo!r} desconocido"
+
+
+def autoriza_descarga(ficha: dict | None, hoy: date, uso: str, url: str | None = None) -> tuple[bool, str]:
+    """Puerta única ANTES de abrir una conexión. El motivo nombra la condición que falló."""
+    if not isinstance(ficha, dict):
+        return False, "ficha ausente: la fuente no está registrada en fuentes.yml"
+    if ficha.get("estado") != "vigente":
+        return False, f"estado {ficha.get('estado')!r}: debe ser vigente"
+    vence = ficha.get("vence")
+    if vence is not None:
+        f = _a_fecha(vence)
+        if f is None:
+            return False, f"vence ilegible ({vence!r})"
+        if f < _a_fecha(hoy):
+            return False, f"vencida el {f}"
+    ok, motivo = puede_descargar(ficha)
+    if not ok:
+        return False, f"no descargable: {motivo}"
+    if uso == "produccion":
+        ok, motivo = es_publicable(ficha, hoy)
+        if not ok:
+            return False, f"uso produccion no autorizado: {motivo}"
+    elif uso == "muestras":
+        if ficha.get("uso") != "muestras":
+            ok, motivo = es_publicable(ficha, hoy)
+            if not ok:
+                return False, f"uso muestras no autorizado: la ficha no es de muestras ni publicable ({motivo})"
+    else:
+        return False, f"uso {uso!r} desconocido (produccion o muestras)"
+    material = ficha.get("material")
+    if material is not None and (url is None or url not in material):
+        return False, f"url fuera de material: {url!r}"
+    return True, "ok"

@@ -38,6 +38,9 @@
     divulgacion: "atribución CC BY 3.0: © Blender Foundation, durian.blender.org"
     audiencia: "sin restricción"
   pilares: [primeras_veces]
+  material:
+    - https://raw.githubusercontent.com/mdn/shared-assets/main/videos/sintel-short.mp4
+    - https://raw.githubusercontent.com/mdn/shared-assets/main/misc/sintel-en.vtt
   campana: null
   tarifa_usd_por_mil: null
   minimo_por_clip_usd: null
@@ -63,6 +66,8 @@
     divulgacion: "atribución CC BY 3.0: © Blender Foundation, peach.blender.org"
     audiencia: "sin restricción"
   pilares: [momentos]
+  material:
+    - https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4
   campana: null
   tarifa_usd_por_mil: null
   minimo_por_clip_usd: null
