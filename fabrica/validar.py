@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import yaml
 
 from .config import ARCHIVOS, raiz_repo
+from .fuentes import es_publicable
 from .registro import CABECERA_ENVIOS, CABECERA_MARCADOR
 
 TIPOS = {"A", "B", "C", "D"}
@@ -167,11 +168,31 @@ def validar_fuentes(f, inf: Informe) -> None:
                 inf.error(f"{et}: tipo D exige campana null")
         if ficha.get("estado") in ESTADOS and ficha.get("estado") != "vigente" \
                 and ficha.get("publicable") is True:
-            inf.aviso(f"{et}: estado {ficha['estado']} con publicable true; "
+            _, motivo = es_publicable(ficha, _hoy())
+            inf.aviso(f"{et}: marcada publicable pero no lo es ({motivo}); "
                       "la puerta de N3 exigirá estado vigente para descargar o publicar")
+        _validar_campos_n3(ficha, et, inf)
         vence = ficha.get("vence")
         if ficha.get("estado") == "vigente" and isinstance(vence, date) and vence < _hoy():
             inf.aviso(f"{et}: ficha vigente con vence {vence} ya pasado; debe pasar a vencida")
+
+
+def _validar_campos_n3(ficha: dict, et: str, inf: Informe) -> None:
+    """Campos opcionales de N3: twitch_login, material, reglas.permite_descarga, envio."""
+    tl = ficha.get("twitch_login")
+    if tl is not None and not (isinstance(tl, str) and re.fullmatch(r"[A-Za-z0-9_]{1,25}", tl)):
+        inf.error(f"{et}: twitch_login debe ser texto (letras, números y guion bajo)")
+    mat = ficha.get("material")
+    if mat is not None and not (isinstance(mat, list) and mat
+                                and all(isinstance(u, str) and u.startswith("https://") and len(u) > 8
+                                        for u in mat)):
+        inf.error(f"{et}: material debe ser una lista de URL https")
+    reglas = ficha.get("reglas")
+    if isinstance(reglas, dict) and "permite_descarga" in reglas \
+            and not isinstance(reglas["permite_descarga"], bool):
+        inf.error(f"{et}: reglas.permite_descarga debe ser booleano")
+    if "envio" in ficha and ficha["envio"] not in ("manual", "api"):
+        inf.error(f"{et}: envio debe ser manual o api")
 
 
 def validar_marca(m, inf: Informe) -> None:

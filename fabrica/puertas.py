@@ -1,0 +1,137 @@
+"""Puertas baratas (sin LLM) que filtran candidatos antes de descargar o editar."""
+from __future__ import annotations
+
+import csv
+from datetime import datetime
+from pathlib import Path
+
+from .config import cargar_yaml, raiz_repo
+from .detectar import Candidato, ClienteTwitch
+from .fuentes import cargar_fuentes, es_publicable
+from .registro import ZONA
+
+
+def _ficha(raiz, fuente_id: str) -> dict | None:
+    return next((f for f in cargar_fuentes(raiz) if f.get("id") == fuente_id), None)
+
+
+def puerta_ficha(raiz, cand: Candidato, ahora: datetime, plataforma: str,
+                 pilar: str | None = None) -> tuple[bool, str]:
+    ficha = _ficha(raiz, cand.fuente_id)
+    if ficha is None:
+        return False, f"la fuente {cand.fuente_id} no está en fuentes.yml"
+    return es_publicable(ficha, ahora.astimezone(ZONA).date(), plataforma, pilar)
+
+
+def id_juego_temporada(raiz, cliente: ClienteTwitch | None = None) -> str | None:
+    t = cargar_yaml("temporada.yml", raiz)
+    if t.get("twitch_game_id"):
+        return str(t["twitch_game_id"])
+    if cliente is not None and t.get("nombre_twitch"):
+        return cliente.juego_id(t["nombre_twitch"])
+    return None
+
+
+def puerta_juego(cand: Candidato, juego_esperado: str | None) -> tuple[bool, str]:
+    if cand.origen == "brief":
+        return True, "material del brief: se acepta"
+    if juego_esperado is None:
+        return False, "no se pudo resolver el id del juego de la temporada"
+    if cand.juego_id != juego_esperado:
+        return False, f"juego {cand.juego_id} distinto del de la temporada ({juego_esperado})"
+    return True, "ok"
+
+
+def puerta_duracion(raiz, cand: Candidato) -> tuple[bool, str]:
+    if cand.duracion_s is None:
+        if cand.origen == "brief":
+            return True, "duración desconocida (brief): se mide al descargar"
+        return False, "duración desconocida"
+    ficha = _ficha(raiz, cand.fuente_id) or {}
+    minimo = ((ficha.get("reglas") or {}).get("duracion_s") or [0])[0]
+    if cand.duracion_s < minimo:
+        return False, f"dura {cand.duracion_s}s, menos del mínimo {minimo}s"
+    return True, "ok"
+
+
+def _vistos(raiz) -> set[str]:
+    ruta = raiz_repo(raiz) / "estado" / "vistos.txt"
+    if not ruta.exists():
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text("", encoding="utf-8")
+        return set()
+    return {l.strip() for l in ruta.read_text(encoding="utf-8").splitlines() if l.strip()}
+
+
+def anotar_visto(raiz, id_origen: str) -> None:
+    _vistos(raiz)  # asegura que exista
+    with open(raiz_repo(raiz) / "estado" / "vistos.txt", "a", encoding="utf-8") as f:
+        f.write(id_origen + "\n")
+
+
+def _filas_marcador(raiz) -> list[dict]:
+    with open(raiz_repo(raiz) / "marcador.csv", newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def puerta_no_repetido(raiz, cand: Candidato) -> tuple[bool, str]:
+    if cand.id_origen in _vistos(raiz):
+        return False, "ya está en estado/vistos.txt"
+    # El marcador guarda la URL de publicación; un id de origen ahí o en notas cuenta como repetido.
+    for fila in _filas_marcador(raiz):
+        if cand.id_origen and cand.id_origen in (fila.get("notas") or "") + (fila.get("url") or "") \
+                + (fila.get("id_clip") or ""):
+            return False, "ya está en el marcador"
+    return True, "ok"
+
+
+def cupo_del_dia(raiz, ahora: datetime, plataforma: str) -> int:
+    t = cargar_yaml("temporada.yml", raiz)
+    cupos = t["cupos"]
+    v = t["ventana_estreno"]
+    ini, fin = datetime.fromisoformat(str(v["inicio"])), datetime.fromisoformat(str(v["fin"]))
+    if ini <= ahora <= fin:
+        return int(cupos["estreno_max_por_dia_por_plataforma"])
+    return int(cupos["por_dia_por_plataforma"])
+
+
+def puerta_cupo(raiz, ahora: datetime, plataforma: str) -> tuple[bool, str]:
+    hoy = ahora.astimezone(ZONA).date().isoformat()
+    usados = sum(1 for f in _filas_marcador(raiz)
+                 if f.get("fecha") == hoy and f.get("plataforma") == plataforma)
+    cupo = cupo_del_dia(raiz, ahora, plataforma)
+    if usados >= cupo:
+        return False, f"cupo del día lleno en {plataforma} ({usados}/{cupo})"
+    return True, "ok"
+
+
+def filtrar(raiz, candidatos: list[Candidato], ahora: datetime, plataforma: str,
+            cliente: ClienteTwitch | None = None, pilar: str | None = None):
+    """Devuelve (aprobados, descartados[(candidato, motivo)]). Las puertas corren en orden."""
+    aprobados: list[Candidato] = []
+    descartados: list[tuple[Candidato, str]] = []
+    juego = id_juego_temporada(raiz, cliente)
+    for c in candidatos:
+        pruebas = [
+            puerta_ficha(raiz, c, ahora, plataforma, pilar),
+            puerta_juego(c, juego),
+            puerta_duracion(raiz, c),
+            puerta_no_repetido(raiz, c),
+        ]
+        fallo = next(((ok, m) for ok, m in pruebas if not ok), None)
+        if fallo is None:
+            ok, m = puerta_cupo(raiz, ahora, plataforma)
+            # los ya aprobados en esta corrida también ocupan cupo
+            if ok:
+                cupo = cupo_del_dia(raiz, ahora, plataforma)
+                hoy = ahora.astimezone(ZONA).date().isoformat()
+                base = sum(1 for f in _filas_marcador(raiz)
+                           if f.get("fecha") == hoy and f.get("plataforma") == plataforma)
+                if base + len(aprobados) >= cupo:
+                    ok, m = False, f"cupo del día lleno con los aprobados de esta corrida ({cupo})"
+            fallo = None if ok else (ok, m)
+        if fallo is None:
+            aprobados.append(c)
+        else:
+            descartados.append((c, fallo[1]))
+    return aprobados, descartados
