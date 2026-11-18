@@ -45,6 +45,7 @@ class Mirada:
     modelo: str | None = None          # el que respondió
     motivo: str | None = None          # por qué no hay datos
     intentos: list[str] = field(default_factory=list)   # un renglón por intento (sin claves)
+    pasajero: bool = False             # falló Gemini (429, 5xx, red), no el clip: la fuente no se gasta
 
 
 def esquema_respuesta() -> dict:
@@ -185,29 +186,44 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
     transporte = transporte or transporte_urllib
     encabezados = {"Content-Type": "application/json", "x-goog-api-key": clave}
     mirada = Mirada(None)
+    respaldos_por_falla = 1      # ante 429/5xx/red persistentes se prueba UN modelo más (18 nov: 503 y timeouts)
     for modelo in [cfg["modelo"], *cfg.get("modelos_respaldo", [])]:
         url = URL_BASE.format(modelo=modelo)
         estado, texto = None, ""
+        caida = None
         for intento in (1, 2):
             try:
                 estado, texto = transporte(url, encabezados, cuerpo)
             except ErrorOjos as e:
-                mirada.motivo = str(e)
-                mirada.intentos.append(f"{modelo}: {e}")
-                return mirada
+                mirada.intentos.append(f"{modelo}: {e} (intento {intento})")
+                caida = str(e)
+                if intento == 1:
+                    espera(ESPERA_REINTENTO_S)
+                    continue
+                break
+            caida = None
             if estado == 429 or 500 <= estado < 600:
                 mirada.intentos.append(f"{modelo}: HTTP {estado} (intento {intento})")
                 if intento == 1:
                     espera(ESPERA_REINTENTO_S)
                     continue
             break
+        if caida is not None or estado == 429 or (estado is not None and 500 <= estado < 600):
+            mirada.motivo = caida or f"Gemini respondió HTTP {estado} con {modelo}"
+            mirada.pasajero = True
+            if respaldos_por_falla > 0:
+                respaldos_por_falla -= 1
+                continue
+            return mirada
         if estado == 404:
             mirada.intentos.append(f"{modelo}: HTTP 404, no existe; se prueba el siguiente")
             continue
         if estado != 200:
             mirada.motivo = f"Gemini respondió HTTP {estado} con {modelo}"
+            mirada.pasajero = False
             return mirada
         mirada.modelo = modelo
+        mirada.pasajero = False
         mirada.intentos.append(f"{modelo}: HTTP 200")
         try:
             crudo = _texto_de_respuesta(texto)
@@ -224,7 +240,8 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
             return mirada
         mirada.datos = datos
         return mirada
-    mirada.motivo = "ningún modelo respondió (todos dieron 404)"
+    if not mirada.pasajero:
+        mirada.motivo = "ningún modelo respondió (todos dieron 404)"
     return mirada
 
 

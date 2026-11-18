@@ -187,10 +187,17 @@ def test_reintento_unico_ante_429_con_espera(tmp_path):
     assert t.modelos()[0] == t.modelos()[1]
 
 
-def test_dos_429_seguidos_se_rinden(tmp_path):
-    t = Transporte((429, "{}"), (429, "{}"))
+def test_dos_429_seguidos_prueban_un_solo_modelo_mas_y_se_rinden(tmp_path):
+    t = Transporte((429, "{}"), (429, "{}"), (429, "{}"), (429, "{}"))
     m = mirar(tmp_path, t)
-    assert m.datos is None and "429" in m.motivo and len(t.llamadas) == 2
+    assert m.datos is None and "429" in m.motivo and len(t.llamadas) == 4 and m.pasajero
+    assert t.modelos()[0] == t.modelos()[1] != t.modelos()[2] == t.modelos()[3]
+
+
+def test_503_persistente_pasa_al_modelo_de_respaldo(tmp_path):
+    t = Transporte((503, "x"), (503, "x"), (200, sobre(respuesta_grabada("valida"))))
+    m = mirar(tmp_path, t)
+    assert m.datos is not None and not m.pasajero and m.modelo == t.modelos()[2] != t.modelos()[0]
 
 
 def test_reintento_ante_5xx(tmp_path):
@@ -212,10 +219,26 @@ def test_la_clave_va_en_el_encabezado_y_nunca_en_la_url_ni_en_los_informes(tmp_p
     assert "CLAVE-SECRETA" not in repr(m) and "CLAVE-SECRETA" not in " ".join(m.intentos)
 
 
-def test_error_de_conexion_da_motivo_sin_clave(tmp_path):
-    t = Transporte(ojos.ErrorOjos("fallo de conexión con Gemini: URLError"))
+def test_error_de_conexion_da_motivo_sin_clave_y_es_pasajero(tmp_path):
+    e = ojos.ErrorOjos("fallo de conexión con Gemini: TimeoutError")
+    t = Transporte(e, e, e, e)
     m = mirar(tmp_path, t, clave="CLAVE-SECRETA-XYZ")
     assert m.datos is None and "conexión" in m.motivo and "CLAVE-SECRETA" not in m.motivo
+    assert m.pasajero and len(t.llamadas) == 4
+
+
+def test_un_timeout_y_luego_respuesta_valida(tmp_path):
+    t = Transporte(ojos.ErrorOjos("fallo de conexión con Gemini: TimeoutError"),
+                   (200, sobre(respuesta_grabada("valida"))))
+    m = mirar(tmp_path, t)
+    assert m.datos is not None and not m.pasajero and len(t.llamadas) == 2
+
+
+def test_quitar_visto_deshace_anotar_visto(repo):
+    from fabrica import puertas as p
+    p.anotar_visto(repo, "a"); p.anotar_visto(repo, "b")
+    p.quitar_visto(repo, "a"); p.quitar_visto(repo, "zzz")
+    assert (repo / "estado" / "vistos.txt").read_text(encoding="utf-8").split() == ["b"]
 
 
 def test_json_roto_se_descarta_con_motivo(tmp_path):
@@ -926,3 +949,19 @@ def test_anotar_clip_acepta_la_forma_corta_de_publicar(repo):
     filas = puertas._filas_marcador(repo)
     assert [f["toma"] for f in filas] == ["3", "4"] and filas[1]["notas"] == "origen:clip-corto"
     assert "clip-corto" in (repo / "estado" / "vistos.txt").read_text(encoding="utf-8").split()
+
+
+def test_gemini_caido_no_gasta_la_fuente(repo, tmp_path, video20):
+    e = ojos.ErrorOjos("fallo de conexión con Gemini: TimeoutError")
+    r = toma.hacer_toma(repo, candidato(), ficha_propia(), AHORA, salida=tmp_path / "s", abrir=abrir_con(video20),
+                        transporte=Transporte(e, e, e, e), entorno={"GEMINI_API_KEY": "k"}, espera=lambda s: None)
+    assert not r.ok and "pasajero" in r.motivos[0]
+    vistos = repo / "estado" / "vistos.txt"
+    assert candidato().id_origen not in (vistos.read_text(encoding="utf-8").split() if vistos.exists() else [])
+
+
+def test_un_descarte_por_contenido_si_gasta_la_fuente(repo, tmp_path, video20):
+    r = toma.hacer_toma(repo, candidato(), ficha_propia(), AHORA, salida=tmp_path / "s", abrir=abrir_con(video20),
+                        transporte=Transporte((400, "mala")), entorno={"GEMINI_API_KEY": "k"}, espera=lambda s: None)
+    assert not r.ok
+    assert candidato().id_origen in (repo / "estado" / "vistos.txt").read_text(encoding="utf-8").split()

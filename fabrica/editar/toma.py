@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .. import descargar as mod_descargar
-from .. import fuentes, ojos
+from .. import fuentes, ojos, puertas
 from ..config import cargar_yaml, raiz_repo
 from ..registro import ZONA, contador_toma
 from . import estilo
@@ -142,6 +142,10 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                                     transporte=transporte, espera=espera, entorno=entorno, juego=juego,
                                     nota=ojos.nota_de_ficha(ficha) or None, recorte=recorte)
             if mirada.datos is None:
+                if mirada.pasajero:          # Gemini caído: la fuente se vuelve a intentar en otra corrida
+                    puertas.quitar_visto(raiz, candidato.id_origen)
+                    return Resultado(False, [f"ojos: {mirada.motivo} (pasajero: se reintenta)"],
+                                     modelo=mirada.modelo)
                 return Resultado(False, [f"ojos: {mirada.motivo}"], modelo=mirada.modelo)
             ok, motivos = ojos.validar_respuesta(mirada.datos, marca, temporada, duracion=d.duracion,
                                               juego=juego, recorte=recorte)

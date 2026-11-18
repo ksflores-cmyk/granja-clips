@@ -74,6 +74,17 @@ def anotar_visto(raiz, id_origen: str) -> None:
         f.write(id_origen + "\n")
 
 
+def quitar_visto(raiz, id_origen: str) -> None:
+    """Deshace `anotar_visto` cuando el descarte fue de la máquina (Gemini caído), no de la fuente."""
+    ruta = raiz_repo(raiz) / "estado" / "vistos.txt"
+    if not ruta.exists():
+        return
+    lineas = ruta.read_text(encoding="utf-8").splitlines()
+    quedan = [x for x in lineas if x.strip() != id_origen]
+    if len(quedan) != len(lineas):
+        ruta.write_text("".join(x + "\n" for x in quedan), encoding="utf-8")
+
+
 def _filas_marcador(raiz) -> list[dict]:
     with open(raiz_repo(raiz) / "marcador.csv", newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
