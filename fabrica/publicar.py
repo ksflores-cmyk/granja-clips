@@ -1196,33 +1196,58 @@ def ensayo(raiz, env, salida=print, transporte_buffer=None, transporte_almacen=N
     return codigo
 
 
-def borrador(raiz, env, salida=print, transporte_buffer=None, ahora=None) -> int:
+def borrador(raiz, env, salida=print, transporte_buffer=None, ahora=None, transporte_almacen=None) -> int:
     """--borrador: createPost con saveToDraft y deletePost enseguida. Exige la clave real.
 
+    Buffer descarga el video al crear el borrador, así que con las claves de Supabase se sube un MP4
+    vertical de prueba de 5 s, se usa su URL pública y se borra al terminar (pase lo que pase).
     Si un borrador no se confirma como borrado, lo dice con su id y sale con 1 (hay que borrarlo a mano)."""
+    from .almacen import Almacen, ErrorAlmacen, crear_mp4_vertical_de_prueba
     if not env.get("BUFFER_API_KEY"):
         salida("sin BUFFER_API_KEY: --borrador necesita la clave real y no se puede simular")
         return COD_ERROR
     ahora = ahora or (lambda: datetime.now(timezone.utc))
+    almacen, ruta, url_video = None, None, "https://ejemplo.invalid/prueba.mp4"
+    codigo = COD_OK
     try:
+        if all(env.get(s) for s in SECRETOS_ALMACEN):
+            almacen = Almacen(env["SUPABASE_URL"], env["SUPABASE_SERVICE_KEY"],
+                              cargar_yaml("config/almacen.yml", raiz), transporte_almacen)
+            almacen.asegurar_bucket()
+            with tempfile.TemporaryDirectory(prefix="borrador-") as d:
+                mp4 = crear_mp4_vertical_de_prueba(Path(d) / "borrador.mp4")
+                ruta, url_video = almacen.subir(mp4, 0)
+            almacen.comprobar(url_video)
+        else:
+            salida("sin claves de Supabase: el borrador usa una URL de ejemplo y Buffer puede rechazarla")
         cliente = ClienteBuffer(env["BUFFER_API_KEY"], transporte_buffer, raiz, ahora=ahora)
         canales_api = cliente.todos_los_canales()
         ids = confirmar_canales(canales_api, cargar_yaml("config/canales.yml", raiz), raiz)
         pub = Publicador(cliente, None, raiz, "borrador", ahora, ids, orgs=organizaciones_de(canales_api, ids))
         for plat in PLATAFORMAS:
-            r = pub.borrador(plat, "https://ejemplo.invalid/prueba.mp4", ahora() + timedelta(days=1))
+            r = pub.borrador(plat, url_video, ahora() + timedelta(days=1))
             if not r["borrado"]:
                 salida(f"BORRADOR SIN BORRAR en {plat}: id {r['id']} ({r.get('motivo', 'sin confirmar')}); "
                        "bórralo a mano en Buffer")
-                return COD_ERROR
+                codigo = COD_ERROR
+                break
             salida(f"Borrador {plat}: creado y borrado ({r['id']})")
     except AlertaRoja as e:
         salida(f"ALERTA ROJA: {e}")
-        return COD_ALERTA
-    except (ErrorBuffer, Descartada, red.ErrorRed) as e:
+        codigo = COD_ALERTA
+    except (ErrorBuffer, Descartada, red.ErrorRed, ErrorAlmacen) as e:
         salida(f"ERROR: {e}")
-        return COD_ERROR
-    return COD_OK
+        codigo = COD_ERROR
+    finally:
+        if almacen is not None and ruta:
+            try:
+                almacen.borrar(ruta)
+                almacen.confirmar_borrado(ruta)
+                salida("Video de prueba del borrador: borrado del almacén")
+            except (ErrorAlmacen, red.ErrorRed) as e:
+                salida(f"VIDEO DE PRUEBA SIN BORRAR en el almacén ({ruta}): {e}")
+                codigo = codigo or COD_ERROR
+    return codigo
 
 
 def vivo(raiz, env, entrada: dict, salida=print, transporte_buffer=None, transporte_almacen=None,
@@ -1330,7 +1355,8 @@ def ejecutar(raiz=None, ensayo_forzado=False, con_borrador=False, entrada: str |
         salida(f"PAUSA: {motivo or 'sin motivo'}. No se hace ninguna llamada.")
         return COD_OK
     if con_borrador:
-        return borrador(raiz, env, salida, transportes.get("transporte_buffer"), transportes.get("ahora"))
+        return borrador(raiz, env, salida, transportes.get("transporte_buffer"), transportes.get("ahora"),
+                        transportes.get("transporte_almacen"))
     modo = cargar_yaml("config/modo.yml", raiz).get("modo")
     if ensayo_forzado or modo == "ensayo":
         return ensayo(raiz, env, salida, **transportes)

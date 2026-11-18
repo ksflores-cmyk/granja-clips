@@ -1411,3 +1411,27 @@ def test_los_tipos_concretos_de_mutationerror_se_clasifican_y_dicen_su_tipo(tmp_
     error = Descartada if es_rechazo else publicar.ErrorIncierto
     with pytest.raises(error, match=f"{tipo}.*video demasiado corto"):
         pub._crear({"text": "x"}, "canal-yt-001")
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="sin ffmpeg")
+def test_borrador_con_supabase_usa_un_video_real_y_lo_borra_al_final(repo):
+    sin_pausa(repo)
+    sim, supa, sal = BufferSimulado(), SupabaseSimulado(), []
+    cod = publicar.ejecutar(repo, con_borrador=True, env=entorno_real(), salida=sal.append,
+                            transporte_buffer=sim, transporte_almacen=supa, ahora=lambda: AHORA)
+    assert cod == 0, sal
+    urls = {json.dumps(v["input"]) for q, v in zip(sim.consultas, sim.variables) if "createPost" in q}
+    assert len(urls) == 3 and all("/storage/v1/object/public/clips/tomas/" in u for u in urls)
+    assert "ejemplo.invalid" not in "".join(urls)
+    assert supa.objetos == {} and "borrado del almacén" in sal[-1]
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="sin ffmpeg")
+def test_borrador_que_falla_en_buffer_igual_borra_el_video_de_prueba(repo):
+    sin_pausa(repo)
+    supa, sal = SupabaseSimulado(), []
+    cod = publicar.ejecutar(repo, con_borrador=True, env=entorno_real(), salida=sal.append,
+                            transporte_buffer=BufferSimulado(crear="createpost_error.json"),
+                            transporte_almacen=supa, ahora=lambda: AHORA)
+    assert cod == 1 and supa.objetos == {}
+    assert any(s.startswith("ERROR:") for s in sal)

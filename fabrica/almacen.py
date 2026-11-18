@@ -193,6 +193,24 @@ def _es_objeto_no_encontrado(datos: bytes) -> bool:
     return "bucket" not in texto and ("object not found" in mensaje.lower() or "object not found" in error.lower())
 
 
+def crear_mp4_vertical_de_prueba(destino, segundos: int = 5) -> Path:
+    """MP4 1080x1920 con audio mudo, como los que publica la fábrica, para el borrador de Buffer
+    (Buffer descarga el video y rechaza lo que no puede leer). Sin red."""
+    destino = Path(destino)
+    cmd = ["ffmpeg", "-y", "-loglevel", "error",
+           "-f", "lavfi", "-i", f"testsrc2=duration={segundos}:size=1080x1920:rate=30",
+           "-f", "lavfi", "-i", f"anullsrc=channel_layout=stereo:sample_rate=48000",
+           "-t", str(segundos), "-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", "veryfast",
+           "-c:a", "aac", "-shortest", "-movflags", "+faststart", str(destino)]
+    try:
+        r = subprocess.run(cmd, capture_output=True, timeout=120)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise ErrorAlmacen(f"ffmpeg no pudo crear el MP4 vertical de prueba ({type(e).__name__})") from None
+    if r.returncode != 0 or not destino.exists():
+        raise ErrorAlmacen("ffmpeg no pudo crear el MP4 vertical de prueba")
+    return destino
+
+
 def crear_mp4_de_prueba(destino) -> Path:
     """MP4 de 1 s con ffmpeg (fuente testsrc). Sin red."""
     destino = Path(destino)
