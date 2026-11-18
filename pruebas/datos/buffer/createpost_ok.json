@@ -1,6 +1,7 @@
 {
  "data": {
   "createPost": {
+   "__typename": "PostActionSuccess",
    "post": {
     "id": "post-ejemplo-001",
     "status": "scheduled",

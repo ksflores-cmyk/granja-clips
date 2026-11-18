@@ -1213,3 +1213,173 @@ def test_entradas_del_formato_anterior_se_leen_como_creadas_y_registradas(tmp_pa
     assert e["estado"] == "creado" and e["registrado"] is True and e["id"]
     assert pub.reconciliar() == {}
     assert pub.limpiar_enviados() == [ruta]          # sin KeyError; su post está en sent
+
+
+# ================= cierre: casos límite del modo vivo =================
+
+@pytest.mark.parametrize("archivo", ["createpost_sin_discriminador_mensaje.json",
+                                     "createpost_sin_discriminador_post.json"])
+def test_sin_discriminador_es_incierto_y_la_segunda_llamada_no_envia(tmp_path, monkeypatch, archivo):
+    monkeypatch.delattr(registro, "anotar_clip", raising=False)
+    sim = BufferSimulado(crear=archivo)
+    pub, _ = vivo(tmp_path, sim)
+    args = ("shorts", TOMA, "https://x.invalid/v.mp4", textos(TOMA, FICHA_LIMPIA, "shorts"), hueco_a_utc(HOY, "11:00"))
+    with pytest.raises(publicar.ResultadoIncierto):
+        pub.programar(*args)
+    assert leer_libro(tmp_path)[0]["estado"] == "incierto"
+    with pytest.raises(Descartada, match="ya hay un envío"):   # incierto, o creado si el listado ya lo muestra
+        pub.programar(*args)
+    assert sum("createPost" in q for q in sim.consultas) == 1
+
+
+def test_exito_con_id_vacio_o_tipo_distinto_es_incierto(tmp_path):
+    pub, _ = vivo(tmp_path)
+    for r in ({"__typename": "PostActionSuccess", "post": {"id": " "}},
+              {"__typename": "OtroExito", "post": {"id": "1"}},
+              {"__typename": "MutationError", "message": "  "},
+              {"__typename": "MutationError", "message": 5}):
+        pub.cliente.transporte = lambda *a, r=r, **k: F.resp(200, {"data": {"createPost": r}})
+        with pytest.raises(publicar.ErrorIncierto):
+            pub._crear({"text": "x"}, "canal-yt-001")
+
+
+def libro_a_mano(tmp_path, *envios):
+    base = {"plataforma": "shorts", "canal": "canal-yt-001", "ruta": None, "estado": "incierto",
+            "post_id": None, "registrado": False, "intento": "i1"}
+    libro = []
+    for n, hora, texto in envios:
+        due = f"2026-11-18T{hora}:00:00.000Z"
+        libro.append({**base, "id": f"shorts|{n}|{due}", "toma": n, "dueAt": due, "texto": texto,
+                      "datos": {"toma": {**TOMA, "numero": n}, "textos": {"texto": texto, "credito": "c"},
+                                "ficha_id": "propio"}})
+    publicar._escribir_json(LIBRO(tmp_path), libro)
+
+
+class Paginas:
+    def __init__(self, paginas):
+        self.sim, self.paginas = BufferSimulado(), paginas
+
+    def __call__(self, metodo, url, cab, cuerpo=None, tiempo=60):
+        q = json.loads(cuerpo.decode())["query"]
+        if "posts(" in q and "first:" in q:
+            i = int(q.split('after: "p')[1].split('"')[0]) if "after:" in q else 0
+            return F.resp(200, self.paginas[i])
+        return self.sim(metodo, url, cab, cuerpo, tiempo)
+
+
+def pagina(nodos, siguiente):
+    return {"data": {"posts": {"edges": [{"node": n} for n in nodos], "pageInfo": {
+        "hasNextPage": siguiente, "endCursor": "p1" if siguiente else None}}}}
+
+
+def nodo_de(n, hora, texto):
+    return {"id": f"post-{n}", "status": "scheduled", "dueAt": f"2026-11-18T{hora}:00:00.000Z", "text": texto}
+
+
+def pub_con(tmp_path, transporte, ahora):
+    c = ClienteBuffer(CLAVE, transporte, tmp_path, dormir=lambda s: None, ahora=lambda: ahora)
+    return Publicador(c, None, tmp_path, "vivo", lambda: ahora, {"shorts": "canal-yt-001"},
+                      orgs={"shorts": "org-ejemplo-001"})
+
+
+TARDE = datetime(2026, 11, 25, tzinfo=timezone.utc)
+
+
+def test_a_en_la_pagina_1_y_b_en_la_2_b_se_resuelve_sin_abandonarse(tmp_path, monkeypatch):
+    monkeypatch.delattr(registro, "anotar_clip", raising=False)
+    (tmp_path / "marcador.csv").write_text(",".join(registro.CABECERA_MARCADOR) + "\n", encoding="utf-8")
+    libro_a_mano(tmp_path, (12, "17", "tA"), (13, "19", "tB"))
+    t = Paginas([pagina([nodo_de(12, "17", "tA")], True), pagina([nodo_de(13, "19", "tB")], False)])
+    r = pub_con(tmp_path, t, TARDE).reconciliar()
+    assert sorted(r.values()) == ["creado", "creado"]
+
+
+def test_encontrar_a_no_hace_concluyente_la_busqueda_de_b(tmp_path, monkeypatch):
+    monkeypatch.delattr(registro, "anotar_clip", raising=False)
+    (tmp_path / "marcador.csv").write_text(",".join(registro.CABECERA_MARCADOR) + "\n", encoding="utf-8")
+    libro_a_mano(tmp_path, (12, "17", "tA"), (13, "19", "tB"))
+    sin_info = {"data": {"posts": {"edges": []}}}          # la página 2 no trae pageInfo
+    t = Paginas([pagina([nodo_de(12, "17", "tA")], True), sin_info])
+    pub_con(tmp_path, t, TARDE).reconciliar()
+    assert {e["toma"]: e["estado"] for e in leer_libro(tmp_path)} == {12: "creado", 13: "incierto"}
+
+
+@pytest.mark.parametrize("respuesta", [{"data": {}}, {"data": {"posts": None}},
+                                       {"data": {"posts": {"edges": []}}},
+                                       {"data": {"posts": {"edges": [], "pageInfo": {"hasNextPage": None}}}},
+                                       {"data": {"posts": {"edges": [], "pageInfo": {"hasNextPage": "false"}}}}])
+def test_sin_posts_o_sin_pageinfo_valido_no_es_concluyente(tmp_path, respuesta):
+    libro_a_mano(tmp_path, (12, "17", "tA"))
+    pub_con(tmp_path, Paginas([respuesta]), TARDE).reconciliar()
+    assert leer_libro(tmp_path)[0]["estado"] == "incierto"
+
+
+def test_con_pageinfo_valido_y_sin_mas_paginas_la_ausencia_si_es_concluyente(tmp_path):
+    libro_a_mano(tmp_path, (12, "17", "tA"))
+    pub_con(tmp_path, Paginas([pagina([], False)]), TARDE).reconciliar()
+    assert leer_libro(tmp_path)[0]["estado"] == "abandonado"
+
+
+def test_una_transicion_vieja_no_pisa_un_creado_ni_otro_intento(tmp_path):
+    libro_a_mano(tmp_path, (12, "17", "tA"))
+    pub = pub_con(tmp_path, Paginas([pagina([], False)]), TARDE)
+    vieja = pub._libro()[0]
+    libro = pub._libro()
+    libro[0].update(estado="creado", post_id="post-12", registrado=True)
+    publicar._escribir_json(LIBRO(tmp_path), libro)
+    assert pub._transicionar(vieja, "abandonado") is False
+    assert leer_libro(tmp_path)[0]["estado"] == "creado"
+    libro[0].update(estado="incierto", intento="i2")                 # otro intento con el mismo id
+    publicar._escribir_json(LIBRO(tmp_path), libro)
+    assert pub._transicionar(vieja, "abandonado") is False
+    assert leer_libro(tmp_path)[0]["estado"] == "incierto"
+
+
+def test_reconciliar_no_abandona_si_el_envio_se_hizo_creado_mientras_leia(tmp_path):
+    libro_a_mano(tmp_path, (12, "17", "tA"))
+
+    class Lento(Paginas):
+        def __call__(self, metodo, url, cab, cuerpo=None, tiempo=60):
+            if "posts(" in json.loads(cuerpo.decode())["query"]:
+                libro = json.loads(LIBRO(tmp_path).read_text(encoding="utf-8"))
+                libro[0].update(estado="creado", post_id="post-12", registrado=True)   # otro proceso lo cerró
+                LIBRO(tmp_path).write_text(json.dumps(libro), encoding="utf-8")
+            return super().__call__(metodo, url, cab, cuerpo, tiempo)
+    assert pub_con(tmp_path, Lento([pagina([], False)]), TARDE).reconciliar() == {}
+    assert leer_libro(tmp_path)[0]["estado"] == "creado"
+
+
+def test_limpiar_borra_bajo_el_candado_del_libro(tmp_path):
+    fcntl = pytest.importorskip("fcntl")
+    ruta = "tomas/2026-11-18/toma-012-ab12cd34.mp4"
+    alm, supa = almacen_con_video(tmp_path, ruta)
+    visto = {}
+    original = alm.borrar
+
+    def borrar(r):
+        with open(str(LIBRO(tmp_path)) + ".lock", "a+b") as f:
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                visto["libre"] = True
+            except BlockingIOError:
+                visto["libre"] = False
+        original(r)
+    alm.borrar = borrar
+    pub = Publicador(cliente(tmp_path), alm, tmp_path, "vivo", lambda: AHORA, {})
+    assert pub.limpiar_enviados() == [ruta]
+    assert visto == {"libre": False}
+
+
+def test_limpiar_no_borra_si_alguien_reservo_la_ruta_durante_la_comprobacion(tmp_path):
+    ruta = "tomas/2026-11-18/toma-012-ab12cd34.mp4"
+    alm, supa = almacen_con_video(tmp_path, ruta)
+    pub = Publicador(cliente(tmp_path), alm, tmp_path, "vivo", lambda: AHORA, {})
+    original = Publicador.estado
+
+    def estado_y_reserva(self, post_id, org_id=None):
+        libro = json.loads(LIBRO(tmp_path).read_text(encoding="utf-8"))
+        libro.append({**libro[0], "id": "otro", "estado": "enviando", "toma": 99, "post_id": None})
+        LIBRO(tmp_path).write_text(json.dumps(libro), encoding="utf-8")     # simula otra reserva
+        return original(self, post_id, org_id)
+    pub.estado = estado_y_reserva.__get__(pub)
+    assert pub.limpiar_enviados() == [] and len(supa.objetos) == 1

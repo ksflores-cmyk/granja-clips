@@ -17,6 +17,7 @@ import re
 import sys
 import tempfile
 import time
+import uuid
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -657,9 +658,9 @@ class Publicador:
     def _crear(self, carga: dict, canal_id: str) -> dict:
         """createPost sin reintento y con resultado estricto.
 
-        Éxito: `createPost.post.id`. Rechazo (Descartada): sólo un `MutationError` explícito con mensaje.
-        Cualquier otra cosa en un 200 (null, sin post.id, __typename inesperado, `errors`) es
-        ErrorIncierto: no se sabe si Buffer lo creó.
+        Éxito: `__typename == "PostActionSuccess"` con `post.id` no vacío. Rechazo (Descartada): sólo
+        `__typename == "MutationError"` con mensaje. Cualquier otra cosa en un 200 (null, sin `__typename`,
+        sin post.id, tipo inesperado, `errors`) es ErrorIncierto: no se sabe si Buffer lo creó.
         """
         if self.modo == "ensayo":
             raise ErrorBuffer("createPost no está permitido en ensayo")
@@ -667,18 +668,16 @@ class Publicador:
             raise ErrorBuffer("en borrador createPost sólo se manda con saveToDraft")
         data = self.cliente.consulta(M_CREAR, {"input": carga}, canal=canal_id, mutacion=True)
         r = data.get("createPost")
-        incierto = ErrorIncierto("createPost devolvió una respuesta incompleta o inesperada; "
+        incierto = ErrorIncierto("createPost devolvió una respuesta sin discriminador o inesperada; "
                                  "el resultado es incierto, no se repite")
         if not isinstance(r, dict):
             raise incierto
-        tipo = r.get("__typename")
-        post = r.get("post")
-        if isinstance(post, dict) and post.get("id") and tipo in (None, "PostActionSuccess"):
+        tipo, post, mensaje = r.get("__typename"), r.get("post"), r.get("message")
+        if tipo == "PostActionSuccess" and isinstance(post, dict) \
+                and isinstance(post.get("id"), str) and post["id"].strip():
             return post
-        mensaje = r.get("message")
-        if "post" not in r and isinstance(mensaje, str) and mensaje.strip() and tipo in (None, "MutationError"):
-            raise Descartada("Buffer rechazó la publicación: "
-                             + red.ocultar(mensaje, [self.cliente._clave]))
+        if tipo == "MutationError" and isinstance(mensaje, str) and mensaje.strip():
+            raise Descartada("Buffer rechazó la publicación: " + red.ocultar(mensaje, [self.cliente._clave]))
         raise incierto
 
     def programar(self, plataforma: str, toma: dict, url_video: str, textos: dict, cuando: datetime,
@@ -701,6 +700,7 @@ class Publicador:
         id_envio = f"{plataforma}|{toma.get('numero')}|{due}"
         entrada = {"id": id_envio, "plataforma": plataforma, "toma": toma.get("numero"), "dueAt": due,
                    "canal": canal, "ruta": ruta_almacen, "estado": "enviando", "post_id": None,
+                   "intento": uuid.uuid4().hex,
                    "registrado": False, "texto": textos["texto"],
                    "datos": {"toma": toma, "textos": textos, "ficha_id": (ficha or {}).get("id")}}
         with self._candado():                       # lectura, comprobación y reserva, de una vez
@@ -716,10 +716,10 @@ class Publicador:
         try:
             post = self._crear(carga, canal)
         except ErrorIncierto as e:
-            self._intentar_marcar(id_envio, estado="incierto")
+            self._intentar_transicion(entrada, "incierto")
             raise ResultadoIncierto(str(e)) from None
         except (Descartada, ErrorBuffer):
-            self._intentar_marcar(id_envio, estado="rechazado")
+            self._intentar_transicion(entrada, "rechazado")
             raise
         try:
             self._cerrar_creado(entrada, post)
@@ -729,17 +729,34 @@ class Publicador:
             pass
         return {"id": post["id"], "dueAt": post.get("dueAt"), "anotaciones": anot}
 
-    def _intentar_marcar(self, id_envio: str, **cambios) -> None:
+    def _intentar_transicion(self, entrada: dict, a: str) -> None:
         try:
-            self._marcar(id_envio, **cambios)
+            self._transicionar(entrada, a)
         except OSError:
             pass
+
+    def _transicionar(self, entrada: dict, a: str, **cambios) -> bool:
+        """Bajo candado: relee el envío y sólo cambia su estado si sigue abierto y es el mismo intento.
+
+        Así una transición vieja nunca pisa un `creado` (ni otro intento con el mismo id).
+        """
+        with self._candado():
+            libro = self._libro()
+            for e in libro:
+                if e["id"] == entrada["id"] and e.get("intento") == entrada.get("intento") \
+                        and e["estado"] in ESTADOS_ABIERTOS:
+                    e.update(estado=a, **cambios)
+                    self._guardar_libro(libro)
+                    return True
+        return False
 
     def _cerrar_creado(self, entrada: dict, post: dict) -> None:
         """Pasa el envío a `creado` y escribe el marcador y el registro de textos, una sola vez."""
         with self._candado():
-            actual = next((e for e in self._libro() if e["id"] == entrada["id"]), None)
-            if actual is None or (actual["estado"] == "creado" and actual.get("registrado")):
+            actual = next((e for e in self._libro() if e["id"] == entrada["id"]
+                           and e.get("intento") == entrada.get("intento")), None)
+            if actual is None or actual["estado"] not in ESTADOS_ABIERTOS + ("creado",) \
+                    or (actual["estado"] == "creado" and actual.get("registrado")):
                 return
             self._marcar(entrada["id"], estado="creado", post_id=post["id"])
             d = entrada["datos"]
@@ -775,10 +792,13 @@ class Publicador:
         campos = {f["name"] for f in t.get("fields") or []}
         return campos or {"id", "status", "dueAt"}
 
-    def _posts_del_canal(self, canal: str, org: str, campos: set, buscado=None):
+    def _posts_del_canal(self, canal: str, org: str, campos: set, buscados=None):
         """Posts del canal, paginados (`first`/`after`, hasta PAGINAS_MAX). Devuelve (posts, concluyente).
 
-        Concluyente = se leyó hasta la última página, o se encontró `buscado` (función de un post).
+        Concluyente sólo si se leyó hasta una última página con `pageInfo.hasNextPage == false` válido.
+        Una respuesta sin `posts`, sin `edges` o sin `pageInfo`, o con más páginas de las permitidas, no lo es.
+        `buscados` (lista de funciones post -> bool): si todos aparecen se deja de leer (sin ser concluyente
+        para nada más: cada envío se resuelve por separado).
         """
         sel = " ".join(c for c in ("id", "status", "dueAt", "text") if c in campos)
         posts, cursor = [], None
@@ -787,19 +807,19 @@ class Publicador:
             q = ("query { posts(input: { organizationId: %s, filter: { channelIds: [%s] } }, first: %d%s) "
                  "{ edges { node { %s } } pageInfo { hasNextPage endCursor } } }"
                  % (_lit(org), _lit(canal), TAM_PAGINA, despues, sel))
-            data = self.cliente.consulta(q, canal=canal).get("posts") or {}
-            if isinstance(data, dict):
-                posts += [e["node"] for e in data.get("edges") or []]
-                info = data.get("pageInfo") or {}
-            else:
-                posts += list(data)
-                info = {}
-            if buscado and any(buscado(p) for p in posts):
-                return posts, True
-            if not info.get("hasNextPage"):
+            data = self.cliente.consulta(q, canal=canal).get("posts")
+            if not (isinstance(data, dict) and isinstance(data.get("edges"), list)):
+                return posts, False
+            posts += [e["node"] for e in data["edges"] if isinstance(e, dict) and isinstance(e.get("node"), dict)]
+            if buscados and all(any(b(p) for p in posts) for b in buscados):
+                return posts, False
+            info = data.get("pageInfo")
+            if not (isinstance(info, dict) and isinstance(info.get("hasNextPage"), bool)):
+                return posts, False          # sin pageInfo válido: lo visto vale, la ausencia no se concluye
+            if not info["hasNextPage"]:
                 return posts, True
             cursor = info.get("endCursor")
-            if not cursor:
+            if not isinstance(cursor, str) or not cursor:
                 return posts, False
         return posts, False
 
@@ -808,8 +828,9 @@ class Publicador:
 
         Sólo hay dos salidas: el listado muestra el post y el envío pasa a `creado` (se registra en el
         marcador), o no aparece y el envío SIGUE `incierto` hasta 24 h después de su `dueAt`, cuando queda
-        `abandonado`. Nunca se vuelve a enviar nada. Si la lectura no es concluyente (error, o más de
-        PAGINAS_MAX páginas sin encontrarlo) no cambia nada. También completa el marcador de los `creado`
+        `abandonado`. Nunca se vuelve a enviar nada. La ausencia sólo es concluyente tras leer hasta la
+        última página con `hasNextPage == false` válido; si no, no cambia nada. Cada envío se resuelve por
+        separado: encontrar uno no vuelve concluyente la búsqueda de otro. También completa el marcador de los `creado`
         que quedaron sin registrar. Devuelve {id_envio: nuevo estado}.
         """
         resultado = {}
@@ -831,8 +852,8 @@ class Publicador:
                     org = next((o for p, o in self.orgs.items() if self.canales.get(p) == e["canal"] and o), None)
                     org = org or self.cliente.organizaciones()[0]["id"]
                     por_canal[e["canal"]] = self._posts_del_canal(
-                        e["canal"], org, campos, lambda p, canal=e["canal"]: any(
-                            _mismo_post(p, x) for x in abiertos if x["canal"] == canal))
+                        e["canal"], org, campos,
+                        [lambda p, x=x: _mismo_post(p, x) for x in abiertos if x["canal"] == e["canal"]])
         except ErrorBuffer:
             return resultado                      # lectura no concluyente: no cambia nada
         for e in abiertos:
@@ -845,8 +866,8 @@ class Publicador:
                 except Exception:
                     pass
             elif concluyente and self.ahora().astimezone(timezone.utc) > _a_utc(e["dueAt"]) + timedelta(hours=HORAS_ABANDONO):
-                self._marcar(e["id"], estado="abandonado")
-                resultado[e["id"]] = "abandonado"
+                if self._transicionar(e, "abandonado"):
+                    resultado[e["id"]] = "abandonado"
         return resultado
 
     # ---- estado de un post ----
@@ -879,37 +900,40 @@ class Publicador:
         `rechazado` o `abandonado`. Devuelve las rutas borradas.
         """
         self.reconciliar()
-        libro = self._libro()
-        por_ruta: dict[str, list] = {}
-        for e in libro:
-            if e.get("ruta") and not e.get("ruta_borrada"):
-                por_ruta.setdefault(e["ruta"], []).append(e)
         borradas = []
-        for r, envios in por_ruta.items():
-            if any(e["estado"] in ESTADOS_ABIERTOS for e in envios):
-                continue
-            vivos = [e for e in envios if e["estado"] == "creado"]
-            if all(e.get("post_id") and self.estado(e["post_id"]) == "sent" for e in vivos):
+        with self._candado():     # comprobación final, borrado y marca bajo el mismo candado que la reserva
+            libro = self._libro()
+            por_ruta: dict[str, list] = {}
+            for e in libro:
+                if e.get("ruta") and not e.get("ruta_borrada"):
+                    por_ruta.setdefault(e["ruta"], []).append(e)
+            for r, envios in por_ruta.items():
+                if any(e["estado"] in ESTADOS_ABIERTOS for e in envios):
+                    continue
+                vivos = [e for e in envios if e["estado"] == "creado"]
+                if not all(e.get("post_id") and self.estado(e["post_id"]) == "sent" for e in vivos):
+                    continue
+                if any(e["estado"] in ESTADOS_ABIERTOS and e.get("ruta") == r for e in self._libro()):
+                    continue          # alguien reservó mientras se consultaba
                 self.almacen.borrar(r)
                 borradas.append(r)
-        if borradas:
-            # Las entradas se quedan (memoria de lo enviado: impiden repetir un hueco); sólo se marca el video.
-            with self._candado():
+                # Las entradas se quedan (memoria de lo enviado: impiden repetir un hueco); sólo se marca el video.
                 actual = self._libro()
                 for e in actual:
-                    if e.get("ruta") in borradas:
+                    if e.get("ruta") == r:
                         e["ruta_borrada"] = True
                 self._guardar_libro(actual)
         return borradas
 
     def soltar_si_huerfano(self, ruta: str) -> bool:
         """Borra el video recién subido si ningún envío lo usa o todos se rechazaron de forma definitiva.
-        Con un envío incierto o abierto, se conserva hasta reconciliarlo."""
-        envios = [e for e in self._libro() if e.get("ruta") == ruta]
-        if any(e["estado"] != "rechazado" for e in envios):
-            return False
-        self.almacen.borrar(ruta)
-        return True
+        Con un envío incierto o abierto, se conserva hasta reconciliarlo. Todo bajo el candado del libro."""
+        with self._candado():
+            envios = [e for e in self._libro() if e.get("ruta") == ruta]
+            if any(e["estado"] != "rechazado" for e in envios):
+                return False
+            self.almacen.borrar(ruta)
+            return True
 
     # ---- borrador ----
 

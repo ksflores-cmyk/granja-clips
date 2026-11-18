@@ -270,3 +270,13 @@ def test_html_o_bucket_no_encontrado_no_cuentan_como_objeto_ausente(estado, cuer
 def test_el_json_de_objeto_no_encontrado_de_storage_si_cuenta(cuerpo):
     a, _ = almacen([F.resp(404, cuerpo)])
     a.confirmar_ausente(URL_PUBLICA + "ab12cd34.mp4")
+
+
+@pytest.mark.parametrize("cuerpo", ['{"error":"not_found","message":"Route not found"}',
+                                    '{"error":"not_found"}',
+                                    '{"error":404,"message":"Object not found"}',
+                                    '{"error":"not_found","message":["Object not found"]}'])
+def test_not_found_sin_indicacion_de_objeto_o_con_tipos_raros_no_cuenta(cuerpo):
+    a, _ = almacen([F.resp(404, cuerpo)])
+    with pytest.raises(ErrorAlmacen, match="no se pudo confirmar"):
+        a.confirmar_ausente(URL_PUBLICA + "ab12cd34.mp4")
