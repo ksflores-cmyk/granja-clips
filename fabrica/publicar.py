@@ -56,6 +56,12 @@ Q_CAMPOS_POST = 'query { __type(name: "Post") { fields { name } } }'
 Q_CONSULTAS = "query { __type(name: \"Query\") { fields { name args { name } } } }"
 
 
+# Tipos de error de createPost que garantizan que no se creó nada (implementan MutationError).
+# UnexpectedError, RestProxyError o un tipo desconocido quedan como inciertos: nunca se reenvían.
+RECHAZOS_SEGUROS = {"MutationError", "InvalidInputError", "NotFoundError", "UnauthorizedError",
+                    "LimitReachedError"}
+
+
 class ErrorBuffer(Exception):
     """Fallo de la API de Buffer (red, código o `errors` de GraphQL)."""
 
@@ -732,17 +738,21 @@ class Publicador:
             raise ErrorBuffer("en borrador createPost sólo se manda con saveToDraft")
         data = self.cliente.consulta(M_CREAR, {"input": carga}, canal=canal_id, mutacion=True)
         r = data.get("createPost")
-        incierto = ErrorIncierto("createPost devolvió una respuesta sin discriminador o inesperada; "
-                                 "el resultado es incierto, no se repite")
         if not isinstance(r, dict):
-            raise incierto
+            raise ErrorIncierto("createPost devolvió una respuesta sin discriminador o inesperada; "
+                                "el resultado es incierto, no se repite")
         tipo, post, mensaje = r.get("__typename"), r.get("post"), r.get("message")
         if tipo == "PostActionSuccess" and isinstance(post, dict) \
                 and isinstance(post.get("id"), str) and post["id"].strip():
             return post
-        if tipo == "MutationError" and isinstance(mensaje, str) and mensaje.strip():
-            raise Descartada("Buffer rechazó la publicación: " + red.ocultar(mensaje, [self.cliente._clave]))
-        raise incierto
+        texto = red.ocultar(mensaje, [self.cliente._clave]) if isinstance(mensaje, str) else ""
+        # MutationError es una interfaz: Buffer responde con el tipo concreto (InvalidInputError...).
+        # Sólo los tipos que dicen con certeza que no se creó nada cuentan como rechazo.
+        if tipo in RECHAZOS_SEGUROS and texto.strip():
+            raise Descartada(f"Buffer rechazó la publicación ({tipo}): {texto}")
+        raise ErrorIncierto(f"createPost devolvió {tipo or 'sin __typename'}"
+                            + (f": {texto}" if texto.strip() else "")
+                            + "; el resultado es incierto, no se repite")
 
     def programar(self, plataforma: str, toma: dict, url_video: str, textos: dict, cuando: datetime,
                   ruta_almacen: str | None = None, ficha: dict | None = None) -> dict:

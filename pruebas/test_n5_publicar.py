@@ -1397,3 +1397,17 @@ def test_limpiar_no_borra_si_alguien_reservo_la_ruta_durante_la_comprobacion(tmp
         return original(self, post_id, org_id)
     pub.estado = estado_y_reserva.__get__(pub)
     assert pub.limpiar_enviados() == [] and len(supa.objetos) == 1
+
+
+
+@pytest.mark.parametrize("tipo,es_rechazo", [("InvalidInputError", True), ("LimitReachedError", True),
+                                             ("UnauthorizedError", True), ("NotFoundError", True),
+                                             ("UnexpectedError", False), ("RestProxyError", False),
+                                             ("OtroTipoNuevo", False)])
+def test_los_tipos_concretos_de_mutationerror_se_clasifican_y_dicen_su_tipo(tmp_path, tipo, es_rechazo):
+    pub, _ = vivo(tmp_path)
+    r = {"__typename": tipo, "message": "video demasiado corto"}
+    pub.cliente.transporte = lambda *a, **k: F.resp(200, {"data": {"createPost": r}})
+    error = Descartada if es_rechazo else publicar.ErrorIncierto
+    with pytest.raises(error, match=f"{tipo}.*video demasiado corto"):
+        pub._crear({"text": "x"}, "canal-yt-001")
