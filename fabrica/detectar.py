@@ -14,8 +14,11 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+from zoneinfo import ZoneInfo
+
 from .fuentes import cargar_fuentes, es_publicable
 
+ZONA = ZoneInfo("America/Guatemala")
 URL_TOKEN = "https://id.twitch.tv/oauth2/token"
 URL_USUARIOS = "https://api.twitch.tv/helix/users"
 URL_JUEGOS = "https://api.twitch.tv/helix/games"
@@ -34,6 +37,10 @@ def transporte_urllib(metodo: str, url: str, encabezados: dict, cuerpo: bytes | 
             return r.status, r.read().decode("utf-8")
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode("utf-8", errors="replace")
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        # Sin la query ni claves: sólo host, ruta y tipo de error.
+        p = urllib.parse.urlparse(url)
+        raise ErrorTwitch(f"fallo de conexión con {p.netloc}{p.path}: {type(e).__name__}") from None
 
 
 class ClienteTwitch:
@@ -124,6 +131,8 @@ class Candidato:
     vistas_por_hora: float
     creado_en: datetime | None
     vod_offset: int | None
+    pilar: str | None = None            # None = sin pilar declarado; tipo D lo fija a "informativa"
+    medir_al_descargar: bool = False    # True: la duración no se conoce; N4 debe medirla y volver a comprobarla
 
 
 def cliente_desde_entorno(transporte=None) -> ClienteTwitch | None:
@@ -150,12 +159,13 @@ def detectar_con_motivos(raiz, ahora: datetime, cliente: ClienteTwitch | None = 
     """Devuelve (candidatos, saltos) donde saltos es una lista de motivos legibles."""
     candidatos: list[Candidato] = []
     saltos: list[str] = []
-    hoy = ahora.date()
+    hoy = ahora.astimezone(ZONA).date()   # fecha local de Guatemala, igual que las puertas
     if cliente is None:
         cliente = cliente_desde_entorno()
     fichas = cargar_fuentes(raiz)
     for ficha in fichas:
-        ok, motivo = es_publicable(ficha, hoy)
+        pilar = "informativa" if ficha.get("tipo") == "D" else None
+        ok, motivo = es_publicable(ficha, hoy, None, pilar)
         if not ok:
             continue
         if ficha.get("material"):
@@ -164,7 +174,8 @@ def detectar_con_motivos(raiz, ahora: datetime, cliente: ClienteTwitch | None = 
                     fuente_id=ficha["id"], origen="brief", id_origen=url, url=url,
                     titulo=url.rsplit("/", 1)[-1], creador=str(ficha.get("creador", "")),
                     idioma="", juego_id=None, duracion_s=None, vistas=0,
-                    vistas_por_hora=0.0, creado_en=None, vod_offset=None))
+                    vistas_por_hora=0.0, creado_en=None, vod_offset=None,
+                    pilar=pilar, medir_al_descargar=True))
         if ficha.get("origen") == "twitch" and ficha.get("twitch_login"):
             if cliente is None:
                 saltos.append(f"{ficha['id']}: sin claves de Twitch, se salta")
@@ -180,6 +191,8 @@ def detectar_con_motivos(raiz, ahora: datetime, cliente: ClienteTwitch | None = 
                 saltos.append(f"{ficha['id']}: {e}")
                 continue
             lista = [_de_clip(ficha, c, ahora) for c in crudos]
+            for x in lista:
+                x.pilar = pilar
             lista.sort(key=lambda x: x.vistas_por_hora, reverse=True)
             candidatos.extend(lista)
     return candidatos, saltos
