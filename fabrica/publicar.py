@@ -1207,19 +1207,21 @@ def borrador(raiz, env, salida=print, transporte_buffer=None, ahora=None, transp
         salida("sin BUFFER_API_KEY: --borrador necesita la clave real y no se puede simular")
         return COD_ERROR
     ahora = ahora or (lambda: datetime.now(timezone.utc))
-    almacen, ruta, url_video = None, None, "https://ejemplo.invalid/prueba.mp4"
+    almacen, ruta, url_video = None, None, None
     codigo = COD_OK
     try:
-        if all(env.get(s) for s in SECRETOS_ALMACEN):
-            almacen = Almacen(env["SUPABASE_URL"], env["SUPABASE_SERVICE_KEY"],
-                              cargar_yaml("config/almacen.yml", raiz), transporte_almacen)
-            almacen.asegurar_bucket()
-            with tempfile.TemporaryDirectory(prefix="borrador-") as d:
-                mp4 = crear_mp4_vertical_de_prueba(Path(d) / "borrador.mp4")
-                ruta, url_video = almacen.subir(mp4, 0)
-            almacen.comprobar(url_video)
-        else:
-            salida("sin claves de Supabase: el borrador usa una URL de ejemplo y Buffer puede rechazarla")
+        faltan = [s for s in SECRETOS_ALMACEN if not env.get(s)]
+        if faltan:
+            salida("sin " + ", ".join(faltan) + ": el borrador necesita un video real en el almacén")
+            return COD_ERROR
+        almacen = Almacen(env["SUPABASE_URL"], env["SUPABASE_SERVICE_KEY"],
+                          cargar_yaml("config/almacen.yml", raiz), transporte_almacen)
+        almacen.asegurar_bucket()
+        with tempfile.TemporaryDirectory(prefix="borrador-") as d:
+            mp4 = crear_mp4_vertical_de_prueba(Path(d) / "borrador.mp4")
+            ruta = almacen.ruta_objeto(mp4, 0)     # reservada ANTES de subir: si se pierde la respuesta,
+            ruta, url_video = almacen.subir(mp4, 0)   # el finally igual la borra
+        almacen.comprobar(url_video)
         cliente = ClienteBuffer(env["BUFFER_API_KEY"], transporte_buffer, raiz, ahora=ahora)
         canales_api = cliente.todos_los_canales()
         ids = confirmar_canales(canales_api, cargar_yaml("config/canales.yml", raiz), raiz)

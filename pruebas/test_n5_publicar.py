@@ -8,7 +8,7 @@ import pytest
 import yaml
 
 import falsos_n5 as F
-from fabrica import publicar, registro, validar
+from fabrica import publicar, red, registro, validar
 from fabrica.almacen import Almacen
 from fabrica.publicar import (AlertaRoja, ClienteBuffer, Cuota, Descartada, ErrorBuffer, ErrorCuota,
                               Publicador, armar_carga, confirmar_canales, hueco_a_utc, textos)
@@ -488,17 +488,18 @@ def test_ensayo_con_canal_ajeno_es_alerta_roja_y_crea_pausa(repo):
     assert (repo / "estado" / "alerta-roja.json").exists()
 
 
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="sin ffmpeg")
 def test_borrador_hace_createpost_con_savetodraft_y_deletepost(repo):
     sin_pausa(repo)
     sim, sal = BufferSimulado(), []
-    cod = publicar.ejecutar(repo, con_borrador=True, env={"BUFFER_API_KEY": CLAVE}, salida=sal.append,
-                            transporte_buffer=sim, ahora=lambda: AHORA)
+    cod = publicar.ejecutar(repo, con_borrador=True, env=entorno_real(), salida=sal.append,
+                            transporte_buffer=sim, transporte_almacen=SupabaseSimulado(), ahora=lambda: AHORA)
     assert cod == 0
     creaciones = [v["input"] for q, v in zip(sim.consultas, sim.variables) if "createPost" in q]
     assert len(creaciones) == 3 and all(c["saveToDraft"] is True for c in creaciones)
     borrados = [v["input"] for q, v in zip(sim.consultas, sim.variables) if "deletePost" in q]
     assert borrados == [{"id": "post-ejemplo-001"}] * 3
-    assert sal[-1] == "Borrador reels: creado y borrado (post-ejemplo-001)"
+    assert "Borrador reels: creado y borrado (post-ejemplo-001)" in sal
 
 
 def test_borrador_sin_clave_no_se_simula(repo):
@@ -955,11 +956,13 @@ def test_limpiar_enviados_es_publica_y_conserva_lo_incierto(tmp_path, monkeypatc
 
 @pytest.mark.parametrize("archivo", ["deletepost_nulo.json", "deletepost_sin_tipo.json",
                                      "deletepost_error.json", "deletepost_tipo_raro.json"])
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="sin ffmpeg")
 def test_borrador_sin_tipo_de_exito_no_cuenta_como_borrado(repo, archivo):
     sin_pausa(repo)
     sal = []
-    cod = publicar.ejecutar(repo, con_borrador=True, env={"BUFFER_API_KEY": CLAVE}, salida=sal.append,
-                            transporte_buffer=BufferSimulado(borrar=archivo), ahora=lambda: AHORA)
+    cod = publicar.ejecutar(repo, con_borrador=True, env=entorno_real(), salida=sal.append,
+                            transporte_buffer=BufferSimulado(borrar=archivo),
+                            transporte_almacen=SupabaseSimulado(), ahora=lambda: AHORA)
     assert cod == 1
     assert any("BORRADOR SIN BORRAR" in s and "post-ejemplo-001" in s for s in sal)
     assert not any("creado y borrado" in s for s in sal)
@@ -1435,3 +1438,28 @@ def test_borrador_que_falla_en_buffer_igual_borra_el_video_de_prueba(repo):
                             transporte_almacen=supa, ahora=lambda: AHORA)
     assert cod == 1 and supa.objetos == {}
     assert any(s.startswith("ERROR:") for s in sal)
+
+
+
+def test_borrador_sin_claves_de_supabase_no_llama_a_buffer(repo):
+    sin_pausa(repo)
+    sim, sal = BufferSimulado(), []
+    cod = publicar.ejecutar(repo, con_borrador=True, env={"BUFFER_API_KEY": CLAVE}, salida=sal.append,
+                            transporte_buffer=sim, ahora=lambda: AHORA)
+    assert cod == 1 and sim.consultas == [] and "SUPABASE_URL" in sal[-1]
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="sin ffmpeg")
+def test_borrador_con_subida_guardada_pero_respuesta_perdida_igual_borra(repo):
+    sin_pausa(repo)
+    supa, sal = SupabaseSimulado(), []
+
+    def transporte(metodo, url, cab, cuerpo=None, tiempo=60):
+        r = supa(metodo, url, cab, cuerpo, tiempo)
+        if metodo == "POST" and "/storage/v1/object/clips/" in url:
+            raise red.ErrorRed("POST: respuesta perdida")   # Supabase lo guardó, la respuesta no llegó
+        return r
+    cod = publicar.ejecutar(repo, con_borrador=True, env=entorno_real(), salida=sal.append,
+                            transporte_buffer=BufferSimulado(), transporte_almacen=transporte,
+                            ahora=lambda: AHORA)
+    assert cod == 1 and supa.objetos == {}, sal
