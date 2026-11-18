@@ -1,0 +1,162 @@
+"""Descarga de un candidato autorizado, siempre dentro de una carpeta temporal fuera del repo.
+
+Orden fijo: (1) `fuentes.autoriza_descarga` y `fuentes.puede_descargar` ANTES de abrir una conexión;
+(2) descarga; (3) ffprobe mide la duración y se vuelve a comprobar contra `reglas.duracion_s`.
+Si la descarga salió bien se llama a `puertas.anotar_visto` (aunque la duración no cumpla, para no
+volver a bajar el mismo archivo). La carpeta temporal se borra al salir del `with`, pase lo que pase.
+
+Dos caminos, sin más:
+- `material` (o ficha propia) con URL https directa: streaming con tope de 300 MB y `Content-Type` de video.
+- clip de Twitch, sólo con `reglas.permite_descarga: true`: `yt-dlp` sin cookies, sin listas, 1080p o menos,
+  tope de 120 s. Nunca se descarga de YouTube.
+"""
+from __future__ import annotations
+
+import shutil
+import subprocess
+import tempfile
+import urllib.request
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
+from urllib.parse import urlparse
+
+from . import fuentes, puertas
+from .editar.componer import sondear_video
+
+TOPE_BYTES = 300 * 1024 * 1024
+TOPE_TWITCH_S = 120
+BLOQUE = 1 << 20
+TIEMPO_ESPERA_S = 60
+FORMATO_TWITCH = "best[height<=1080][ext=mp4]/best[height<=1080]/best"
+
+
+class ErrorDescarga(RuntimeError):
+    """La descarga no se hizo o no sirve. El mensaje es el motivo del descarte."""
+
+
+@dataclass
+class Descarga:
+    ruta: Path
+    duracion: float
+
+
+def _abrir_urllib(url: str):
+    req = urllib.request.Request(url, headers={"User-Agent": "granja-clips-descarga"})
+    return urllib.request.urlopen(req, timeout=TIEMPO_ESPERA_S)  # noqa: S310 (https comprobado antes)
+
+
+def _es_https(url) -> bool:
+    return isinstance(url, str) and url.startswith("https://") and bool(urlparse(url).hostname)
+
+
+def _host(url: str) -> str:
+    return (urlparse(url).hostname or "").lower()
+
+
+def _es_youtube(url: str) -> bool:
+    h = _host(url)
+    return h in ("youtu.be", "youtube.com") or h.endswith(".youtube.com")
+
+
+def bajar_https(url: str, destino: Path, *, abrir=None, tope: int = TOPE_BYTES) -> Path:
+    """Streaming a disco. Exige https y `Content-Type` de video; corta al pasar el tope."""
+    if not _es_https(url):
+        raise ErrorDescarga(f"URL no https: {url!r}")
+    abrir = abrir or _abrir_urllib
+    try:
+        with abrir(url) as r:
+            tipo = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            if not tipo.startswith("video/"):
+                raise ErrorDescarga(f"Content-Type {tipo or 'ausente'!r}: no es video")
+            largo = r.headers.get("Content-Length")
+            if largo and str(largo).isdigit() and int(largo) > tope:
+                raise ErrorDescarga(f"el archivo pesa {int(largo)} bytes y el tope es {tope}")
+            total = 0
+            with open(destino, "wb") as f:
+                while True:
+                    bloque = r.read(BLOQUE)
+                    if not bloque:
+                        break
+                    total += len(bloque)
+                    if total > tope:
+                        raise ErrorDescarga(f"la descarga pasó el tope de {tope} bytes")
+                    f.write(bloque)
+    except ErrorDescarga:
+        destino.unlink(missing_ok=True)
+        raise
+    except OSError as e:   # incluye URLError y tiempos de espera
+        destino.unlink(missing_ok=True)
+        raise ErrorDescarga(f"fallo de conexión: {type(e).__name__}") from None
+    if total == 0:
+        destino.unlink(missing_ok=True)
+        raise ErrorDescarga("la descarga llegó vacía")
+    return destino
+
+
+def orden_ytdlp(url: str, carpeta: Path) -> list[str]:
+    """Orden de yt-dlp: un solo clip, sin cookies ni configuración, mp4 de 1080p o menos, 120 s como máximo."""
+    return ["yt-dlp", "--ignore-config", "--no-playlist", "--no-cookies", "--no-part",
+            "--match-filter", f"duration<={TOPE_TWITCH_S}", "--max-filesize", str(TOPE_BYTES),
+            "-f", FORMATO_TWITCH, "--merge-output-format", "mp4",
+            "-o", str(carpeta / "clip.%(ext)s"), "--", url]
+
+
+def bajar_twitch(url: str, carpeta: Path, *, ejecutor=None) -> Path:
+    ejecutor = ejecutor or subprocess.run
+    if puertas._id_de_clip_twitch(url) is None:
+        raise ErrorDescarga(f"no es la URL de un clip de Twitch: {url!r}")
+    try:
+        r = ejecutor(orden_ytdlp(url, carpeta), capture_output=True, text=True, timeout=300)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise ErrorDescarga(f"yt-dlp no corrió: {type(e).__name__}") from None
+    if r.returncode != 0:
+        raise ErrorDescarga(f"yt-dlp falló (código {r.returncode})")
+    salidas = sorted(carpeta.glob("clip.*"))
+    if not salidas:
+        raise ErrorDescarga("yt-dlp no dejó ningún archivo (¿duración sobre el tope de 120 s?)")
+    return salidas[0]
+
+
+def _autorizar(ficha, candidato, hoy: date) -> None:
+    url = candidato.url
+    ok, motivo = fuentes.autoriza_descarga(ficha, hoy, "produccion", url, pilar=candidato.pilar)
+    if not ok:
+        raise ErrorDescarga(f"descarga no autorizada: {motivo}")
+    ok, motivo = fuentes.puede_descargar(ficha)
+    if not ok:
+        raise ErrorDescarga(f"descarga no permitida: {motivo}")
+    if candidato.origen == "twitch":
+        if (ficha.get("reglas") or {}).get("permite_descarga") is not True:
+            raise ErrorDescarga("clip de Twitch sin reglas.permite_descarga: true; sólo enlace, no se descarga")
+        if _es_youtube(url):
+            raise ErrorDescarga("nunca se descarga de YouTube")
+    elif _es_youtube(url):
+        raise ErrorDescarga("nunca se descarga de YouTube")
+
+
+@contextmanager
+def descargar(raiz, candidato, ficha: dict | None, hoy: date, *, abrir=None, ejecutor=None):
+    """Autoriza, descarga y mide. Entrega `Descarga` dentro del `with`; borra la carpeta al salir.
+
+    Lanza `ErrorDescarga` con el motivo si algo no cumple.
+    """
+    _autorizar(ficha, candidato, hoy)         # antes de abrir ninguna conexión
+    carpeta = Path(tempfile.mkdtemp(prefix="granja-descarga-"))
+    try:
+        if candidato.origen == "twitch":
+            ruta = bajar_twitch(candidato.url, carpeta, ejecutor=ejecutor)
+        else:
+            ruta = bajar_https(candidato.url, carpeta / "origen.mp4", abrir=abrir)
+        puertas.anotar_visto(raiz, candidato.id_origen)
+        try:
+            duracion = float(sondear_video(ruta)["duracion"])
+        except (subprocess.SubprocessError, ValueError, KeyError, StopIteration, OSError) as e:
+            raise ErrorDescarga(f"ffprobe no pudo medir el archivo ({type(e).__name__})") from None
+        minimo, maximo = ((ficha.get("reglas") or {}).get("duracion_s") or [0, float("inf")])
+        if not (minimo <= duracion <= maximo):
+            raise ErrorDescarga(f"el archivo dura {duracion:.1f} s y la ficha pide de {minimo} a {maximo} s")
+        yield Descarga(ruta, duracion)
+    finally:
+        shutil.rmtree(carpeta, ignore_errors=True)
