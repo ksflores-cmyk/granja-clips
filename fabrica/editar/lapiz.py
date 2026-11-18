@@ -89,13 +89,13 @@ def trazo_subrayado(marca: Marca, ancho_palabra: float, indice: int) -> Image.Im
     der = rng.uniform(*cfg["sobresale"])
     grosor = rng.uniform(*cfg["grosor"])
     largo = ancho_palabra + izq + der
-    alto = int(math.ceil(grosor + 2 * RELLENO + 14))
+    alto = int(math.ceil(grosor + 2 * RELLENO + cfg["alto_extra"]))
     ancho = int(math.ceil(largo + 2 * RELLENO))
     lienzo = Image.new("L", (ancho * k, alto * k), 0)
     n = 60
-    inclin = rng.uniform(-0.012, 0.012)
+    inclin = rng.uniform(-cfg["inclinacion_max"], cfg["inclinacion_max"])
     fase = rng.uniform(0, math.tau)
-    amp = rng.uniform(1.6, 3.2)
+    amp = rng.uniform(*cfg["amplitud"])
     pts = []
     for i in range(n + 1):
         t = i / n
@@ -116,7 +116,7 @@ def _puntos_circulo(marca: Marca, w: float, h: float, indice: int, n_exp: float,
     ry = h / 2 + cfg["margen_y"] + extra
     a0 = rng.uniform(0, math.tau)
     sobrepaso = math.radians(rng.uniform(*cfg["sobrepaso_grados"]))
-    giro = math.radians(rng.uniform(-3.0, 3.0))
+    giro = math.radians(rng.uniform(-cfg["giro_max_grados"], cfg["giro_max_grados"]))
     p1, p2 = rng.uniform(0, math.tau), rng.uniform(0, math.tau)
     grosor = rng.uniform(*cfg["grosor"])
     total = math.tau + sobrepaso
@@ -145,7 +145,8 @@ def trazo_circulo(marca: Marca, ancho_palabra: float, alto_palabra: float, indic
     más bajo con el que el trazo no pisa el rectángulo de la palabra.
     """
     k = SUPERMUESTREO
-    for extra in (0.0, 4.0, 8.0, 14.0):
+    cfg = marca.m("circulo")
+    for extra in (0.0, *(float(h) for h in cfg["holguras_extra"])):
         for n_exp in (2.6, 3.0, 3.5, 4.0, 5.0, 6.5):
             pts, grosor, rng = _puntos_circulo(marca, ancho_palabra, alto_palabra, indice, n_exp, extra)
             mx = max(abs(x) for x, _ in pts) + grosor / 2 + RELLENO
@@ -155,7 +156,7 @@ def trazo_circulo(marca: Marca, ancho_palabra: float, alto_palabra: float, indic
                 ancho += 1
             if alto % 2:
                 alto += 1
-            if _libre(pts, grosor, ancho_palabra, alto_palabra):
+            if _libre(pts, grosor, ancho_palabra, alto_palabra, float(cfg["holgura_letra"])):
                 lienzo = Image.new("L", (ancho * k, alto * k), 0)
                 px = [((ancho / 2 + x) * k, (alto / 2 + y) * k) for x, y in pts]
                 _pintar(lienzo, px, grosor, rng, k)
@@ -163,9 +164,9 @@ def trazo_circulo(marca: Marca, ancho_palabra: float, alto_palabra: float, indic
     raise ValueError("no se pudo trazar un círculo que no cruce la palabra")
 
 
-def _libre(pts, grosor: float, w: float, h: float) -> bool:
+def _libre(pts, grosor: float, w: float, h: float, holgura_letra: float) -> bool:
     """Ningún punto del trazo (con medio grosor) entra en el rectángulo de la palabra."""
-    holgura = grosor / 2 + 1.0
+    holgura = grosor / 2 + holgura_letra
     for x, y in pts:
         dx = max(abs(x) - w / 2, 0)
         dy = max(abs(y) - h / 2, 0)

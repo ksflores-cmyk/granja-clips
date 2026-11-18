@@ -57,8 +57,10 @@ maqueta:                        # todas las medidas de la página de guion, en p
   cierre_s: 0.5                 # el cierre ocupa el último medio segundo
   opacidad_mosca: 0.80
   grano: {papel: 2.2, fibra: 1.2, bloque_fibra: 4, semilla: 7}
-  circulo: {margen_x: 28, margen_y: 20, irregularidad: 0.06, sobrepaso_grados: [15, 35], grosor: [5, 8]}
-  subrayado: {grosor: [6, 9], sobresale: [12, 24]}
+  circulo: {margen_x: 28, margen_y: 20, irregularidad: 0.06, sobrepaso_grados: [15, 35], grosor: [5, 8],
+            giro_max_grados: 3, holguras_extra: [4, 8, 14], holgura_letra: 1.0}
+  subrayado: {grosor: [6, 9], sobresale: [12, 24], bajo_palabra: 6, alto_extra: 14,
+              inclinacion_max: 0.012, amplitud: [1.6, 3.2]}
 prohibido:
   - subtítulos palabra por palabra con una palabra en amarillo
   - emojis dentro del video

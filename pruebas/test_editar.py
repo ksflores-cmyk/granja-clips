@@ -178,22 +178,26 @@ def test_papel_con_grano_y_semilla_fija(marca):
 
 
 def test_mosca_en_la_esquina_elegida(marca):
-    def tinta_en(m, lado):
-        img = np.asarray(lienzo.papel(m).convert("RGB")).astype(int)
-        lienzo_img = Image.fromarray(img.astype("uint8")).convert("RGBA")
-        lienzo.fila_superior(lienzo_img, m, 5)
-        a = np.asarray(lienzo_img.convert("RGB")).astype(int)
-        fila = a[m.m("fila_superior_y"): m.m("fila_superior_y") + 30]
-        oscuro = (fila.sum(axis=2) < 300)
-        mitad = fila.shape[1] // 2
-        return oscuro[:, :mitad].sum(), oscuro[:, mitad:].sum()
-    izq_d, der_d = tinta_en(marca, "d")
-    assert izq_d > 0 and der_d > 0
+    """La mosca (GUION VIVO, 10 letras) y TOMA nnn (8) cambian de mitad según mosca.esquina."""
+    def anchos(m):
+        img = lienzo.papel(m)
+        lienzo.fila_superior(img, m, 5)
+        a = np.asarray(img.convert("RGB")).astype(int)
+        y0 = int(m.m("fila_superior_y"))
+        banda = a[y0: y0 + int(m.m("tam_fila")) + 10]
+        cols = np.where((banda.sum(axis=2) < 300).any(axis=0))[0]
+        mitad = a.shape[1] // 2
+        izq, der = cols[cols < mitad], cols[cols >= mitad]
+        assert izq.size and der.size
+        return izq.max() - izq.min(), der.max() - der.min()
+
+    assert marca.datos["mosca"]["esquina"] == "superior_derecha"
+    izq_d, der_d = anchos(marca)
+    assert der_d > izq_d
     datos = json.loads(json.dumps(marca.datos))
     datos["mosca"]["esquina"] = "superior_izquierda"
-    m2 = Marca(datos, marca.raiz)
-    izq2, der2 = tinta_en(m2, "i")
-    assert izq2 > 0 and der2 > 0
+    izq_i, der_i = anchos(Marca(datos, marca.raiz))
+    assert izq_i > der_i
 
 
 def test_cambiar_una_medida_de_marca_cambia_la_imagen(marca, tmp_path):

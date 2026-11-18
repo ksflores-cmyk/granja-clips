@@ -34,8 +34,10 @@ jobs:
       - name: Renderizar muestras fuera del repo
         run: python -m fabrica.editar.muestras --salida "$RUNNER_TEMP/muestras"
       - name: Resumen de la puerta de estilo
-        run: cat "$RUNNER_TEMP/muestras/puerta-estilo-auto.md" >> "$GITHUB_STEP_SUMMARY"
+        if: always()
+        run: cat "$RUNNER_TEMP/muestras/puerta-estilo-auto.md" >> "$GITHUB_STEP_SUMMARY" || true
       - name: Subir muestras como artefacto
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: muestras

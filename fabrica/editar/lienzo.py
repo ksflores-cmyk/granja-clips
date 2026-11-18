@@ -132,8 +132,9 @@ def cabecera(marca: Marca, t: Toma) -> tuple[Image.Image, int]:
     x0, y0, x1, y1 = caja
     tr = lapiz.trazo_para(marca, t.lapiz, t.numero, x1 - x0, y1 - y0)
     if lapiz.normalizar_tipo(t.lapiz) == "subrayado":
-        izq = tr.info.get("sobresale_izq", 18)
-        img.alpha_composite(tr, (int(round(x0 - izq - lapiz.RELLENO)), int(round(y1 + 6 - tr.height / 2))))
+        izq = tr.info["sobresale_izq"]
+        bajo = marca.m("subrayado")["bajo_palabra"]
+        img.alpha_composite(tr, (int(round(x0 - izq - lapiz.RELLENO)), int(round(y1 + bajo - tr.height / 2))))
     else:
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
         img.alpha_composite(tr, (int(round(cx - tr.width / 2)), int(round(cy - tr.height / 2))))
