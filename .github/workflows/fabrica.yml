@@ -1,0 +1,118 @@
+name: fabrica
+
+# El ciclo de la fábrica: cada hora, minuto 7. La cadencia real la decide el código (fabrica.ciclo), no el cron.
+# Con PAUSA, `decidir` dice trabajo=no en menos de un minuto y `producir` se salta.
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+    inputs:
+      ensayo_forzado:
+        description: "Corre el ciclo completo en ensayo aunque exista PAUSA (sólo si config/modo.yml dice ensayo)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: fabrica
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  decidir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      trabajo: ${{ steps.decidir.outputs.trabajo }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Decidir (PAUSA, validar, cadencia, tope y hueco)
+        id: decidir
+        run: python -m fabrica.ciclo --decidir
+
+  producir:
+    needs: decidir
+    if: ${{ needs.decidir.outputs.trabajo == 'si' || inputs.ensayo_forzado }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ENSAYO_FORZADO: ${{ inputs.ensayo_forzado }}
+      BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+      TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Marcar el inicio
+        run: echo "INICIO_S=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalar ffmpeg
+        timeout-minutes: 6
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update -q
+          sudo apt-get -o Acquire::Retries=3 install -y -q --no-install-recommends ffmpeg
+      - run: pip install -r requirements.txt
+      - name: Ciclo
+        run: |
+          if [ "$ENSAYO_FORZADO" = "true" ]; then
+            python -m fabrica.ciclo --ensayo-forzado --salida "$RUNNER_TEMP/ensayo"
+          else
+            python -m fabrica.ciclo
+          fi
+      - name: Subir el ensayo (MP4, plan e informe de la puerta)
+        if: ${{ always() && inputs.ensayo_forzado }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ensayo-forzado
+          path: ${{ runner.temp }}/ensayo
+          retention-days: 3
+          if-no-files-found: warn
+      - name: Cerrar el ciclo (minutos, avisos, alerta roja, commit)
+        if: ${{ always() && !inputs.ensayo_forzado }}
+        run: |
+          set -u
+          minutos=$(( ( $(date +%s) - INICIO_S + 59 ) / 60 ))
+          python -m fabrica.ciclo --sumar-minutos "$minutos"
+          python -m fabrica.ciclo --abrir-avisos || true
+          if [ -f estado/alerta.json ] && [ -n "$(git status --porcelain -- estado/alerta.json)" ]; then
+            motivo=$(python -c "import json;print(json.load(open('estado/alerta.json',encoding='utf-8'))['motivo'])")
+            gh issue create --title "ALERTA ROJA: ${motivo}" \
+              --body "La fábrica creó PAUSA y no publica nada más. Motivo: ${motivo}. Detalle en estado/alerta.json (sin claves). Para reanudar, revisa y borra PAUSA."
+            git add -f PAUSA estado/alerta.json
+            [ -f estado/alerta-roja.json ] && git add -f estado/alerta-roja.json
+          fi
+          for ruta in marcador.csv registro.md estado config/canales.yml informativas.yml marca.yml; do
+            [ -e "$ruta" ] && git add -A -- "$ruta"
+          done
+          if git diff --cached --quiet; then
+            echo "Nada que guardar."
+            exit 0
+          fi
+          git config user.name "fabrica"
+          git config user.email "fabrica@users.noreply.github.com"
+          git commit -m "[skip ci] ciclo $(TZ=America/Guatemala date '+%Y-%m-%d %H:%M')"
+          guardado=no
+          for intento in 1 2 3; do
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              guardado=si
+              break
+            fi
+            git pull --rebase origin "${GITHUB_REF_NAME}" || git rebase --abort
+          done
+          if [ "$guardado" != "si" ]; then
+            echo "El push fue rechazado 3 veces."
+            exit 1
+          fi
