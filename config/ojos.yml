@@ -1,5 +1,5 @@
 # Los ojos: Gemini mira el clip y devuelve JSON (fabrica/ojos.py). La clave sólo vive en GEMINI_API_KEY.
 modelo: gemini-3.8-flash
 modelos_respaldo: [gemini-3.7-flash, gemini-3-flash-preview, gemini-2.5-flash]   # se prueban en orden si el modelo da 404
-max_mb_en_linea: 18      # el video se envía en línea; si pesa más, se descarta
+max_mb_en_linea: 14      # el video se envía en línea (base64 lo infla un tercio; la API admite 20 MB); si pesa más, se descarta
 temperatura: 0.2

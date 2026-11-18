@@ -25,6 +25,7 @@ from .config_ruta import RAIZ
 from .marca import Marca
 
 ID_MUESTRA = "dialogo-sintel"
+JUEGO_MUESTRA = "Sintel, cortometraje de Blender (no es un videojuego: aquí juego_correcto significa que es Sintel)"
 
 
 def correr(salida: Path, *, entorno=None, transporte=None) -> int:
@@ -50,7 +51,8 @@ def correr(salida: Path, *, entorno=None, transporte=None) -> int:
         vid = m["video"]
         ruta = muestras.descargar(vid["url"], vid["sha256"], tmp / Path(vid["url"]).name)
         dur_src = sondear_video(ruta)["duracion"]
-        mirada = ojos.mirar(ruta, marca, temporada, duracion=dur_src, entorno=env, transporte=transporte)
+        mirada = ojos.mirar(ruta, marca, temporada, duracion=dur_src, entorno=env, transporte=transporte,
+                       juego=JUEGO_MUESTRA)
         informe += [f"- Modelo que respondió: {mirada.modelo}", *[f"- Intento: {i}" for i in mirada.intentos]]
         if mirada.datos is None:
             informe += ["", f"RESULTADO: sin datos de Gemini ({mirada.motivo})."]
@@ -59,7 +61,7 @@ def correr(salida: Path, *, entorno=None, transporte=None) -> int:
             return 1
         (salida / "gemini.json").write_text(json.dumps({"modelo": mirada.modelo, "respuesta": mirada.datos},
                                                        ensure_ascii=False, indent=2), encoding="utf-8")
-        ok, motivos = ojos.validar_respuesta(mirada.datos, marca, temporada, duracion=dur_src)
+        ok, motivos = ojos.validar_respuesta(mirada.datos, marca, temporada, duracion=dur_src, juego=JUEGO_MUESTRA)
         informe += ["", f"## Validación de la respuesta: {'OK' if ok else 'DESCARTE'}", *[f"- {x}" for x in motivos]]
         if not ok:
             (salida / "informe.md").write_text("\n".join(informe) + "\n", encoding="utf-8")

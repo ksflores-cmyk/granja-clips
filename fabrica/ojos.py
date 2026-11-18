@@ -27,6 +27,7 @@ URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models/{modelo}:gen
 RUTA_PROMPT = Path(__file__).resolve().parent / "ojos_prompt.md"
 ESPERA_REINTENTO_S = 8.0
 TIEMPO_ESPERA_S = 180
+TOPE_PETICION_BYTES = 20 * 1024 * 1024   # límite de la API para una petición en línea
 RECORTE_MIN_S, RECORTE_MAX_S = 7.0, 30.0
 TOL_S = 0.05
 CAMPOS_BOOL = ("apto", "spoiler", "desnudez", "cinematica", "juego_correcto")
@@ -69,12 +70,12 @@ def _sin_acentos(t: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", str(t).lower()) if unicodedata.category(c) != "Mn")
 
 
-def instruccion(marca: Marca, temporada: dict, duracion: float | None) -> str:
+def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: str | None = None) -> str:
     """Arma la instrucción desde `ojos_prompt.md` con la duración, el juego y las listas de marca y temporada."""
     texto = RUTA_PROMPT.read_text(encoding="utf-8")
     cambios = {
         "{{DURACION}}": f"{duracion:.1f}" if duracion else "desconocida",
-        "{{JUEGO}}": str(temporada.get("nombre", "")),
+        "{{JUEGO}}": str(juego or temporada.get("nombre", "")),
         "{{GANCHOS_PROHIBIDOS}}": ", ".join(marca.ganchos_prohibidos()),
         "{{PALABRAS_EVITAR}}": ", ".join(str(p) for p in temporada.get("palabras_evitar", [])),
     }
@@ -124,7 +125,8 @@ def _texto_de_respuesta(texto_http: str) -> str:
 
 
 def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracion: float | None = None,
-          transporte=None, espera=time.sleep, entorno=None, config: dict | None = None) -> Mirada:
+          transporte=None, espera=time.sleep, entorno=None, config: dict | None = None,
+          juego: str | None = None) -> Mirada:
     """Le pide a Gemini el análisis del clip. Reintenta una vez ante 429 o 5xx; ante 404 prueba el modelo siguiente."""
     env = os.environ if entorno is None else entorno
     clave = env.get("GEMINI_API_KEY", "")
@@ -137,8 +139,11 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
     if tam > tope:
         return Mirada(None, motivo=f"el video pesa {tam / 1048576:.1f} MB y el máximo en línea es "
                                    f"{cfg['max_mb_en_linea']} MB")
-    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion), ruta_video.read_bytes(),
+    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego), ruta_video.read_bytes(),
                              float(cfg["temperatura"]))
+    if len(cuerpo) > TOPE_PETICION_BYTES:     # el base64 infla un tercio: se mide lo que de verdad se envía
+        return Mirada(None, motivo=f"la petición serializada pesa {len(cuerpo) / 1048576:.1f} MB y el tope es "
+                                   f"{TOPE_PETICION_BYTES // 1048576} MB")
     transporte = transporte or transporte_urllib
     encabezados = {"Content-Type": "application/json", "x-goog-api-key": clave}
     mirada = Mirada(None)
@@ -220,7 +225,8 @@ def dividir_frase(marca: Marca, frase: str) -> list[str] | None:
     return mejor[1] if mejor else None
 
 
-def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float | None = None) -> tuple[bool, list[str]]:
+def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float | None = None,
+                      juego: str | None = None) -> tuple[bool, list[str]]:
     """(ok, motivos). Tipos y campos; veto del modelo; recorte; líneas; gancho; palabras a evitar; cabida."""
     if not isinstance(datos, dict):
         return False, ["la respuesta no es un objeto JSON"]
@@ -261,7 +267,7 @@ def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float |
     if datos["cinematica"]:
         m.append("cinemática aislada")
     if not datos["juego_correcto"]:
-        m.append("no es el juego de la temporada")
+        m.append(f"no es el juego esperado ({juego or temporada.get('nombre', 'el de la temporada')})")
 
     # recorte
     ini, fin = float(rec["inicio"]), float(rec["fin"])

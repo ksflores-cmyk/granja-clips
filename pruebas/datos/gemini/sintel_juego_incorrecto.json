@@ -1,0 +1,35 @@
+{
+  "apto": false,
+  "motivos": [
+    "no es Sintel, es otro video"
+  ],
+  "spoiler": false,
+  "desnudez": false,
+  "cinematica": false,
+  "juego_correcto": false,
+  "idioma_original": "inglés",
+  "lineas": [
+    {
+      "t0": 40.4,
+      "t1": 44.8,
+      "hablante": "CHAMÁN",
+      "original": "What brings you to the land of the gatekeepers?",
+      "es": "¿Qué te trae a la tierra de los guardianes?"
+    },
+    {
+      "t0": 46.0,
+      "t1": 48.5,
+      "hablante": "SINTEL",
+      "original": "I'm searching for someone.",
+      "es": "Busco a alguien."
+    }
+  ],
+  "gancho": "Ella busca a un dragón",
+  "palabra_lapiz": "DRAGÓN",
+  "escena": "INT. CABAÑA DEL CHAMÁN — NOCHE",
+  "acotacion": "",
+  "recorte": {
+    "inicio": 39.6,
+    "fin": 56.6
+  }
+}
