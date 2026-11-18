@@ -135,17 +135,24 @@ class Almacen:
         if not tipo.startswith("video/"):
             raise ErrorAlmacen(f"GET {red.ruta_de(url)}: el tipo es '{tipo or 'ninguno'}', no video")
 
-    def confirmar_ausente(self, url) -> None:
+    def confirmar_ausente(self, url, *, con_clave=False) -> None:
         """Tras borrar: sólo cuenta como ausente un 400 o 404 con el error de objeto no encontrado de
         Storage. Si el archivo aún responde, o es cualquier otro error (403, 503...), lanza ErrorAlmacen."""
-        estado, _, datos = red.solicitar(self.transporte, "GET", url, {"Range": "bytes=0-0"}, None,
-                                         dormir=self.dormir)
+        cab = self._cabeceras({"Range": "bytes=0-0"}) if con_clave else {"Range": "bytes=0-0"}
+        estado, _, datos = red.solicitar(self.transporte, "GET", url, cab, None, dormir=self.dormir)
         if estado in (200, 206):
             raise ErrorAlmacen(f"GET {red.ruta_de(url)}: sigue respondiendo tras borrar")
         if estado in (400, 404) and _es_objeto_no_encontrado(datos):
             return
         raise ErrorAlmacen(f"GET {red.ruta_de(url)}: código {estado}; no se pudo confirmar que el "
                            "objeto desapareció")
+
+    def confirmar_borrado(self, ruta) -> None:
+        """Pregunta al API de Storage (con clave, sin la caché de la CDN) si el objeto sigue existiendo.
+        La URL pública puede seguir sirviendo la copia de la CDN un rato después de borrar (pasó en el
+        ensayo real del 18 nov), así que no sirve para confirmar el borrado."""
+        self.confirmar_ausente(f"{self.url}/storage/v1/object/info/{self.bucket}/{quote(ruta, safe='/')}",
+                               con_clave=True)
 
     def borrar(self, ruta) -> None:
         self._pedir("DELETE", f"{self.url}/storage/v1/object/{self.bucket}",
@@ -155,7 +162,7 @@ class Almacen:
     # ---- ensayo ----
 
     def ida_y_vuelta(self) -> dict:
-        """Ensayo: sube un MP4 de 1 s, comprueba la URL pública, lo borra y comprueba que ya no responde."""
+        """Ensayo: sube un MP4 de 1 s, comprueba la URL pública, lo borra y confirma en el API que ya no existe."""
         self.asegurar_bucket()
         with tempfile.TemporaryDirectory(prefix="almacen-") as d:
             mp4 = Path(d) / "prueba.mp4"
@@ -166,7 +173,7 @@ class Almacen:
                 self.comprobar(url)
             finally:
                 self.borrar(ruta)
-            self.confirmar_ausente(url)
+            self.confirmar_borrado(ruta)
         return {"subida": True, "url_comprobada": True, "borrado": True, "bytes": peso}
 
 

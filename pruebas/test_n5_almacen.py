@@ -205,6 +205,9 @@ def test_ida_y_vuelta_completa_con_almacen_en_memoria():
         if metodo == "DELETE":
             objetos.clear()
             return F.resp(200, F.leer("supabase", "borrado_ok.json"))
+        if "/object/info/clips/" in ruta:
+            assert "apikey" in cab, "el borrado se confirma con clave, en el API"
+            ruta = ruta.replace("/object/info/clips/", "/object/public/clips/")
         if ruta in objetos:
             return F.resp(206, b"\x00", "video/mp4")
         return F.resp(404, F.leer("supabase", "objeto_404.json"))
@@ -307,3 +310,21 @@ def test_una_url_que_no_es_de_supabase_se_rechaza_antes_de_pedir_nada():
     assert llamadas == []
     assert Almacen("https://abcd.supabase.co/rest/v1/", "clave-falsa", cfg, transporte=transporte).url \
         == "https://abcd.supabase.co"
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="sin ffmpeg")
+def test_la_copia_de_la_cdn_tras_borrar_no_tumba_el_ensayo_si_el_api_dice_que_ya_no_existe():
+    vistos = []
+
+    def reglas(metodo, url, cab, cuerpo):
+        vistos.append((metodo, url.split(".invalid", 1)[1]))
+        if "/bucket/" in url:
+            return F.resp(200, "{}")
+        if metodo == "GET" and "/object/info/" in url:
+            return F.resp(400, '{"statusCode":"404","error":"not_found","message":"Object not found"}')
+        if metodo == "GET":
+            return F.resp(206, b"\x00", "video/mp4")      # la CDN sigue sirviendo su copia
+        return F.resp(200, "[]")
+    a, _ = almacen(reglas)
+    assert a.ida_y_vuelta()["borrado"] is True
+    assert any("/object/info/clips/tomas/" in r for m, r in vistos if m == "GET")
