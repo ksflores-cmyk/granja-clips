@@ -9,6 +9,17 @@ on:
     paths:
       - "marca/**"
       - "fabrica/editar/**"
+      - "marca.yml"
+      - "fuentes.yml"
+      - "requirements.txt"
+      - ".github/workflows/muestras.yml"
+  pull_request:
+    paths:
+      - "marca/**"
+      - "fabrica/editar/**"
+      - "marca.yml"
+      - "fuentes.yml"
+      - "requirements.txt"
       - ".github/workflows/muestras.yml"
 
 permissions:
