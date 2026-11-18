@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import csv
-import fcntl
 import os
 import re
 import tempfile
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime
@@ -36,25 +36,48 @@ def anotar_fila(raiz, fila: dict) -> None:
         w.writerow(["" if fila.get(c) is None else fila.get(c) for c in CABECERA_MARCADOR])
 
 
+def _bloquear(f) -> None:
+    """Candado exclusivo sobre el archivo abierto: fcntl en POSIX, msvcrt.locking en Windows."""
+    try:
+        import fcntl
+    except ImportError:
+        import msvcrt
+        f.seek(0)
+        while True:
+            try:
+                msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                return
+            except OSError:
+                time.sleep(0.02)
+    fcntl.flock(f, fcntl.LOCK_EX)
+
+
+def _desbloquear(f) -> None:
+    try:
+        import fcntl
+    except ImportError:
+        import msvcrt
+        f.seek(0)
+        msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+    fcntl.flock(f, fcntl.LOCK_UN)
+
+
 def anotar_registro(raiz, texto: str) -> str:
     """Añade una línea con fecha y hora de Guatemala a registro.md."""
     sello = datetime.now(ZONA).strftime("%Y-%m-%d %H:%M")
     linea = f"- {sello} GT · {' '.join(str(texto).split())}"
     ruta = raiz_repo(raiz) / "registro.md"
-    # Modo anexado: cada línea se escribe de una vez al final; dos corridas no se pisan.
-    with open(ruta, "a+b") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
-        try:
-            tam = f.seek(0, os.SEEK_END)
-            prefijo = b""
-            if tam:
-                f.seek(-1, os.SEEK_END)
-                if f.read(1) != b"\n":
-                    prefijo = b"\n"
-            f.write(prefijo + (linea + "\n").encode("utf-8"))
-            f.flush()
-        finally:
-            fcntl.flock(f, fcntl.LOCK_UN)
+    # Modo anexado bajo el candado: cada línea se escribe de una vez al final.
+    with _candado(ruta), open(ruta, "a+b") as f:
+        tam = f.seek(0, os.SEEK_END)
+        prefijo = b""
+        if tam:
+            f.seek(-1, os.SEEK_END)
+            if f.read(1) != b"\n":
+                prefijo = b"\n"
+        f.seek(0, os.SEEK_END)
+        f.write(prefijo + (linea + "\n").encode("utf-8"))
     return linea
 
 
@@ -84,13 +107,13 @@ def contador_toma(raiz=None) -> int:
 
 @contextmanager
 def _candado(ruta: Path):
-    """Candado exclusivo entre procesos (fcntl; el runner es Linux) sobre un archivo aparte."""
+    """Candado exclusivo entre procesos (fcntl en POSIX, msvcrt en Windows) sobre un archivo aparte."""
     with open(ruta.with_name(ruta.name + ".lock"), "a+b") as lk:
-        fcntl.flock(lk, fcntl.LOCK_EX)
+        _bloquear(lk)
         try:
             yield
         finally:
-            fcntl.flock(lk, fcntl.LOCK_UN)
+            _desbloquear(lk)
 
 
 def avanzar_toma(raiz=None) -> int:

@@ -343,3 +343,17 @@ def test_anotar_registro_anexa_sin_reescribir(repo):
     registro.anotar_registro(repo, "nueva")
     texto = (repo / "registro.md").read_text(encoding="utf-8")
     assert texto.startswith("# Registro\n- vieja\n") and texto.rstrip().endswith("nueva")
+
+
+# ---------------------------------------------------------------- ronda 2
+import importlib
+import sys
+
+
+def test_registro_importa_sin_fcntl(monkeypatch):
+    """En Windows no existe fcntl: el módulo debe cargar igual (el candado se importa al usarlo)."""
+    monkeypatch.setitem(sys.modules, "fcntl", None)       # import fcntl -> ImportError
+    mod = importlib.reload(registro)
+    assert hasattr(mod, "avanzar_toma") and hasattr(mod, "_bloquear")
+    monkeypatch.undo()
+    importlib.reload(registro)
