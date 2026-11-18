@@ -357,3 +357,89 @@ def test_registro_importa_sin_fcntl(monkeypatch):
     assert hasattr(mod, "avanzar_toma") and hasattr(mod, "_bloquear")
     monkeypatch.undo()
     importlib.reload(registro)
+
+
+@necesita_ffmpeg
+def test_plan_con_cuerpo_sin_origen_sale_en_rojo(vertical, marca):
+    plan = json.loads(json.dumps(vertical["plan"]))
+    plan["origen"] = None
+    ok, det = estilo.cuerpo_coincide(vertical["mp4"], plan, marca)
+    assert not ok and "origen" in det
+    for k in ("archivo", "sha256", "inicio", "duracion"):
+        p2 = json.loads(json.dumps(vertical["plan"]))
+        del p2["origen"][k]
+        assert not estilo.cuerpo_coincide(vertical["mp4"], p2, marca)[0], k
+    p3 = json.loads(json.dumps(vertical["plan"]))
+    p3["origen"]["sha256"] = "0" * 64
+    assert not estilo.cuerpo_coincide(vertical["mp4"], p3, marca)[0]
+    # sin cuerpo y sin origen (tipográfica) sí es "no aplica"
+    p4 = {"duracion": 4.0, "geometria": {"cuerpo": None, "y_dialogo": 790}, "origen": None}
+    assert estilo.cuerpo_coincide(vertical["mp4"], p4, marca)[0]
+
+
+@necesita_ffmpeg
+def test_mp4_alargado_despues_del_cierre_sale_en_rojo(vertical, marca, tmp_path):
+    largo = tmp_path / "largo.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(vertical["mp4"]),
+                    "-vf", "tpad=stop_mode=clone:stop_duration=3", "-af", "apad=pad_dur=3",
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart",
+                    str(largo)], check=True)
+    assert estilo.sondear(largo)["duracion"] > 6.5
+    ok, det = estilo.cierre_visible(largo, vertical["plan"], marca)
+    assert not ok and "plan" in det
+    puntos = estilo.revisar(largo, vertical["plan"], marca)
+    assert "[fotograma] Duración igual a la del plan" in malos(puntos)
+    assert "[fotograma] Duración igual a la del plan" not in malos(estilo.revisar(vertical["mp4"], vertical["plan"], marca))
+
+
+@necesita_ffmpeg
+def test_fuente_con_video_corto_y_audio_largo_no_acepta_recorte_largo(tmp_path, marca):
+    f = tmp_path / "va.mp4"
+    subprocess.run([
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "testsrc=size=1080x1920:rate=30:duration=5",
+        "-f", "lavfi", "-i", "sine=frequency=440:duration=10",
+        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", str(f)], check=True)
+    info = componer.sondear_video(f)
+    assert 4.9 <= info["duracion"] <= 5.2, info
+    with pytest.raises(ValueError, match="terminaría antes del cierre"):
+        componer.componer(marca, lienzo.Toma(**TOMA), [], tmp_path / "x.mp4", duracion=8.0,
+                          trabajo=tmp_path / "w", fuente_video=f, inicio=0.0)
+    assert not (tmp_path / "x.mp4").exists()
+
+
+def test_dif_tinta_rechaza_cajas_vacias_o_fuera_del_cuadro(marca):
+    from PIL import Image
+    papel = lienzo.papel(marca).convert("RGB")
+    for caja in [(0, 100, 0, 200), (0, 200, 1080, 200), (0, 1900, 1080, 2100), (-5, 0, 100, 100), (0, 0, 2000, 100)]:
+        with pytest.raises(ValueError, match="vacía o fuera"):
+            estilo.dif_tinta(papel, papel, papel, caja)
+    with pytest.raises(ValueError):
+        estilo.dif_tinta(Image.new("RGB", (10, 10)), papel, papel, (0, 0, 10, 10))
+
+
+@necesita_ffmpeg
+def test_dialogo_con_geometria_fuera_del_cuadro_sale_en_rojo(vertical, marca):
+    plan = json.loads(json.dumps(vertical["plan"]))
+    plan["geometria"]["y_dialogo"] = 5000
+    ok, det = estilo.dialogo_visible(vertical["mp4"], plan, marca)
+    assert not ok and "fuera del cuadro" in det
+
+
+def test_tinta_extra_en_el_fotograma_se_detecta(marca):
+    papel = lienzo.papel(marca).convert("RGB")
+    real = papel.copy()
+    real.paste((0, 0, 0), (100, 940, 400, 980))          # texto añadido que el plan no tiene
+    d = estilo.dif_tinta(real, papel, papel, (90, 930, 990, 1014))
+    assert d > estilo.UMBRAL_TINTA
+
+
+@necesita_ffmpeg
+def test_credito_con_texto_extra_sale_en_rojo(vertical, marca, tmp_path):
+    mp4 = tmp_path / "extra.mp4"
+    componer.componer(marca, lienzo.Toma(**{**TOMA, "credito": "Con: Blender Foundation (CC BY 3.0)"}), LINEAS,
+                      mp4, duracion=4.0, trabajo=tmp_path / "w", fuente_video=vertical["fuente"], inicio=0.0)
+    corto = json.loads(json.dumps(vertical["plan"]))
+    corto["toma"]["credito"] = "Con: Blender"
+    ok, det = estilo.cierre_visible(mp4, corto, marca)
+    assert not ok and "crédito" in det.split("falla:")[1]

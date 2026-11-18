@@ -34,6 +34,8 @@ DIF_TINTA = 48
 DILATAR_TINTA_PX = 2
 MINIATURA_ANCHO = 64
 T_CABECERA_S = 0.5
+# La duración real (ffprobe) debe coincidir con la del plan: un fotograma más un margen pequeño.
+TOL_DURACION_S = 1 / 30 + 0.1
 
 RE_EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿⬀-⯿️‍⃣\U0001F1E6-\U0001F1FF]")
 
@@ -119,18 +121,27 @@ def dif_tinta(real: Image.Image, esperado: Image.Image, papel: Image.Image,
               caja: tuple[int, int, int, int]) -> float:
     """Diferencia media del fotograma contra lo esperado, sólo en los píxeles de tinta.
 
-    La máscara es donde la página esperada difiere del papel en más de DIF_TINTA (canal máximo),
-    dilatada DILATAR_TINTA_PX. Si la región esperada no tiene tinta, mide toda la región.
+    La máscara une la tinta esperada y la tinta real (píxeles que difieren del papel en más de
+    DIF_TINTA, canal máximo), dilatada DILATAR_TINTA_PX; así el texto añadido también cuenta. Si
+    ninguna tiene tinta, mide toda la región. ValueError si la caja es vacía o sale del cuadro, o
+    si el resultado no es un número finito.
     """
-    x0, y0, x1, y1 = caja
+    x0, y0, x1, y1 = (int(c) for c in caja)
+    ancho, alto = esperado.size
+    if not (0 <= x0 < x1 <= ancho and 0 <= y0 < y1 <= alto):
+        raise ValueError(f"región vacía o fuera del cuadro {ancho}x{alto}: {caja}")
+    if real.size != esperado.size:
+        raise ValueError(f"tamaño {real.size} distinto de {esperado.size}")
     a = np.asarray(real.convert("RGB"), dtype=np.int16)[y0:y1, x0:x1]
     b = np.asarray(esperado.convert("RGB"), dtype=np.int16)[y0:y1, x0:x1]
     p = np.asarray(papel.convert("RGB"), dtype=np.int16)[y0:y1, x0:x1]
-    mascara = _dilatar(np.abs(b - p).max(axis=2) > DIF_TINTA, DILATAR_TINTA_PX)
+    tinta = (np.abs(b - p).max(axis=2) > DIF_TINTA) | (np.abs(a - p).max(axis=2) > DIF_TINTA)
+    mascara = _dilatar(tinta, DILATAR_TINTA_PX)
     d = np.abs(a - b)
-    if not mascara.any():
-        return float(d.mean())
-    return float(d[mascara].mean())
+    r = float(d[mascara].mean()) if mascara.any() else float(d.mean())
+    if not np.isfinite(r):
+        raise ValueError("la comparación no dio un número finito")
+    return r
 
 
 def cierre_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
@@ -142,8 +153,11 @@ def cierre_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     dur = float(plan.get("duracion") or 0)
     if dur <= 0:
         return False, "el plan no trae la duración"
+    dur_real = sondear(Path(video))["duracion"]
+    if abs(dur_real - dur) > TOL_DURACION_S:
+        return False, f"el MP4 dura {dur_real:.2f} s y el plan {dur:.2f} s (tolerancia {TOL_DURACION_S:.2f})"
     esperado = mod_cierre.pagina_cierre(marca, _toma(plan))
-    real = _fotograma(Path(video), max(0.0, dur - 0.2))
+    real = _fotograma(Path(video), max(0.0, dur_real - 0.2))
     if real is None:
         return False, "no se pudo leer el fotograma final"
     if real.size != esperado.size:
@@ -153,8 +167,11 @@ def cierre_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     corte_y, credito_y = int(marca.m("corte_y")), int(marca.m("credito_y"))
     regiones = {"CORTE.": (x0, corte_y, x1, credito_y),
                 "crédito": (x0, credito_y, x1, int(credito_y + 2 * marca.m("tam_credito")))}
-    difs = {n: dif_tinta(real, esperado, papel, caja) for n, caja in regiones.items()}
-    fallan = [n for n, d in difs.items() if d >= UMBRAL_TINTA]
+    try:
+        difs = {n: dif_tinta(real, esperado, papel, caja) for n, caja in regiones.items()}
+    except ValueError as e:
+        return False, str(e)
+    fallan = [n for n, d in difs.items() if not d < UMBRAL_TINTA]
     det = ", ".join(f"{n} {d:.1f}" for n, d in difs.items()) + f" (tolerancia {UMBRAL_TINTA:.0f})"
     if fallan:
         det += "; falla: " + " y ".join(fallan)
@@ -173,7 +190,10 @@ def cabecera_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
         return False, "no se pudo leer el fotograma"
     if real.size != esperado.size:
         return False, f"tamaño {real.size} distinto de {esperado.size}"
-    d = dif_tinta(real, esperado, lienzo.papel(marca), (0, 0, marca.ancho, int(y_cont)))
+    try:
+        d = dif_tinta(real, esperado, lienzo.papel(marca), (0, 0, marca.ancho, int(y_cont)))
+    except ValueError as e:
+        return False, str(e)
     return d < UMBRAL_TINTA, f"diferencia media {d:.1f} (tolerancia {UMBRAL_TINTA:.0f})"
 
 
@@ -221,9 +241,13 @@ def dialogo_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
         if real is None or real.size != esperado.size:
             fallos.append(f"línea {i + 1}: no se pudo leer el fotograma en {t:.2f} s")
             continue
-        d = dif_tinta(real, esperado, papel, (0, y0, marca.ancho, y1))
+        try:
+            d = dif_tinta(real, esperado, papel, (0, y0, marca.ancho, y1))
+        except ValueError as e:
+            fallos.append(f"línea {i + 1}: {e}")
+            continue
         detalle.append(f"{d:.1f}")
-        if d >= UMBRAL_TINTA:
+        if not d < UMBRAL_TINTA:
             fallos.append(f"línea {i + 1} distinta en {t:.2f} s (diferencia {d:.1f})")
     if fallos:
         return False, "; ".join(fallos) + f" (tolerancia {UMBRAL_TINTA:.0f})"
@@ -237,18 +261,23 @@ def _miniatura_gris(img: Image.Image, ancho: int, alto: int) -> np.ndarray:
 def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     """El cuerpo del MP4 es el metraje de origen en el mismo instante (miniaturas en gris)."""
     origen = plan.get("origen")
-    if not origen:
-        return True, "no aplica (toma tipográfica, sin video de origen)"
-    ruta = Path(str(origen.get("archivo", "")))
+    geo = plan.get("geometria") or {}
+    cuerpo = geo.get("cuerpo")
+    if not origen and not cuerpo:
+        return True, "no aplica (toma tipográfica, sin cuerpo de video)"
+    if not cuerpo:
+        return False, "el plan trae origen pero no la caja del cuerpo"
+    faltan = [k for k in ("archivo", "sha256", "inicio", "duracion") if not (origen or {}).get(k) and (origen or {}).get(k) != 0]
+    if faltan:
+        return False, "el plan declara cuerpo de video pero el origen no trae: " + ", ".join(faltan)
+    if cuerpo.get("ancho", 0) <= 0 or cuerpo.get("alto", 0) <= 0:
+        return False, f"la caja del cuerpo es inválida: {cuerpo}"
+    ruta = Path(str(origen["archivo"]))
     if not ruta.is_file():
         return False, f"el archivo de origen no está: {ruta}"
     from .componer import sha256_archivo
-    if origen.get("sha256") and sha256_archivo(ruta) != origen["sha256"]:
+    if sha256_archivo(ruta) != origen["sha256"]:
         return False, "el archivo de origen no coincide con el sha256 del plan"
-    geo = plan.get("geometria") or {}
-    cuerpo = geo.get("cuerpo")
-    if not cuerpo:
-        return False, "el plan trae origen pero no la caja del cuerpo"
     dur = float(plan.get("duracion") or 0)
     inicio = float(origen.get("inicio", 0))
     tope = dur - float(marca.m("cierre_s")) - 0.2
@@ -320,6 +349,9 @@ def revisar(video: Path, plan: dict, marca: Marca) -> list[tuple[str, bool, str]
     punto("fotograma", "30 fps", abs(info["fps"] - 30) < 0.01, f"{info['fps']:.2f}")
     punto("fotograma", "Duración de 7 a 30 s", 7 <= info["duracion"] <= 30, f"{info['duracion']:.2f} s")
     punto("fotograma", "faststart (moov antes de mdat)", faststart(Path(video)))
+    dur_plan = float(plan.get("duracion") or 0)
+    punto("fotograma", "Duración igual a la del plan", abs(info["duracion"] - dur_plan) <= TOL_DURACION_S,
+          f"MP4 {info['duracion']:.2f} s, plan {dur_plan:.2f} s (tolerancia {TOL_DURACION_S:.2f})")
 
     t = plan.get("toma", {})
     gancho = str(t.get("gancho", ""))

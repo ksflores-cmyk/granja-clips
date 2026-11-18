@@ -30,18 +30,50 @@ class Linea:
     original: str | None = None      # texto original (sólo para el manifiesto)
 
 
+def _duracion_pista_video(ruta: Path, v: dict, formato: dict) -> float:
+    """Duración de la pista de video (no la del contenedor, que puede ser la del audio).
+
+    Orden: `duration` de la pista; nb_frames / tasa de cuadros; marcas de tiempo de los paquetes.
+    """
+    def numero(x):
+        try:
+            n = float(x)
+            return n if n > 0 else None
+        except (TypeError, ValueError):
+            return None
+    d = numero(v.get("duration"))
+    if d:
+        return d
+    n = numero(v.get("nb_frames"))
+    num, _, den = str(v.get("r_frame_rate", "0/1")).partition("/")
+    try:
+        fps = float(num) / float(den or 1)
+    except (ValueError, ZeroDivisionError):
+        fps = 0.0
+    if n and fps > 0:
+        return n / fps
+    paquetes = json.loads(subprocess.check_output([
+        "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time,duration_time",
+        "-of", "json", str(ruta)])).get("packets", [])
+    fin = 0.0
+    for p in paquetes:
+        pts = numero(p.get("pts_time")) or 0.0
+        fin = max(fin, pts + (numero(p.get("duration_time")) or 0.0))
+    if fin > 0:
+        return fin
+    raise ValueError(f"no se pudo leer la duración de la pista de video de {ruta}")
+
+
 def sondear_video(ruta: Path) -> dict:
-    """Ancho, alto y presencia de audio de un archivo de video."""
+    """Ancho, alto, presencia de audio y duración de la pista de video de un archivo."""
     out = json.loads(subprocess.check_output([
-        "ffprobe", "-v", "error", "-show_entries", "stream=codec_type,width,height:format=duration",
+        "ffprobe", "-v", "error", "-show_entries",
+        "stream=codec_type,width,height,duration,nb_frames,r_frame_rate:format=duration",
         "-of", "json", str(ruta)]))
     v = next(s for s in out["streams"] if s["codec_type"] == "video")
     audio = any(s["codec_type"] == "audio" for s in out["streams"])
-    try:
-        duracion = float(out["format"]["duration"])
-    except (KeyError, TypeError, ValueError):
-        raise ValueError(f"no se pudo leer la duración de {ruta}") from None
-    return {"ancho": int(v["width"]), "alto": int(v["height"]), "audio": audio, "duracion": duracion}
+    return {"ancho": int(v["width"]), "alto": int(v["height"]), "audio": audio,
+            "duracion": _duracion_pista_video(ruta, v, out.get("format", {}))}
 
 
 def sha256_archivo(ruta: Path) -> str:
