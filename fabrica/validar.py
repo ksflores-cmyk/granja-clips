@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import yaml
 
 from .config import ARCHIVOS, raiz_repo
-from .fuentes import es_publicable
+from .fuentes import _a_fecha, es_publicable
 from .registro import CABECERA_ENVIOS, CABECERA_MARCADOR
 
 TIPOS = {"A", "B", "C", "D"}
@@ -83,6 +83,22 @@ def _claves(dato, rel: str, claves: list[str], inf: Informe) -> bool:
     return ok
 
 
+def _en(valor, conjunto) -> bool:
+    """`valor in conjunto` sin TypeError cuando el YAML trae una lista o un diccionario."""
+    return isinstance(valor, str) and valor in conjunto
+
+
+def _fecha_hora(valor) -> datetime:
+    """Fecha ISO a datetime con zona; sin zona se toma como hora de Guatemala. ValueError si no vale."""
+    if isinstance(valor, datetime):
+        dt = valor
+    elif isinstance(valor, date):
+        dt = datetime(valor.year, valor.month, valor.day)
+    else:
+        dt = datetime.fromisoformat(str(valor))
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=ZoneInfo("America/Guatemala"))
+
+
 def _hoy() -> date:
     return datetime.now(ZoneInfo("America/Guatemala")).date()
 
@@ -95,7 +111,7 @@ def validar_temporada(t, inf: Informe) -> None:
     v = t["ventana_estreno"]
     if _claves(v, f"{rel}: ventana_estreno", ["inicio", "fin"], inf):
         try:
-            if datetime.fromisoformat(str(v["inicio"])) >= datetime.fromisoformat(str(v["fin"])):
+            if _fecha_hora(v["inicio"]) >= _fecha_hora(v["fin"]):
                 inf.error(f"{rel}: ventana_estreno.inicio debe ser anterior a fin")
         except ValueError:
             inf.error(f"{rel}: ventana_estreno con fechas ISO inválidas")
@@ -127,13 +143,13 @@ def validar_fuentes(f, inf: Informe) -> None:
         else:
             vistos.add(fid)
         tipo = ficha.get("tipo")
-        if tipo not in TIPOS:
+        if not _en(tipo, TIPOS):
             inf.error(f"{et}: tipo debe ser A, B, C o D")
-        if ficha.get("origen") not in ORIGENES:
+        if not _en(ficha.get("origen"), ORIGENES):
             inf.error(f"{et}: origen inválido (permitidos: {', '.join(sorted(ORIGENES))})")
-        if ficha.get("estado") not in ESTADOS:
+        if not _en(ficha.get("estado"), ESTADOS):
             inf.error(f"{et}: estado inválido (permitidos: {', '.join(sorted(ESTADOS))})")
-        if ficha.get("uso") not in USOS:
+        if not _en(ficha.get("uso"), USOS):
             inf.error(f"{et}: uso debe ser produccion o muestras")
         if not isinstance(ficha.get("publicable"), bool):
             inf.error(f"{et}: publicable debe ser booleano")
@@ -173,8 +189,12 @@ def validar_fuentes(f, inf: Informe) -> None:
                       "la puerta de N3 exigirá estado vigente para descargar o publicar")
         _validar_campos_n3(ficha, et, inf)
         vence = ficha.get("vence")
-        if ficha.get("estado") == "vigente" and isinstance(vence, date) and vence < _hoy():
-            inf.aviso(f"{et}: ficha vigente con vence {vence} ya pasado; debe pasar a vencida")
+        if vence is not None:
+            f_vence = _a_fecha(vence)
+            if f_vence is None:
+                inf.error(f"{et}: vence ilegible ({vence!r}); use una fecha AAAA-MM-DD")
+            elif ficha.get("estado") == "vigente" and f_vence < _hoy():
+                inf.aviso(f"{et}: ficha vigente con vence {f_vence} ya pasado; debe pasar a vencida")
 
 
 def _validar_campos_n3(ficha: dict, et: str, inf: Informe) -> None:
@@ -236,6 +256,12 @@ CLAVES_MAQUETA = [
     "alto_dialogo_sin_video", "margen_inferior", "tam_corte", "corte_y", "tam_credito", "credito_y", "cierre_s",
     "opacidad_mosca", "grano", "circulo", "subrayado",
 ]
+SUBCLAVES_MAQUETA = {
+    "grano": ["papel", "fibra", "bloque_fibra", "semilla"],
+    "circulo": ["margen_x", "margen_y", "irregularidad", "sobrepaso_grados", "grosor",
+                "giro_max_grados", "holguras_extra", "holgura_letra"],
+    "subrayado": ["grosor", "sobresale", "bajo_palabra", "alto_extra", "inclinacion_max", "amplitud"],
+}
 ESQUINAS = {"superior_derecha", "superior_izquierda"}
 ESTILOS_FUENTE = ("regular", "bold", "italic", "bolditalic")
 
@@ -275,6 +301,9 @@ def validar_maqueta(m, inf: Informe) -> None:
         if c not in maq:
             inf.error(f"{rel}: maqueta: falta la clave '{c}'")
     _positivos(maq, "maqueta", inf)
+    for sub, claves in SUBCLAVES_MAQUETA.items():
+        if sub in maq:
+            _claves(maq[sub], f"{rel}: maqueta.{sub}", claves, inf)
     col = maq.get("columna_dialogo")
     if isinstance(col, list) and len(col) == 2 and all(isinstance(x, (int, float)) for x in col):
         if col[0] >= col[1]:
