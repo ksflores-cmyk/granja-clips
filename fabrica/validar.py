@@ -235,6 +235,9 @@ def _validar_campos_n3(ficha: dict, et: str, inf: Informe) -> None:
         ob = reglas.get("etiquetas_obligatorias")
         if ob is not None and not (isinstance(ob, list) and all(isinstance(x, str) and x.strip() for x in ob)):
             inf.error(f"{et}: reglas.etiquetas_obligatorias debe ser una lista de texto")
+        hs = reglas.get("hashtags")
+        if hs is not None and not (isinstance(hs, list) and all(isinstance(x, str) and x.startswith("#") for x in hs)):
+            inf.error(f"{et}: reglas.hashtags debe ser una lista de hashtags que empiecen con #")
 
 
 def _es_https(u) -> bool:
@@ -294,6 +297,27 @@ def validar_marca(m, inf: Informe) -> None:
     if not (_es_int(s) and 1 <= s <= 2):
         inf.error(f"{rel}: subtitulo_max_lineas debe ser entero de 1 a 2")
     validar_maqueta(m, inf)
+    validar_marca_agua(m, inf)
+
+
+def validar_marca_agua(m, inf: Informe) -> None:
+    """`marca_agua` de marca.yml: lugar fijo, ancho, margen, opacidad y placa del logo de campaña."""
+    rel = "marca.yml: marca_agua"
+    ma = m.get("marca_agua")
+    if not isinstance(ma, dict):
+        inf.error("marca.yml: falta la sección marca_agua")
+        return
+    if ma.get("posicion") not in POSICIONES_AGUA:
+        inf.error(f"{rel}.posicion debe ser una de {', '.join(POSICIONES_AGUA)}")
+    for k in ("ancho", "margen", "opacidad", "placa"):
+        v = ma.get(k)
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or v <= 0:
+            inf.error(f"{rel}.{k} debe ser un número positivo")
+    if isinstance(ma.get("opacidad"), (int, float)) and not isinstance(ma.get("opacidad"), bool) \
+            and ma["opacidad"] > 1:
+        inf.error(f"{rel}.opacidad debe estar entre 0 y 1")
+    if isinstance(ma.get("ancho"), (int, float)) and not isinstance(ma.get("ancho"), bool) and ma["ancho"] > 540:
+        inf.error(f"{rel}.ancho {ma['ancho']}: el logo no puede pasar de la mitad del ancho (540)")
 
 
 CLAVES_MAQUETA = [
@@ -311,6 +335,8 @@ SUBCLAVES_MAQUETA = {
     "subrayado": ["grosor", "sobresale", "bajo_palabra", "alto_extra", "inclinacion_max", "amplitud"],
 }
 ESQUINAS = {"superior_derecha", "superior_izquierda"}
+POSICIONES_AGUA = ("cuerpo_inferior_derecha", "cuerpo_inferior_izquierda",
+                   "cuerpo_superior_derecha", "cuerpo_superior_izquierda")
 ESTILOS_FUENTE = ("regular", "bold", "italic", "bolditalic")
 
 

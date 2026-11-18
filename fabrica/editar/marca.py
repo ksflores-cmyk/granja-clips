@@ -65,6 +65,11 @@ class Marca:
         return self.datos["mosca"]
 
     @property
+    def marca_agua(self) -> dict:
+        """Posición, ancho, margen, opacidad y placa del logo de campaña (clave `marca_agua` de marca.yml)."""
+        return self.datos["marca_agua"]
+
+    @property
     def max_palabras_gancho(self) -> int:
         return int(self.datos["encabezado_max_palabras"])
 

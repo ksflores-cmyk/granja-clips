@@ -14,6 +14,7 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from . import agua as mod_agua
 from . import cierre as mod_cierre
 from . import dialogo as mod_dialogo
 from . import lienzo
@@ -153,6 +154,7 @@ def orden_ffmpeg(*, salida: str, duracion: float, ancho: int, cierre_s: float,
     """Arma la orden de ffmpeg (función pura; no corre nada).
 
     `capas`: [(ruta PNG, t0, t1)]. `video`: None o {ruta, inicio, alto, y, audio (bool)}.
+    El audio es siempre el del video de origen (nunca música ni voz añadidas); sin audio de origen, silencio.
     """
     d = f"{duracion:g}"
     entradas = ["-loop", "1", "-framerate", "30", "-t", d, "-i", pagina]
@@ -187,12 +189,13 @@ def orden_ffmpeg(*, salida: str, duracion: float, ancho: int, cierre_s: float,
 
 
 def plan_json(marca: Marca, t: Toma, lineas: list[Linea], duracion: float, *,
-              geometria: dict | None = None, origen: dict | None = None) -> dict:
+              geometria: dict | None = None, origen: dict | None = None, campana: dict | None = None) -> dict:
     """Plan de la toma (lo que lee la puerta de estilo): textos, colores y fuente de marca.yml.
 
-    `origen` es {archivo, sha256, inicio, duracion} cuando hay video de fuente y None si no.
+    `origen` es {archivo, sha256, inicio, duracion} cuando hay video de fuente y None si no. `campana`
+    ({id, duracion_s, marca_agua, sin_musica, audio}) sólo se escribe si la toma es de una campaña.
     """
-    return {
+    plan = {
         "toma": {"numero": t.numero, "gancho": t.gancho, "palabra_lapiz": t.palabra_lapiz,
                  "lapiz": t.lapiz, "escena": t.escena, "credito": t.credito},
         "lineas": [{k: v for k, v in asdict(ln).items() if k != "original" and v is not None}
@@ -204,12 +207,19 @@ def plan_json(marca: Marca, t: Toma, lineas: list[Linea], duracion: float, *,
         "origen": origen,
         "geometria": geometria,
     }
+    if campana is not None:
+        plan["campana"] = campana
+    return plan
 
 
 def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duracion: float,
              trabajo: Path, fuente_video: Path | None = None, inicio: float = 0.0,
-             plan_salida: Path | None = None) -> dict:
-    """Renderiza la toma. Devuelve el plan. Lanza ValueError si algún texto no cabe."""
+             plan_salida: Path | None = None, ficha: dict | None = None) -> dict:
+    """Renderiza la toma. Devuelve el plan. Lanza ValueError si algún texto no cabe.
+
+    `ficha`: si trae `marca_agua`, el logo va en el lugar fijo de `marca.yml`; `reglas.sin_musica` deja el audio
+    original de la fuente tal cual (nunca se añade audio). Ambas cosas quedan declaradas en `plan["campana"]`.
+    """
     trabajo = Path(trabajo)
     trabajo.mkdir(parents=True, exist_ok=True)
     # Validar todo antes de pintar o correr ffmpeg
@@ -234,12 +244,33 @@ def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duraci
         origen = {"archivo": str(fuente_video), "sha256": sha256_archivo(Path(fuente_video)),
                   "inicio": inicio, "duracion": duracion}
     geo = geometria(marca, y_contenido, cuerpo)
+    campana = None
+    capa_agua = None
+    if ficha is not None and (ficha.get("marca_agua") or (ficha.get("reglas") or {}).get("sin_musica")
+                              or (ficha.get("reglas") or {}).get("duracion_s") not in (None, [7, 30])):
+        campana = {"id": ficha.get("id"), "duracion_s": (ficha.get("reglas") or {}).get("duracion_s"),
+                   "marca_agua": None, "sin_musica": bool((ficha.get("reglas") or {}).get("sin_musica")),
+                   "audio": None}
+        if video is not None:
+            campana["audio"] = "original" if video["audio"] else "silencio"
+        if ficha.get("marca_agua"):
+            if cuerpo is None:
+                raise ValueError("la campaña exige marca de agua y la toma no lleva video")
+            ruta_logo = marca.raiz / ficha["marca_agua"]
+            if not ruta_logo.is_file():
+                raise ValueError(f"marca de agua ausente: {ficha['marca_agua']}")
+            capa_agua = mod_agua.capa(marca, ruta_logo, cuerpo)
+            campana["marca_agua"] = {"archivo": ficha["marca_agua"], "sha256": sha256_archivo(ruta_logo),
+                                     "caja": capa_agua[1]}
     y_dialogo = geo["y_dialogo"]
     if y_dialogo + alto_zona_dialogo(marca) > marca.alto:
         raise ValueError(f"el diálogo se sale del cuadro: termina en {y_dialogo + alto_zona_dialogo(marca)} "
                          f"y el cuadro mide {marca.alto}")
     pagina.save(trabajo / "pagina.png")
     capas = []
+    if capa_agua is not None:                     # el logo va sobre el video y bajo el diálogo, todo el clip
+        capa_agua[0].save(trabajo / "marca_agua.png")
+        capas.append((str(trabajo / "marca_agua.png"), 0.0, duracion))
     for i, ln in enumerate(lineas):
         ruta = trabajo / f"dialogo_{i:02d}.png"
         mod_dialogo.bloque(marca, y_dialogo, nombre=ln.nombre, frase=ln.frase, acotacion=ln.acotacion).save(ruta)
@@ -250,7 +281,7 @@ def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duraci
                        cierre=str(trabajo / "cierre.png"), capas=capas, video=video)
     Path(salida).parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(cmd, check=True)
-    plan = plan_json(marca, t, lineas, duracion, geometria=geo, origen=origen)
+    plan = plan_json(marca, t, lineas, duracion, geometria=geo, origen=origen, campana=campana)
     if plan_salida is not None:
         Path(plan_salida).write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
     return plan

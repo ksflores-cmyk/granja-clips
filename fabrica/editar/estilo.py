@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageFilter
 
+from . import agua as mod_agua
 from . import cierre as mod_cierre
 from . import dialogo as mod_dialogo
 from . import lienzo
@@ -43,6 +44,14 @@ K_BLOQUE = 30               # píxeles discrepantes en un bloque que ponen el pu
 T_CABECERA_S = 0.5
 # La duración real (ffprobe) debe coincidir con la del plan: un fotograma más un margen pequeño.
 TOL_DURACION_S = 1 / 30 + 0.1
+
+# Marca de agua de campaña (medida en píxeles reales del cuadro, en gris, tras 1 px de desenfoque).
+# Calibración con metraje sintético (testsrc2 y mandelbrot): con la capa bien puesta la diferencia contra lo esperado
+# es de 0.2 a 3; sin la capa, contra la fuente limpia, pasa de 30. Con un logo no declarado, la esquina da más de 30.
+TOL_AGUA = 8.0
+SALTO_AGUA = 5.0       # lo esperado debe parecerse al fotograma al menos esto más que la fuente limpia
+UMBRAL_LOGO_EXTRA = 12.0
+DURACION_FORMATO_S = (7.0, 30.0)
 
 RE_EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿⬀-⯿️‍⃣\U0001F1E6-\U0001F1FF]")
 
@@ -295,6 +304,136 @@ def _miniatura_gris(img: Image.Image, ancho: int, alto: int) -> np.ndarray:
     return np.asarray(img.convert("L").resize((ancho, alto), Image.LANCZOS), dtype=np.float32)
 
 
+def _gris_desenfocado(img: Image.Image) -> np.ndarray:
+    return np.asarray(img.convert("RGB").filter(ImageFilter.GaussianBlur(1)).convert("L"), dtype=np.float32)
+
+
+def _fuente_en_cuerpo(ruta: Path, t_fuente: float, cuerpo: dict) -> Image.Image | None:
+    """Fotograma de la fuente escalado a la caja del cuerpo (RGBA), como lo deja el compositor."""
+    f = _fotograma(ruta, t_fuente)
+    if f is None:
+        return None
+    return f.resize((int(cuerpo["ancho"]), int(cuerpo["alto"])), Image.LANCZOS).convert("RGBA")
+
+
+def _diff_region(real: Image.Image, esperado_cuerpo: Image.Image, cuerpo: dict, c: dict) -> float:
+    """Diferencia media en gris entre el fotograma real y el cuerpo esperado, dentro de la caja `c` (del cuadro)."""
+    x0, y0 = c["x"] - cuerpo["x"], c["y"] - cuerpo["y"]
+    a = _gris_desenfocado(real.crop((c["x"], c["y"], c["x"] + c["ancho"], c["y"] + c["alto"])))
+    b = _gris_desenfocado(esperado_cuerpo.crop((x0, y0, x0 + c["ancho"], y0 + c["alto"])))
+    return float(np.abs(a - b).mean())
+
+
+def marca_agua_visible(video: Path, plan: dict, marca: Marca, ficha: dict | None) -> tuple[bool, str]:
+    """La marca de agua de la campaña, demostrada en el fotograma y sólo si la ficha la declara.
+
+    Rojo si el plan trae una capa que la ficha no declara, si la ficha la declara y el plan no, si el archivo del
+    logo no es el declarado, o si en los fotogramas de 30 % y 70 % la esquina no muestra el logo (se compara con la
+    fuente más el logo esperado y con la fuente limpia).
+    """
+    declarada = (ficha or {}).get("marca_agua")
+    en_plan = (plan.get("campana") or {}).get("marca_agua")
+    if not declarada and not en_plan:
+        return True, "no aplica (la ficha no declara marca de agua)"
+    if en_plan and not declarada:
+        return False, "el plan trae una capa de marca de agua que la ficha no declara"
+    if not en_plan:
+        return False, f"la ficha declara {declarada} y el plan no la trae"
+    if en_plan.get("archivo") != declarada:
+        return False, f"el plan usa {en_plan.get('archivo')} y la ficha declara {declarada}"
+    ruta_logo = marca.raiz / declarada
+    if not ruta_logo.is_file():
+        return False, f"el logo declarado no está: {declarada}"
+    from .componer import sha256_archivo
+    if sha256_archivo(ruta_logo) != en_plan.get("sha256"):
+        return False, "el logo del repo no coincide con el sha256 del plan"
+    origen, geo = plan.get("origen") or {}, plan.get("geometria") or {}
+    cuerpo = geo.get("cuerpo")
+    if not origen or not cuerpo:
+        return False, "el plan declara marca de agua pero no trae el cuerpo de video"
+    placa = mod_agua.logo(ruta_logo, marca)
+    try:
+        esperada = mod_agua.caja(marca, cuerpo, placa.size)
+    except ValueError as e:
+        return False, str(e)
+    if esperada != en_plan.get("caja"):
+        return False, f"la caja del plan {en_plan.get('caja')} no es la de marca.yml {esperada}"
+    dur = float(plan.get("duracion") or 0)
+    tope = dur - float(marca.m("cierre_s")) - 0.2
+    detalle = []
+    for frac in (0.3, 0.7):
+        t = min(dur * frac, tope)
+        real = _fotograma(Path(video), t)
+        fuente = _fuente_en_cuerpo(Path(origen["archivo"]), float(origen["inicio"]) + t, cuerpo)
+        if real is None or fuente is None:
+            return False, f"no se pudo leer el fotograma en {t:.2f} s"
+        limpia = fuente.copy()
+        fuente.alpha_composite(placa, (esperada["x"] - cuerpo["x"], esperada["y"] - cuerpo["y"]))
+        d_con = _diff_region(real, fuente, cuerpo, esperada)
+        d_sin = _diff_region(real, limpia, cuerpo, esperada)
+        detalle.append(f"{t:.1f} s: con logo {d_con:.1f}, sin logo {d_sin:.1f}")
+        if not (d_con < TOL_AGUA and d_sin >= d_con + SALTO_AGUA):
+            return False, "el logo no aparece en el fotograma (" + "; ".join(detalle) + ")"
+    return True, "; ".join(detalle) + f" (tolerancia {TOL_AGUA:g})"
+
+
+def logo_extra_en_esquina(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
+    """Sin capa declarada, la esquina de marca.yml donde iría el logo debe seguir siendo la de la fuente."""
+    origen, geo = plan.get("origen") or {}, plan.get("geometria") or {}
+    cuerpo = geo.get("cuerpo")
+    if not origen or not cuerpo:
+        return True, "no aplica"
+    cfg = marca.marca_agua
+    w = int(cfg["ancho"]) + 2 * int(cfg["placa"])
+    h = int(round(w * 0.4))
+    try:
+        c = mod_agua.caja(marca, cuerpo, (w, h))
+    except ValueError:
+        return True, "no aplica (el cuerpo es más chico que el logo)"
+    dur = float(plan.get("duracion") or 0)
+    t = min(dur * 0.5, dur - float(marca.m("cierre_s")) - 0.2)
+    real = _fotograma(Path(video), t)
+    fuente = _fuente_en_cuerpo(Path(origen["archivo"]), float(origen["inicio"]) + t, cuerpo)
+    if real is None or fuente is None:
+        return False, f"no se pudo leer el fotograma en {t:.2f} s"
+    d = _diff_region(real, fuente, cuerpo, c)
+    return d < UMBRAL_LOGO_EXTRA, f"esquina del logo {d:.1f} (máximo {UMBRAL_LOGO_EXTRA:g})"
+
+
+def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
+    """Con sin_musica el audio del MP4 es el de la fuente (correlación alta), sin audio añadido."""
+    camp = plan.get("campana") or {}
+    origen = plan.get("origen") or {}
+    if camp.get("audio") == "silencio":
+        a = sondear(Path(video))["audio"]
+        return bool(a), "la fuente no trae audio: el MP4 lleva silencio (nada añadido)"
+    if camp.get("audio") != "original" or not origen:
+        return False, f"el plan declara audio {camp.get('audio')!r}, no el original de la fuente"
+    dur = float(plan.get("duracion") or 0)
+    inicio = float(origen.get("inicio", 0))
+
+    def pcm(ruta: Path, ss: float, t: float) -> np.ndarray:
+        r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{ss:.3f}", "-t", f"{t:.3f}", "-i", str(ruta),
+                            "-vn", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"], capture_output=True)
+        return np.frombuffer(r.stdout, dtype=np.int16).astype(np.float32)
+    largo = max(1.0, dur - float(0.5))
+    a, b = pcm(Path(video), 0.0, largo), pcm(Path(origen["archivo"]), inicio, largo)
+    n = min(len(a), len(b))
+    if n < 800:
+        return False, "no se pudo leer el audio"
+    a, b = a[:n], b[:n]
+    if not b.any():
+        return not a.any(), "la fuente es muda y el MP4 también" if not a.any() else "el MP4 trae audio y la fuente es muda"
+    # el códec AAC corre la señal unas decenas de milisegundos: se busca el mejor desfase de ±100 ms
+    mejor = 0.0
+    for lag in range(-800, 801, 40):
+        x, y = (a[lag:], b[:n - lag]) if lag >= 0 else (a[:n + lag], b[-lag:])
+        den = float(np.linalg.norm(x) * np.linalg.norm(y))
+        if den > 0:
+            mejor = max(mejor, float(np.dot(x, y)) / den)
+    return mejor > 0.9, f"correlación con el audio de la fuente {mejor:.2f} (mínimo 0.90)"
+
+
 def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     """El cuerpo del MP4 es el metraje de origen en el mismo instante (miniaturas en gris)."""
     origen = plan.get("origen")
@@ -329,6 +468,11 @@ def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     caja = (cuerpo["x"], cuerpo["y"], cuerpo["x"] + cuerpo["ancho"], cuerpo["y"] + cuerpo["alto"])
     alto_min = max(1, int(round(MINIATURA_ANCHO * cuerpo["alto"] / cuerpo["ancho"])))
     difs = []
+    agua = None
+    en_plan = (plan.get("campana") or {}).get("marca_agua")
+    if en_plan and (marca.raiz / en_plan["archivo"]).is_file():
+        placa = mod_agua.logo(marca.raiz / en_plan["archivo"], marca)
+        agua = (placa, en_plan["caja"])
     for frac in (0.3, 0.7):
         t = min(dur * frac, tope)
         real = _fotograma(Path(video), t)
@@ -336,6 +480,9 @@ def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
         if real is None or fuente is None:
             return False, f"no se pudo leer el fotograma en {t:.2f} s"
         a = _miniatura_gris(real.crop(caja), MINIATURA_ANCHO, alto_min)
+        if agua is not None:                 # la fuente esperada lleva el logo en su lugar fijo
+            fuente = fuente.resize((cuerpo["ancho"], cuerpo["alto"]), Image.LANCZOS).convert("RGBA")
+            fuente.alpha_composite(agua[0], (agua[1]["x"] - cuerpo["x"], agua[1]["y"] - cuerpo["y"]))
         b = _miniatura_gris(fuente, MINIATURA_ANCHO, alto_min)
         difs.append(float(np.abs(a - b).mean()))
     return max(difs) < UMBRAL_CUERPO, \
@@ -370,7 +517,16 @@ def textos_caben(plan: dict, marca: Marca) -> tuple[bool, str]:
     return not malos, "; ".join(malos)
 
 
-def revisar(video: Path, plan: dict, marca: Marca) -> list[tuple[str, bool, str]]:
+def rango_duracion(plan: dict, ficha: dict | None) -> tuple[float, float]:
+    """Duración permitida: `reglas.duracion_s` de la ficha (o la que declara el plan), dentro del formato."""
+    d = ((ficha or {}).get("reglas") or {}).get("duracion_s") if ficha is not None \
+        else (plan.get("campana") or {}).get("duracion_s")
+    if isinstance(d, (list, tuple)) and len(d) == 2 and all(isinstance(x, (int, float)) for x in d):
+        return max(DURACION_FORMATO_S[0], float(d[0])), min(DURACION_FORMATO_S[1], float(d[1]))
+    return DURACION_FORMATO_S
+
+
+def revisar(video: Path, plan: dict, marca: Marca, ficha: dict | None = None) -> list[tuple[str, bool, str]]:
     """Lista de (punto, ok, detalle). Cada nombre empieza con su base: [fotograma] o [plan].
 
     [fotograma] = medido sobre el MP4 (ffprobe o píxeles de sus fotogramas); [plan] = leído del
@@ -392,7 +548,9 @@ def revisar(video: Path, plan: dict, marca: Marca) -> list[tuple[str, bool, str]
           f"{v.get('codec_name')} + {a.get('codec_name')}")
     punto("fotograma", "Formato yuv420p", v.get("pix_fmt") == "yuv420p", str(v.get("pix_fmt")))
     punto("fotograma", "30 fps", abs(info["fps"] - 30) < 0.01, f"{info['fps']:.2f}")
-    punto("fotograma", "Duración de 7 a 30 s", 7 <= info["duracion"] <= 30, f"{info['duracion']:.2f} s")
+    d_min, d_max = rango_duracion(plan, ficha)
+    punto("fotograma", f"Duración de {d_min:g} a {d_max:g} s", d_min <= info["duracion"] <= d_max,
+          f"{info['duracion']:.2f} s")
     punto("fotograma", "faststart (moov antes de mdat)", faststart(Path(video)))
     dur_plan = float(plan.get("duracion") or 0)
     punto("fotograma", "Duración igual a la del plan", abs(info["duracion"] - dur_plan) <= TOL_DURACION_S,
@@ -433,6 +591,16 @@ def revisar(video: Path, plan: dict, marca: Marca) -> list[tuple[str, bool, str]
     ok_cue, det_cue = cuerpo_coincide(Path(video), plan, marca)
     punto("fotograma", "Cuerpo coincide con el origen", ok_cue, det_cue)
 
+    if (ficha or {}).get("marca_agua") or (plan.get("campana") or {}).get("marca_agua"):
+        ok_ma, det_ma = marca_agua_visible(Path(video), plan, marca, ficha)
+        punto("fotograma", "Marca de agua de la campaña", ok_ma, det_ma)
+    elif plan.get("origen"):
+        ok_ex, det_ex = logo_extra_en_esquina(Path(video), plan, marca)
+        punto("fotograma", "Sin logos extra no declarados", ok_ex, det_ex)
+    if ((ficha or {}).get("reglas") or {}).get("sin_musica") or (plan.get("campana") or {}).get("sin_musica"):
+        ok_au, det_au = audio_original(Path(video), plan)
+        punto("fotograma", "Audio sólo el original (sin música)", ok_au, det_au)
+
     col = plan.get("colores", {})
     colores_ok = all(str(col.get(k, "")).lower() == str(marca.datos["colores"][k]).lower()
                      for k in ("papel", "tinta", "lapiz_rojo"))
@@ -467,10 +635,18 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("video")
     ap.add_argument("plan")
     ap.add_argument("--raiz", default=None)
+    ap.add_argument("--ficha", default=None, help="id de la ficha de fuentes.yml (marca de agua y duración)")
     args = ap.parse_args(argv)
     marca = Marca.cargar(args.raiz)
     plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
-    puntos = revisar(Path(args.video), plan, marca)
+    ficha = None
+    if args.ficha:
+        from ..fuentes import cargar_fuentes
+        ficha = next((f for f in cargar_fuentes(args.raiz) if f.get("id") == args.ficha), None)
+        if ficha is None:
+            print(f"ficha {args.ficha!r} no existe en fuentes.yml")
+            return 2
+    puntos = revisar(Path(args.video), plan, marca, ficha)
     for nombre, ok, det in puntos:
         print(f"{'SÍ' if ok else 'NO'}  {nombre}" + (f"  [{det}]" if det else ""))
     todo = all(ok for _, ok, _ in puntos)
