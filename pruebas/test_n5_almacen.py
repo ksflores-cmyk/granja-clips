@@ -286,7 +286,7 @@ def test_la_url_de_supabase_copiada_con_rest_v1_se_normaliza():
     from fabrica.almacen import normalizar_url
     base = "https://abcd1234.supabase.co"
     for variante in (base, base + "/", base + "/rest/v1", base + "/rest/v1/", " " + base + "/REST/V1/ ",
-                     base + "/storage/v1"):
+                     base + "/storage/v1", base + "/auth/v1"):
         assert normalizar_url(variante) == base
 
 
@@ -300,7 +300,8 @@ def test_una_url_que_no_es_de_supabase_se_rechaza_antes_de_pedir_nada():
 
     cfg = {"bucket": "clips", "max_mb": 50, "prefijo": "tomas"}
     for mala in ("https://otro.example/rest/v1", "http://abcd.supabase.co", "https://abcd.supabase.co.evil.io",
-                 "https://abcd.supabase.co/otra/ruta", "https://u@abcd.supabase.co"):
+                 "https://abcd.supabase.co/otra/ruta", "https://u@abcd.supabase.co", "https://@abcd.supabase.co",
+                 "https://abcd.supabase.co#x", "https://abcd.supabase.co?", "https://abcd.supabase.co?a=1"):
         with pytest.raises(ErrorAlmacen):
             Almacen(mala, "clave-falsa", cfg, transporte=transporte)
     assert llamadas == []

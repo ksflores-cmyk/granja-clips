@@ -44,7 +44,8 @@ class Almacen:
         self.url = normalizar_url(url)
         partes = urlparse(self.url)
         if partes.scheme != "https" or not (partes.hostname or "").endswith((".supabase.co", ".invalid")) \
-                or partes.path not in ("", "/") or partes.query or partes.username:
+                or partes.path not in ("", "/") or partes.username is not None \
+                or any(c in self.url for c in "?#@"):
             # `.invalid` (RFC 2606) nunca resuelve: sólo existe para las pruebas.
             raise ErrorAlmacen("SUPABASE_URL no es la base https://<proyecto>.supabase.co; no se envía la clave")
         self._clave = clave
