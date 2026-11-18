@@ -14,7 +14,7 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from . import red
 from .config import cargar_yaml
@@ -42,6 +42,11 @@ class Almacen:
         if not url or not clave:
             raise ErrorAlmacen("falta SUPABASE_URL o SUPABASE_SERVICE_KEY")
         self.url = normalizar_url(url)
+        partes = urlparse(self.url)
+        if partes.scheme != "https" or not (partes.hostname or "").endswith((".supabase.co", ".invalid")) \
+                or partes.path not in ("", "/") or partes.query or partes.username:
+            # `.invalid` (RFC 2606) nunca resuelve: sólo existe para las pruebas.
+            raise ErrorAlmacen("SUPABASE_URL no es la base https://<proyecto>.supabase.co; no se envía la clave")
         self._clave = clave
         self.bucket = config["bucket"]
         self.max_bytes = int(config["max_mb"]) * 1024 * 1024

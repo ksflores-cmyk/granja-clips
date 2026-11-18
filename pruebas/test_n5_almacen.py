@@ -288,3 +288,21 @@ def test_la_url_de_supabase_copiada_con_rest_v1_se_normaliza():
     for variante in (base, base + "/", base + "/rest/v1", base + "/rest/v1/", " " + base + "/REST/V1/ ",
                      base + "/storage/v1"):
         assert normalizar_url(variante) == base
+
+
+def test_una_url_que_no_es_de_supabase_se_rechaza_antes_de_pedir_nada():
+    from fabrica.almacen import Almacen, ErrorAlmacen
+    llamadas = []
+
+    def transporte(*a, **k):
+        llamadas.append(a)
+        raise AssertionError("no debía haber red")
+
+    cfg = {"bucket": "clips", "max_mb": 50, "prefijo": "tomas"}
+    for mala in ("https://otro.example/rest/v1", "http://abcd.supabase.co", "https://abcd.supabase.co.evil.io",
+                 "https://abcd.supabase.co/otra/ruta", "https://u@abcd.supabase.co"):
+        with pytest.raises(ErrorAlmacen):
+            Almacen(mala, "clave-falsa", cfg, transporte=transporte)
+    assert llamadas == []
+    assert Almacen("https://abcd.supabase.co/rest/v1/", "clave-falsa", cfg, transporte=transporte).url \
+        == "https://abcd.supabase.co"
