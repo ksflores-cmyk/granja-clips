@@ -586,3 +586,51 @@ def test_pruebas_datos_no_esta_ignorado_por_gitignore():
     assert archivos
     r = subprocess.run(["git", "check-ignore", "--", *archivos], cwd=raiz, capture_output=True, text=True)
     assert r.returncode == 1 and r.stdout == "", f"ignorados por .gitignore: {r.stdout}"
+
+
+# ---- ronda 2 ----
+
+def test_cero_llamadas_a_helix_si_todas_las_fichas_de_twitch_se_rechazan(repo, editar_yaml):
+    editar_yaml(repo, "fuentes.yml", lambda d: d + [base(estado="pausada")])
+    f = Falso()
+    ok, no = puertas.filtrar(repo, [cand(id_origen="a"), cand(id_origen="b")], AHORA, "tiktok", cliente=cliente(f))
+    assert ok == [] and len(no) == 2 and f.llamadas == []
+
+
+@pytest.mark.parametrize("notas", ["origen:ClipX", "origen ClipX", "ok; origen ClipX; fin"])
+def test_notas_con_origen_en_ambas_formas(repo_n3, notas):
+    anotar_fila(repo_n3, {"notas": notas})
+    assert not puertas.puerta_no_repetido(repo_n3, cand())[0]
+    assert puertas.puerta_no_repetido(repo_n3, cand(id_origen="Clip"))[0]
+
+
+@pytest.mark.parametrize("url", ["https://clips.twitch.tv/ClipX", "https://www.twitch.tv/canal_ejemplo/clip/ClipX"])
+def test_url_de_clip_de_twitch_aporta_su_id(repo_n3, url):
+    anotar_fila(repo_n3, {"url": url})
+    assert not puertas.puerta_no_repetido(repo_n3, cand())[0]
+
+
+def test_url_de_tiktok_no_bloquea_un_id_igual_al_ultimo_tramo(repo_n3):
+    anotar_fila(repo_n3, {"url": "https://www.tiktok.com/@canal/video/123"})
+    assert puertas.puerta_no_repetido(repo_n3, cand(id_origen="123"))[0]
+    # la URL completa sí cuenta (brief)
+    u = "https://www.tiktok.com/@canal/video/123"
+    assert not puertas.puerta_no_repetido(repo_n3, cand(id_origen=u))[0]
+
+
+def test_workflows_no_interpolan_secretos_en_run():
+    carpeta = Path(__file__).parent.parent / ".github" / "workflows"
+    archivos = sorted(carpeta.glob("*.yml"))
+    assert archivos
+    for ruta in archivos:
+        wf = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+        for nombre, job in wf["jobs"].items():
+            for paso in job.get("steps", []):
+                run = paso.get("run", "")
+                assert "${{ secrets." not in run and "${{secrets." not in run, \
+                    f"{ruta.name}/{nombre}: un run interpola secretos; pásalos por env"
+
+
+def test_diagnostico_no_escribe_el_token_en_disco():
+    texto = (Path(__file__).parent.parent / ".github" / "workflows" / "diagnostico.yml").read_text(encoding="utf-8")
+    assert "-o token" not in texto and "-o juego" not in texto and "> token" not in texto

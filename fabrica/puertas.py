@@ -79,17 +79,25 @@ def _filas_marcador(raiz) -> list[dict]:
         return list(csv.DictReader(f))
 
 
-RE_ORIGEN = re.compile(r"origen:([^\s;,]+)")
+RE_ORIGEN = re.compile(r"origen[:\s]+([^\s;,]+)")   # "origen:<id>" u "origen <id>"
 
 
-def _ultimo_tramo(url: str) -> str:
-    return urlparse(url).path.rstrip("/").rsplit("/", 1)[-1]
+def _id_de_clip_twitch(url: str) -> str | None:
+    """Id de un clip de Twitch (clips.twitch.tv/<id> o twitch.tv/<canal>/clip/<id>); None si no lo es."""
+    u = urlparse(url)
+    host = (u.hostname or "").lower()
+    partes = [x for x in u.path.split("/") if x]
+    if host == "clips.twitch.tv" and len(partes) == 1:
+        return partes[0]
+    if host in ("twitch.tv", "www.twitch.tv", "m.twitch.tv") and len(partes) == 3 and partes[1] == "clip":
+        return partes[2]
+    return None
 
 
 def ids_en_marcador(raiz) -> set[str]:
     """Ids de origen ya registrados en marcador.csv. Convención para N4 al escribir el marcador:
-    poner el id de origen completo en `id_clip`, o la URL del clip en `url`, o `origen:<id>`
-    en `notas`. Se compara el id entero, nunca por subcadena."""
+    poner el id de origen completo en `id_clip`, o la URL del clip en `url` (de Twitch se extrae el id; de otras plataformas se compara la URL
+    completa), o `origen:<id>` u `origen <id>` en `notas`. Se compara el id entero, nunca por subcadena."""
     ids: set[str] = set()
     for f in _filas_marcador(raiz):
         if f.get("id_clip"):
@@ -97,7 +105,9 @@ def ids_en_marcador(raiz) -> set[str]:
         url = (f.get("url") or "").strip()
         if url:
             ids.add(url)
-            ids.add(_ultimo_tramo(url))
+            clip = _id_de_clip_twitch(url)
+            if clip:
+                ids.add(clip)
         ids.update(RE_ORIGEN.findall(f.get("notas") or ""))
     return ids
 
@@ -156,10 +166,10 @@ def filtrar(raiz, candidatos: list[Candidato], ahora: datetime, plataforma: str,
     base = sum(1 for f in _filas_marcador(raiz)
                if f.get("fecha") == hoy and f.get("plataforma") == plataforma)
     for c in candidatos:
-        j, err = juego() if c.origen != "brief" else (None, None)
         pruebas = [
             lambda: puerta_ficha(raiz, c, ahora, plataforma, c.pilar or pilar),
-            lambda: puerta_juego(c, j, err),
+            # el id del juego se resuelve aquí, sólo si la ficha ya pasó la primera puerta
+            lambda: puerta_juego(c, *(juego() if c.origen != "brief" else (None, None))),
             lambda: puerta_duracion(raiz, c),
             lambda: puerta_no_repetido(raiz, c),
             lambda: (False, "repetido en esta corrida") if c.id_origen in aprobados_ids else (True, "ok"),
