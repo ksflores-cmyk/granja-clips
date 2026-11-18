@@ -15,6 +15,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import tempfile
+import urllib.error
 import urllib.request
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -29,7 +30,7 @@ TOPE_BYTES = 300 * 1024 * 1024
 TOPE_TWITCH_S = 120
 BLOQUE = 1 << 20
 TIEMPO_ESPERA_S = 60
-FORMATO_TWITCH = "best[height<=1080][ext=mp4]/best[height<=1080]/best"
+FORMATO_TWITCH = "best[height<=1080][ext=mp4]/best[height<=1080]"   # todas las alternativas con tope de 1080p
 
 
 class ErrorDescarga(RuntimeError):
@@ -42,9 +43,20 @@ class Descarga:
     duracion: float
 
 
+class _SinRedirecciones(urllib.request.HTTPRedirectHandler):
+    """No sigue ninguna redirección: la URL autorizada es la única que se abre."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _opener():
+    return urllib.request.build_opener(_SinRedirecciones)
+
+
 def _abrir_urllib(url: str):
     req = urllib.request.Request(url, headers={"User-Agent": "granja-clips-descarga"})
-    return urllib.request.urlopen(req, timeout=TIEMPO_ESPERA_S)  # noqa: S310 (https comprobado antes)
+    return _opener().open(req, timeout=TIEMPO_ESPERA_S)  # noqa: S310 (https comprobado antes)
 
 
 def _es_https(url) -> bool:
@@ -86,6 +98,11 @@ def bajar_https(url: str, destino: Path, *, abrir=None, tope: int = TOPE_BYTES) 
     except ErrorDescarga:
         destino.unlink(missing_ok=True)
         raise
+    except urllib.error.HTTPError as e:
+        destino.unlink(missing_ok=True)
+        if 300 <= e.code < 400:
+            raise ErrorDescarga(f"redirección HTTP {e.code} rechazada: no se siguen redirecciones") from None
+        raise ErrorDescarga(f"HTTP {e.code}") from None
     except OSError as e:   # incluye URLError y tiempos de espera
         destino.unlink(missing_ok=True)
         raise ErrorDescarga(f"fallo de conexión: {type(e).__name__}") from None
