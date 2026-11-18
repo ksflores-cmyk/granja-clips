@@ -16,6 +16,9 @@ PAUSA_DE_ARRANQUE = (
 )
 
 
+MODO_DE_ARRANQUE = "modo: ensayo\nplataformas_activas: []\n"
+
+
 @pytest.fixture
 def repo(tmp_path):
     destino = tmp_path / "repo"
@@ -25,6 +28,7 @@ def repo(tmp_path):
     )
     # Las pruebas parten del estado de arranque (con PAUSA), sea cual sea el estado real del repo.
     (destino / "PAUSA").write_text(PAUSA_DE_ARRANQUE, encoding="utf-8")
+    (destino / "config" / "modo.yml").write_text(MODO_DE_ARRANQUE, encoding="utf-8")
     return destino
 
 

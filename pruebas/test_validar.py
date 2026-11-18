@@ -195,8 +195,10 @@ def test_sin_pausa_pasa(repo):
 
 def test_cabecera_marcador_exacta():
     assert len(CABECERA_MARCADOR) == 25
-    assert (RAIZ_REAL / "marcador.csv").read_text(encoding="utf-8").strip() == ",".join(CABECERA_MARCADOR)
-    assert (RAIZ_REAL / "envios-pendientes.csv").read_text(encoding="utf-8").strip() == ",".join(CABECERA_ENVIOS)
+    # Sólo la primera línea: en vivo la fábrica añade filas.
+    assert (RAIZ_REAL / "marcador.csv").read_text(encoding="utf-8").splitlines()[0] == ",".join(CABECERA_MARCADOR)
+    assert (RAIZ_REAL / "envios-pendientes.csv").read_text(encoding="utf-8").splitlines()[0] \
+        == ",".join(CABECERA_ENVIOS)
 
 
 def test_cabecera_alterada_falla(repo):
