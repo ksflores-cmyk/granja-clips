@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import struct
 import subprocess
@@ -28,6 +29,9 @@ from .marca import Marca
 # Diferencia media en gris entre miniaturas de 64 px del cuerpo del MP4 y de la fuente. Calibrada:
 # el cuerpo correcto da 0.3 a 1.3 (Sintel y BBB); con la fuente desfasada 0.5, 1 y -1 s da 1.8 a 49,
 # y el menor con desfase de 1 s es 4.6 (Sintel, -1 s). Tolerancia 2.5.
+# Metraje de juego a 60 fps (N4, render correcto, fuente a 60 fps y salida a 30): testsrc2 0.1 y 0.1;
+# testsrc2 con ruido temporal y cambio de tono continuo 0.4 y 0.6; mandelbrot en zoom 0.2 y 0.2. Ningún rojo
+# falso, así que no hace falta comparar contra el mejor de ±1 fotograma de la fuente.
 UMBRAL_CUERPO = 2.5
 # La tinta es donde la página esperada difiere del papel en más de este valor (canal máximo).
 DIF_TINTA = 48
@@ -110,6 +114,20 @@ def _fotograma(video: Path, seg: float) -> Image.Image | None:
         return img
 
 
+def _ultimo_fotograma(video: Path) -> Image.Image | None:
+    """Último fotograma decodificable del video (RGB), o None si no se pudo sacar."""
+    with tempfile.TemporaryDirectory(prefix="ultimo-") as tmp:
+        png = Path(tmp) / "u.png"
+        r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-sseof", "-0.5",
+                            "-i", str(video), "-an", "-update", "1", "-f", "image2", str(png)],
+                           capture_output=True)
+        if r.returncode != 0 or not png.is_file():
+            return None
+        img = Image.open(png).convert("RGB")
+        img.load()
+        return img
+
+
 def _dilatar(mascara: np.ndarray, px: int) -> np.ndarray:
     alto, ancho = mascara.shape
     p = np.pad(mascara, px)
@@ -160,8 +178,9 @@ def discrepancia_local(real: Image.Image, esperado: Image.Image, papel: Image.Im
 def cierre_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     """Demuestra en el video, no en el plan, que el cierre trae CORTE. y el crédito.
 
-    Saca el fotograma de duración − 0.2 s y compara por separado la región de CORTE. y la del
-    crédito con la página de cierre que corresponde al plan (sólo sobre la tinta esperada).
+    Saca el fotograma de duración − 0.2 s y el último fotograma decodificable (un MP4 con los
+    últimos cuadros en negro y la misma duración no debe pasar) y compara en cada uno, por separado,
+    la región de CORTE. y la del crédito con la página de cierre del plan (sólo sobre la tinta esperada).
     """
     dur = float(plan.get("duracion") or 0)
     if dur <= 0:
@@ -170,25 +189,30 @@ def cierre_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     if abs(dur_real - dur) > TOL_DURACION_S:
         return False, f"el MP4 dura {dur_real:.2f} s y el plan {dur:.2f} s (tolerancia {TOL_DURACION_S:.2f})"
     esperado = mod_cierre.pagina_cierre(marca, _toma(plan))
-    real = _fotograma(Path(video), max(0.0, dur_real - 0.2))
-    if real is None:
-        return False, "no se pudo leer el fotograma final"
-    if real.size != esperado.size:
-        return False, f"tamaño {real.size} distinto de {esperado.size}"
+    cuadros = {"en duración − 0.2 s": _fotograma(Path(video), max(0.0, dur_real - 0.2)),
+               "último fotograma": _ultimo_fotograma(Path(video))}
     papel = lienzo.papel(marca)
     x0, x1 = int(marca.m("margen")), int(marca.ancho - marca.m("margen"))
     corte_y, credito_y = int(marca.m("corte_y")), int(marca.m("credito_y"))
     regiones = {"CORTE.": (x0, corte_y, x1, credito_y),
                 "crédito": (x0, credito_y, x1, int(credito_y + 2 * marca.m("tam_credito")))}
-    try:
-        difs = {n: discrepancia_local(real, esperado, papel, caja) for n, caja in regiones.items()}
-    except ValueError as e:
-        return False, str(e)
-    fallan = [n for n, d in difs.items() if not d < K_BLOQUE]
-    det = ", ".join(f"{n} {d}" for n, d in difs.items()) + f" (máximo {K_BLOQUE} px por bloque)"
+    fallan: list[str] = []
+    det: list[str] = []
+    for cuando, real in cuadros.items():
+        if real is None:
+            return False, f"no se pudo leer el fotograma ({cuando})"
+        if real.size != esperado.size:
+            return False, f"tamaño {real.size} distinto de {esperado.size} ({cuando})"
+        try:
+            difs = {n: discrepancia_local(real, esperado, papel, caja) for n, caja in regiones.items()}
+        except ValueError as e:
+            return False, str(e)
+        det.append(f"{cuando}: " + ", ".join(f"{n} {d}" for n, d in difs.items()))
+        fallan += [f"{n} ({cuando})" for n, d in difs.items() if not d < K_BLOQUE]
+    texto = "; ".join(det) + f" (máximo {K_BLOQUE} px por bloque)"
     if fallan:
-        det += "; falla: " + " y ".join(fallan)
-    return not fallan, det
+        texto += "; falla: " + " y ".join(fallan)
+    return not fallan, texto
 
 
 def cabecera_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
@@ -283,6 +307,14 @@ def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     faltan = [k for k in ("archivo", "sha256", "inicio", "duracion") if not (origen or {}).get(k) and (origen or {}).get(k) != 0]
     if faltan:
         return False, "el plan declara cuerpo de video pero el origen no trae: " + ", ".join(faltan)
+    dur_o, ini_o, dur_p = origen["duracion"], origen["inicio"], plan.get("duracion")
+    for nombre, v in (("duracion", dur_o), ("inicio", ini_o)):
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+            return False, f"origen.{nombre} debe ser un número finito (trae {v!r})"
+    if dur_o <= 0 or ini_o < 0:
+        return False, f"origen.duracion debe ser positiva e inicio no negativo (trae {dur_o!r} y {ini_o!r})"
+    if isinstance(dur_p, bool) or not isinstance(dur_p, (int, float)) or abs(dur_o - dur_p) > 0.01:
+        return False, f"origen.duracion {dur_o!r} no coincide con la duración que declara el compositor ({dur_p!r})"
     if cuerpo.get("ancho", 0) <= 0 or cuerpo.get("alto", 0) <= 0:
         return False, f"la caja del cuerpo es inválida: {cuerpo}"
     ruta = Path(str(origen["archivo"]))

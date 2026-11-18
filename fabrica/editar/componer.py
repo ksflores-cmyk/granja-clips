@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -33,7 +34,8 @@ class Linea:
 def _duracion_pista_video(ruta: Path, v: dict, formato: dict) -> float:
     """Duración de la pista de video (no la del contenedor, que puede ser la del audio).
 
-    Orden: `duration` de la pista; nb_frames / tasa de cuadros; marcas de tiempo de los paquetes.
+    Orden: `duration` de la pista; nb_frames / tasa de cuadros; marcas de tiempo de los paquetes
+    (del primer PTS válido al final del último paquete).
     """
     def numero(x):
         try:
@@ -55,12 +57,23 @@ def _duracion_pista_video(ruta: Path, v: dict, formato: dict) -> float:
     paquetes = json.loads(subprocess.check_output([
         "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time,duration_time",
         "-of", "json", str(ruta)])).get("packets", [])
-    fin = 0.0
+    # Intervalo desde el primer PTS válido hasta el final del último paquete (no "mayor PTS + duración":
+    # con una pista que no arranca en 0 eso suma el desfase inicial a la duración).
+    pts = []
     for p in paquetes:
-        pts = numero(p.get("pts_time")) or 0.0
-        fin = max(fin, pts + (numero(p.get("duration_time")) or 0.0))
-    if fin > 0:
-        return fin
+        try:
+            t = float(p.get("pts_time"))
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(t):
+            pts.append((t, numero(p.get("duration_time"))))
+    if pts:
+        inicio = min(t for t, _ in pts)
+        fin = max(t + (d or 0.0) for t, d in pts)
+        if not any(d for _, d in pts) and len(pts) > 1:     # sin duraciones: un paso medio más allá del último
+            fin += (max(t for t, _ in pts) - inicio) / (len(pts) - 1)
+        if fin - inicio > 0:
+            return fin - inicio
     raise ValueError(f"no se pudo leer la duración de la pista de video de {ruta}")
 
 
