@@ -169,10 +169,13 @@ def detectar_con_motivos(raiz, ahora: datetime, cliente: ClienteTwitch | None = 
         if not ok:
             continue
         if ficha.get("material"):
-            for url in ficha["material"]:
+            for m in ficha["material"]:
+                url = m.get("url") if isinstance(m, dict) else m
+                creador = (m.get("creador") if isinstance(m, dict) else None) or ficha.get("creador", "")
                 candidatos.append(Candidato(
                     fuente_id=ficha["id"], origen="brief", id_origen=url, url=url,
-                    titulo=url.rsplit("/", 1)[-1], creador=str(ficha.get("creador", "")),
+                    titulo=(m.get("archivo") if isinstance(m, dict) and m.get("archivo")
+                            else url.rsplit("/", 1)[-1]), creador=str(creador),
                     idioma="", juego_id=None, duracion_s=None, vistas=0,
                     vistas_por_hora=0.0, creado_en=None, vod_offset=None,
                     pilar=pilar, medir_al_descargar=True))
