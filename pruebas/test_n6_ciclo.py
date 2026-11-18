@@ -82,6 +82,7 @@ def mp4_falso(carpeta: Path, nombre="toma.mp4") -> Path:
     carpeta.mkdir(parents=True, exist_ok=True)
     ruta = carpeta / nombre
     ruta.write_bytes(b"video-inventado")
+    ruta.with_suffix(".plan.json").write_text("{}", encoding="utf-8")
     return ruta
 
 
@@ -291,19 +292,58 @@ def test_desde_el_21_el_decidir_dice_si_en_cada_hueco_y_no_en_las_demas_horas(r,
         assert salida.read_text() == f"trabajo={esperado}\n", hh
 
 
-def test_tope_de_60_minutos_de_actions(r):
+def minutos(r, **datos):
     (r / "estado").mkdir(exist_ok=True)
-    (r / "estado" / "actions-minutos.json").write_text(json.dumps({"2026-11-18": 60}), encoding="utf-8")
+    (r / "estado" / "actions-minutos.json").write_text(json.dumps(datos), encoding="utf-8")
+
+
+# AHORA es 10:07 GT: ese día ya corrieron 11 `decidir` de 1 minuto (los de las 0:07 a las 10:07).
+def test_el_tope_exige_20_minutos_libres_de_los_60(r):
+    minutos(r, **{"2026-11-18": 30})                       # 30 + 11 de decidir = 41: quedan 19
     cod, sal, e = correr_con_espias(r)
     assert cod == 0 and "tope diario de Actions" in sal and sin_llamadas(e)
+    minutos(r, **{"2026-11-18": 60})
+    assert "tope diario" in correr_con_espias(r)[1]
 
 
-def test_con_59_minutos_aun_corre_y_otro_dia_no_cuenta(r):
-    (r / "estado").mkdir(exist_ok=True)
-    (r / "estado" / "actions-minutos.json").write_text(json.dumps({"2026-11-18": 59, "2026-11-17": 500}),
-                                                       encoding="utf-8")
+def test_con_29_minutos_y_11_de_decidir_quedan_20_y_aun_corre(r):
+    minutos(r, **{"2026-11-18": 29, "2026-11-17": 500})    # otro día no cuenta
     cod, sal = correr(r, hacer=Hacer(r, oks=(False,)), cands=[cand()])
     assert "tope diario" not in sal and "sin hueco" not in sal
+
+
+def test_cada_decidir_cuenta_un_minuto():
+    assert ciclo.minutos_de_decidir(datetime(2026, 11, 18, 0, 7, tzinfo=ZONA)) == 1
+    assert ciclo.minutos_de_decidir(datetime(2026, 11, 18, 23, 7, tzinfo=ZONA)) == 24
+
+
+def test_un_producir_que_murio_sin_cerrar_cobra_20_minutos_a_la_siguiente(r):
+    ciclo.marcar_inicio(r, AHORA - timedelta(hours=1), "111")
+    assert ciclo.minutos_del_dia(r, AHORA, run_id="222") == 20          # otra corrida: se cobra
+    assert ciclo.minutos_del_dia(r, AHORA, run_id="111") == 0           # la propia corrida no se cobra a sí misma
+    minutos_antes = ciclo.minutos_usados(r, AHORA, "222")
+    assert minutos_antes == 20 + 11
+    cod, sal, e = correr_con_espias(r)                                  # 31 + 20 = 51 <= 60: aún entra
+    assert "tope diario" not in sal
+    ciclo.sumar_minutos(r, AHORA, 5, run_id="222")                      # el cierre de la siguiente: cobra la ajena
+    datos = json.loads((r / "estado" / "actions-minutos.json").read_text())
+    assert "_en_curso" not in datos and datos["2026-11-18"] == 25
+
+
+def test_el_cierre_normal_borra_la_marca_sin_cobrar_de_mas(r):
+    ciclo.marcar_inicio(r, AHORA, "111")
+    ciclo.sumar_minutos(r, AHORA, 4, run_id="111")
+    datos = json.loads((r / "estado" / "actions-minutos.json").read_text())
+    assert datos == {"2026-11-18": 4}
+
+
+def test_la_marca_de_inicio_vieja_entra_en_la_admision(r):
+    ciclo.marcar_inicio(r, AHORA - timedelta(hours=1), "111")
+    minutos_json = json.loads((r / "estado" / "actions-minutos.json").read_text())
+    minutos_json["2026-11-18"] = 10
+    (r / "estado" / "actions-minutos.json").write_text(json.dumps(minutos_json))
+    assert ciclo.minutos_usados(r, AHORA, "222") == 41            # 10 anotados + 20 de la marca + 11 de decidir
+    assert ciclo.admite_producir(r, AHORA, "222") is False        # 41 + 20 > 60
 
 
 def test_sumar_minutos_acumula_por_dia_y_poda(r):
@@ -427,13 +467,24 @@ def test_regla_del_10_por_ciento_y_la_primera_toma_puede_ser_informativa(r):
     ok, motivo = informativa.cabe_en_el_tope(r, AHORA)
     assert ok and "primera toma" in motivo
     for n in range(1, 9):                                   # 8 tomas no informativas en los últimos 7 días
-        anotar(r, id_clip=f"y-{n}", toma=n, fecha="2026-11-18", pilar="momentos")
+        anotar(r, id_clip=f"y-{n}", toma=n, fecha="2026-11-18", hora="08:00", pilar="momentos")
     assert informativa.cabe_en_el_tope(r, AHORA)[0] is False        # 1/9 = 11 %: no pasa
-    anotar(r, id_clip="y-9", toma=9, fecha="2026-11-18", pilar="momentos")
+    anotar(r, id_clip="y-9", toma=9, fecha="2026-11-18", hora="08:00", pilar="momentos")
     assert informativa.cabe_en_el_tope(r, AHORA)[0] is True         # 1/10 = 10 %: cabe justo
     for n in range(10, 20):
-        anotar(r, id_clip=f"y-{n}", toma=n, fecha="2026-11-18", pilar="momentos")
+        anotar(r, id_clip=f"y-{n}", toma=n, fecha="2026-11-18", hora="08:00", pilar="momentos")
     assert informativa.cabe_en_el_tope(r, AHORA)[0] is True         # 1/20 = 5 %
+
+
+def test_la_regla_del_10_por_ciento_no_cuenta_lo_programado_a_futuro(r):
+    for n in range(1, 9):                                   # 8 tomas programadas para más tarde hoy y mañana
+        anotar(r, id_clip=f"f-{n}", toma=n, fecha="2026-11-18" if n < 5 else "2026-11-19",
+               hora="11:00" if n < 5 else "08:00", pilar="momentos")
+    ok, motivo = informativa.cabe_en_el_tope(r, AHORA)
+    assert ok and "primera toma" in motivo                  # nada publicado todavía: no hay base
+    anotar(r, id_clip="p-1", toma=20, fecha="2026-11-18", hora="10:07", pilar="momentos")   # justo ahora: ya cuenta
+    anotar(r, id_clip="p-2", toma=21, fecha="2026-11-18", hora="10:08", pilar="momentos")   # un minuto después: no
+    assert informativa.cabe_en_el_tope(r, AHORA) == (False, informativa.cabe_en_el_tope(r, AHORA)[1])
 
 
 def test_la_regla_del_10_por_ciento_impide_el_respaldo(r, monkeypatch):
@@ -854,3 +905,136 @@ def test_confirmar_canales_acepta_guion_vivo_con_espacio_pero_sigue_exigiendo_se
         with pytest.raises(publicar.AlertaRoja):
             publicar.confirmar_canales([malo], cfg, None, plataformas=["shorts"], escribir=False,
                                        exigir_guardado=True)
+
+
+# ---------------------------------------------------------------- 10. ronda 2
+
+def test_la_alerta_en_la_segunda_plataforma_conserva_lo_de_la_primera(r):
+    """Shorts sale y tiktok dispara alerta roja: la toma avanza, el candidato queda visto y la informativa usada."""
+    cambiar_modo(r, "vivo", ["shorts", "tiktok"])
+
+    class BufferAlertaEnLaSegunda(BufferSimulado):
+        creados = 0
+
+        def __call__(self, metodo, url, encabezados, cuerpo=None, tiempo=60):
+            if cuerpo and b"createPost" in cuerpo:
+                type(self).creados += 1
+                if type(self).creados > 1:
+                    return F.resp(200, {"data": {"createPost": {"__typename": "MutationError",
+                                                                "message": "Account restricted"}}})
+            return super().__call__(metodo, url, encabezados, cuerpo, tiempo)
+
+    antes = registro.contador_toma(r)
+    cod, sal = correr(r, cands=[cand("c1")], buffer=BufferAlertaEnLaSegunda())
+    comprobar_alerta(r, "cuenta")
+    assert [f["plataforma"] for f in filas(r)] == ["shorts"]
+    assert registro.contador_toma(r) == antes + 1 and "c1" in vistos(r)
+    cerrados = json.loads((r / "estado" / "huecos-cerrados.json").read_text())
+    assert {"fecha": "2026-11-18", "hora": "11:00", "plataforma": "shorts"} in cerrados
+
+
+def test_la_alerta_en_la_segunda_conserva_la_informativa_usada(r, monkeypatch):
+    monkeypatch.setattr(ciclo.informativa, "armar", armar_falso)
+    cambiar_modo(r, "vivo", ["shorts", "tiktok"])
+
+    class B(BufferSimulado):
+        n = 0
+
+        def __call__(self, metodo, url, encabezados, cuerpo=None, tiempo=60):
+            if cuerpo and b"createPost" in cuerpo:
+                B.n += 1
+                if B.n > 1:
+                    return F.resp(200, {"data": {"createPost": {"__typename": "MutationError",
+                                                                "message": "Account suspended"}}})
+            return super().__call__(metodo, url, encabezados, cuerpo, tiempo)
+
+    correr(r, buffer=B())
+    assert yaml.safe_load((r / "informativas.yml").read_text(encoding="utf-8"))["informativas"][0]["usada"] is True
+    assert (r / "PAUSA").exists()
+
+
+def test_una_clave_en_el_error_de_elegir_candidatos_corta_antes_del_respaldo_y_de_publicar(r, monkeypatch):
+    monkeypatch.setattr(ciclo.informativa, "armar", lambda *a, **k: pytest.fail("no debe armar la informativa"))
+    sim, supa = BufferSimulado(), SupabaseSimulado()
+
+    def detectar_roto(raiz, ahora, cliente):
+        raise RuntimeError(f"fallo con {CLAVE} en la URL")
+
+    sal = []
+    cod = ciclo.ejecutar(r, ahora=AHORA, env=ENV, imprimir=sal.append, validar_fn=VERDE, detectar_fn=detectar_roto,
+                         hacer_toma_fn=Hacer(r), transporte_buffer=sim, transporte_almacen=supa)
+    assert cod == 0 and CLAVE not in "\n".join(sal)
+    comprobar_alerta(r, "BUFFER_API_KEY")
+    assert sim.consultas == [] and supa.llamadas == [] and filas(r) == []
+
+
+def test_un_hueco_cerrado_por_plataforma_no_se_reabre_aunque_fallara(r):
+    cambiar_modo(r, "vivo", ["shorts", "tiktok"])
+    assert ciclo.buscar_hueco(r, AHORA, ["shorts", "tiktok"]).plataformas == ["shorts", "tiktok"]
+    ciclo.cerrar_hueco(r, ciclo.buscar_hueco(r, AHORA, ["shorts"]), "tiktok")
+    assert ciclo.buscar_hueco(r, AHORA, ["shorts", "tiktok"]).plataformas == ["shorts"]
+    ciclo.cerrar_hueco(r, ciclo.buscar_hueco(r, AHORA, ["shorts"]), "shorts")
+    assert ciclo.buscar_hueco(r, AHORA, ["shorts", "tiktok"]) is None
+    assert ciclo.buscar_hueco(r, datetime(2026, 11, 18, 12, 7, tzinfo=ZONA), ["shorts"]).hora == "13:00"
+
+
+def test_una_plataforma_que_fallo_no_vuelve_a_intentar_ese_hueco_en_la_siguiente_corrida(r):
+    cod, sal = correr(r, cands=[cand("c1")], buffer=BufferCuentaRechaza())
+    assert "shorts: descartada" in sal and filas(r) == []
+    assert ciclo.buscar_hueco(r, AHORA, ["shorts"]) is None        # cerrado aunque no haya fila en el marcador
+
+
+def test_con_modo_ensayo_forzado_por_la_rama_nunca_hay_createpost(r):
+    sim = BufferSimulado()
+    cod, sal = correr(r, cands=[cand("c1")], buffer=sim, solo_ensayo=True)
+    assert cod == 0 and not sim.hubo("createPost") and filas(r) == []
+
+
+def test_ensayo_forzado_falla_si_no_entrega_mp4_plan_e_informe(r, tmp_path, monkeypatch):
+    cambiar_modo(r, "ensayo", [])
+
+    def armar_sin_plan(raiz, entrada, ahora, salida):
+        res = armar_falso(raiz, entrada, ahora, salida)
+        res.mp4.with_suffix(".plan.json").unlink()
+        return res
+
+    monkeypatch.setattr(ciclo.informativa, "armar", armar_sin_plan)
+    cod, sal = correr(r, ensayo_forzado=True, salida_dir=tmp_path / "s", env={})
+    assert cod == 1 and "no entregó" in sal and "plan" in sal
+
+
+def test_ensayo_forzado_sin_toma_falla(r, tmp_path):
+    cambiar_modo(r, "ensayo", [])
+    ruta = r / "informativas.yml"
+    d = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    d["informativas"][0]["usada"] = True
+    ruta.write_text(yaml.safe_dump(d, allow_unicode=True), encoding="utf-8")
+    cod, sal = correr(r, ensayo_forzado=True, salida_dir=tmp_path / "s", env={})
+    assert cod == 1 and "sin toma" in sal
+
+
+def test_workflow_cada_corrida_parte_de_main_al_dia_y_fuera_de_main_solo_ensayo(wf):
+    pasos = wf["jobs"]["producir"]["steps"]
+    nombres = [p.get("name", p.get("uses", "")) for p in pasos]
+    reset = next(p for p in pasos if p.get("name") == "Partir de main al día")
+    assert reset["run"] == "git fetch origin main && git reset --hard origin/main"
+    assert reset["if"] == "${{ github.ref == 'refs/heads/main' }}"
+    assert nombres.index("Partir de main al día") == 1                       # justo después del checkout
+    ciclo_paso = next(p for p in pasos if p.get("name") == "Ciclo")
+    assert pasos.index(reset) < pasos.index(ciclo_paso)
+    assert 'extra="--modo-ensayo"' in ciclo_paso["run"] and 'refs/heads/main' in ciclo_paso["run"]
+    cierre = next(p for p in pasos if "Cerrar el ciclo" in p.get("name", ""))
+    assert "github.ref == 'refs/heads/main'" in cierre["if"]
+
+
+def test_workflow_la_marca_de_inicio_se_escribe_al_empezar_y_el_cierre_la_cierra(wf):
+    pasos = wf["jobs"]["producir"]["steps"]
+    marca = next(p for p in pasos if "por si la corrida muere" in p.get("name", ""))
+    assert "--marcar-inicio" in marca["run"] and "git push" in marca["run"] and "refs/heads/main" in marca["run"]
+    assert pasos.index(marca) < pasos.index(next(p for p in pasos if p.get("name") == "Ciclo"))
+    assert '--run-id "$GITHUB_RUN_ID"' in cierre_run(wf)
+
+
+def test_workflow_el_artefacto_falla_si_no_hay_archivos(wf):
+    subir = next(p for p in wf["jobs"]["producir"]["steps"] if p.get("uses", "").startswith("actions/upload-artifact"))
+    assert subir["with"]["if-no-files-found"] == "error"

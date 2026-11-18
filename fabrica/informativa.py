@@ -76,13 +76,17 @@ def _filas(raiz) -> list[dict]:
 
 
 def cabe_en_el_tope(raiz, ahora: datetime) -> tuple[bool, str]:
-    """La informativa no pasa del 10 % de las tomas de los últimos 7 días, contando la nueva.
+    """La informativa no pasa del 10 % de las tomas ya publicadas en los últimos 7 días (las programadas a futuro no cuentan), contando la nueva.
 
     Sin nada publicado en esos 7 días, la primera toma del canal puede ser informativa."""
-    desde = (ahora.astimezone(ZONA) - timedelta(days=DIAS_VENTANA)).date().isoformat()
+    local = ahora.astimezone(ZONA)
+    desde = (local - timedelta(days=DIAS_VENTANA)).date().isoformat()
+    corte = (local.date().isoformat(), local.strftime("%H:%M"))
     tomas: dict[str, str] = {}
     for f in _filas(raiz):
-        if (f.get("fecha") or "") >= desde and f.get("toma"):
+        momento = (f.get("fecha") or "", (f.get("hora") or "00:00").strip())
+        # sólo lo ya publicado: dentro de la ventana y con fecha y hora menores o iguales a ahora
+        if momento[0] >= desde and momento <= corte and f.get("toma"):
             tomas[f["toma"]] = f.get("pilar") or ""
     total = len(tomas)
     if total == 0:

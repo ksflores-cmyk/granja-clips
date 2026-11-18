@@ -53,7 +53,12 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - name: Marcar el inicio
+      # Cada corrida parte del estado MÁS NUEVO de main, no del SHA que la disparó: si quedó en cola detrás de
+      # otra que guardó un envío, el marcador y el libro de envíos de su checkout estarían viejos.
+      - name: Partir de main al día
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: git fetch origin main && git reset --hard origin/main
+      - name: Marcar el inicio (reloj)
         run: echo "INICIO_S=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v5
         with:
@@ -65,12 +70,30 @@ jobs:
           sudo apt-get -o Acquire::Retries=3 update -q
           sudo apt-get -o Acquire::Retries=3 install -y -q --no-install-recommends ffmpeg
       - run: pip install -r requirements.txt
+      - name: Marcar el inicio (en el repo, por si la corrida muere)
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/main" ] && [ "$ENSAYO_FORZADO" != "true" ]; then
+            python -m fabrica.ciclo --marcar-inicio --run-id "$GITHUB_RUN_ID" || true
+            if [ -n "$(git status --porcelain -- estado/actions-minutos.json)" ]; then
+              git config user.name "fabrica"
+              git config user.email "fabrica@users.noreply.github.com"
+              git add -A -- estado/actions-minutos.json
+              git commit -q -m "[skip ci] inicio de ciclo $GITHUB_RUN_ID"
+              for intento in 1 2 3; do
+                git push origin "HEAD:${GITHUB_REF_NAME}" && break
+                git pull -q --rebase origin "${GITHUB_REF_NAME}" || { git rebase --abort; break; }
+              done
+            fi
+          fi
       - name: Ciclo
         run: |
+          # Fuera de main (un dispatch desde otra rama) sólo se hace ensayo y no se guarda nada.
+          extra=""
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then extra="--modo-ensayo"; fi
           if [ "$ENSAYO_FORZADO" = "true" ]; then
-            python -m fabrica.ciclo --ensayo-forzado --salida "$RUNNER_TEMP/ensayo"
+            python -m fabrica.ciclo $extra --ensayo-forzado --salida "$RUNNER_TEMP/ensayo"
           else
-            python -m fabrica.ciclo
+            python -m fabrica.ciclo $extra
           fi
       - name: Subir el ensayo (MP4, plan e informe de la puerta)
         if: ${{ always() && inputs.ensayo_forzado }}
@@ -79,19 +102,19 @@ jobs:
           name: ensayo-forzado
           path: ${{ runner.temp }}/ensayo
           retention-days: 3
-          if-no-files-found: warn
+          if-no-files-found: error
       # El cron corre en `main` y la fábrica guarda su estado con un push directo (decisión del director):
       # es el repo de la fábrica. Por eso el commit sólo puede incluir los archivos de PERMITIDOS; cualquier
       # otro archivo cambiado hace fallar el paso ANTES de commit y push. El issue de alerta roja se abre
       # sólo después de que el push haya quedado confirmado; si el push falla 3 veces, el paso falla sin
       # abrir el issue (la corrida en rojo ya avisa por correo de GitHub).
       - name: Cerrar el ciclo (minutos, avisos, alerta roja, commit)
-        if: ${{ always() && !inputs.ensayo_forzado }}
+        if: ${{ always() && !inputs.ensayo_forzado && github.ref == 'refs/heads/main' }}
         run: |
           set -u
           PERMITIDOS='^(marcador\.csv|registro\.md|estado/.*|config/canales\.yml|informativas\.yml|marca\.yml|PAUSA)$'
           minutos=$(( ( $(date +%s) - INICIO_S + 59 ) / 60 ))
-          python -m fabrica.ciclo --sumar-minutos "$minutos"
+          python -m fabrica.ciclo --sumar-minutos "$minutos" --run-id "$GITHUB_RUN_ID"
           python -m fabrica.ciclo --abrir-avisos || true
           alerta=no
           if [ -f estado/alerta.json ] && [ -n "$(git status --porcelain -- estado/alerta.json)" ]; then

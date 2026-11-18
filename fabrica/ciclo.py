@@ -51,18 +51,28 @@ COD_OK, COD_ERROR, COD_NEGADO = 0, 1, 2
 
 # ------------------------------------------------------------------ utilidades
 
+class AlertaRojaCiclo(Exception):
+    """Algo que obliga a parar: se crea PAUSA y estado/alerta.json."""
+
+
 class Salida:
     """Imprime cada línea sin claves y guarda el texto crudo para buscar fugas."""
 
     def __init__(self, imprimir=print, env=None):
         self.imprimir = imprimir
-        self.secretos = [v for k in SECRETOS if len(v := (env or {}).get(k, "")) >= 8]
+        self.valores = {k: v for k in SECRETOS if len(v := (env or {}).get(k, "")) >= 8}
+        self.secretos = list(self.valores.values())
         self.lineas: list[str] = []
+        self.vigilar = False       # con el ciclo en marcha, una clave en cualquier texto lo corta
 
     def __call__(self, texto) -> None:
         texto = str(texto)
         self.lineas.append(texto)
         self.imprimir(red.ocultar(texto, self.secretos))
+        if self.vigilar:
+            for nombre, valor in self.valores.items():
+                if valor in texto:
+                    raise AlertaRojaCiclo(f"una clave apareció en el log ({nombre})")
 
     def fuga(self, env) -> str | None:
         """Nombre de la variable cuya clave apareció en lo que se imprimió, o None."""
@@ -72,10 +82,6 @@ class Salida:
             if len(v) >= 8 and v in todo:
                 return k
         return None
-
-
-class AlertaRojaCiclo(Exception):
-    """Algo que obliga a parar: se crea PAUSA y estado/alerta.json."""
 
 
 def _ahora(ahora) -> datetime:
@@ -117,20 +123,70 @@ def en_cadencia(ahora: datetime) -> bool:
     return local.date() < DIA_CADENCIA_LENTA or local.hour % 3 == 0
 
 
+MINUTOS_PRODUCIR = 20          # lo que se cobra a un `producir` que no llegó a cerrar
+CLAVE_EN_CURSO = "_en_curso"
+
+
 def _ruta_minutos(raiz) -> Path:
     return raiz_repo(raiz) / "estado" / "actions-minutos.json"
 
 
-def minutos_del_dia(raiz, ahora: datetime) -> float:
+def _leer_minutos(raiz) -> dict:
     datos = _leer_json(_ruta_minutos(raiz), {})
+    return datos if isinstance(datos, dict) else {}
+
+
+def _marca_ajena(datos: dict, run_id) -> dict | None:
+    """La marca de inicio de un `producir` que no cerró (otra corrida distinta de la actual)."""
+    m = datos.get(CLAVE_EN_CURSO)
+    if isinstance(m, dict) and m.get("inicio") and str(m.get("run_id") or "") != str(run_id or "\0"):
+        return m
+    return None
+
+
+def minutos_del_dia(raiz, ahora: datetime, run_id=None) -> float:
+    """Minutos anotados hoy (GT), más los 20 de un `producir` anterior que no llegó a cerrar."""
+    datos = _leer_minutos(raiz)
     dia = ahora.astimezone(ZONA).date().isoformat()
-    return float(datos.get(dia, 0)) if isinstance(datos, dict) else 0.0
+    total = float(datos.get(dia, 0))
+    m = _marca_ajena(datos, run_id)
+    if m and str(m["inicio"])[:10] == dia:
+        total += MINUTOS_PRODUCIR
+    return total
 
 
-def sumar_minutos(raiz, ahora: datetime, minutos: float) -> float:
-    """Suma los minutos de una corrida al total del día (GT) y borra los días de más de 14 días."""
-    datos = _leer_json(_ruta_minutos(raiz), {})
-    datos = datos if isinstance(datos, dict) else {}
+def minutos_de_decidir(ahora: datetime) -> int:
+    """Cada hora corre un `decidir` de 1 minuto: se cuentan los del día hasta ahora (no dejan commit)."""
+    return ahora.astimezone(ZONA).hour + 1
+
+
+def minutos_usados(raiz, ahora: datetime, run_id=None) -> float:
+    return minutos_del_dia(raiz, ahora, run_id) + minutos_de_decidir(ahora)
+
+
+def admite_producir(raiz, ahora: datetime, run_id=None) -> bool:
+    """`producir` sólo entra si quedan al menos 20 minutos del tope de 60."""
+    return minutos_usados(raiz, ahora, run_id) + MINUTOS_PRODUCIR <= TOPE_MINUTOS_DIA
+
+
+def marcar_inicio(raiz, ahora: datetime, run_id) -> None:
+    """Se escribe al empezar `producir`: si la corrida muere por tiempo, la siguiente le cobra sus 20 minutos."""
+    datos = _leer_minutos(raiz)
+    datos[CLAVE_EN_CURSO] = {"inicio": ahora.astimezone(ZONA).replace(microsecond=0).isoformat(),
+                             "run_id": str(run_id or "")}
+    _escribir_json(_ruta_minutos(raiz), datos)
+
+
+def sumar_minutos(raiz, ahora: datetime, minutos: float, run_id=None) -> float:
+    """Suma los minutos de una corrida al total del día (GT), cierra su marca de inicio y poda lo viejo.
+
+    Si la marca es de otra corrida (que murió sin cerrar), le cobra sus 20 minutos en el día de esa marca."""
+    datos = _leer_minutos(raiz)
+    ajena = _marca_ajena(datos, run_id)
+    datos.pop(CLAVE_EN_CURSO, None)
+    if ajena:
+        d = str(ajena["inicio"])[:10]
+        datos[d] = round(float(datos.get(d, 0)) + MINUTOS_PRODUCIR, 2)
     dia = ahora.astimezone(ZONA).date()
     datos[dia.isoformat()] = round(float(datos.get(dia.isoformat(), 0)) + float(minutos), 2)
     corte = (dia - timedelta(days=14)).isoformat()
@@ -140,6 +196,26 @@ def sumar_minutos(raiz, ahora: datetime, minutos: float) -> float:
 
 
 # ------------------------------------------------------------------ paso 5: hueco
+
+def _ruta_cerrados(raiz) -> Path:
+    return raiz_repo(raiz) / "estado" / "huecos-cerrados.json"
+
+
+def huecos_cerrados(raiz) -> set[tuple]:
+    datos = _leer_json(_ruta_cerrados(raiz), [])
+    return {(d.get("fecha"), d.get("hora"), d.get("plataforma")) for d in datos if isinstance(d, dict)} \
+        if isinstance(datos, list) else set()
+
+
+def cerrar_hueco(raiz, hueco, plataforma: str) -> None:
+    """Un hueco queda cerrado para una plataforma en cuanto se intentó (salió o falló): no se reintenta."""
+    datos = _leer_json(_ruta_cerrados(raiz), [])
+    datos = datos if isinstance(datos, list) else []
+    nuevo = {"fecha": hueco.fecha, "hora": hueco.hora, "plataforma": plataforma}
+    if nuevo not in datos:
+        datos.append(nuevo)
+        _escribir_json(_ruta_cerrados(raiz), datos[-200:])
+
 
 @dataclass
 class Hueco:
@@ -168,7 +244,7 @@ def buscar_hueco(raiz, ahora: datetime, activas: list[str]) -> Hueco | None:
     t = cargar_yaml("temporada.yml", raiz)
     local = ahora.astimezone(ZONA)
     filas = puertas._filas_marcador(raiz)
-    ocupados = {(f.get("fecha"), f.get("hora"), f.get("plataforma")) for f in filas}
+    ocupados = {(f.get("fecha"), f.get("hora"), f.get("plataforma")) for f in filas} | huecos_cerrados(raiz)
     candidatos = []
     for dia in (local.date(), local.date() + timedelta(days=1)):
         for lista in ("huecos_normales", "huecos_estreno"):
@@ -377,27 +453,48 @@ def ensayo_de_carga(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer,
 
 
 def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer, transporte_almacen,
-                     reloj) -> tuple[list[str], list[str]]:
+                     reloj, al_resolver=None) -> tuple[list[str], list[str], list[str]]:
     """Sube el MP4, comprueba la URL y programa en cada plataforma, a la hora exacta del hueco.
 
-    Devuelve (programadas, falladas, inciertas). Lanza AlertaRojaCiclo ante canal ajeno, 401/403 o cuenta restringida."""
+    Devuelve (programadas, falladas, inciertas). Lanza AlertaRojaCiclo ante canal ajeno, 401/403 o cuenta restringida.
+
+    `al_resolver(plataforma, estado)` se llama en cuanto se conoce el resultado de cada plataforma
+    (`programada`, `incierta` o `fallada`), ANTES de intentar la siguiente: así lo ya confirmado se guarda
+    aunque una alerta roja corte el resto."""
+    falladas, programadas, inciertas = [], [], []
+
+    def resolver(plat, estado):
+        lista = {"programada": programadas, "incierta": inciertas, "fallada": falladas}[estado]
+        if plat not in lista:
+            lista.append(plat)
+        if estado == "incierta" and plat not in falladas:
+            falladas.append(plat)
+        if al_resolver:
+            al_resolver(plat, estado)
+
+    def fallo(*plats):
+        for p in plats:
+            if p not in programadas and p not in falladas:
+                resolver(p, "fallada")
+
     faltan = [s for s in publicar.SECRETOS_BUFFER + publicar.SECRETOS_ALMACEN if not env.get(s)]
     if faltan:
         out("sin " + ", ".join(faltan) + ": no se publica")
-        return [], list(hueco.plataformas), []
+        fallo(*hueco.plataformas)
+        return programadas, falladas, inciertas
     hoy = reloj().astimezone(ZONA).date()
-    destinos, falladas = [], []
+    destinos = []
     for plat in hueco.plataformas:
         ok, motivo = es_publicable(toma.ficha, hoy, plat, toma.toma.get("pilar"))
         if ok:
             destinos.append(plat)
         else:
             out(f"{plat}: descartada, la ficha no es publicable ({motivo})")
-            falladas.append(plat)
+            fallo(plat)
     if not destinos:
-        return [], falladas, []
+        return programadas, falladas, inciertas
     mp4 = toma.resultado.mp4
-    ruta, pub, programadas, inciertas = None, None, [], []
+    ruta, pub = None, None
     try:
         cliente = publicar.ClienteBuffer(env["BUFFER_API_KEY"], transporte_buffer, raiz, ahora=reloj)
         canales_api = cliente.todos_los_canales()
@@ -419,39 +516,39 @@ def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer
                 listos[plat] = tx
             except publicar.Descartada as e:
                 out(f"{plat}: descartada antes de subir ({e})")
-                falladas.append(plat)
+                fallo(plat)
         if not listos:
-            return [], falladas, []
+            return programadas, falladas, inciertas
         almacen.asegurar_bucket()
         try:
             ruta, url = almacen.subir(mp4, toma.toma["numero"], hueco.fecha)
             almacen.comprobar(url)
         except ErrorAlmacen as e:
             out(f"subida fallida: se salta el hueco ({e})")
-            return [], falladas + list(listos), []
+            fallo(*listos)
+            return programadas, falladas, inciertas
         for plat, tx in listos.items():
             try:
                 r = pub.programar(plat, toma.toma, url, tx, cuando, ruta, toma.ficha)
                 out(f"{plat}: programada {r['id']} para {r['dueAt']}")
-                programadas.append(plat)
+                resolver(plat, "programada")
             except publicar.ResultadoIncierto as e:
                 out(f"{plat}: resultado INCIERTO, no se repite ({e})")
-                falladas.append(plat)
-                inciertas.append(plat)
+                resolver(plat, "incierta")
             except publicar.Descartada as e:
                 if (motivo := _motivo_cuenta(e)):
                     raise AlertaRojaCiclo(motivo) from None
                 out(f"{plat}: descartada ({e})")
-                falladas.append(plat)
+                fallo(plat)
     except (publicar.AlertaRoja, publicar.ErrorBuffer) as e:
         motivo = _motivo_cuenta(e)
         if motivo:
             raise AlertaRojaCiclo(motivo) from None
         out(f"ERROR de Buffer: {e}")
-        falladas += [p for p in destinos if p not in programadas and p not in falladas]
+        fallo(*destinos)
     except (ErrorAlmacen, red.ErrorRed, KeyError, TypeError, ValueError) as e:
         out(f"ERROR: {type(e).__name__}: {e}")
-        falladas += [p for p in destinos if p not in programadas and p not in falladas]
+        fallo(*destinos)
     finally:
         if ruta and pub is not None:
             try:
@@ -487,7 +584,7 @@ def mantenimiento(raiz, env, out, transporte_buffer, transporte_almacen, reloj) 
 
 def ejecutar(raiz=None, *, decidir=False, ensayo_forzado=False, ahora=None, salida_dir=None, env=None,
              imprimir=print, detectar_fn=None, hacer_toma_fn=None, transporte_buffer=None,
-             transporte_almacen=None, transporte_twitch=None, validar_fn=None) -> int:
+             transporte_almacen=None, transporte_twitch=None, validar_fn=None, solo_ensayo=False) -> int:
     raiz = raiz_repo(raiz)
     env = dict(os.environ if env is None else env)
     out = Salida(imprimir, env)
@@ -502,7 +599,7 @@ def ejecutar(raiz=None, *, decidir=False, ensayo_forzado=False, ahora=None, sali
         return codigo
 
     modo_cfg = cargar_yaml("config/modo.yml", raiz)
-    modo = modo_cfg.get("modo")
+    modo = "ensayo" if solo_ensayo else modo_cfg.get("modo")      # fuera de main nunca se publica
     if ensayo_forzado and modo != "ensayo":
         out("--ensayo-forzado se niega: config/modo.yml dice "
             f"{modo!r}, no 'ensayo'. No se hace nada.")
@@ -522,9 +619,9 @@ def ejecutar(raiz=None, *, decidir=False, ensayo_forzado=False, ahora=None, sali
     sim = ensayo_forzado
     # 4) tope de Actions (la cadencia, paso 3, se aplica abajo, sólo a las corridas sin hueco).
     if not sim:
-        usados = minutos_del_dia(raiz, ahora)
-        if usados >= TOPE_MINUTOS_DIA:
-            out(f"tope diario de Actions ({usados:g} min)")
+        usados = minutos_usados(raiz, ahora, env.get("GITHUB_RUN_ID"))
+        if not admite_producir(raiz, ahora, env.get("GITHUB_RUN_ID")):
+            out(f"tope diario de Actions ({usados:g} min usados; hacen falta {MINUTOS_PRODUCIR} libres de {TOPE_MINUTOS_DIA})")
             return terminar(COD_OK)
     # 5) hueco.
     activas = list(modo_cfg.get("plataformas_activas") or [])
@@ -559,6 +656,7 @@ def _solo_mantenimiento(raiz, env, out, pendiente, tb, ta, reloj) -> int:
 def _con_alerta(raiz, out: Salida, env, ahora, fn) -> int:
     """Ejecuta el cuerpo del ciclo; toda alerta roja (y toda fuga de claves) crea PAUSA y alerta.json."""
     codigo = COD_OK
+    out.vigilar = True
     motivo = _revisar_retiros(raiz)          # un aviso de retiro frena antes de tocar nada
     if motivo is None:
         try:
@@ -602,10 +700,18 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
             if not sim:
                 registro.anotar_registro(raiz, "ciclo: sin toma")
             out("sin toma")
-            return COD_OK
-        if sim and toma.resultado.mp4:
-            _informe_puerta(carpeta, toma.resultado)
-            out(f"toma {toma.toma['numero']} lista en {toma.resultado.mp4}; informe de la puerta en "
+            return COD_ERROR if sim else COD_OK         # el ensayo forzado existe para entregar una toma
+        if sim:
+            mp4 = toma.resultado.mp4
+            if mp4:
+                _informe_puerta(carpeta, toma.resultado)
+            faltan = [n for n, ruta in (("MP4", mp4), ("plan", mp4 and Path(mp4).with_suffix(".plan.json")),
+                                        ("informe de la puerta", carpeta / "informe-puerta.txt"))
+                      if not ruta or not Path(ruta).exists()]
+            if faltan:
+                out("--ensayo-forzado no entregó: " + ", ".join(faltan))
+                return COD_ERROR
+            out(f"toma {toma.toma['numero']} lista en {mp4}; informe de la puerta en "
                 f"{carpeta / 'informe-puerta.txt'}")
         if modo == "ensayo":
             ok = ensayo_de_carga(raiz, env, toma, hueco, out, tb, reloj)
@@ -614,17 +720,24 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
                                                f"({toma.toma['pilar']}) {'validada' if ok else 'con cargas no válidas'}"
                                                f" para {hueco.fecha} {hueco.hora}; sin createPost")
             return COD_OK if ok else COD_ERROR
-        programadas, falladas, inciertas = publicar_en_vivo(raiz, env, toma, hueco, out, tb, ta, reloj)
-        if programadas:
-            if toma.candidato is not None:
-                puertas.anotar_visto(raiz, toma.candidato.id_origen)
-            if toma.entrada is not None:
+        hecho = {"gastada": False}
+
+        def al_resolver(plat, estado):
+            cerrar_hueco(raiz, hueco, plat)               # el hueco de esa plataforma se cierra, salga o falle
+            # El número de toma se gasta en cuanto una plataforma quedó programada (o su resultado es incierto,
+            # y entonces el post puede existir). Las que fallaron pierden esa toma y ese hueco: la misma toma
+            # nunca se reintenta en otra corrida. Se guarda ya, por si una alerta roja corta el resto.
+            if estado != "fallada" and not hecho["gastada"]:
+                hecho["gastada"] = True
+                if toma.candidato is not None:
+                    puertas.anotar_visto(raiz, toma.candidato.id_origen)
+                if toma.entrada is not None and estado == "programada":
+                    informativa.marcar_usada(raiz, toma.entrada["id"])
+                registro.avanzar_toma(raiz)
+            elif estado == "programada" and toma.entrada is not None:
                 informativa.marcar_usada(raiz, toma.entrada["id"])
-        # El número de toma se gasta en cuanto una plataforma quedó programada (o su resultado es incierto, y
-        # entonces el post puede existir). Las que fallaron pierden esa toma y ese hueco: la misma toma nunca
-        # se reintenta en otra corrida, así un fallo parcial no bloquea el canal.
-        if programadas or inciertas:
-            registro.avanzar_toma(raiz)
+
+        programadas, falladas, inciertas = publicar_en_vivo(raiz, env, toma, hueco, out, tb, ta, reloj, al_resolver)
         registro.anotar_registro(raiz, f"ciclo: toma {toma.toma['numero']} ({toma.toma['pilar']}) programada en "
                                        f"{', '.join(programadas) or 'ninguna'}"
                                        + (f"; falló {', '.join(falladas)}" if falladas else ""))
@@ -662,20 +775,28 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--salida", help="carpeta del MP4, el plan y el informe (con --ensayo-forzado)")
     ap.add_argument("--raiz", default=None)
     ap.add_argument("--sumar-minutos", type=float, help="suma minutos de Actions al total del día y sale")
+    ap.add_argument("--marcar-inicio", action="store_true", help="escribe la marca de inicio de `producir` y sale")
+    ap.add_argument("--run-id", default=None, help="id de la corrida de Actions (para la marca de inicio)")
+    ap.add_argument("--modo-ensayo", action="store_true",
+                    help="trata config/modo.yml como ensayo (ramas que no son main: nunca publica)")
     ap.add_argument("--abrir-avisos", action="store_true",
                     help="abre un issue por cada envío incierto o abandonado nuevo y sale")
     a = ap.parse_args(argv)
     ahora = datetime.fromisoformat(a.ahora) if a.ahora else None
     if a.sumar_minutos is not None:
-        total = sumar_minutos(a.raiz, _ahora(ahora), math.ceil(a.sumar_minutos))
+        total = sumar_minutos(a.raiz, _ahora(ahora), math.ceil(a.sumar_minutos), a.run_id)
         print(f"minutos de Actions hoy: {total:g}")
+        return COD_OK
+    if a.marcar_inicio:
+        marcar_inicio(a.raiz, _ahora(ahora), a.run_id)
+        print("marca de inicio escrita")
         return COD_OK
     if a.abrir_avisos:
         for clave in abrir_avisos(a.raiz):
             print(f"issue abierto: {clave}")
         return COD_OK
     return ejecutar(a.raiz, decidir=a.decidir, ensayo_forzado=a.ensayo_forzado, ahora=ahora,
-                    salida_dir=a.salida)
+                    salida_dir=a.salida, solo_ensayo=a.modo_ensayo)
 
 
 if __name__ == "__main__":
