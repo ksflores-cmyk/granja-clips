@@ -52,10 +52,12 @@ class Almacen:
         h.update(extra or {})
         return h
 
-    def _pedir(self, metodo, url, extra=None, cuerpo=None, esperados=(200,)):
-        """Petición con reintento único; si el código no es el esperado, ErrorAlmacen sin secretos."""
-        estado, cab, datos = red.solicitar(self.transporte, metodo, url, self._cabeceras(extra),
-                                           cuerpo, dormir=self.dormir)
+    def _pedir(self, metodo, url, extra=None, cuerpo=None, esperados=(200,), anonimo=False):
+        """Petición con reintento único; si el código no es el esperado, ErrorAlmacen sin secretos.
+
+        `anonimo`: sin `apikey` ni `Authorization` (la URL pública no necesita clave, y así se demuestra)."""
+        cab = dict(extra or {}) if anonimo else self._cabeceras(extra)
+        estado, cab, datos = red.solicitar(self.transporte, metodo, url, cab, cuerpo, dormir=self.dormir)
         if estado not in esperados:
             raise ErrorAlmacen(f"{metodo} {red.ruta_de(url)}: código {estado}")
         return estado, cab, datos
@@ -110,17 +112,25 @@ class Almacen:
         return ruta, self.url_publica(ruta)
 
     def comprobar(self, url) -> None:
-        """GET con Range: exige 200 o 206 y un Content-Type de video."""
-        estado, cab, _ = self._pedir("GET", url, {"Range": "bytes=0-0"}, esperados=(200, 206))
+        """GET anónimo con Range: exige 200 o 206 y un Content-Type de video."""
+        estado, cab, _ = self._pedir("GET", url, {"Range": "bytes=0-0"}, esperados=(200, 206),
+                                     anonimo=True)
         tipo = str(cab.get("content-type", "")).lower()
         if not tipo.startswith("video/"):
             raise ErrorAlmacen(f"GET {red.ruta_de(url)}: el tipo es '{tipo or 'ninguno'}', no video")
 
-    def responde(self, url) -> bool:
-        """True si la URL pública aún entrega el archivo (200 o 206)."""
-        estado, _, _ = red.solicitar(self.transporte, "GET", url, self._cabeceras({"Range": "bytes=0-0"}),
-                                     None, dormir=self.dormir)
-        return estado in (200, 206)
+    def confirmar_ausente(self, url) -> None:
+        """Tras borrar: sólo cuenta como ausente un 400 o 404 con el error de objeto no encontrado de
+        Storage. Si el archivo aún responde, o es cualquier otro error (403, 503...), lanza ErrorAlmacen."""
+        estado, _, datos = red.solicitar(self.transporte, "GET", url, {"Range": "bytes=0-0"}, None,
+                                         dormir=self.dormir)
+        if estado in (200, 206):
+            raise ErrorAlmacen(f"GET {red.ruta_de(url)}: sigue respondiendo tras borrar")
+        cuerpo = datos.decode("utf-8", errors="ignore").lower()
+        if estado in (400, 404) and ("not found" in cuerpo or "not_found" in cuerpo):
+            return
+        raise ErrorAlmacen(f"GET {red.ruta_de(url)}: código {estado}; no se pudo confirmar que el "
+                           "objeto desapareció")
 
     def borrar(self, ruta) -> None:
         self._pedir("DELETE", f"{self.url}/storage/v1/object/{self.bucket}",
@@ -141,8 +151,7 @@ class Almacen:
                 self.comprobar(url)
             finally:
                 self.borrar(ruta)
-            if self.responde(url):
-                raise ErrorAlmacen(f"GET {red.ruta_de(url)}: sigue respondiendo tras borrar")
+            self.confirmar_ausente(url)
         return {"subida": True, "url_comprobada": True, "borrado": True, "bytes": peso}
 
 

@@ -96,9 +96,59 @@ def test_url_publica_con_tipo_que_no_es_video_falla():
 
 def test_url_publica_404_despues_de_borrar():
     a, _ = almacen([F.resp(404, F.leer("supabase", "objeto_404.json"))])
-    assert a.responde(URL_PUBLICA + "ab12cd34.mp4") is False
+    a.confirmar_ausente(URL_PUBLICA + "ab12cd34.mp4")
     with pytest.raises(ErrorAlmacen, match="código 404"):
         a.comprobar(URL_PUBLICA + "ab12cd34.mp4")
+
+
+def test_400_de_storage_con_objeto_no_encontrado_tambien_cuenta_como_ausente():
+    a, _ = almacen([F.resp(400, F.leer("supabase", "objeto_404.json"))])
+    a.confirmar_ausente(URL_PUBLICA + "ab12cd34.mp4")
+
+
+@pytest.mark.parametrize("estado,cuerpo", [(403, "{}"), (503, "{}"), (404, "<html>no es de Storage</html>"),
+                                           (400, '{"error":"otra cosa"}')])
+def test_otros_errores_tras_borrar_no_cuentan_como_ausente(estado, cuerpo):
+    a, _ = almacen([F.resp(estado, cuerpo)])
+    with pytest.raises(ErrorAlmacen, match="no se pudo confirmar|código"):
+        a.confirmar_ausente(URL_PUBLICA + "ab12cd34.mp4")
+
+
+def test_la_comprobacion_de_la_url_publica_es_anonima():
+    a, esp = almacen([F.resp(206, b"\x00", "video/mp4"), F.resp(404, F.leer("supabase", "objeto_404.json"))])
+    a.comprobar(URL_PUBLICA + "ab12cd34.mp4")
+    a.confirmar_ausente(URL_PUBLICA + "ab12cd34.mp4")
+    for c in esp.llamadas:
+        bajos = {k.lower() for k in c["encabezados"]}
+        assert not ({"apikey", "authorization"} & bajos)
+        assert CLAVE not in json.dumps(c["encabezados"])
+
+
+def test_redireccion_a_otro_origen_con_clave_se_rechaza():
+    import urllib.request
+    from fabrica import red
+    m = red.ManejadorRedireccion()
+    req = urllib.request.Request("https://a.invalid/x", headers={"apikey": CLAVE})
+    for destino in ("https://otro.invalid/x", "http://a.invalid/x", "https://a.invalid:8443/x"):
+        with pytest.raises(red.ErrorRed, match="otro origen") as e:
+            m.redirect_request(req, None, 302, "Found", {}, destino)
+        assert CLAVE not in str(e.value)
+    assert m.redirect_request(req, None, 302, "Found", {}, "https://a.invalid/y") is not None
+
+
+def test_redireccion_sin_clave_si_se_sigue():
+    import urllib.request
+    from fabrica import red
+    req = urllib.request.Request("https://a.invalid/x", headers={"Range": "bytes=0-0"})
+    assert red.ManejadorRedireccion().redirect_request(req, None, 302, "Found", {}, "https://cdn.invalid/x")
+
+
+def test_una_mutacion_no_se_reintenta():
+    from fabrica import red
+    esp = F.Espia([F.resp(500, "{}"), F.resp(200, "{}")])
+    estado, _, _ = red.solicitar(esp, "POST", "https://x.invalid/", {}, b"", dormir=lambda s: None,
+                                 reintentar=False)
+    assert estado == 500 and len(esp.llamadas) == 1
 
 
 def test_borrar_manda_los_prefijos():
