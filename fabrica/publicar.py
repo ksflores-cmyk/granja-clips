@@ -353,7 +353,8 @@ def armar_carga(plataforma: str, canal_id: str, texto: str, titulo: str | None, 
 # ---------------------------------------------------------------- canales
 
 def _norm(nombre) -> str:
-    return str(nombre or "").strip().lstrip("@").strip().lower()
+    """Sin @, sin mayúsculas, sin espacios ni signos: "Guion Vivo" y "guionvivo" comparan igual."""
+    return re.sub(r"[^a-z0-9]", "", str(nombre or "").lower())
 
 
 def _alerta(raiz, motivo: str, escribir: bool) -> None:

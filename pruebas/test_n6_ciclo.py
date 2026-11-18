@@ -88,14 +88,14 @@ def mp4_falso(carpeta: Path, nombre="toma.mp4") -> Path:
 class Hacer:
     """hacer_toma falso: espía los intentos y devuelve ok o descarte."""
 
-    def __init__(self, repo, oks=(True,), motivo="ojos: descartado"):
-        self.repo, self.oks, self.motivo, self.llamadas = repo, list(oks), motivo, []
+    def __init__(self, repo, oks=(True,), motivo="ojos: descartado", gemini=None):
+        self.repo, self.oks, self.motivo, self.gemini, self.llamadas = repo, list(oks), motivo, gemini, []
 
     def __call__(self, raiz, c, ficha, ahora, salida=None, **kw):
         self.llamadas.append(c.id_origen)
         ok = self.oks[min(len(self.llamadas), len(self.oks)) - 1]
         if not ok:
-            return Resultado(False, [self.motivo])
+            return Resultado(False, [self.motivo], gemini=self.gemini)
         n = registro.contador_toma(raiz)
         fila = {"toma": n, "fecha": "2026-11-18", "hora": "10:07", "pilar": c.pilar or "momentos",
                 "fuente_id": ficha.get("id"), "campana": None, "gancho": f"Gancho de prueba {n}",
@@ -158,11 +158,22 @@ def test_con_pausa_no_hay_ninguna_llamada(r):
     assert cod == 0 and sal.startswith("PAUSA: prueba") and sin_llamadas(e)
 
 
-def test_pausa_va_antes_que_validar_y_que_la_cadencia(r):
+def test_con_pausa_no_se_llama_a_validar_ni_a_la_cadencia_ni_al_tope_ni_al_hueco_ni_a_la_red(r, monkeypatch):
     (r / "PAUSA").write_text("motivo: prueba\n", encoding="utf-8")
-    cod, sal = correr(r, ahora=datetime(2026, 11, 21, 17, 0, tzinfo=timezone.utc),
-                      validar_fn=lambda raiz: pytest.fail("validar no debe correr con PAUSA"))
-    assert cod == 0 and "PAUSA: prueba" in sal and "fuera de cadencia" not in sal
+    llamado = []
+    for nombre in ("en_cadencia", "minutos_del_dia", "buscar_hueco", "hay_mantenimiento", "elegir_candidatos",
+                   "publicar_en_vivo", "mantenimiento"):
+        monkeypatch.setattr(ciclo, nombre, lambda *a, _n=nombre, **k: llamado.append(_n))
+    e = espias()
+    for decidir in (False, True):
+        sal = []
+        cod = ciclo.ejecutar(r, ahora=AHORA, decidir=decidir, env=ENV, imprimir=sal.append,
+                             validar_fn=lambda raiz: llamado.append("validar"),
+                             detectar_fn=lambda *a: e.detectar.append(a) or ([], []),
+                             hacer_toma_fn=lambda *a, **k: e.hacer.append(a),
+                             transporte_buffer=e.buffer, transporte_almacen=e.almacen)
+        assert cod == 0 and "PAUSA: prueba" in sal[0]
+    assert llamado == [] and sin_llamadas(e)
 
 
 def test_decidir_con_pausa_escribe_trabajo_no(r, tmp_path):
@@ -245,9 +256,39 @@ def test_la_cadencia_cuenta_el_dia_en_hora_de_guatemala_no_en_utc():
     assert ciclo.en_cadencia(datetime(2026, 11, 21, 7, 30, tzinfo=timezone.utc)) is False      # 01:30 GT
 
 
-def test_fuera_de_cadencia_sale_antes_de_cualquier_llamada(r):
-    cod, sal, e = correr_con_espias(r, ahora=datetime(2026, 11, 21, 10, 7, tzinfo=ZONA))
+def test_fuera_de_cadencia_sin_hueco_sale_sin_llamadas_ni_mantenimiento(r):
+    (r / "estado").mkdir(exist_ok=True)
+    (r / "estado" / "buffer-envios.json").write_text(
+        json.dumps([{"id": "a", "estado": "incierto", "plataforma": "shorts", "toma": 3}]), encoding="utf-8")
+    cod, sal, e = correr_con_espias(r, ahora=datetime(2026, 11, 21, 11, 7, tzinfo=ZONA))   # sin hueco y 11 no es múltiplo de 3
     assert cod == 0 and "fuera de cadencia" in sal and sin_llamadas(e)
+
+
+def test_en_hora_multiplo_de_3_sin_hueco_si_hace_el_mantenimiento(r, monkeypatch):
+    llamadas = []
+    monkeypatch.setattr(publicar.Publicador, "limpiar_enviados", lambda self: llamadas.append(1) or [])
+    (r / "estado").mkdir(exist_ok=True)
+    (r / "estado" / "buffer-envios.json").write_text(
+        json.dumps([{"id": "a", "estado": "creado", "ruta": "tomas/x.mp4", "plataforma": "shorts"}]), encoding="utf-8")
+    cod, sal = correr(r, ahora=datetime(2026, 11, 21, 12, 7, tzinfo=ZONA))
+    assert "sin hueco" in sal and llamadas == [1]
+
+
+@pytest.mark.parametrize("corrida_gt,hueco", [((10, 7), "11:00"), ((14, 7), "15:00"), ((18, 7), "19:00")])
+def test_desde_el_21_los_tres_huecos_normales_se_cubren(r, corrida_gt, hueco):
+    ahora = datetime(2026, 11, 21, *corrida_gt, tzinfo=ZONA)
+    h = ciclo.buscar_hueco(r, ahora, ["shorts"])
+    assert h is not None and h.hora == hueco
+    cod, sal = correr(r, ahora=ahora, hacer=Hacer(r, oks=(False,)), cands=[cand("c1")])
+    assert "fuera de cadencia" not in sal and "sin hueco" not in sal
+
+
+def test_desde_el_21_el_decidir_dice_si_en_cada_hueco_y_no_en_las_demas_horas(r, tmp_path):
+    for hh, esperado in ((10, "si"), (11, "no"), (12, "no"), (14, "si"), (18, "si"), (19, "no")):
+        salida = tmp_path / f"gh{hh}"
+        correr(r, decidir=True, ahora=datetime(2026, 11, 21, hh, 7, tzinfo=ZONA),
+               env={**ENV, "GITHUB_OUTPUT": str(salida)})
+        assert salida.read_text() == f"trabajo={esperado}\n", hh
 
 
 def test_tope_de_60_minutos_de_actions(r):
@@ -416,6 +457,30 @@ def test_entrada_vencida_o_usada_no_sirve_de_respaldo(r, monkeypatch, campo, val
     assert "no hay informativa vigente" in sal and "sin toma" in sal and filas(r) == []
 
 
+def vistos(r):
+    ruta = r / "estado" / "vistos.txt"
+    return ruta.read_text(encoding="utf-8").split() if ruta.exists() else []
+
+
+def test_un_descarte_definitivo_de_gemini_se_anota_como_visto(r, monkeypatch):
+    monkeypatch.setattr(ciclo.informativa, "armar", armar_falso)
+    hacer = Hacer(r, oks=(False,), motivo="ojos: es una cinemática", gemini={"gancho": "x"})
+    correr(r, cands=[cand("c1"), cand("c2", hace_min=20)], hacer=hacer)
+    assert {"c1", "c2"} <= set(vistos(r))
+    hacer2 = Hacer(r, oks=(False,))
+    correr(r, ahora=datetime(2026, 11, 18, 12, 7, tzinfo=ZONA), cands=[cand("c1"), cand("c2")], hacer=hacer2)
+    assert hacer2.llamadas == []                                    # ya vistos: no se vuelven a procesar
+
+
+@pytest.mark.parametrize("motivo,gemini", [("ojos: sin GEMINI_API_KEY", None), ("ojos: Gemini respondió 429", None),
+                                           ("descarga: fallo de conexión", None),
+                                           ("puerta de estilo: algo", {"gancho": "x"})])
+def test_un_fallo_de_red_cuota_o_estilo_no_se_anota_como_visto(r, monkeypatch, motivo, gemini):
+    monkeypatch.setattr(ciclo.informativa, "armar", armar_falso)
+    correr(r, cands=[cand("c1")], hacer=Hacer(r, oks=(False,), motivo=motivo, gemini=gemini))
+    assert "c1" not in vistos(r)
+
+
 # ---------------------------------------------------------------- 5. vivo y ensayo
 
 def test_en_vivo_programa_registra_y_avanza_el_numero_de_toma(r):
@@ -456,13 +521,46 @@ class BufferParcial(BufferSimulado):
         return super().__call__(metodo, url, encabezados, cuerpo, tiempo)
 
 
-def test_en_vivo_si_falla_una_plataforma_el_numero_de_toma_no_avanza(r):
-    cambiar_modo(r, "vivo", ["shorts", "tiktok"])
+def test_un_fallo_parcial_gasta_la_toma_y_la_siguiente_corrida_publica_en_las_tres(r):
+    cambiar_modo(r, "vivo", ["shorts", "tiktok", "reels"])
     antes = registro.contador_toma(r)
-    cod, sal = correr(r, cands=[cand("c1")], buffer=BufferParcial())
+    cod, sal = correr(r, cands=[cand("c1")], buffer=BufferParcial(), almacen=SupabaseSimulado())
     assert "shorts: programada" in sal and "tiktok: descartada" in sal
-    assert registro.contador_toma(r) == antes
+    assert registro.contador_toma(r) == antes + 1                      # una quedó programada: la toma se gastó
     assert [f["plataforma"] for f in filas(r)] == ["shorts"]
+    # Segunda corrida, dos horas después (hueco de las 13:00): toma siguiente, en las tres plataformas.
+    cod, sal = correr(r, ahora=datetime(2026, 11, 18, 12, 7, tzinfo=ZONA), cands=[cand("c2")],
+                      buffer=BufferSimulado(), almacen=SupabaseSimulado())
+    assert sal.count("programada") == 3 and "ya hay un envío" not in sal
+    nuevas = [f for f in filas(r) if f["hora"] == "13:00"]
+    assert sorted(f["plataforma"] for f in nuevas) == ["reels", "shorts", "tiktok"]
+    assert {f["toma"] for f in nuevas} == {str(antes + 1)} and registro.contador_toma(r) == antes + 2
+
+
+def test_si_ninguna_plataforma_se_programa_la_toma_no_se_gasta(r):
+    antes = registro.contador_toma(r)
+    correr(r, cands=[cand("c1")], buffer=BufferCuentaRechaza())
+    assert registro.contador_toma(r) == antes and filas(r) == []
+
+
+class BufferCuentaRechaza(BufferSimulado):
+    def __call__(self, metodo, url, encabezados, cuerpo=None, tiempo=60):
+        if cuerpo and b"createPost" in cuerpo:
+            return F.resp(200, {"data": {"createPost": {"__typename": "MutationError", "message": "Formato no válido"}}})
+        return super().__call__(metodo, url, encabezados, cuerpo, tiempo)
+
+
+class BufferIncierto(BufferSimulado):
+    def __call__(self, metodo, url, encabezados, cuerpo=None, tiempo=60):
+        if cuerpo and b"createPost" in cuerpo:
+            return F.resp(500, "error")
+        return super().__call__(metodo, url, encabezados, cuerpo, tiempo)
+
+
+def test_un_resultado_incierto_tambien_gasta_la_toma_para_no_bloquear_el_canal(r):
+    antes = registro.contador_toma(r)
+    cod, sal = correr(r, cands=[cand("c1")], buffer=BufferIncierto())
+    assert "INCIERTO" in sal and registro.contador_toma(r) == antes + 1
 
 
 def test_en_vivo_con_la_informativa_la_marca_usada(r, monkeypatch):
@@ -663,13 +761,11 @@ def test_workflow_tiempos_maximos_y_dependencia(wf):
     assert wf["jobs"]["decidir"]["outputs"]["trabajo"]
 
 
-def test_workflow_decidir_corre_el_ciclo_con_decidir_y_la_pausa_es_lo_primero(wf):
+def test_workflow_decidir_el_ultimo_paso_tras_checkout_y_setup_es_el_de_decidir(wf):
     pasos = wf["jobs"]["decidir"]["steps"]
-    comandos = [p.get("run", "") for p in pasos]
-    assert any("python -m fabrica.ciclo --decidir" in c for c in comandos)
-    assert "uses" in pasos[0] and "checkout" in pasos[0]["uses"]
-    texto = (RAIZ_REAL / "fabrica" / "ciclo.py").read_text(encoding="utf-8")
-    assert texto.index("esta_pausada(raiz)") < texto.index("mod_validar.validar") < texto.index("en_cadencia(ahora)")
+    assert "checkout" in pasos[0]["uses"] and "setup-python" in pasos[1]["uses"]
+    assert pasos[2]["run"].startswith("pip install")
+    assert len(pasos) == 4 and pasos[3]["run"].strip() == "python -m fabrica.ciclo --decidir" and pasos[3]["id"] == "decidir"
 
 
 def test_workflow_los_secretos_entran_por_env_nunca_dentro_de_run(wf):
@@ -693,9 +789,38 @@ def test_workflow_commit_skip_ci_y_reintentos(wf):
     assert "inputs.ensayo_forzado" in cierre["if"]
 
 
+def cierre_run(wf):
+    return next(p for p in wf["jobs"]["producir"]["steps"] if "Cerrar el ciclo" in p.get("name", ""))["run"]
+
+
 def test_workflow_alerta_abre_issue_y_hace_commit_de_pausa(wf):
-    run = next(p for p in wf["jobs"]["producir"]["steps"] if "Cerrar el ciclo" in p.get("name", ""))["run"]
+    run = cierre_run(wf)
     assert 'gh issue create --title "ALERTA ROJA: ' in run and "estado/alerta.json" in run and "PAUSA" in run
+
+
+def test_workflow_el_issue_de_alerta_se_abre_despues_de_confirmar_el_push(wf):
+    run = cierre_run(wf)
+    assert run.index("git push") < run.index('guardado" != "si"') < run.index("gh issue create")
+    assert run.count("gh issue create") == 1
+
+
+def permitidos(wf):
+    run = cierre_run(wf)
+    return re.compile(re.search(r"PERMITIDOS='([^']+)'", run).group(1))
+
+
+def test_workflow_el_commit_sólo_admite_los_archivos_permitidos(wf):
+    run = cierre_run(wf)
+    ok = permitidos(wf)
+    for bueno in ("marcador.csv", "registro.md", "estado/buffer-envios.json", "estado/vistos.txt",
+                  "config/canales.yml", "informativas.yml", "marca.yml", "PAUSA"):
+        assert ok.match(bueno), bueno
+    for malo in ("fabrica/ciclo.py", ".github/workflows/fabrica.yml", "fuentes.yml", "config/modo.yml",
+                 "marcador.csv.bak", "estadoX", "temporada.yml", "config/horarios.yml"):
+        assert not ok.match(malo), malo
+    # la comprobación corre antes de añadir, de hacer commit y de empujar
+    assert run.index("grep -Ev") < run.index("git add -A") < run.index("git commit") < run.index("git push")
+    assert 'echo "Archivos fuera de la lista permitida' in run and run.index("grep -Ev") < run.index("exit 1")
     assert "--sumar-minutos" in run and "--abrir-avisos" in run
 
 
@@ -710,3 +835,22 @@ def test_workflow_ensayo_forzado_sube_artefacto_de_3_dias(wf):
 def test_workflow_instala_ffmpeg_con_reintentos_y_tope(wf):
     paso = next(p for p in wf["jobs"]["producir"]["steps"] if "ffmpeg" in p.get("name", ""))
     assert "Acquire::Retries=3" in paso["run"] and paso["timeout-minutes"] == 6
+
+
+# ---------------------------------------------------------------- 9. nombres de canal
+
+def test_los_nombres_de_canal_comparan_sin_espacios_ni_signos():
+    assert publicar._norm("Guion Vivo") == publicar._norm("guionvivo") == publicar._norm("@guion_vivo") == "guionvivo"
+
+
+def test_confirmar_canales_acepta_guion_vivo_con_espacio_pero_sigue_exigiendo_servicio_e_id():
+    cfg = {"shorts": {"servicio": "youtube", "nombre_esperado": "Guion Vivo",
+                      "buffer_channel_id": "canal-yt-001", "buffer_org_id": "org-ejemplo-001"}}
+    api = [{"id": "canal-yt-001", "name": "Guion Vivo", "service": "youtube", "isQueuePaused": False,
+            "_org": "org-ejemplo-001"}]
+    assert publicar.confirmar_canales(api, cfg, None, plataformas=["shorts"], escribir=False,
+                                      exigir_guardado=True) == {"shorts": "canal-yt-001"}
+    for malo in ({**api[0], "service": "tiktok"}, {**api[0], "id": "otro"}, {**api[0], "name": "Otro Canal"}):
+        with pytest.raises(publicar.AlertaRoja):
+            publicar.confirmar_canales([malo], cfg, None, plataformas=["shorts"], escribir=False,
+                                       exigir_guardado=True)

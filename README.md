@@ -43,7 +43,7 @@ python -m pytest -q
 
 ## Decisiones conservadoras tomadas en N1
 
-- `marca.yml` queda con `confirmado: false`: Kevin aún no confirma el nombre "Guion Vivo".
+- `marca.yml` quedó con `confirmado: false` en N1; Kevin confirmó el nombre "Guion Vivo" y ya es `confirmado: true`.
 - La ficha única `propio-tipografico` es tipo C, sin metraje ajeno, sin campaña y sin cobro.
 - El validador exige `pilares: [informativa]` exacto para el tipo D (sólo informativa) y trata `encabezado_max_palabras` y `subtitulo_max_lineas` como enteros de 1 hasta el máximo del playbook.
 - `validar` revisa en canales sólo `servicio` y `nombre_esperado`; `buffer_channel_id` puede ser null hasta que Kevin conecte los canales.

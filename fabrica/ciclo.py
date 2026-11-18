@@ -4,6 +4,10 @@
 El orden de los pasos no se cambia: 1) PAUSA, 2) puerta de configuración, 3) cadencia, 4) tope de Actions,
 5) hueco, 6) candidatos, 7) respaldo informativo, 8) publicar (vivo) o ensayo, 9) --ensayo-forzado, 10) alerta roja.
 
+Cadencia: la corrida con un hueco por cubrir siempre sigue; la cadencia (cada hora del 18 al 20, desde el 21
+sólo en horas múltiplo de 3) frena las corridas sin hueco. El número de toma avanza si al menos una plataforma
+quedó programada (o incierta): las que fallaron pierden esa toma y ese hueco, nunca se reintenta la misma toma.
+
 Todo lo de red entra por parámetros (transportes, `detectar_fn`, `hacer_toma_fn`) para probarlo sin red.
 Nunca imprime claves: cada línea sale redactada y, si una clave aparecía, es alerta roja.
 """
@@ -105,7 +109,10 @@ def escribir_salida_github(env, **pares) -> None:
 # ------------------------------------------------------------------ pasos 3 y 4: cadencia y tope
 
 def en_cadencia(ahora: datetime) -> bool:
-    """Del 18 al 20 de nov (GT), cada hora; desde el 21, sólo en las horas múltiplo de 3."""
+    """Del 18 al 20 de nov (GT), cada hora; desde el 21, sólo en las horas múltiplo de 3.
+
+    Un hueco a cubrir siempre cuenta: la cadencia sólo frena las corridas sin hueco (el mantenimiento),
+    así los huecos de las 11:00, 15:00 y 19:00 se cubren aunque su corrida caiga en otra hora."""
     local = ahora.astimezone(ZONA)
     return local.date() < DIA_CADENCIA_LENTA or local.hour % 3 == 0
 
@@ -323,6 +330,13 @@ def _toma_dict(r, c, ficha: dict) -> dict:
             "creador": c.creador or ficha.get("creador")}
 
 
+def descarte_definitivo(r) -> bool:
+    """Gemini miró el clip y su respuesta no pasó la validación (cinemática, spoiler, frase imposible...).
+    Un fallo de red, de cuota o de clave (sin respuesta de Gemini) no lo es: se puede reintentar."""
+    return (not r.ok and r.gemini is not None and bool(r.motivos)
+            and all(str(m).startswith("ojos:") for m in r.motivos))
+
+
 def _informe_puerta(carpeta: Path, r) -> Path:
     ruta = carpeta / "informe-puerta.txt"
     lineas = [f"{'OK ' if ok else 'ROJO'} {n}" + (f" ({det})" if det else "") for n, ok, det in r.puntos]
@@ -366,11 +380,11 @@ def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer
                      reloj) -> tuple[list[str], list[str]]:
     """Sube el MP4, comprueba la URL y programa en cada plataforma, a la hora exacta del hueco.
 
-    Devuelve (programadas, falladas). Lanza AlertaRojaCiclo ante canal ajeno, 401/403 o cuenta restringida."""
+    Devuelve (programadas, falladas, inciertas). Lanza AlertaRojaCiclo ante canal ajeno, 401/403 o cuenta restringida."""
     faltan = [s for s in publicar.SECRETOS_BUFFER + publicar.SECRETOS_ALMACEN if not env.get(s)]
     if faltan:
         out("sin " + ", ".join(faltan) + ": no se publica")
-        return [], list(hueco.plataformas)
+        return [], list(hueco.plataformas), []
     hoy = reloj().astimezone(ZONA).date()
     destinos, falladas = [], []
     for plat in hueco.plataformas:
@@ -381,9 +395,9 @@ def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer
             out(f"{plat}: descartada, la ficha no es publicable ({motivo})")
             falladas.append(plat)
     if not destinos:
-        return [], falladas
+        return [], falladas, []
     mp4 = toma.resultado.mp4
-    ruta, pub, programadas = None, None, []
+    ruta, pub, programadas, inciertas = None, None, [], []
     try:
         cliente = publicar.ClienteBuffer(env["BUFFER_API_KEY"], transporte_buffer, raiz, ahora=reloj)
         canales_api = cliente.todos_los_canales()
@@ -407,14 +421,14 @@ def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer
                 out(f"{plat}: descartada antes de subir ({e})")
                 falladas.append(plat)
         if not listos:
-            return [], falladas
+            return [], falladas, []
         almacen.asegurar_bucket()
         try:
             ruta, url = almacen.subir(mp4, toma.toma["numero"], hueco.fecha)
             almacen.comprobar(url)
         except ErrorAlmacen as e:
             out(f"subida fallida: se salta el hueco ({e})")
-            return [], falladas + list(listos)
+            return [], falladas + list(listos), []
         for plat, tx in listos.items():
             try:
                 r = pub.programar(plat, toma.toma, url, tx, cuando, ruta, toma.ficha)
@@ -423,6 +437,7 @@ def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer
             except publicar.ResultadoIncierto as e:
                 out(f"{plat}: resultado INCIERTO, no se repite ({e})")
                 falladas.append(plat)
+                inciertas.append(plat)
             except publicar.Descartada as e:
                 if (motivo := _motivo_cuenta(e)):
                     raise AlertaRojaCiclo(motivo) from None
@@ -444,7 +459,7 @@ def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer
                     out("el video subido no tiene ningún envío vivo: se borró del almacén")
             except (ErrorAlmacen, publicar.ErrorBuffer, red.ErrorRed, OSError) as e:
                 out(f"AVISO: no se pudo borrar el video huérfano {ruta} ({e})")
-    return programadas, falladas
+    return programadas, falladas, inciertas
 
 
 def mantenimiento(raiz, env, out, transporte_buffer, transporte_almacen, reloj) -> None:
@@ -505,11 +520,8 @@ def ejecutar(raiz=None, *, decidir=False, ensayo_forzado=False, ahora=None, sali
         out("fabrica.validar en rojo: no se publica nada")
         return terminar(COD_ERROR)
     sim = ensayo_forzado
-    # 3) cadencia y 4) tope de Actions (no aplican al ensayo forzado: es una prueba a mano).
+    # 4) tope de Actions (la cadencia, paso 3, se aplica abajo, sólo a las corridas sin hueco).
     if not sim:
-        if not en_cadencia(ahora):
-            out("fuera de cadencia")
-            return terminar(COD_OK)
         usados = minutos_del_dia(raiz, ahora)
         if usados >= TOPE_MINUTOS_DIA:
             out(f"tope diario de Actions ({usados:g} min)")
@@ -522,6 +534,9 @@ def ejecutar(raiz=None, *, decidir=False, ensayo_forzado=False, ahora=None, sali
         hueco = buscar_hueco(raiz, ahora, activas)
     pendiente = modo == "vivo" and hay_mantenimiento(raiz)
     if hueco is None:
+        if not sim and not en_cadencia(ahora):
+            out("fuera de cadencia")
+            return terminar(COD_OK)
         out("sin hueco")
         if decidir:
             return terminar(COD_OK, "si" if pendiente else "no")
@@ -579,6 +594,8 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
                 toma = Toma(r, _toma_dict(r, c, ficha), ficha, c)
                 break
             out(f"intento {i}: {c.id_origen} descartado: " + "; ".join(r.motivos))
+            if descarte_definitivo(r) and not sim:
+                puertas.anotar_visto(raiz, c.id_origen)       # no se gasta cuota repitiéndolo
         if toma is None:
             toma = _respaldo(raiz, ahora, carpeta, fichas, out)
         if toma is None:
@@ -597,13 +614,16 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
                                                f"({toma.toma['pilar']}) {'validada' if ok else 'con cargas no válidas'}"
                                                f" para {hueco.fecha} {hueco.hora}; sin createPost")
             return COD_OK if ok else COD_ERROR
-        programadas, falladas = publicar_en_vivo(raiz, env, toma, hueco, out, tb, ta, reloj)
+        programadas, falladas, inciertas = publicar_en_vivo(raiz, env, toma, hueco, out, tb, ta, reloj)
         if programadas:
             if toma.candidato is not None:
                 puertas.anotar_visto(raiz, toma.candidato.id_origen)
             if toma.entrada is not None:
                 informativa.marcar_usada(raiz, toma.entrada["id"])
-        if programadas and not falladas:
+        # El número de toma se gasta en cuanto una plataforma quedó programada (o su resultado es incierto, y
+        # entonces el post puede existir). Las que fallaron pierden esa toma y ese hueco: la misma toma nunca
+        # se reintenta en otra corrida, así un fallo parcial no bloquea el canal.
+        if programadas or inciertas:
             registro.avanzar_toma(raiz)
         registro.anotar_registro(raiz, f"ciclo: toma {toma.toma['numero']} ({toma.toma['pilar']}) programada en "
                                        f"{', '.join(programadas) or 'ninguna'}"
