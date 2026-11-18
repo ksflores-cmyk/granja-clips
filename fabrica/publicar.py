@@ -56,10 +56,11 @@ Q_CAMPOS_POST = 'query { __type(name: "Post") { fields { name } } }'
 Q_CONSULTAS = "query { __type(name: \"Query\") { fields { name args { name } } } }"
 
 
-# Tipos de error de createPost que garantizan que no se creó nada (implementan MutationError).
-# UnexpectedError, RestProxyError o un tipo desconocido quedan como inciertos: nunca se reenvían.
-RECHAZOS_SEGUROS = {"MutationError", "InvalidInputError", "NotFoundError", "UnauthorizedError",
-                    "LimitReachedError"}
+# Tipos de error de createPost que Buffer documenta como rechazo previo a crear (validación y límite).
+# NotFoundError, UnauthorizedError, UnexpectedError, RestProxyError o un tipo nuevo quedan como
+# inciertos: no se sabe en qué paso fallaron y un incierto nunca se reenvía (Codex, 18 nov).
+# "MutationError" es la interfaz; se conserva por compatibilidad con las respuestas grabadas.
+RECHAZOS_SEGUROS = {"MutationError", "InvalidInputError", "LimitReachedError"}
 
 
 class ErrorBuffer(Exception):

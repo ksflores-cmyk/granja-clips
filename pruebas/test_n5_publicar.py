@@ -1401,7 +1401,7 @@ def test_limpiar_no_borra_si_alguien_reservo_la_ruta_durante_la_comprobacion(tmp
 
 
 @pytest.mark.parametrize("tipo,es_rechazo", [("InvalidInputError", True), ("LimitReachedError", True),
-                                             ("UnauthorizedError", True), ("NotFoundError", True),
+                                             ("UnauthorizedError", False), ("NotFoundError", False),
                                              ("UnexpectedError", False), ("RestProxyError", False),
                                              ("OtroTipoNuevo", False)])
 def test_los_tipos_concretos_de_mutationerror_se_clasifican_y_dicen_su_tipo(tmp_path, tipo, es_rechazo):
