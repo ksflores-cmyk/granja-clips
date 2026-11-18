@@ -72,14 +72,51 @@ def _es_youtube(url: str) -> bool:
     return h in ("youtu.be", "youtube.com") or h.endswith(".youtube.com")
 
 
-def bajar_https(url: str, destino: Path, *, abrir=None, tope: int = TOPE_BYTES) -> Path:
-    """Streaming a disco. Exige https y `Content-Type` de video; corta al pasar el tope."""
+DRIVE = "drive.usercontent.google.com"
+
+
+def _aviso_drive(url: str, html: str) -> str | None:
+    """Si Google Drive devuelve su página de aviso ("no se puede analizar en busca de virus"),
+    arma la URL de confirmación con los campos ocultos del formulario. Sólo para el mismo host
+    y el mismo `id` del archivo autorizado; si no, None."""
+    import html as _html
+    import re
+    from urllib.parse import parse_qs, urlencode, urlparse
+    orig = parse_qs(urlparse(url).query)
+    accion = re.search(r'<form[^>]+action="([^"]+)"', html)
+    if not accion:
+        return None
+    destino = urlparse(_html.unescape(accion.group(1)))
+    if destino.scheme != "https" or destino.netloc != DRIVE or destino.path != "/download":
+        return None
+    campos = dict(re.findall(r'<input[^>]+type="hidden"[^>]+name="([^"]+)"[^>]+value="([^"]*)"', html))
+    if not campos.get("id") or campos.get("id") != (orig.get("id") or [None])[0]:
+        return None
+    return f"https://{DRIVE}/download?" + urlencode({k: _html.unescape(v) for k, v in campos.items()})
+
+
+def _titulo(html: str) -> str:
+    import re
+    m = re.search(r"<title>([^<]{0,80})", html)
+    return m.group(1).strip() if m else "sin título"
+
+
+def bajar_https(url: str, destino: Path, *, abrir=None, tope: int = TOPE_BYTES, _reintento: bool = True) -> Path:
+    """Streaming a disco. Exige https y `Content-Type` de video; corta al pasar el tope.
+    Con Google Drive, si llega su página de aviso, sigue una vez su formulario de confirmación
+    (mismo host y mismo id; nunca otro destino)."""
     if not _es_https(url):
         raise ErrorDescarga(f"URL no https: {url!r}")
     abrir = abrir or _abrir_urllib
     try:
         with abrir(url) as r:
             tipo = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            if tipo == "text/html" and _host(url) == DRIVE:
+                pagina = r.read(200_000).decode("utf-8", errors="replace")
+                siguiente = _aviso_drive(url, pagina) if _reintento else None
+                if siguiente:
+                    return bajar_https(siguiente, destino, abrir=abrir, tope=tope, _reintento=False)
+                raise ErrorDescarga(f"Google Drive devolvió una página y no el video ({_titulo(pagina)!r})")
             if not tipo.startswith("video/"):
                 raise ErrorDescarga(f"Content-Type {tipo or 'ausente'!r}: no es video")
             largo = r.headers.get("Content-Length")
