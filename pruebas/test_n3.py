@@ -49,7 +49,7 @@ class Falso:
             r = r.pop(0) if len(r) > 1 else r[0]
         if r is not None:
             return r
-        return {"/oauth2/token": (200, leer("token.json")),
+        return {"/oauth2/token": (200, leer("oauth.json")),
                 "/helix/users": (200, leer("users.json")),
                 "/helix/games": (200, leer("games.json")),
                 "/helix/clips": (200, leer("clips.json"))}[ruta]
