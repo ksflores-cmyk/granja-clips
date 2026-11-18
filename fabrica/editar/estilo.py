@@ -402,17 +402,28 @@ def logo_extra_en_esquina(video: Path, plan: dict, marca: Marca) -> tuple[bool, 
     return d < UMBRAL_LOGO_EXTRA, f"esquina del logo {d:.1f} (máximo {UMBRAL_LOGO_EXTRA:g})"
 
 
-UMBRAL_SILENCIO_DB = -50.0
+UMBRAL_SILENCIO_DB = -45.0      # sobre el pico: un tramo corto de voz o música no se esconde en el promedio
 
 
-def nivel_medio_db(video: Path) -> float | None:
-    """Nivel medio del audio en dB (volumedetect). El silencio digital marca -91 dB. None si no se pudo medir."""
+def picos_audio(video: Path) -> tuple[float | None, str | None]:
+    """(pico en dB con volumedetect, motivo del error). El silencio digital marca -91 dB o menos."""
     r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(video), "-vn", "-af", "volumedetect",
                         "-f", "null", "-"], capture_output=True, text=True)
-    m = re.search(r"mean_volume:\s*(-?[0-9.]+|-inf)\s*dB", r.stderr)
+    if r.returncode != 0:
+        return None, f"ffmpeg falló (código {r.returncode}): {(r.stderr or '').strip().splitlines()[-1:] or ['sin detalle']}"
+    m = re.search(r"max_volume:\s*(-?[0-9.]+|-inf)\s*dB", r.stderr)
     if not m:
-        return None
-    return float("-inf") if m.group(1) == "-inf" else float(m.group(1))
+        return None, "volumedetect no dio el pico del audio"
+    return (float("-inf") if m.group(1) == "-inf" else float(m.group(1))), None
+
+
+def _pistas_de_audio(video: Path) -> int:
+    out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index",
+                          "-of", "json", str(video)], capture_output=True, text=True)
+    try:
+        return len(json.loads(out.stdout).get("streams", []))
+    except json.JSONDecodeError:
+        return -1
 
 
 def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
@@ -420,13 +431,14 @@ def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
     camp = plan.get("campana") or {}
     origen = plan.get("origen") or {}
     if camp.get("audio") == "silencio":
-        if not sondear(Path(video))["audio"]:
-            return False, "el MP4 no trae pista de audio"
-        nivel = nivel_medio_db(Path(video))
-        if nivel is None:
-            return False, "no se pudo medir el nivel del audio"
-        return nivel <= UMBRAL_SILENCIO_DB, (f"la fuente no trae audio: el MP4 debe ir en silencio; nivel medio "
-                                             f"{nivel:.1f} dB (máximo {UMBRAL_SILENCIO_DB:g} dB)")
+        pistas = _pistas_de_audio(Path(video))
+        if pistas != 1:
+            return False, f"el MP4 trae {pistas} pistas de audio y debe traer exactamente una (silencio)"
+        pico, error = picos_audio(Path(video))
+        if pico is None:
+            return False, f"no se pudo medir el audio: {error}"
+        return pico <= UMBRAL_SILENCIO_DB, (f"la fuente no trae audio: el MP4 debe ir en silencio; pico "
+                                            f"{pico:.1f} dB (máximo {UMBRAL_SILENCIO_DB:g} dB)")
     if camp.get("audio") != "original" or not origen:
         return False, f"el plan declara audio {camp.get('audio')!r}, no el original de la fuente"
     dur = float(plan.get("duracion") or 0)

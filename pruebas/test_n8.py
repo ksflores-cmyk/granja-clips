@@ -729,7 +729,10 @@ def test_hashtag_en_el_gancho_no_antecede_a_publicidad(red):
     tx = textos({**TOMA_FM, "creador": "DARO", "gancho": "#Fichaje Sebas ficha #FM27 al delantero"}, ficha_real(), red)
     antes = tx["texto"].split("\n#Publicidad")[0]
     assert "#" not in antes and "Sebas ficha al delantero" in antes
-    assert tx["texto"].split()[tx["texto"].split().index("#Publicidad")] == "#Publicidad"
+    lineas = tx["texto"].split("\n")
+    i = lineas.index("#Publicidad")
+    assert not any("#" in ln for ln in lineas[:i])                    # ningún # antes de la divulgación
+    assert [w for w in tx["texto"].split() if w.startswith("#")][0] == "#Publicidad"
 
 
 def test_el_valor_de_la_toma_ya_no_entra_al_texto_de_campana():
@@ -789,3 +792,39 @@ def test_candidato_fm27_por_toma_dict_y_textos_da_la_etiqueta_de_cada_red(repo, 
     assert tx["texto"].split("\n")[2:5] == ["@footballmanager", CREADORES[creador][RED[red]], "#Publicidad"]
     with pytest.raises(Descartada, match="sin gancho"):
         textos({**TOMA_FM, "creador": "DARO", "gancho": "#Solo #Hashtags"}, ficha_real(), "tiktok")
+
+
+def _mp4_con_audio(origen: Path, destino: Path, audio_lavfi: list[str]):
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(origen), *audio_lavfi,
+                    "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-shortest", str(destino)], check=True)
+
+
+def test_un_segundo_de_tono_entre_silencios_sale_en_rojo(marca, tmp_path):
+    mudo = tmp_path / "mudo.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                    "testsrc2=size=1280x720:rate=30:duration=20", "-c:v", "libx264", "-preset", "ultrafast",
+                    "-pix_fmt", "yuv420p", str(mudo)], check=True)
+    mp4, plan = render(marca, tmp_path, mudo, sin_agua(ficha_real()), "m")
+    corto = tmp_path / "corto.mp4"
+    _mp4_con_audio(mp4, corto, ["-f", "lavfi", "-i",
+                                "aevalsrc=if(between(t\\,5\\,6)\\,0.5*sin(2*PI*440*t)\\,0):s=48000:d=12"])
+    ok, det = estilo.audio_original(corto, plan)
+    assert not ok and "pico" in det
+    assert estilo.audio_original(mp4, plan)[0]
+
+
+def test_dos_pistas_de_audio_o_ffmpeg_con_error_son_rojo(marca, tmp_path):
+    mudo = tmp_path / "mudo.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                    "testsrc2=size=1280x720:rate=30:duration=20", "-c:v", "libx264", "-preset", "ultrafast",
+                    "-pix_fmt", "yuv420p", str(mudo)], check=True)
+    mp4, plan = render(marca, tmp_path, mudo, sin_agua(ficha_real()), "m")
+    dos = tmp_path / "dos.mkv"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(mp4), "-i", str(mp4),
+                    "-map", "0:v", "-map", "0:a", "-map", "1:a", "-c", "copy", str(dos)], check=True)
+    ok, det = estilo.audio_original(dos, plan)
+    assert not ok and "2 pistas" in det
+    roto = tmp_path / "roto.mp4"
+    roto.write_bytes(b"no es un mp4")
+    ok, det = estilo.audio_original(roto, plan)
+    assert not ok
