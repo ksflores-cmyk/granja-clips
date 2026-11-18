@@ -434,8 +434,8 @@ def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer
             raise AlertaRojaCiclo(motivo) from None
         out(f"ERROR de Buffer: {e}")
         falladas += [p for p in destinos if p not in programadas and p not in falladas]
-    except (ErrorAlmacen, red.ErrorRed) as e:
-        out(f"ERROR: {e}")
+    except (ErrorAlmacen, red.ErrorRed, KeyError, TypeError, ValueError) as e:
+        out(f"ERROR: {type(e).__name__}: {e}")
         falladas += [p for p in destinos if p not in programadas and p not in falladas]
     finally:
         if ruta and pub is not None:
