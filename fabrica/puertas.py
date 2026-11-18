@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import csv
+import re
 from datetime import datetime
-from pathlib import Path
+from urllib.parse import urlparse
 
 from .config import cargar_yaml, raiz_repo
-from .detectar import Candidato, ClienteTwitch
+from .detectar import Candidato, ClienteTwitch, ErrorTwitch
 from .fuentes import cargar_fuentes, es_publicable
 from .registro import ZONA
 
@@ -24,6 +25,7 @@ def puerta_ficha(raiz, cand: Candidato, ahora: datetime, plataforma: str,
 
 
 def id_juego_temporada(raiz, cliente: ClienteTwitch | None = None) -> str | None:
+    """Id del juego de la temporada. Puede lanzar ErrorTwitch si hay que resolverlo y Helix falla."""
     t = cargar_yaml("temporada.yml", raiz)
     if t.get("twitch_game_id"):
         return str(t["twitch_game_id"])
@@ -32,9 +34,11 @@ def id_juego_temporada(raiz, cliente: ClienteTwitch | None = None) -> str | None
     return None
 
 
-def puerta_juego(cand: Candidato, juego_esperado: str | None) -> tuple[bool, str]:
+def puerta_juego(cand: Candidato, juego_esperado: str | None, error: str | None = None):
     if cand.origen == "brief":
         return True, "material del brief: se acepta"
+    if error:
+        return False, f"no se pudo resolver el id del juego: {error}"
     if juego_esperado is None:
         return False, "no se pudo resolver el id del juego de la temporada"
     if cand.juego_id != juego_esperado:
@@ -45,6 +49,7 @@ def puerta_juego(cand: Candidato, juego_esperado: str | None) -> tuple[bool, str
 def puerta_duracion(raiz, cand: Candidato) -> tuple[bool, str]:
     if cand.duracion_s is None:
         if cand.origen == "brief":
+            cand.medir_al_descargar = True   # N4 debe medirla al descargar y volver a comprobar
             return True, "duración desconocida (brief): se mide al descargar"
         return False, "duración desconocida"
     ficha = _ficha(raiz, cand.fuente_id) or {}
@@ -74,14 +79,44 @@ def _filas_marcador(raiz) -> list[dict]:
         return list(csv.DictReader(f))
 
 
+RE_ORIGEN = re.compile(r"origen[:\s]+([^\s;,]+)")   # "origen:<id>" u "origen <id>"
+
+
+def _id_de_clip_twitch(url: str) -> str | None:
+    """Id de un clip de Twitch (clips.twitch.tv/<id> o twitch.tv/<canal>/clip/<id>); None si no lo es."""
+    u = urlparse(url)
+    host = (u.hostname or "").lower()
+    partes = [x for x in u.path.split("/") if x]
+    if host == "clips.twitch.tv" and len(partes) == 1:
+        return partes[0]
+    if host in ("twitch.tv", "www.twitch.tv", "m.twitch.tv") and len(partes) == 3 and partes[1] == "clip":
+        return partes[2]
+    return None
+
+
+def ids_en_marcador(raiz) -> set[str]:
+    """Ids de origen ya registrados en marcador.csv. Convención para N4 al escribir el marcador:
+    poner el id de origen completo en `id_clip`, o la URL del clip en `url` (de Twitch se extrae el id; de otras plataformas se compara la URL
+    completa), o `origen:<id>` u `origen <id>` en `notas`. Se compara el id entero, nunca por subcadena."""
+    ids: set[str] = set()
+    for f in _filas_marcador(raiz):
+        if f.get("id_clip"):
+            ids.add(f["id_clip"].strip())
+        url = (f.get("url") or "").strip()
+        if url:
+            ids.add(url)
+            clip = _id_de_clip_twitch(url)
+            if clip:
+                ids.add(clip)
+        ids.update(RE_ORIGEN.findall(f.get("notas") or ""))
+    return ids
+
+
 def puerta_no_repetido(raiz, cand: Candidato) -> tuple[bool, str]:
     if cand.id_origen in _vistos(raiz):
         return False, "ya está en estado/vistos.txt"
-    # El marcador guarda la URL de publicación; un id de origen ahí o en notas cuenta como repetido.
-    for fila in _filas_marcador(raiz):
-        if cand.id_origen and cand.id_origen in (fila.get("notas") or "") + (fila.get("url") or "") \
-                + (fila.get("id_clip") or ""):
-            return False, "ya está en el marcador"
+    if cand.id_origen and cand.id_origen in ids_en_marcador(raiz):
+        return False, "ya está en el marcador"
     return True, "ok"
 
 
@@ -107,31 +142,49 @@ def puerta_cupo(raiz, ahora: datetime, plataforma: str) -> tuple[bool, str]:
 
 def filtrar(raiz, candidatos: list[Candidato], ahora: datetime, plataforma: str,
             cliente: ClienteTwitch | None = None, pilar: str | None = None):
-    """Devuelve (aprobados, descartados[(candidato, motivo)]). Las puertas corren en orden."""
+    """Devuelve (aprobados, descartados[(candidato, motivo)]). Las puertas corren en orden.
+
+    El pilar sale del candidato; si no trae, del argumento. Sin pilar, una ficha tipo D no pasa.
+    El id del juego se resuelve al llegar al primer candidato de Twitch; si falla, sólo ésos se descartan.
+    """
     aprobados: list[Candidato] = []
     descartados: list[tuple[Candidato, str]] = []
-    juego = id_juego_temporada(raiz, cliente)
+    aprobados_ids: set[str] = set()
+    estado = {"hecho": False, "juego": None, "error": None}
+
+    def juego():
+        if not estado["hecho"]:
+            estado["hecho"] = True
+            try:
+                estado["juego"] = id_juego_temporada(raiz, cliente)
+            except ErrorTwitch as e:
+                estado["error"] = str(e)
+        return estado["juego"], estado["error"]
+
+    cupo = cupo_del_dia(raiz, ahora, plataforma)
+    hoy = ahora.astimezone(ZONA).date().isoformat()
+    base = sum(1 for f in _filas_marcador(raiz)
+               if f.get("fecha") == hoy and f.get("plataforma") == plataforma)
     for c in candidatos:
         pruebas = [
-            puerta_ficha(raiz, c, ahora, plataforma, pilar),
-            puerta_juego(c, juego),
-            puerta_duracion(raiz, c),
-            puerta_no_repetido(raiz, c),
+            lambda: puerta_ficha(raiz, c, ahora, plataforma, c.pilar or pilar),
+            # el id del juego se resuelve aquí, sólo si la ficha ya pasó la primera puerta
+            lambda: puerta_juego(c, *(juego() if c.origen != "brief" else (None, None))),
+            lambda: puerta_duracion(raiz, c),
+            lambda: puerta_no_repetido(raiz, c),
+            lambda: (False, "repetido en esta corrida") if c.id_origen in aprobados_ids else (True, "ok"),
+            lambda: (False, f"cupo del día lleno en {plataforma} ({base + len(aprobados)}/{cupo})")
+            if base + len(aprobados) >= cupo else (True, "ok"),
         ]
-        fallo = next(((ok, m) for ok, m in pruebas if not ok), None)
-        if fallo is None:
-            ok, m = puerta_cupo(raiz, ahora, plataforma)
-            # los ya aprobados en esta corrida también ocupan cupo
-            if ok:
-                cupo = cupo_del_dia(raiz, ahora, plataforma)
-                hoy = ahora.astimezone(ZONA).date().isoformat()
-                base = sum(1 for f in _filas_marcador(raiz)
-                           if f.get("fecha") == hoy and f.get("plataforma") == plataforma)
-                if base + len(aprobados) >= cupo:
-                    ok, m = False, f"cupo del día lleno con los aprobados de esta corrida ({cupo})"
-            fallo = None if ok else (ok, m)
-        if fallo is None:
+        motivo = None
+        for p in pruebas:
+            ok, m = p()
+            if not ok:
+                motivo = m
+                break
+        if motivo is None:
             aprobados.append(c)
+            aprobados_ids.add(c.id_origen)
         else:
-            descartados.append((c, fallo[1]))
+            descartados.append((c, motivo))
     return aprobados, descartados

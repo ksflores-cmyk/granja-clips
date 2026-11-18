@@ -1,5 +1,7 @@
 """N3: lista blanca (es_publicable / puede_descargar), detector de Twitch y puertas baratas. Sin red."""
+import dataclasses
 import datetime as dt
+import re
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from zoneinfo import ZoneInfo
@@ -319,9 +321,26 @@ def test_puerta_no_repetido_y_vistos_se_crea(repo_n3):
 
 def test_puerta_no_repetido_por_marcador(repo_n3):
     anotar_fila(repo_n3, {"id_clip": "c1", "fecha": "2026-11-18", "plataforma": "tiktok",
-                          "notas": "origen ClipX"})
+                          "notas": "origen:ClipX"})
     ok, m = puertas.puerta_no_repetido(repo_n3, cand())
     assert not ok and "marcador" in m
+
+
+def test_no_repetido_compara_id_completo_no_subcadena(repo_n3):
+    anotar_fila(repo_n3, {"id_clip": "ClipXyz", "notas": "origen:ClipXyz otro", "url": "https://clips.twitch.tv/ClipXyz"})
+    assert puertas.puerta_no_repetido(repo_n3, cand(id_origen="ClipX"))[0]
+    assert not puertas.puerta_no_repetido(repo_n3, cand(id_origen="ClipXyz"))[0]
+
+
+@pytest.mark.parametrize("fila", [
+    {"id_clip": "ClipX"},
+    {"url": "https://clips.twitch.tv/ClipX"},
+    {"url": "https://clips.twitch.tv/ClipX/"},
+    {"notas": "bueno; origen:ClipX; ok"},
+])
+def test_no_repetido_formas_del_marcador(repo_n3, fila):
+    anotar_fila(repo_n3, dict(fila, fecha="2026-11-18", plataforma="tiktok"))
+    assert not puertas.puerta_no_repetido(repo_n3, cand())[0]
 
 
 def llenar(repo, n, plataforma="tiktok", fecha="2026-11-19"):
@@ -375,11 +394,7 @@ def test_filtrar_respeta_cupo_dentro_de_la_corrida(repo_n3):
 
 # ---- validador ----
 
-def test_validador_usa_es_publicable_para_su_aviso(repo, editar_yaml):
-    editar_yaml(repo, "fuentes.yml", lambda d: [dict(d[0], estado="pausada")] + d[1:])
-    inf = validar.validar(repo)
-    assert inf.errores == [] and any("estado 'pausada'" in a for a in inf.avisos)
-    assert validar.es_publicable is es_publicable
+
 
 
 @pytest.mark.parametrize("campo,valor,fragmento", [
@@ -413,10 +428,209 @@ def test_cargar_fuentes_real():
     assert any(f["id"] == "propio-tipografico" for f in cargar_fuentes())
 
 
-def test_diagnostico_no_imprime_valores():
+
+
+
+# ---- ronda 1: correcciones de Codex y Haiku ----
+
+def ficha_d(**kw):
+    return base(id="ficha-d", tipo="D", pilares=["informativa"], campana=None, origen="web",
+                twitch_login=None, material=["https://example.invalid/d.mp4"], **kw)
+
+
+def test_tipo_d_sin_pilar_no_es_publicable():
+    ok, m = es_publicable(ficha_d(), HOY)
+    assert not ok and "informativa" in m
+    assert es_publicable(ficha_d(), HOY, None, "informativa")[0]
+
+
+def test_tipo_d_de_extremo_a_extremo_nadie_pasa_sin_pilar_informativa(repo, editar_yaml):
+    editar_yaml(repo, "fuentes.yml", lambda d: d + [ficha_d()])
+    editar_yaml(repo, "temporada.yml", lambda d: dict(d, twitch_game_id="777001"))
+    cands = detectar.detectar(repo, AHORA)
+    assert [c.fuente_id for c in cands] == ["ficha-d"] and cands[0].pilar == "informativa"
+    ok, _ = puertas.filtrar(repo, cands, AHORA, "tiktok")
+    assert [c.fuente_id for c in ok] == ["ficha-d"]
+    for pilar_malo in (None, "momentos"):
+        sin = [dataclasses.replace(c, pilar=pilar_malo) for c in cands]
+        ok, no = puertas.filtrar(repo, sin, AHORA, "tiktok", pilar=pilar_malo)
+        assert ok == [] and "informativa" in no[0][1]
+    assert all(c.pilar == "informativa" for c in ok) or ok == []
+
+
+def test_validador_no_da_aviso_falso_para_tipo_d(repo, editar_yaml):
+    editar_yaml(repo, "fuentes.yml", lambda d: d + [ficha_d(permiso_url="https://example.invalid/p")])
+    inf = validar.validar(repo)
+    assert inf.errores == [] and inf.avisos == []
+
+
+def test_filtrar_no_aprueba_dos_veces_el_mismo_id(repo, editar_yaml):
+    url = "https://example.invalid/a.mp4"
+    editar_yaml(repo, "fuentes.yml", lambda d: d + [
+        base(id="b1", origen="web", twitch_login=None, tipo="B", material=[url]),
+        base(id="b2", origen="web", twitch_login=None, tipo="B", material=[url])])
+    ok, no = puertas.filtrar(repo, detectar.detectar(repo, AHORA), AHORA, "tiktok")
+    assert [c.fuente_id for c in ok] == ["b1"] and "repetido" in no[0][1]
+
+
+def test_transporte_convierte_fallos_de_conexion(monkeypatch):
+    import urllib.error
+    def falla(req, timeout=None):
+        raise urllib.error.URLError("sin ruta")
+    monkeypatch.setattr(detectar.urllib.request, "urlopen", falla)
+    with pytest.raises(ErrorTwitch) as e:
+        detectar.transporte_urllib("GET", "https://api.twitch.tv/helix/users?login=secreto-q", {})
+    assert "secreto-q" not in str(e.value) and "URLError" in str(e.value)
+    monkeypatch.setattr(detectar.urllib.request, "urlopen", lambda r, timeout=None: (_ for _ in ()).throw(TimeoutError()))
+    with pytest.raises(ErrorTwitch):
+        detectar.transporte_urllib("GET", "https://api.twitch.tv/helix/users", {})
+
+
+def test_detector_salta_twitch_por_fallo_de_red_y_conserva_brief(repo_twitch, editar_yaml):
+    editar_yaml(repo_twitch, "fuentes.yml", lambda d: d + [base(
+        id="brief", origen="web", twitch_login=None, tipo="B", material=["https://example.invalid/a.mp4"])])
+
+    def roto(metodo, url, enc, cuerpo=None):
+        raise ErrorTwitch("fallo de conexión con api.twitch.tv/helix/users: URLError")
+    cands, saltos = detectar.detectar_con_motivos(repo_twitch, AHORA, cliente(roto))
+    assert [c.origen for c in cands] == ["brief"] and any("fallo de conexión" in s for s in saltos)
+
+
+def test_fallo_de_helix_no_aborta_lote_de_brief(repo_twitch, editar_yaml):
+    repo = repo_twitch
+    editar_yaml(repo, "fuentes.yml", lambda d: d + [base(
+        id="brief", origen="web", twitch_login=None, tipo="B", material=["https://example.invalid/a.mp4"])])
+    c = cliente(Falso({"/helix/games": (500, "{}")}))
+    mezcla = [cand(id_origen="ClipA"), detectar.detectar(repo, AHORA)[0]]
+    ok, no = puertas.filtrar(repo, mezcla, AHORA, "tiktok", cliente=c)
+    assert [x.origen for x in ok] == ["brief"]
+    assert "no se pudo resolver" in no[0][1]
+
+
+def test_lote_solo_de_brief_no_llama_a_helix(repo, editar_yaml):
+    editar_yaml(repo, "fuentes.yml", lambda d: d + [base(
+        id="brief", origen="web", twitch_login=None, tipo="B", material=["https://example.invalid/a.mp4"])])
+    f = Falso()
+    ok, _ = puertas.filtrar(repo, detectar.detectar(repo, AHORA), AHORA, "tiktok", cliente=cliente(f))
+    assert len(ok) == 1 and f.llamadas == []
+
+
+def test_fecha_de_guatemala_en_el_detector(repo, editar_yaml):
+    # 03:00 UTC del 20 nov es 19 nov 21:00 en Guatemala: una ficha que vence el 19 sigue vigente
+    editar_yaml(repo, "fuentes.yml", lambda d: d + [base(
+        id="brief", origen="web", twitch_login=None, tipo="B", vence=dt.date(2026, 11, 19),
+        material=["https://example.invalid/a.mp4"])])
+    tarde = dt.datetime(2026, 11, 20, 3, 0, tzinfo=UTC)
+    assert len(detectar.detectar(repo, tarde)) == 1
+    assert detectar.detectar(repo, tarde + dt.timedelta(hours=7)) == []   # ya es 20 nov en Guatemala
+
+
+def test_brief_sin_duracion_queda_marcado_para_medir(repo_n3):
+    c = cand(origen="brief", duracion_s=None)
+    assert puertas.puerta_duracion(repo_n3, c)[0] and c.medir_al_descargar is True
+    assert cand().medir_al_descargar is False
+
+
+def test_cupo_con_filas_reales_de_marcador_csv(repo_n3):
+    from fabrica.registro import CABECERA_MARCADOR
+    fila = {c: "" for c in CABECERA_MARCADOR}
+    lineas = [",".join(CABECERA_MARCADOR)]
+    for i in range(8):
+        f = dict(fila, id_clip=f"r{i}", fecha="2026-11-19", hora="10:00", plataforma="tiktok")
+        lineas.append(",".join(f[c] for c in CABECERA_MARCADOR))
+    (repo_n3 / "marcador.csv").write_text("\n".join(lineas) + "\n", encoding="utf-8")
+    assert not puertas.puerta_cupo(repo_n3, AHORA, "tiktok")[0]
+    assert puertas.puerta_cupo(repo_n3, AHORA, "shorts")[0]
+
+
+def test_validador_llama_a_es_publicable(repo, editar_yaml, monkeypatch):
+    visto = []
+    real = validar.es_publicable
+    monkeypatch.setattr(validar, "es_publicable", lambda *a, **k: (visto.append(a[0]["id"]), real(*a, **k))[1])
+    editar_yaml(repo, "fuentes.yml", lambda d: [dict(d[0], estado="vetada")] + d[1:])
+    inf = validar.validar(repo)
+    assert visto == [d["id"] for d in cargar_fuentes(repo)][:1] and any("estado 'vetada'" in a for a in inf.avisos)
+
+
+SECRETOS = ["GEMINI_API_KEY", "BUFFER_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY",
+            "TWITCH_CLIENT_ID", "TWITCH_CLIENT_SECRET"]
+
+
+def test_diagnostico_ningun_paso_imprime_un_secreto():
     ruta = Path(__file__).parent.parent / ".github" / "workflows" / "diagnostico.yml"
+    wf = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    assert wf[True] == {"workflow_dispatch": None} and wf["permissions"] == {"contents": "read"}
+    pasos = wf["jobs"]["diagnostico"]["steps"]
+    assert all(p.get("shell") == "bash" for p in pasos)
+    for p in pasos:
+        logicas = p["run"].replace("\\\n", " ").splitlines()
+        for linea in logicas:
+            toca = [n for n in SECRETOS if re.search(r"\$\{?" + n + r"\b", linea)]
+            if not toca:
+                continue
+            assert not re.match(r"\s*(echo|print)\b", linea), linea
+            if "printf" in linea:                 # sólo viaja por tubería a curl, nunca a la pantalla
+                assert "| curl" in linea or linea.rstrip().endswith("|"), linea
+            if "TWITCH_CLIENT_SECRET" in toca and "printf" not in linea:
+                assert "curl" not in linea, linea   # el secreto nunca va en la línea de órdenes de curl
     texto = ruta.read_text(encoding="utf-8")
-    d = yaml.safe_load(texto)
-    assert d[True if True in d else "on"] == {"workflow_dispatch": None}
-    assert d["permissions"] == {"contents": "read"}
-    assert "echo \"$" not in texto.replace('echo "$n: ', "")
+    assert "-d \"client_secret=" not in texto and "--data @-" in texto
+
+
+def test_pruebas_datos_no_esta_ignorado_por_gitignore():
+    import shutil, subprocess
+    raiz = Path(__file__).parent.parent
+    if shutil.which("git") is None or not (raiz / ".git").exists():
+        pytest.skip("sin git")
+    archivos = [str(p.relative_to(raiz)) for p in (raiz / "pruebas" / "datos").rglob("*") if p.is_file()]
+    assert archivos
+    r = subprocess.run(["git", "check-ignore", "--", *archivos], cwd=raiz, capture_output=True, text=True)
+    assert r.returncode == 1 and r.stdout == "", f"ignorados por .gitignore: {r.stdout}"
+
+
+# ---- ronda 2 ----
+
+def test_cero_llamadas_a_helix_si_todas_las_fichas_de_twitch_se_rechazan(repo, editar_yaml):
+    editar_yaml(repo, "fuentes.yml", lambda d: d + [base(estado="pausada")])
+    f = Falso()
+    ok, no = puertas.filtrar(repo, [cand(id_origen="a"), cand(id_origen="b")], AHORA, "tiktok", cliente=cliente(f))
+    assert ok == [] and len(no) == 2 and f.llamadas == []
+
+
+@pytest.mark.parametrize("notas", ["origen:ClipX", "origen ClipX", "ok; origen ClipX; fin"])
+def test_notas_con_origen_en_ambas_formas(repo_n3, notas):
+    anotar_fila(repo_n3, {"notas": notas})
+    assert not puertas.puerta_no_repetido(repo_n3, cand())[0]
+    assert puertas.puerta_no_repetido(repo_n3, cand(id_origen="Clip"))[0]
+
+
+@pytest.mark.parametrize("url", ["https://clips.twitch.tv/ClipX", "https://www.twitch.tv/canal_ejemplo/clip/ClipX"])
+def test_url_de_clip_de_twitch_aporta_su_id(repo_n3, url):
+    anotar_fila(repo_n3, {"url": url})
+    assert not puertas.puerta_no_repetido(repo_n3, cand())[0]
+
+
+def test_url_de_tiktok_no_bloquea_un_id_igual_al_ultimo_tramo(repo_n3):
+    anotar_fila(repo_n3, {"url": "https://www.tiktok.com/@canal/video/123"})
+    assert puertas.puerta_no_repetido(repo_n3, cand(id_origen="123"))[0]
+    # la URL completa sí cuenta (brief)
+    u = "https://www.tiktok.com/@canal/video/123"
+    assert not puertas.puerta_no_repetido(repo_n3, cand(id_origen=u))[0]
+
+
+def test_workflows_no_interpolan_secretos_en_run():
+    carpeta = Path(__file__).parent.parent / ".github" / "workflows"
+    archivos = sorted(carpeta.glob("*.yml"))
+    assert archivos
+    for ruta in archivos:
+        wf = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+        for nombre, job in wf["jobs"].items():
+            for paso in job.get("steps", []):
+                run = paso.get("run", "")
+                assert "${{ secrets." not in run and "${{secrets." not in run, \
+                    f"{ruta.name}/{nombre}: un run interpola secretos; pásalos por env"
+
+
+def test_diagnostico_no_escribe_el_token_en_disco():
+    texto = (Path(__file__).parent.parent / ".github" / "workflows" / "diagnostico.yml").read_text(encoding="utf-8")
+    assert "-o token" not in texto and "-o juego" not in texto and "> token" not in texto

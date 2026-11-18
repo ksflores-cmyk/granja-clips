@@ -184,7 +184,8 @@ def validar_fuentes(f, inf: Informe) -> None:
                 inf.error(f"{et}: tipo D exige campana null")
         if ficha.get("estado") in ESTADOS and ficha.get("estado") != "vigente" \
                 and ficha.get("publicable") is True:
-            _, motivo = es_publicable(ficha, _hoy())
+            _, motivo = es_publicable(ficha, _hoy(), None,
+                                      "informativa" if ficha.get("tipo") == "D" else None)
             inf.aviso(f"{et}: marcada publicable pero no lo es ({motivo}); "
                       "la puerta de N3 exigirá estado vigente para descargar o publicar")
         _validar_campos_n3(ficha, et, inf)

@@ -47,8 +47,8 @@ def es_publicable(ficha: dict, hoy: date, plataforma: str | None = None,
     if plataforma is not None and plataforma not in (reglas.get("plataformas") or []):
         return False, f"plataforma {plataforma} no está en reglas.plataformas"
     pilares = ficha.get("pilares")
-    if ficha.get("tipo") == "D" and pilar is not None and pilar != "informativa":
-        return False, "tipo D sólo con pilar informativa"
+    if ficha.get("tipo") == "D" and pilar != "informativa":
+        return False, f"tipo D exige pilar informativa (recibió {pilar!r})"
     if pilar is not None and pilares and pilar not in pilares:
         return False, f"pilar {pilar} no está en los pilares de la ficha"
     return True, "ok"
