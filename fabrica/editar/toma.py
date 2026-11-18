@@ -7,6 +7,7 @@ todos sus motivos. La puerta de estilo corre mientras el video de origen sigue e
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import tempfile
 import time
@@ -81,10 +82,24 @@ def hacer_toma(raiz, candidato, ficha: dict | None, ahora: datetime, *, salida: 
                abrir=None, ejecutor=None, transporte=None, espera=time.sleep, entorno=None) -> Resultado:
     """Descarga → ojos → validar_respuesta → componer → puerta de estilo. Nunca publica.
 
-    `salida`: carpeta del MP4 (por defecto una temporal nueva que queda al cuidado de quien llama).
+    `salida`: carpeta del MP4. Si no se da, se crea una temporal que sólo se conserva cuando la toma sale ok
+    (en cualquier descarte o error se borra). Cualquier excepción inesperada es un descarte con su motivo.
     """
+    propia = salida is None
+    carpeta = Path(salida) if salida is not None else Path(tempfile.mkdtemp(prefix="granja-toma-"))
+    r = None
+    try:
+        r = _hacer_toma(raiz, candidato, ficha, ahora, carpeta, abrir, ejecutor, transporte, espera, entorno)
+    except Exception as e:  # noqa: BLE001 (nada debe subir sin control: es un descarte)
+        r = Resultado(False, [f"error inesperado: {type(e).__name__}: {e}"])
+    finally:
+        if propia and not (r is not None and r.ok):
+            shutil.rmtree(carpeta, ignore_errors=True)
+    return r
+
+
+def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, transporte, espera, entorno) -> Resultado:
     raiz = raiz_repo(raiz)
-    salida = Path(salida) if salida is not None else Path(tempfile.mkdtemp(prefix="granja-toma-"))
     salida.mkdir(parents=True, exist_ok=True)
     marca = Marca.cargar(raiz)
     temporada = cargar_yaml("temporada.yml", raiz)
