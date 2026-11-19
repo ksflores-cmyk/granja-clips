@@ -42,7 +42,8 @@
     ]
    },
    "ficha_id": "propio-tipografico"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|1|2026-11-18T13:00:00.000Z",
@@ -87,7 +88,8 @@
     ]
    },
    "ficha_id": "propio-tipografico"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|1|2026-11-18T13:00:00.000Z",
@@ -132,6 +134,7 @@
     ]
    },
    "ficha_id": "propio-tipografico"
-  }
+  },
+  "ruta_borrada": true
  }
 ]
