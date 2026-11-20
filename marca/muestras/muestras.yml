@@ -83,7 +83,7 @@ muestras:
         url: https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4
         sha256: 543a4ad9fef4c9e0004ec9482cb7225c2574b0f889291e8270b1c4d61dbc1ab8
       inicio: 30.0
-    stream: {esquina_facecam: superior_derecha, esquina_logo: inferior_derecha, chat: izquierda, alerta_s: null, tramo_cara: [29.5, 3.0]}
+    stream: {esquina_facecam: superior_derecha, esquina_logo: inferior_derecha, chat: izquierda, alerta_s: null, tramo_cara: [42.5, 2.2]}
     licencia: "CC BY 3.0, © Blender Foundation (durian.blender.org y peach.blender.org); compuesto sintético, no se publica"
     enlace_licencia: https://creativecommons.org/licenses/by/3.0/
     recorte: {inicio: 0.0, duracion: 9.0}      # sobre el compuesto
