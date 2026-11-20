@@ -336,6 +336,7 @@ def test_informativa_usa_la_plantilla_y_el_credito_de_rockstar():
 
 
 def test_el_juego_se_escribe_gta_6():
+    # Gancho cambiado en la tarea #8: «Lo mejor de GTA VI y gta6» quedaba con una sola palabra de contenido y ahora se descarta.
     t = textos({**TOMA, "gancho": "El mejor tiroteo de GTA VI y gta6"}, FICHA_LIMPIA, "shorts")["texto"]
     assert "tiroteo de GTA 6 y GTA 6" in t and "VI" not in t
 
@@ -426,7 +427,8 @@ def test_con_pausa_no_hay_ninguna_llamada(repo):
     sal = []
     cod = publicar.ejecutar(repo, env=entorno_real(), salida=sal.append, transporte_buffer=esp,
                             transporte_almacen=esp, ahora=lambda: AHORA)
-    assert cod == 0 and esp.llamadas == [] and "PAUSA" in sal[0]
+    assert cod == 0 and esp.llamadas == [] and "PAUSA" in sal[-1]
+    # Tarea #8 (ronda 2): en modo ensayo, con PAUSA se imprimen antes los textos de muestra (offline), y el aviso va al final.
 
 
 def test_con_pausa_ni_borrador_ni_vivo_llaman(repo, editar_yaml):

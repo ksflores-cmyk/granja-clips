@@ -120,7 +120,7 @@ def test_el_credito_y_publicidad_no_se_recortan_para_caber():
 
 @pytest.mark.parametrize("gancho", ["NO VAS A CREER lo que pasa aquí", "Esto cambia todo para el mapa",
                                     "Mira esto: un auto volando", "Un momento ÉPICO... no, momento épico total",
-                                    "Una locura total en la playa", "Es increíble el tiroteo", "El final te sorprenderará"])
+                                    "Una locura total en la playa", "Es increíble el tiroteo", "El final te sorprenderá"])
 def test_gancho_generico_se_descarta(gancho):
     with pytest.raises(Descartada, match="genérico"):
         textos({**TOMA_P, "gancho": gancho}, FICHA_PROPIA, "shorts")
@@ -280,3 +280,149 @@ def test_no_se_repite_el_mismo_texto_en_7_dias(tmp_path):
     with pytest.raises(Descartada, match="repetido"):
         textos({**TOMA_P, "numero": 13}, FICHA_PROPIA, "shorts", tmp_path, hoy)
     textos({**TOMA_P, "numero": 13}, FICHA_PROPIA, "shorts", tmp_path, hoy + timedelta(days=8))
+
+
+# ---------------------------------------------------------------- ronda 2
+
+# 1. Frases genéricas y palabras evitadas: por palabras completas.
+@pytest.mark.parametrize("gancho", ["Increíblemente rápido el auto", "La parte 23 del atraco", "Admira esto de cerca"])
+def test_r2_generico_por_palabra_completa_no_descarta_subcadenas(gancho):
+    textos({**TOMA_P, "gancho": gancho}, FICHA_PROPIA, "shorts")
+
+
+@pytest.mark.parametrize("gancho", ["Mira esto", "PARTE 2 del robo", "Es increíble el auto"])
+def test_r2_generico_sigue_descartando_la_frase_completa(gancho):
+    with pytest.raises(Descartada, match="genérico"):
+        textos({**TOMA_P, "gancho": gancho}, FICHA_PROPIA, "shorts")
+
+
+def test_r2_palabras_evitar_por_palabra_completa_y_sin_acentos():
+    f = ficha_fm27()
+    with pytest.raises(Descartada, match="filtración"):
+        textos({**TOMA_A, "gancho": "Sebas confirma una FILTRACION nueva"}, f, "shorts")
+    textos({**TOMA_A, "gancho": "Sebas habla de filtraciones nuevas"}, f, "shorts")     # otra palabra: pasa
+    textos({**TOMA_A, "gancho": "Sebas lo ve gratuito en casa"}, f, "shorts")
+
+
+# 2. Gancho concreto: 0 palabras con contenido, o 1 sola con menos de 3 palabras en total.
+@pytest.mark.parametrize("gancho", ["Ibai se asusta", "Sale GTA 6", "GTA 6 ya está a la venta"])
+def test_r2_ganchos_cortos_pero_concretos_pasan(gancho):
+    textos({**TOMA_P, "gancho": gancho, "creador": "twitch.tv/ibai"}, ficha_t(), "shorts")
+
+
+@pytest.mark.parametrize("gancho", ["gta6", "ibai", "GTA 6 clip", "El clip"])
+def test_r2_ganchos_vacios_siguen_fuera(gancho):
+    with pytest.raises(Descartada, match="sin contenido"):
+        textos({**TOMA_P, "gancho": gancho, "creador": "twitch.tv/ibai"}, ficha_t(), "shorts")
+
+
+# 3. Sólo se ignora el creador de la toma, su login o etiqueta, el credito de T y el juego.
+def test_r2_el_texto_libre_de_ficha_creador_de_campana_no_se_ignora():
+    r = textos({**TOMA_A, "gancho": "Fichaje oficial"}, ficha_fm27(), "tiktok")    # «oficial» está en ficha.creador
+    assert r["texto"].startswith("Toma 007. Fichaje oficial\n")
+    with pytest.raises(Descartada, match="sin contenido"):
+        textos({**TOMA_A, "gancho": "Sebasberon Sebasclips"}, ficha_fm27(), "tiktok")     # creador y etiqueta
+
+
+# 4. Login de Twitch.
+def test_r2_login_de_twitch_se_normaliza_y_se_valida():
+    toma = {**TOMA_T, "creador": "https://www.twitch.tv/Ibai/clip/AbC-x?a=1"}
+    f = {**ficha_t(), "credito": "https://www.twitch.tv/Ibai/clip/AbC-x?a=1"}
+    assert "🎥 twitch.tv/Ibai\n" in textos(toma, f, "tiktok")["texto"]
+    for malo in ("twitch.tv/ib ai!", "twitch.tv/" + "a" * 26, "twitch.tv/ibai-x"):
+        with pytest.raises(Descartada, match="sin crédito: login de Twitch inválido"):
+            textos(TOMA_T, {**ficha_t(), "credito": malo}, "tiktok")
+
+
+# 5. NFC.
+def test_r2_hashtag_nfd_queda_valido():
+    nfd = "#Cancún"
+    r = textos({**TOMA_P, "etiquetas": [nfd, "#a", "#b"]}, FICHA_PROPIA, "reels")
+    assert "#Cancún" in r["hashtags"] and "́" not in r["texto"]
+    r = textos({**TOMA_P, "gancho": "Primera vez en Cancún"}, FICHA_PROPIA, "tiktok")
+    assert "Cancún" in r["texto"]
+
+
+# 6. Título por UTF-16.
+def test_r2_titulo_se_recorta_por_utf16():
+    r = textos({**TOMA_P, "gancho": "𝕏𝕏𝕏𝕏 " * 30}, FICHA_PROPIA, "shorts")
+    assert mod.utf16(r["titulo"]) <= 100 and r["titulo"].endswith("…")
+    assert len(mod._titulo_youtube("𝕏" * 80)) < 80 and mod.utf16(mod._titulo_youtube("𝕏" * 80)) <= 100
+
+
+# 7. Tipo oración con puntuación y nombre del creador.
+def test_r2_oracion_tras_signos_y_con_nombre_del_creador():
+    t = textos({**TOMA_P, "gancho": "¡NO PUEDE SER! EL NPC TROLEA. ¿QUÉ PASA?"}, FICHA_PROPIA, "tiktok")["texto"]
+    assert t.startswith("Toma 012. ¡No puede ser! El NPC trolea. ¿Qué pasa?\n")
+    t = textos({**TOMA_P, "gancho": "SE ASUSTA IBAILLANOS CON EL NPC", "creador": "twitch.tv/IbaiLlanos"},
+               ficha_t("IbaiLlanos"), "tiktok")["texto"]
+    assert t.startswith("Toma 012. Se asusta IbaiLlanos con el NPC\n")
+
+
+# 8. Hashtags incrustados: sólo los que empiezan con letra.
+def test_r2_hashtag_numerico_en_el_gancho_se_queda():
+    r = textos({**TOMA_P, "gancho": "El top #1 de Latam"}, FICHA_PROPIA, "tiktok")
+    assert r["texto"].startswith("Toma 012. El top #1 de Latam\n")
+    r = textos({**TOMA_A, "gancho": "El top #1 de Latam"}, ficha_fm27(), "tiktok")      # no es el # de la divulgación
+    assert r["hashtags"][0] == "#Publicidad"
+
+
+# 9. Emojis extra.
+def test_r2_emojis_cuadrados_y_banderas_de_etiqueta():
+    escocia = "🏴\U000e0067\U000e0062\U000e0073\U000e0063\U000e0074\U000e007f"
+    r = textos({**TOMA_P, "gancho": f"Primera ⬛ vez ⬜ en {escocia} el mapa ️‍"}, FICHA_PROPIA, "tiktok")
+    assert r["texto"].startswith("Toma 012. Primera vez en el mapa\n")
+    assert not any(0xE0020 <= ord(c) <= 0xE007F or c in "⬛⬜️‍" for c in r["texto"])
+    assert publicar.contar_emojis(r["texto"]) == 1 and publicar.contar_emojis(escocia) == 1
+
+
+# 10. En campaña, primero los hashtags del brief.
+def test_r2_campana_hashtags_del_brief_antes_que_los_de_la_toma():
+    r = textos({**TOMA_A, "etiquetas": ["#Zeta", "#Eta"]}, ficha_fm27(), "tiktok")
+    assert r["texto"].endswith("#Publicidad\n#FootballManager #FM27 #FootballManager27")
+
+
+# 11. Ensayo con PAUSA.
+def test_r2_ensayo_con_pausa_imprime_los_9_textos_y_no_llama_a_buffer(repo, monkeypatch):
+    assert (repo / "PAUSA").exists()
+    monkeypatch.setattr(publicar, "ClienteBuffer", lambda *a, **k: pytest.fail("no debe llamar a Buffer"))
+    sal: list[str] = []
+    cod = publicar.ejecutar(repo, ensayo_forzado=True, env={}, salida=sal.append)
+    assert cod == 0
+    assert len([x for x in sal if x.startswith("Texto ")]) == 9 and all("... ok" in x for x in sal if x.startswith("Texto "))
+    assert sal[-1].startswith("PAUSA:")
+    assert not (repo / "estado" / "buffer-textos.json").exists()
+
+
+def test_r2_ensayo_sale_con_error_si_un_texto_no_cumple(repo, monkeypatch):
+    from fabrica import textos as t
+    monkeypatch.setattr(t, "cargar_config", lambda c=t.cargar_config(): {
+        **c, "limites": {**c["limites"], "tiktok": {**c["limites"]["tiktok"], "max_texto": 10}}})
+    sal: list[str] = []
+    assert publicar.ejecutar(repo, ensayo_forzado=True, env={}, salida=sal.append) == publicar.COD_ERROR
+    assert any("FALLA" in x or "DESCARTADO" in x for x in sal)
+
+
+def test_r2_ensayo_sin_la_ficha_de_fm27_informa_y_sigue(repo, monkeypatch):
+    from fabrica import fuentes
+    real = fuentes.cargar_fuentes
+    monkeypatch.setattr(fuentes, "cargar_fuentes", lambda raiz=None: [f for f in real(raiz) if f["id"] != "sega-fm27"])
+    sal: list[str] = []
+    cod = publicar.ejecutar(repo, ensayo_forzado=True, env={}, salida=sal.append)
+    assert cod == publicar.COD_ERROR and any("sega-fm27" in x for x in sal)
+    assert len([x for x in sal if x.startswith("Texto ")]) == 6
+
+
+# 13. El gancho del marcador pasa por la misma limpieza.
+def test_r2_repetido_contra_el_marcador_ignora_emojis_y_hashtags(tmp_path):
+    import csv
+    from datetime import date
+    from fabrica import registro
+    with open(tmp_path / "marcador.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(registro.CABECERA_MARCADOR)
+        fila = dict.fromkeys(registro.CABECERA_MARCADOR, "")
+        fila.update(toma="5", fecha="2026-11-18", plataforma="shorts", gancho="PRIMERA VEZ EN EL MAPA 🔥 #Gaming")
+        w.writerow([fila[c] for c in registro.CABECERA_MARCADOR])
+    with pytest.raises(Descartada, match="gancho repetido"):
+        textos(TOMA_P, FICHA_PROPIA, "shorts", tmp_path, date(2026, 11, 20))
