@@ -11,4 +11,5 @@ respaldos_por_falla: 2       # ante 429/5xx/red persistentes se prueban hasta N 
 listar_modelos: true         # antes de mirar, ListModels: se saltan los modelos que no aparecen (nunca bloquea)
 sin_ia:                      # corte sin IA cuando Gemini no está disponible (fabrica/editar/sin_ia.py)
   activo: true               # false: Gemini caído = descarte pasajero, como antes
+  max_por_ciclo: 1           # tomas sin IA por proceso/ciclo; las siguientes se descartan como pasajeras
   duracion_objetivo_s: 20    # largo del recorte (acotado al rango de la ficha y a la duración del video)

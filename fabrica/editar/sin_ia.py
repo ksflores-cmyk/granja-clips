@@ -24,6 +24,7 @@ from .. import ojos, plazo
 from .lienzo import PUNTUACION, partir
 from .marca import Marca
 
+MAX_POR_CICLO = 1               # por defecto, si la config no dice `sin_ia.max_por_ciclo`
 PASO_S = 0.5                    # ventana de volumen
 UMBRAL_ESCENA = 0.3
 BONO_ESCENA = 1.5               # puntos que vale cada cambio de escena dentro del recorte (un pico fuerte vale ~3)
@@ -42,6 +43,26 @@ class Construccion:
     datos: dict | None
     motivo: str | None = None
     gastar: bool = False        # el fallo es del material (video corto, título inservible): la fuente se gasta
+
+
+_usadas = [0]
+
+
+def reiniciar_contador() -> None:
+    _usadas[0] = 0
+
+
+def tomas_usadas() -> int:
+    return _usadas[0]
+
+
+def reservar(maximo) -> bool:
+    """Una toma más sin IA en este proceso/ciclo. False si ya se llegó al tope (`sin_ia.max_por_ciclo`)."""
+    tope = maximo if isinstance(maximo, int) and not isinstance(maximo, bool) and maximo >= 0 else MAX_POR_CICLO
+    if _usadas[0] >= tope:
+        return False
+    _usadas[0] += 1
+    return True
 
 
 # ------------------------------------------------------------------ análisis (ffmpeg → números)
@@ -137,8 +158,26 @@ def limpiar_titulo(titulo: str) -> str:
     t = re.sub(r"[#@]\w+", " ", t)
     t = re.sub(EXTENSIONES, " ", t, flags=re.IGNORECASE)
     t = t.replace("_", " ")
-    t = "".join(c if (unicodedata.category(c)[0] in "LNM" or c in CONSERVAR or c.isspace()) else " " for c in t)
-    return " ".join(t.split()).strip(" -.,:;")
+    t = "".join(_conservar(t))
+    palabras = [w for w in t.split() if any(c.isalnum() for c in w)]      # fuera lo que no trae letras ni dígitos
+    return " ".join(palabras).strip(" -.,:;")
+
+
+def _conservar(texto: str):
+    """Letras, dígitos, puntuación básica y espacios. Una marca combinante (acento) sólo se queda si sigue a una
+    letra o un dígito conservados; los selectores de variante (U+FE00-FE0F, U+E0100-E01EF) y el keycap U+20E3
+    que acompañan a emojis como ❤️ ⚠️ ✔️ 1️⃣ se van siempre."""
+    previa_ok = False
+    for c in texto:
+        cat = unicodedata.category(c)
+        if cat[0] in "LN":
+            previa_ok = True
+            yield c
+        elif cat == "Mn" and previa_ok and not (0xFE00 <= ord(c) <= 0xFE0F or 0xE0100 <= ord(c) <= 0xE01EF):
+            yield c
+        else:
+            previa_ok = False
+            yield c if (c in CONSERVAR or c.isspace()) else " "
 
 
 def _cabe_gancho(marca: Marca, gancho: str) -> bool:
@@ -152,7 +191,7 @@ def _cabe_gancho(marca: Marca, gancho: str) -> bool:
 def _problema_gancho(gancho: str, marca: Marca, temporada: dict) -> str | None:
     """Por qué un gancho no sirve, o None si sirve."""
     palabras = gancho.split()
-    if len(palabras) < 2:
+    if sum(1 for p in palabras if any(c.isalpha() for c in p)) < 2:       # cuentan sólo las que traen alguna letra
         return "menos de 2 palabras"
     if any(p.strip(PUNTUACION).isdigit() for p in palabras):
         return "trae palabras que son sólo números"
@@ -172,7 +211,7 @@ def _problema_gancho(gancho: str, marca: Marca, temporada: dict) -> str | None:
 def palabra_lapiz_de(gancho: str) -> str:
     """La palabra más larga del gancho, sin puntuación (la primera si hay empate)."""
     palabras = [p.strip(PUNTUACION) for p in gancho.split()]
-    return max((p for p in palabras if p), key=len)
+    return max((p for p in palabras if p), key=len, default="")
 
 
 def gancho_de(titulo: str, ficha: dict | None, marca: Marca,

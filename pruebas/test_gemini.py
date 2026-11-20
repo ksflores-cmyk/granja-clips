@@ -22,6 +22,7 @@ OK = (200, sobre(respuesta_grabada("valida")))
 @pytest.fixture(autouse=True)
 def cache_limpia(monkeypatch):
     ojos.vaciar_cache_modelos()
+    sin_ia.reiniciar_contador()
 
     def sin_red(*a, **k):
         raise AssertionError("se intentó ListModels por la red real")
@@ -59,7 +60,7 @@ def test_la_config_real_pone_primero_el_modelo_que_respondio_en_4_s():
     assert CFG_REAL["modelo"] == "gemini-3-flash-preview"
     assert CFG_REAL["modelos_respaldo"] == ["gemini-3.8-flash", "gemini-3.7-flash"]
     assert (CFG_REAL["tiempo_por_intento_s"], CFG_REAL["tope_ojos_s"], CFG_REAL["respaldos_por_falla"]) == (90, 300, 2)
-    assert CFG_REAL["listar_modelos"] is True and CFG_REAL["sin_ia"] == {"activo": True, "duracion_objetivo_s": 20}
+    assert CFG_REAL["listar_modelos"] is True and CFG_REAL["sin_ia"] == {"activo": True, "max_por_ciclo": 1, "duracion_objetivo_s": 20}
 
 
 def test_el_orden_de_los_modelos_sale_de_la_config(tmp_path):
@@ -142,13 +143,6 @@ def test_listmodels_se_consulta_una_sola_vez_por_proceso(tmp_path):
     g2 = Lista((200, lista(CFG_REAL["modelo"])))
     mirar(tmp_path, Transporte(OK), config=cfg(listar_modelos=True), transporte_lista=g2)
     assert len(g2.llamadas) == 1
-
-
-def test_un_listmodels_fallido_no_se_guarda_en_la_cache(tmp_path):
-    g = Lista((503, "x"), (200, lista(CFG_REAL["modelo"])))
-    for _ in range(2):
-        mirar(tmp_path, Transporte(OK), config=cfg(listar_modelos=True), transporte_lista=g)
-    assert len(g.llamadas) == 2
 
 
 # ---------------------------------------------------------------- 3. tiempo por intento y respaldos por falla
@@ -380,11 +374,16 @@ def hacer(repo, tmp_path, video, transporte, entorno, cand=None, ficha=None):
 CLAVE = {"GEMINI_API_KEY": "clave-de-prueba"}
 
 
-@pytest.mark.parametrize("caso", ["pasajero", "404", "sin_clave"])
+def caida():
+    """Gemini caído en los 3 modelos (503 sostenido)."""
+    return Transporte(*[(503, "x")] * 6)
+
+
+@pytest.mark.parametrize("caso", ["pasajero", "404"])
 def test_sin_ia_se_activa_si_gemini_no_esta_disponible(repo, tmp_path, video20, sin_render, caso):
     t, env = {"pasajero": (Transporte(*[(503, "x")] * 6), CLAVE),
               "404": (Transporte(*[(404, "{}")] * 3), CLAVE),
-              "sin_clave": (Transporte(), {})}[caso]
+              "sin_clave": (caida(), CLAVE)}[caso]
     r = hacer(repo, tmp_path, video20, t, env)
     assert sin_render.llamadas, r.motivos                 # llegó a componer: no se descartó antes
     assert r.modelo == "sin-ia" and r.gemini["lineas"] == [] and r.gemini["gancho"] == "Clutch increíble en directo"
@@ -417,13 +416,13 @@ def test_sin_ia_desactivada_es_el_descarte_pasajero_de_antes(repo, tmp_path, vid
 
 
 def test_sin_ia_con_titulo_flojo_descarta_sin_gastar_la_fuente(repo, tmp_path, video20, sin_render):
-    r = hacer(repo, tmp_path, video20, Transporte(), {}, cand=candidato(titulo="clip"))
-    assert not r.ok and r.gastar is False and r.motivos[0].startswith("ojos: sin GEMINI_API_KEY; sin IA:")
+    r = hacer(repo, tmp_path, video20, caida(), CLAVE, cand=candidato(titulo="clip"))
+    assert not r.ok and r.gastar is False and r.motivos[0].startswith("ojos: Gemini respondió HTTP 503") and "; sin IA:" in r.motivos[0]
     assert not sin_render.llamadas
 
 
 def test_sin_ia_con_palabra_a_evitar_en_el_titulo_gasta_la_fuente(repo, tmp_path, video20, sin_render):
-    r = hacer(repo, tmp_path, video20, Transporte(), {}, cand=candidato(titulo="El final de la historia"))
+    r = hacer(repo, tmp_path, video20, caida(), CLAVE, cand=candidato(titulo="El final de la historia"))
     assert not r.ok and r.gastar is True and "final" in r.motivos[0]
 
 
@@ -432,7 +431,7 @@ def test_sin_ia_con_un_dict_que_no_valida_descarta_y_gasta(repo, tmp_path, video
             "juego_correcto": True, "idioma_original": "en", "lineas": [], "gancho": "", "palabra_lapiz": "x",
             "escena": "INT. STREAM", "acotacion": "", "recorte": {"inicio": 0.0, "fin": 12.0}}
     monkeypatch.setattr(sin_ia, "construir", lambda *a, **k: sin_ia.Construccion(malo))
-    r = hacer(repo, tmp_path, video20, Transporte(), {})
+    r = hacer(repo, tmp_path, video20, caida(), CLAVE)
     assert not r.ok and r.gastar is True and "ojos: gancho vacío" in r.motivos and not sin_render.llamadas
     assert r.modelo == "sin-ia"
 
@@ -442,7 +441,7 @@ def test_sin_ia_usa_el_objetivo_de_la_config(repo, tmp_path, video20, sin_render
     c = yaml.safe_load(ruta.read_text(encoding="utf-8"))
     c["sin_ia"]["duracion_objetivo_s"] = 10
     ruta.write_text(yaml.safe_dump(c, allow_unicode=True), encoding="utf-8")
-    hacer(repo, tmp_path, video20, Transporte(), {})
+    hacer(repo, tmp_path, video20, caida(), CLAVE)
     assert sin_render.llamadas[0][2]["duracion"] == 10.0
 
 
@@ -484,12 +483,14 @@ def test_el_recorte_elegido_con_ffmpeg_contiene_el_pico_y_es_determinista(video_
 
 @pytest.mark.slow
 def test_hacer_toma_sin_ia_de_punta_a_punta_pasa_la_puerta_de_estilo(repo, tmp_path, video20):
-    r = hacer(repo, tmp_path, video20, Transporte(), {})
+    r = hacer(repo, tmp_path, video20, caida(), CLAVE)
     assert r.ok, r.motivos
     assert r.mp4.is_file() and all(ok for _, ok, _ in r.puntos)
     assert r.modelo == "sin-ia"
     assert r.plan["corte"] == "sin_ia"
-    assert r.plan["gemini"] == {"modelo": None, "corte": "sin_ia", "motivo": "sin GEMINI_API_KEY"}
+    g = r.plan["gemini"]
+    assert (g["modelo"], g["corte"]) == (None, "sin_ia") and "503" in g["motivo"]
+    assert g["intentos"] and all("503" in i for i in g["intentos"])
     assert json.loads(r.mp4.with_suffix(".plan.json").read_text(encoding="utf-8"))["corte"] == "sin_ia"
 
 
@@ -560,3 +561,131 @@ def test_prueba_ojos_manda_la_copia_ligera_y_anota_el_tamano_y_los_modelos(tmp_p
     assert "gemini-3-flash-preview" in informe and "gemini-3.8-flash" in informe and "embed" not in informe
     assert vistos["peso_enviado"] < 5 * 1048576          # nunca el original de 21 MB
     assert "clave-de-prueba" not in informe
+
+
+# ---------------------------------------------------------------- ronda 1 de corrección
+
+@pytest.mark.parametrize("titulo,esperado", [
+    ("❤️ Qué jugada increíble", "Qué jugada increíble"),
+    ("⚠️ Cuidado ⚠️ con esto", "Cuidado con esto"),
+    ("✔️ Listo el clutch ✔️", "Listo el clutch"),
+    ("Top 1️⃣ momento", "Top 1 momento"),
+    ("Qué canción: café ñandú", "Qué canción: café ñandú"),
+])
+def test_limpiar_titulo_quita_selectores_de_variante_y_keycaps_pero_no_acentos(titulo, esperado):
+    out = sin_ia.limpiar_titulo(titulo)
+    assert out == esperado
+    assert not any(c in out for c in "\ufe0f\u20e3\ufe0e")
+
+
+def test_un_titulo_con_keycap_numerico_cae_al_respaldo_por_ser_solo_numeros(marca):
+    assert sin_ia.gancho_de("Top 1️⃣ momento", None, marca, TEMPORADA)[0] is None
+    ficha = ficha_propia(reglas={"gancho_sin_ia": "Mira esta jugada"})
+    assert sin_ia.gancho_de("Top 1️⃣ momento", ficha, marca, TEMPORADA)[0] == "Mira esta jugada"
+
+
+def test_un_titulo_de_pura_puntuacion_no_lanza_y_se_descarta(marca):
+    assert sin_ia.limpiar_titulo("¿¡ ... !?") == ""
+    g, motivo, _ = sin_ia.gancho_de("¿¡ ... !?", None, marca, TEMPORADA)
+    assert g is None and "menos de 2 palabras" in motivo
+    assert sin_ia.gancho_de("¿¡ ... !? sí", None, marca, TEMPORADA)[0] is None     # una sola palabra con letras
+    assert sin_ia.palabra_lapiz_de("¿¡ !?") == ""
+
+
+def test_tras_un_404_con_respaldos_por_falla_pendientes_se_prueba_el_siguiente(tmp_path):
+    t = Transporte((503, "x"), (503, "x"), (404, "{}"), OK)
+    m = mirar(tmp_path, t, config=cfg(modelo="preview", modelos_respaldo=["m38", "m37"], respaldos_por_falla=2))
+    assert t.modelos() == ["preview", "preview", "m38", "m37"] and m.modelo == "m37" and m.datos is not None
+
+
+def test_tras_un_404_sin_respaldos_por_falla_se_rinde_como_antes(tmp_path):
+    t = Transporte((503, "x"), (503, "x"), (404, "{}"))
+    m = mirar(tmp_path, t, config=cfg(modelo="a", modelos_respaldo=["b", "c"], respaldos_por_falla=1))
+    assert m.pasajero and m.datos is None and t.modelos() == ["a", "a", "b"]
+
+
+def test_el_get_de_listmodels_usa_el_presupuesto_restante(tmp_path):
+    g = Lista((200, lista(CFG_REAL["modelo"])))
+    mirar(tmp_path, Transporte(OK), config=cfg(listar_modelos=True, tope_ojos_s=6), transporte_lista=g)
+    assert 1 <= g.llamadas[0][2] <= 6
+    ojos.vaciar_cache_modelos()
+    g2 = Lista((200, lista(CFG_REAL["modelo"])))
+    mirar(tmp_path, Transporte(OK), config=cfg(listar_modelos=True), transporte_lista=g2)
+    assert g2.llamadas[0][2] == 15
+
+
+def test_un_listmodels_fallido_tambien_se_guarda_en_la_cache(tmp_path):
+    g = Lista((503, "x"))
+    for _ in range(3):
+        m = mirar(tmp_path, Transporte(OK), config=cfg(listar_modelos=True), transporte_lista=g)
+        assert m.datos is not None and any("ListModels" in i and "503" in i for i in m.intentos)
+    assert len(g.llamadas) == 1
+    ojos.vaciar_cache_modelos()
+    g2 = Lista((200, lista(CFG_REAL["modelo"])))
+    mirar(tmp_path, Transporte(OK), config=cfg(listar_modelos=True), transporte_lista=g2)
+    assert len(g2.llamadas) == 1
+
+
+def test_listmodels_tiene_un_tope_de_10_paginas():
+    pagina = (200, json.dumps({"models": [], "nextPageToken": None}))
+    paginas = [(200, json.dumps({"models": [], "nextPageToken": f"p{i}"})) for i in range(30)]
+    g = Lista(*paginas)
+    with pytest.raises(ojos.ErrorOjos, match="10 páginas"):
+        ojos.modelos_disponibles("k", g)
+    assert len(g.llamadas) == 10
+    assert pagina and True
+
+
+def test_un_listmodels_interminable_no_bloquea_mirar(tmp_path):
+    g = Lista(*[(200, json.dumps({"models": [], "nextPageToken": f"p{i}"})) for i in range(30)])
+    m = mirar(tmp_path, Transporte(OK), config=cfg(listar_modelos=True), transporte_lista=g)
+    assert m.datos is not None and any("páginas" in i for i in m.intentos)
+
+
+def test_sin_clave_no_hay_corte_sin_ia_y_queda_el_descarte_de_antes(repo, tmp_path, video20, sin_render, monkeypatch):
+    monkeypatch.setattr(sin_ia, "construir", lambda *a, **k: pytest.fail("no debe entrar sin IA"))
+    r = hacer(repo, tmp_path, video20, Transporte(), {})
+    assert not r.ok and r.motivos == ["ojos: sin GEMINI_API_KEY"] and r.gastar is False
+    assert sin_ia.tomas_usadas() == 0
+
+
+def test_solo_una_toma_sin_ia_por_ciclo_las_demas_son_pasajeras(repo, tmp_path, video20, sin_render):
+    r1 = hacer(repo, tmp_path, video20, caida(), CLAVE)
+    assert sin_render.llamadas and r1.modelo == "sin-ia"
+    r2 = hacer(repo, tmp_path, video20, caida(), CLAVE)
+    assert not r2.ok and r2.gastar is False and r2.modelo is None
+    assert "tope de tomas sin IA del ciclo" in r2.motivos[0] and "pasajero" in r2.motivos[0]
+    assert len(sin_render.llamadas) == 1
+    sin_ia.reiniciar_contador()
+    hacer(repo, tmp_path, video20, caida(), CLAVE)
+    assert len(sin_render.llamadas) == 2
+
+
+def test_max_por_ciclo_sale_de_la_config(repo, tmp_path, video20, sin_render):
+    ruta = repo / "config" / "ojos.yml"
+    c = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    c["sin_ia"]["max_por_ciclo"] = 2
+    ruta.write_text(yaml.safe_dump(c, allow_unicode=True), encoding="utf-8")
+    for _ in range(3):
+        hacer(repo, tmp_path, video20, caida(), CLAVE)
+    assert len(sin_render.llamadas) == 2
+    assert CFG_REAL["sin_ia"]["max_por_ciclo"] == 1
+
+
+def test_un_descarte_sin_ia_antes_de_cortar_deja_el_modelo_en_none(repo, tmp_path, video20, sin_render):
+    r = hacer(repo, tmp_path, video20, caida(), CLAVE, cand=candidato(titulo="clip"))
+    assert not r.ok and r.modelo is None
+
+
+def test_validar_revisa_max_por_ciclo(repo):
+    from fabrica import validar
+    ruta = repo / "config" / "ojos.yml"
+    c = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    c["sin_ia"]["max_por_ciclo"] = -1
+    ruta.write_text(yaml.safe_dump(c, allow_unicode=True), encoding="utf-8")
+    assert "max_por_ciclo" in "\n".join(validar.validar(repo).errores)
+
+
+def test_el_diagnostico_no_imprime_http_000000():
+    texto = (RAIZ_REAL / ".github" / "workflows" / "diagnostico.yml").read_text(encoding="utf-8")
+    assert '|| echo "000"' not in texto and texto.count("|| true)") >= 2

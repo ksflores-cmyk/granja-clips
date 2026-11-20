@@ -257,7 +257,7 @@ def test_quitar_visto_deshace_solo_la_ultima_marca(repo):
 
 def test_tras_una_caida_un_404_del_respaldo_no_abre_un_tercer_modelo(tmp_path):
     t = Transporte((503, "x"), (503, "x"), (404, "{}"), (200, sobre(respuesta_grabada("valida"))))
-    m = mirar(tmp_path, t)
+    m = mirar(tmp_path, t, config=cfg_antigua_de_ojos())     # con respaldos_por_falla: 2 sí se prueba el tercero
     assert m.datos is None and m.pasajero and len(t.llamadas) == 3
 
 

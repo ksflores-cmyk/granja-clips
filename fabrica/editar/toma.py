@@ -163,6 +163,7 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             juego = ojos.juego_de(ficha, temporada)          # el de la ficha si lo declara (FM27, no GTA 6)
             recorte = ojos.rango_recorte(ficha)              # reglas.duracion_s de la ficha
             cfg_sin = (cargar_yaml("config/ojos.yml", raiz).get("sin_ia") or {})
+            intentos_gemini: list[str] = []
             por_sin_ia = None                  # por qué no hubo Gemini, si el corte es sin IA
             with tempfile.TemporaryDirectory(prefix="ojos-toma-") as carpeta_ojos:
                 with plazo.etapa("copia ligera"):
@@ -172,14 +173,20 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                                         transporte=transporte, espera=espera, entorno=entorno, juego=juego,
                                         nota=ojos.nota_de_ficha(ficha) or None, recorte=recorte,
                                         transporte_lista=transporte_lista)
-                if mirada.datos is None and mirada.sin_gemini and cfg_sin.get("activo") is True:
+                # Sin clave es un error de configuración, no una caída de Gemini: ahí no hay corte sin IA.
+                if (mirada.datos is None and mirada.sin_gemini and cfg_sin.get("activo") is True
+                        and mirada.motivo != ojos.MOTIVO_SIN_CLAVE):
+                    if not sin_ia.reservar(cfg_sin.get("max_por_ciclo", sin_ia.MAX_POR_CICLO)):
+                        return Resultado(False, [f"ojos: {mirada.motivo}; tope de tomas sin IA del ciclo "
+                                                 "(pasajero: se reintenta)"])
                     por_sin_ia = mirada.motivo
+                    intentos_gemini = list(mirada.intentos)
                     with plazo.etapa("corte sin IA"):
                         obj = cfg_sin.get("duracion_objetivo_s", sin_ia.OBJETIVO_S)
                         c = sin_ia.construir(video_ojos, candidato, ficha, marca, temporada, duracion=d.duracion,
                                              rango=recorte, objetivo_s=obj if isinstance(obj, (int, float)) else sin_ia.OBJETIVO_S)
                     if c.datos is None:
-                        return Resultado(False, [f"ojos: {mirada.motivo}; {c.motivo}"], modelo=SIN_IA, gastar=c.gastar)
+                        return Resultado(False, [f"ojos: {mirada.motivo}; {c.motivo}"], gastar=c.gastar)
                     mirada = ojos.Mirada(c.datos, modelo=SIN_IA)
                     plazo.log(f"ojos: {por_sin_ia}; corte sin IA (picos de volumen y cambios de escena)")
             if mirada.datos is None:
@@ -217,7 +224,8 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                 return Resultado(False, rojos, None, plan, mirada.datos, mirada.modelo, puntos, gastar=True)
             if por_sin_ia is not None:
                 plan["corte"] = "sin_ia"
-                plan["gemini"] = {"modelo": None, "corte": "sin_ia", "motivo": por_sin_ia}
+                plan["gemini"] = {"modelo": None, "corte": "sin_ia", "motivo": por_sin_ia,
+                                 "intentos": intentos_gemini}
             else:
                 plan["gemini"] = {"modelo": mirada.modelo, "idioma_original": mirada.datos["idioma_original"]}
             plan_ruta.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")

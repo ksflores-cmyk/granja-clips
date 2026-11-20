@@ -465,6 +465,9 @@ def validar_ojos(o, inf: Informe) -> None:
         if not isinstance(s, dict) or not isinstance(s.get("activo"), bool):
             inf.error(f"{rel}: sin_ia debe ser un bloque con activo: true o false")
         else:
+            m = s.get("max_por_ciclo", 1)
+            if isinstance(m, bool) or not isinstance(m, int) or m < 0:
+                inf.error(f"{rel}: sin_ia.max_por_ciclo debe ser un entero de 0 o más")
             d = s.get("duracion_objetivo_s", 20)
             if isinstance(d, bool) or not isinstance(d, (int, float)) or not 7 <= d <= 30:
                 inf.error(f"{rel}: sin_ia.duracion_objetivo_s debe ser un número de 7 a 30")

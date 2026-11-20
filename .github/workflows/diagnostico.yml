@@ -56,7 +56,7 @@ jobs:
           if [ -z "$GEMINI_API_KEY" ]; then echo "ListModels: falta la clave"; exit 0; fi
           cod=$(curl -sS -o /tmp/modelos.json -w '%{http_code}' --max-time 20 \
             -H "x-goog-api-key: $GEMINI_API_KEY" \
-            "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000" || echo "000")
+            "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000" || true)
           if [ "$cod" != "200" ]; then echo "ListModels: HTTP $cod (se sigue sin esta lista)"; exit 0; fi
           python3 -c 'import json; d=json.load(open("/tmp/modelos.json")); n=sorted(m["name"].removeprefix("models/") for m in d.get("models",[]) if m.get("name","").startswith("models/gemini-") and "generateContent" in m.get("supportedGenerationMethods",[])); print("ListModels: %d modelos gemini con generateContent" % len(n)); print("\n".join(n))' || echo "ListModels: la respuesta no se pudo leer"
           exit 0
@@ -69,6 +69,6 @@ jobs:
             ini=$(date +%s)
             cod=$(printf '{"contents":[{"parts":[{"text":"Responde solo: ok"}]}]}' | curl -sS -o /tmp/g.json -w '%{http_code}' --max-time 40 \
               -H "x-goog-api-key: $GEMINI_API_KEY" -H 'Content-Type: application/json' --data @- \
-              "https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent" || echo "000")
+              "https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent" || true)
             echo "Gemini $m: HTTP $cod en $(( $(date +%s) - ini )) s"
           done

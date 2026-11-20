@@ -30,6 +30,8 @@ from .editar.marca import Marca
 URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
 URL_LISTA = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000"
 TIEMPO_LISTA_S = 15                      # ListModels: una consulta corta, nunca bloquea
+MAX_PAGINAS_LISTA = 10                   # ListModels: tope de páginas
+MOTIVO_SIN_CLAVE = "sin GEMINI_API_KEY"
 RESPALDOS_POR_FALLA = 1                  # por defecto, si la config no dice `respaldos_por_falla`
 RUTA_PROMPT = Path(__file__).resolve().parent / "ojos_prompt.md"
 ESPERA_REINTENTO_S = 8.0
@@ -199,7 +201,7 @@ def modelos_disponibles(clave: str, transporte_get=None, tiempo: float = TIEMPO_
     encabezados = {"x-goog-api-key": clave}
     nombres: set[str] = set()
     pagina, vistas = None, set()
-    while True:
+    for _ in range(MAX_PAGINAS_LISTA):
         url = URL_LISTA + (f"&pageToken={urllib.parse.quote(pagina)}" if pagina else "")
         estado, texto = get(url, encabezados, tiempo)
         if estado != 200:
@@ -222,9 +224,10 @@ def modelos_disponibles(clave: str, transporte_get=None, tiempo: float = TIEMPO_
         if pagina in vistas:
             raise ErrorOjos("ListModels repitió la página siguiente")
         vistas.add(pagina)
+    raise ErrorOjos(f"ListModels pasó de {MAX_PAGINAS_LISTA} páginas")
 
 
-_CACHE_MODELOS: dict[str, set[str]] = {}
+_CACHE_MODELOS: dict[str, set[str] | ErrorOjos] = {}
 
 
 def vaciar_cache_modelos() -> None:
@@ -233,10 +236,15 @@ def vaciar_cache_modelos() -> None:
 
 def modelos_disponibles_en_cache(clave: str, transporte_get=None, tiempo: float = TIEMPO_LISTA_S) -> set[str]:
     """Como `modelos_disponibles`, pero una sola consulta por proceso y clave (el ciclo mira varias tomas).
-    Sólo se guardan los éxitos; la clave se guarda hasheada."""
+    También se guarda el fallo (no se repite una consulta que ya falló); la clave se guarda hasheada."""
     k = hashlib.sha256(clave.encode("utf-8")).hexdigest()
     if k not in _CACHE_MODELOS:
-        _CACHE_MODELOS[k] = modelos_disponibles(clave, transporte_get, tiempo)
+        try:
+            _CACHE_MODELOS[k] = modelos_disponibles(clave, transporte_get, tiempo)
+        except ErrorOjos as e:
+            _CACHE_MODELOS[k] = e
+    if isinstance(_CACHE_MODELOS[k], ErrorOjos):
+        raise ErrorOjos(str(_CACHE_MODELOS[k]))
     return _CACHE_MODELOS[k]
 
 
@@ -256,14 +264,15 @@ def _numero_cfg(cfg: dict, clave: str, por_defecto: float, entero: bool = False)
     return int(v) if entero else float(v)
 
 
-def _modelos_a_probar(cfg: dict, clave: str, mirada: Mirada, transporte, transporte_lista) -> list[str]:
+def _modelos_a_probar(cfg: dict, clave: str, mirada: Mirada, transporte, transporte_lista,
+                      tiempo: float = TIEMPO_LISTA_S) -> list[str]:
     """La lista de la config, sin los modelos que ListModels no muestra. Nunca bloquea: si la consulta falla o
     el filtro la vacía, se usa la lista completa."""
     todos = [cfg["modelo"], *cfg.get("modelos_respaldo", [])]
     if not cfg.get("listar_modelos") or (transporte is not None and transporte_lista is None):
         return todos
     try:
-        disponibles = modelos_disponibles_en_cache(clave, transporte_lista)
+        disponibles = modelos_disponibles_en_cache(clave, transporte_lista, tiempo)
     except ErrorOjos as e:
         mirada.intentos.append(f"ListModels: {e}; se usa la lista completa")
         return todos
@@ -288,7 +297,7 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
     env = os.environ if entorno is None else entorno
     clave = env.get("GEMINI_API_KEY", "")
     if not clave:
-        return Mirada(None, motivo="sin GEMINI_API_KEY")
+        return Mirada(None, motivo=MOTIVO_SIN_CLAVE)
     cfg = config if config is not None else cargar_yaml("config/ojos.yml", raiz)
     ruta_video = Path(ruta_video)
     tam = ruta_video.stat().st_size
@@ -319,7 +328,8 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
     mirada = Mirada(None)
     # ante 429/5xx/red persistentes se prueban hasta N modelos más (18 nov: 503 y timeouts)
     respaldos_por_falla = int(_numero_cfg(cfg, "respaldos_por_falla", RESPALDOS_POR_FALLA, entero=True))
-    for modelo in _modelos_a_probar(cfg, clave, mirada, transporte, transporte_lista):
+    for modelo in _modelos_a_probar(cfg, clave, mirada, transporte, transporte_lista,
+                              max(1.0, min(float(TIEMPO_LISTA_S), presupuesto()))):
         url = URL_BASE.format(modelo=modelo)
         estado, texto = None, ""
         caida = None
@@ -357,7 +367,7 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
             return mirada
         if estado == 404:
             mirada.intentos.append(f"{modelo}: HTTP 404, no existe; se prueba el siguiente")
-            if mirada.pasajero:          # ya se gastó el único respaldo por una caída: no se sigue probando
+            if mirada.pasajero and respaldos_por_falla <= 0:     # ya se gastaron los respaldos por caída
                 return mirada
             continue
         if estado != 200:
