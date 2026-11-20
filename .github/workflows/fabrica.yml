@@ -172,3 +172,68 @@ jobs:
             gh issue create --title "ALERTA ROJA: ${motivo}" --label alerta-roja \
               --body "La fábrica creó PAUSA y no publica nada más. Motivo: ${motivo}. Detalle en estado/alerta.json (sin claves). Para reanudar, revisa y borra PAUSA."
           fi
+
+  # Robot de envío a Content Rewards: el enlace vale sólo si se envía en los 30 min siguientes a publicar.
+  # Corre en paralelo a `producir` (no depende de él) y escribe su propio archivo (estado/envios-cr.json), así
+  # los dos commits no chocan. Sin nada pendiente termina en menos de un minuto, sin instalar el navegador.
+  enviar_cr:
+    if: ${{ github.ref == 'refs/heads/main' && !inputs.ensayo_forzado }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    env:
+      PYTHONUNBUFFERED: "1"
+      BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+      CR_SESION: ${{ secrets.CR_SESION }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Partir de main al día
+        run: git fetch origin main && git reset --hard origin/main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: ¿Hay envíos pendientes?
+        id: hay
+        run: |
+          if python -m fabrica.enviar_cr --hay; then echo "hay=si" >> "$GITHUB_OUTPUT"; else echo "hay=no" >> "$GITHUB_OUTPUT"; fi
+      - name: Instalar el navegador (Playwright + Chromium)
+        if: ${{ steps.hay.outputs.hay == 'si' }}
+        timeout-minutes: 6
+        run: pip install playwright==1.65.2 && python -m playwright install --with-deps chromium
+      - name: Enviar enlaces a Content Rewards
+        if: ${{ steps.hay.outputs.hay == 'si' }}
+        timeout-minutes: 18
+        env:
+          CR_CAPTURAS: ${{ runner.temp }}/cr
+        run: python -m fabrica.enviar_cr
+      - name: Capturas del robot
+        if: ${{ always() && steps.hay.outputs.hay == 'si' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-cr
+          path: ${{ runner.temp }}/cr
+          retention-days: 3
+          if-no-files-found: ignore
+      - name: Guardar resultado (y alerta si la sesión venció)
+        if: ${{ always() && steps.hay.outputs.hay == 'si' }}
+        run: |
+          set -u
+          alerta=no
+          if [ -f estado/alerta-cr.json ] && [ -n "$(git status --porcelain -- estado/alerta-cr.json)" ]; then alerta=si; fi
+          git add -A -- estado/envios-cr.json estado/alerta-cr.json 2>/dev/null || true
+          if git diff --cached --quiet; then echo "Nada que guardar."; exit 0; fi
+          git config user.name "fabrica"
+          git config user.email "fabrica@users.noreply.github.com"
+          git commit -q -m "[skip ci] envíos a Content Rewards $(TZ=America/Guatemala date '+%Y-%m-%d %H:%M')"
+          for intento in 1 2 3; do
+            git push origin "HEAD:${GITHUB_REF_NAME}" && break
+            git pull -q --rebase origin "${GITHUB_REF_NAME}" || git rebase --abort
+          done
+          if [ "$alerta" = "si" ]; then
+            motivo=$(python -c "import json;print(json.load(open('estado/alerta-cr.json',encoding='utf-8'))['motivo'])")
+            gh label create alerta-roja --color B60205 --force || true
+            gh issue create --title "ALERTA ROJA: ${motivo}" --label alerta-roja \
+              --body "El robot no pudo entrar a Content Rewards, así que los clips de campaña no se están enviando. Hay que renovar el secreto CR_SESION (herramientas/LEEME-sesion-cr.md). Los clips sin campaña siguen publicándose."
+          fi
