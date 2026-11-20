@@ -21,8 +21,10 @@ import yaml
 
 from .. import fuentes as mod_fuentes
 from ..registro import ZONA
+from . import dividida as mod_dividida
 from . import estilo
 from . import musica as mod_musica
+from . import stream_sintetico
 from .componer import Linea, componer, sondear_video
 from .config_ruta import RAIZ
 from .lienzo import Toma
@@ -80,21 +82,33 @@ def fotogramas(mp4: Path, duracion: float, salida: Path, base: str) -> list[str]
     return nombres
 
 
+def _dibujar_deteccion(video: Path, seg: float, det: dict, destino: Path) -> None:
+    """PNG de un fotograma del compuesto con las cajas detectadas (cara, facecam, estorbos y juego)."""
+    from PIL import Image
+    with tempfile.TemporaryDirectory(prefix="deteccion-") as tmp:
+        cuadro = Path(tmp) / "cuadro.png"
+        subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{seg:.3f}", "-i", str(video),
+                        "-frames:v", "1", str(cuadro)], check=True)
+        mod_dividida.dibujar(Image.open(cuadro), det, destino)
+
+
 def autorizar(m: dict, fichas: list[dict], hoy) -> None:
     """Lista blanca: consulta fuentes.yml ANTES de abrir cualquier conexión (video y subtítulos).
 
     Lanza RuntimeError con el motivo si la ficha no autoriza la descarga para muestras.
     """
-    ficha = next((f for f in fichas if f.get("id") == m["fuente_id"]), None)
-    urls = []
+    pares = []                      # (id de la ficha, url)
     if m.get("video"):
-        urls.append(m["video"]["url"])
+        pares.append((m["fuente_id"], m["video"]["url"]))
         if m.get("subtitulos"):
-            urls.append(m["subtitulos"]["url"])
-    for u in urls:
+            pares.append((m["fuente_id"], m["subtitulos"]["url"]))
+    if m.get("juego"):              # muestra dividida: el «juego» del compuesto es otra fuente, también autorizada
+        pares.append((m["juego"]["fuente_id"], m["juego"]["video"]["url"]))
+    for fuente_id, u in pares:
+        ficha = next((f for f in fichas if f.get("id") == fuente_id), None)
         ok, motivo = mod_fuentes.autoriza_descarga(ficha, hoy, "muestras", u)
         if not ok:
-            raise RuntimeError(f"descarga no autorizada para {m['id']} ({m['fuente_id']}): {motivo}")
+            raise RuntimeError(f"descarga no autorizada para {m['id']} ({fuente_id}): {motivo}")
 
 
 ID_CON_MUSICA = "informativa-con-musica"
@@ -190,6 +204,16 @@ def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *
                 descargador(subs["url"], subs["sha256"], descargas / Path(subs["url"]).name)
                 extra_src["subtitulos"] = {"url": subs["url"], "sha256": subs["sha256"]}
             inicio, duracion = float(m["recorte"]["inicio"]), float(m["recorte"]["duracion"])
+            if m.get("juego"):      # muestra dividida: compuesto 1920x1080 en la carpeta temporal (nunca en el repo)
+                jv = m["juego"]["video"]
+                ruta_juego = descargador(jv["url"], jv["sha256"], descargas / Path(jv["url"]).name)
+                extra_src["juego"] = {"fuente_id": m["juego"]["fuente_id"], "url": jv["url"], "sha256": jv["sha256"]}
+                st = m["stream"]
+                ruta_video = stream_sintetico.componer_stream(
+                    marca, ruta_juego, ruta_video, descargas / f"stream-{mid}.mp4", descargas / f"trabajo-stream-{mid}",
+                    duracion=inicio + duracion, juego_inicio=float(m["juego"]["inicio"]),
+                    tramo_cara=tuple(st["tramo_cara"]), esquina_facecam=st["esquina_facecam"],
+                    esquina_logo=st["esquina_logo"], chat=st.get("chat"), alerta_s=st.get("alerta_s"))
         else:
             inicio, duracion = 0.0, float(m["duracion"])
         # Música CC0 sólo si la pieza no trae audio propio (video mudo o sin video); el movimiento, sin video.
@@ -207,10 +231,22 @@ def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *
                             fuente_video=ruta_video, inicio=inicio, plan_salida=plan_ruta,
                             musica=pista, movimiento=ruta_video is None)
         puntos = estilo.revisar(mp4, plan, marca)
+        esperada = m.get("disposicion", "completa" if ruta_video else None)
+        extra = {}
+        if esperada:      # cada muestra declara su disposición: las de siempre, completa; las nuevas, dividida
+            real = (plan.get("geometria") or {}).get("disposicion")
+            puntos.append((f"[plan] Disposición {esperada} (la esperada de la muestra)", real == esperada,
+                           f"real {real}: {((plan.get('geometria') or {}).get('deteccion') or {}).get('motivo', '')}"))
+        if esperada == mod_dividida.DIVIDIDA:
+            png = f"deteccion-{mid}.png"
+            _dibujar_deteccion(ruta_video, inicio + duracion / 2, plan["geometria"]["deteccion"], salida / png)
+            extra["deteccion_png"] = png
+            extra["deteccion"] = plan["geometria"]["deteccion"]
         registrar(mid, mp4, plan_ruta, duracion, puntos, lineas, {
             "pilar": m["pilar"], "fuente_id": m["fuente_id"],
             "fuente": extra_src or {"propio": "tipográfico, sin metraje"},
-            "recorte": m.get("recorte"), "licencia": m["licencia"], "enlace": m.get("enlace_licencia")}, plan)
+            "recorte": m.get("recorte"), "licencia": m["licencia"], "enlace": m.get("enlace_licencia"),
+            "disposicion": (plan.get("geometria") or {}).get("disposicion"), **extra}, plan)
     _muestra_con_musica(salida, marca, registrar, omitir, hoy)
     # Una muestra omitida (p. ej. sin pista de música del release) no cuenta como verde.
     todas = (all(x["puerta_estilo"]["en_verde"] for x in manifiesto["muestras"])

@@ -426,7 +426,7 @@ def test_validar_zona_de_accion_dentro_de_la_segura(repo, editar_yaml):
 def test_las_3_muestras_son_de_video_y_caben_en_la_plantilla(marca):
     from fabrica.editar import muestras
     todas = muestras.cargar_muestras()
-    assert [m["id"] for m in todas] == ["dialogo-sintel", "momento-bbb", "pajaro-bbb"]
+    assert [m["id"] for m in todas][:3] == ["dialogo-sintel", "momento-bbb", "pajaro-bbb"]    # + 3 divididas (#16)
     for m in todas:
         assert m["video"]["sha256"] and m["fuente_id"] in ("sintel-cc-by", "bbb-cc-by")
         lineas = [componer.Linea(**ln) for ln in m["lineas"]]
