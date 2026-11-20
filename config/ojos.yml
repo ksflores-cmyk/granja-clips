@@ -1,5 +1,15 @@
 # Los ojos: Gemini mira el clip y devuelve JSON (fabrica/ojos.py). La clave sólo vive en GEMINI_API_KEY.
-modelo: gemini-3.8-flash
-modelos_respaldo: [gemini-3.7-flash, gemini-3-flash-preview, gemini-2.5-flash]   # se prueban en orden si el modelo da 404
+# Ping real del 19 nov 2026: gemini-3-flash-preview 200 en 4 s; gemini-3.8-flash 200 en 32 s; gemini-3.7-flash sin
+# respuesta en 40 s; los -lite y los 2.5 dieron 404 (quitados).
+modelo: gemini-3-flash-preview
+modelos_respaldo: [gemini-3.8-flash, gemini-3.7-flash]   # se prueban en orden si el modelo da 404 o se cae
 max_mb_en_linea: 14      # el video se envía en línea (base64 lo infla un tercio; la API admite 20 MB); si pesa más, se descarta
 temperatura: 0.2
+tiempo_por_intento_s: 90     # tope de cada petición a Gemini (se recorta a lo que quede del presupuesto)
+tope_ojos_s: 300             # presupuesto total de `mirar`: intentos, esperas y todos los modelos
+respaldos_por_falla: 2       # ante 429/5xx/red persistentes se prueban hasta N modelos más
+listar_modelos: true         # antes de mirar, ListModels: se saltan los modelos que no aparecen (nunca bloquea)
+sin_ia:                      # corte sin IA cuando Gemini no está disponible (fabrica/editar/sin_ia.py)
+  activo: true               # false: Gemini caído = descarte pasajero, como antes
+  max_por_ciclo: 1           # tomas sin IA por proceso/ciclo; las siguientes se descartan como pasajeras
+  duracion_objetivo_s: 20    # largo del recorte (acotado al rango de la ficha y a la duración del video)

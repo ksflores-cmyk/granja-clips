@@ -136,6 +136,20 @@ def carpetas(monkeypatch):
 
 # ---------------------------------------------------------------- ojos: transporte y respaldo
 
+def config_antigua(repo):
+    """Config de antes de la tarea #2 en una copia del repo: 1 respaldo por falla y sin corte sin IA. Para los
+    tests que prueban el descarte pasajero cuando Gemini no está disponible."""
+    ruta = Path(repo) / "config" / "ojos.yml"
+    cfg = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    cfg["respaldos_por_falla"] = 1
+    cfg["sin_ia"] = {"activo": False}
+    ruta.write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
+
+
+def cfg_antigua_de_ojos():
+    return {**yaml.safe_load((RAIZ_REAL / "config" / "ojos.yml").read_text(encoding="utf-8")), "respaldos_por_falla": 1}
+
+
 def mirar(tmp_path, transporte, clave="clave-de-prueba", video_bytes=b"\x00" * 2048, **kw):
     v = tmp_path / "v.mp4"
     v.write_bytes(video_bytes)
@@ -189,7 +203,7 @@ def test_reintento_unico_ante_429_con_espera(tmp_path):
 
 def test_dos_429_seguidos_prueban_un_solo_modelo_mas_y_se_rinden(tmp_path):
     t = Transporte((429, "{}"), (429, "{}"), (429, "{}"), (429, "{}"))
-    m = mirar(tmp_path, t)
+    m = mirar(tmp_path, t, config=cfg_antigua_de_ojos())     # respaldos_por_falla: 1
     assert m.datos is None and "429" in m.motivo and len(t.llamadas) == 4 and m.pasajero
     assert t.modelos()[0] == t.modelos()[1] != t.modelos()[2] == t.modelos()[3]
 
@@ -222,7 +236,7 @@ def test_la_clave_va_en_el_encabezado_y_nunca_en_la_url_ni_en_los_informes(tmp_p
 def test_error_de_conexion_da_motivo_sin_clave_y_es_pasajero(tmp_path):
     e = ojos.ErrorOjos("fallo de conexión con Gemini: TimeoutError")
     t = Transporte(e, e, e, e)
-    m = mirar(tmp_path, t, clave="CLAVE-SECRETA-XYZ")
+    m = mirar(tmp_path, t, clave="CLAVE-SECRETA-XYZ", config=cfg_antigua_de_ojos())     # respaldos_por_falla: 1
     assert m.datos is None and "conexión" in m.motivo and "CLAVE-SECRETA" not in m.motivo
     assert m.pasajero and len(t.llamadas) == 4
 
@@ -243,7 +257,7 @@ def test_quitar_visto_deshace_solo_la_ultima_marca(repo):
 
 def test_tras_una_caida_un_404_del_respaldo_no_abre_un_tercer_modelo(tmp_path):
     t = Transporte((503, "x"), (503, "x"), (404, "{}"), (200, sobre(respuesta_grabada("valida"))))
-    m = mirar(tmp_path, t)
+    m = mirar(tmp_path, t, config=cfg_antigua_de_ojos())     # con respaldos_por_falla: 2 sí se prueba el tercero
     assert m.datos is None and m.pasajero and len(t.llamadas) == 3
 
 
@@ -595,6 +609,7 @@ def test_hacer_toma_con_spoiler_es_descarte_con_su_motivo(repo, tmp_path, video2
 
 
 def test_hacer_toma_sin_clave_descarta(repo, tmp_path, video20):
+    config_antigua(repo)       # con sin_ia.activo el corte sin IA tomaría el relevo (ver test_gemini.py)
     r = toma.hacer_toma(repo, candidato(), ficha_propia(), AHORA, salida=tmp_path / "s", abrir=abrir_con(video20),
                         transporte=Transporte(), entorno={})
     assert not r.ok and r.motivos == ["ojos: sin GEMINI_API_KEY"]
@@ -963,6 +978,7 @@ def test_anotar_clip_acepta_la_forma_corta_de_publicar(repo):
 
 
 def test_gemini_caido_no_gasta_la_fuente(repo, tmp_path, video20):
+    config_antigua(repo)
     e = ojos.ErrorOjos("fallo de conexión con Gemini: TimeoutError")
     r = toma.hacer_toma(repo, candidato(), ficha_propia(), AHORA, salida=tmp_path / "s", abrir=abrir_con(video20),
                         transporte=Transporte(e, e, e, e), entorno={"GEMINI_API_KEY": "k"}, espera=lambda s: None)
