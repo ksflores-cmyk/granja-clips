@@ -125,10 +125,11 @@ jobs:
         if: ${{ always() && !inputs.ensayo_forzado && github.ref == 'refs/heads/main' }}
         run: |
           set -u
-          PERMITIDOS='^(marcador\.csv|registro\.md|estado/.*|config/canales\.yml|informativas\.yml|marca\.yml|PAUSA)$'
+          PERMITIDOS='^(marcador\.csv|registro\.md|estado/.*|config/canales\.yml|informativas\.yml|marca\.yml|retiros\.md|config/vetados\.yml|PAUSA)$'
           minutos=$(( ( $(date +%s) - INICIO_S + 59 ) / 60 ))
           python -m fabrica.ciclo --sumar-minutos "$minutos" --run-id "$GITHUB_RUN_ID"
           python -m fabrica.ciclo --abrir-avisos || true
+          python -m fabrica.retiros --abrir-avisos || true
           alerta=no
           if [ -f estado/alerta.json ] && [ -n "$(git status --porcelain -- estado/alerta.json)" ]; then
             alerta=si
@@ -142,7 +143,7 @@ jobs:
             echo "$fuera"
             exit 1
           fi
-          for ruta in marcador.csv registro.md estado config/canales.yml informativas.yml marca.yml; do
+          for ruta in marcador.csv registro.md estado config/canales.yml informativas.yml marca.yml retiros.md config/vetados.yml; do
             [ -e "$ruta" ] && git add -A -- "$ruta"
           done
           if git diff --cached --quiet; then
@@ -165,6 +166,7 @@ jobs:
             exit 1
           fi
           if [ "$alerta" = "si" ]; then
-            gh issue create --title "ALERTA ROJA: ${motivo}" \
+            gh label create alerta-roja --color B60205 --force || true
+            gh issue create --title "ALERTA ROJA: ${motivo}" --label alerta-roja \
               --body "La fábrica creó PAUSA y no publica nada más. Motivo: ${motivo}. Detalle en estado/alerta.json (sin claves). Para reanudar, revisa y borra PAUSA."
           fi

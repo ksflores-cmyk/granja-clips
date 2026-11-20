@@ -83,3 +83,6 @@ jobs:
         continue-on-error: false
         shell: bash
         run: python -m fabrica.detectar --diagnostico-t --n 10
+      - name: "Buffer, retiros (seco)"
+        shell: bash
+        run: python -m fabrica.retiros --revisar --seco

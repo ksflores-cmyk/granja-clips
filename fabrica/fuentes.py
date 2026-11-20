@@ -6,7 +6,8 @@ from datetime import date, datetime
 from urllib.parse import urlparse
 
 from .config import cargar_yaml, raiz_repo
-from .vetados import logins_vetados
+from .pausa import pausa_t_activa
+from .vetados import fuentes_retiradas, logins_vetados
 
 RUTA_FICHAS_T = "estado/fichas-t.yml"
 RE_ID_T = re.compile(r"^t-[a-z0-9]+(-[a-z0-9]+)*$")
@@ -32,18 +33,29 @@ def fichas_t_guardadas(raiz=None) -> list[dict]:
 
 
 def cargar_fuentes(raiz=None) -> list[dict]:
-    """fuentes.yml más las fichas T generadas por el buscador. Una ficha T cuyo login esté vetado
-    (config/vetados.yml o retiros.md) sale vetada y no publicable."""
+    """fuentes.yml más las fichas T generadas por el buscador.
+
+    Sale vetada y no publicable: una ficha cuyo id esté en la columna «Fuente» de retiros.md, y una ficha T cuyo
+    login esté vetado (config/vetados.yml o retiros.md). Con estado/pausa-t.yml toda ficha T generada sale
+    pausada y no publicable (las de fuentes.yml no cambian)."""
     fichas = _fuentes_yml(raiz)
     ids = {f.get("id") for f in fichas}
     t = [f for f in fichas_t_guardadas(raiz) if f["id"] not in ids]
-    if t:
-        vetados = logins_vetados(raiz)
-        for f in t:
-            if str(f.get("twitch_login", "")).lower() in vetados:
-                f["estado"] = "vetada"
-                f["publicable"] = False
-        fichas = fichas + t
+    vetados = logins_vetados(raiz)
+    pausada = pausa_t_activa(raiz)[0]
+    for f in t:
+        if str(f.get("twitch_login", "")).lower() in vetados:
+            f["estado"] = "vetada"
+            f["publicable"] = False
+        elif pausada:
+            f["estado"] = "pausada"
+            f["publicable"] = False
+    fichas = fichas + t
+    retiradas = fuentes_retiradas(raiz)
+    for f in fichas:
+        if str(f.get("id", "")).lower() in retiradas:
+            f["estado"] = "vetada"
+            f["publicable"] = False
     return fichas
 
 
