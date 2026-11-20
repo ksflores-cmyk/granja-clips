@@ -10,6 +10,8 @@ import json
 import re
 import subprocess
 import tempfile
+import argparse
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -29,6 +31,7 @@ CIERRE_PERDIDO_S = 0.5            # el último medio segundo es el cierre
 NOMBRE_DATO = "EL DATO"
 ETIQUETAS = ("#GTA6", "#Gaming", "#Clips")    # Instagram pide de 3 a 5; no llevan datos
 CREDITO = "Fuente: Rockstar Games Support"
+ACOTACION = "según el soporte de Rockstar"
 ESCENA = "INT. TU CONSOLA — NOCHE"
 TOPE_PORCENTAJE = 0.10
 DIAS_VENTANA = 7
@@ -114,7 +117,7 @@ def _lineas(entrada: dict) -> list[Linea]:
     for i, d in enumerate(datos):
         ln = Linea(t0=round(i * paso, 3), t1=round((i + 1) * paso, 3), nombre=NOMBRE_DATO, frase=d)
         if i == 0:
-            ln.acotacion = "según el soporte de Rockstar"
+            ln.acotacion = str(entrada.get("acotacion") or ACOTACION)
         lineas.append(ln)
     return lineas
 
@@ -132,7 +135,7 @@ def armar(raiz, entrada: dict, ahora: datetime, salida: Path) -> Resultado:
             return Resultado(False, ["informativa: sin pista de música CC0 disponible "
                                      f"(GRANJA_MUSICA_DIR={mod_musica.carpeta() or ''})"])
         toma = Toma(numero=numero, gancho=entrada["gancho"].strip(), palabra_lapiz=entrada["palabra_lapiz"].strip(),
-                    lapiz=lapiz_de(numero), escena=str(entrada.get("escena") or ESCENA).upper(), credito=CREDITO)
+                    lapiz=lapiz_de(numero), escena=str(entrada.get("escena") or ESCENA).upper(), credito=str(entrada.get("credito") or CREDITO))
         mp4 = salida / f"toma-{numero:03d}-{entrada['id']}.mp4"
         plan_ruta = mp4.with_suffix(".plan.json")
         with tempfile.TemporaryDirectory(prefix="trabajo-informativa-") as trabajo:
@@ -173,3 +176,58 @@ def marcar_usada(raiz, id_entrada: str) -> bool:
     if hecho:
         r.write_text("\n".join(lineas), encoding="utf-8")
     return hecho
+
+
+def ensayo(raiz, salida: Path, ahora: datetime, ids: list[str] | None = None, imprimir=print) -> int:
+    """Compone las entradas vigentes (o las de `ids`) sin usar y escribe `informe.md` en `salida`.
+
+    Nunca marca `usada` ni escribe en el repo: `armar` sólo lee marca.yml y la música, y todo sale a `salida`."""
+    raiz = raiz_repo(raiz)
+    salida = Path(salida)
+    salida.mkdir(parents=True, exist_ok=True)
+    if ids:
+        entradas = [e for e in cargar(raiz) if e.get("id") in ids and e.get("usada") is not True]
+        faltan = [i for i in ids if i not in {e.get("id") for e in entradas}]
+    else:
+        entradas = [e for e in cargar(raiz) if vigente(e, ahora)]
+        faltan = []
+    secciones = [f"# Ensayo de informativas ({ahora.isoformat()})", ""]
+    fallas = 0
+    for i in faltan:
+        fallas += 1
+        secciones += [f"## {i}: EN ROJO", "", "- NO: la entrada no existe o ya está usada", ""]
+    for e in entradas:
+        r = armar(raiz, e, ahora, salida)
+        if r.ok:
+            cuerpo = estilo.informe_md("Puerta de estilo", r.puntos) if r.puntos else ""
+        else:
+            fallas += 1
+            cuerpo = "\n".join(f"- NO: {m}" for m in r.motivos) + "\n"
+            if r.puntos:
+                cuerpo += "\n" + estilo.informe_md("Puerta de estilo", r.puntos)
+        secciones += [f"## {e.get('id')}: {'EN VERDE' if r.ok else 'EN ROJO'}", "", cuerpo]
+    if not entradas and not faltan:
+        fallas += 1
+        secciones += ["No hay ninguna entrada vigente y sin usar.", ""]
+    (salida / "informe.md").write_text("\n".join(secciones), encoding="utf-8")
+    imprimir(f"ensayo: {len(entradas)} entradas, {fallas} fallas; informe en {salida / 'informe.md'}")
+    return 1 if fallas else 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="python -m fabrica.informativa")
+    ap.add_argument("--ensayo", action="store_true", help="compone sin marcar usada ni escribir en el repo")
+    ap.add_argument("--salida", required=True)
+    ap.add_argument("--ahora", help="fecha ISO; por omisión, ahora")
+    ap.add_argument("--id", action="append", dest="ids", help="entrada concreta (repetible)")
+    a = ap.parse_args(argv)
+    if not a.ensayo:
+        ap.error("sólo existe el modo --ensayo")
+    ahora = _dt(a.ahora) if a.ahora else datetime.now(ZONA)
+    if ahora is None:
+        ap.error("--ahora no es una fecha ISO")
+    return ensayo(None, Path(a.salida), ahora, a.ids)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -778,6 +778,16 @@ def validar_informativas(datos, marca, inf: Informe) -> None:
             inf.error(f"{et}: vigente_desde debe ser anterior a vigente_hasta")
         if not isinstance(e["usada"], bool):
             inf.error(f"{et}: usada debe ser true o false")
+        for clave, tope, prefijo in (("credito", 40, "Fuente:"), ("acotacion", 40, ""), ("escena", 40, "")):
+            if clave not in e:
+                continue
+            v = e[clave]
+            if not (isinstance(v, str) and v.strip()):
+                inf.error(f"{et}: {clave} debe ser texto no vacío")
+            elif prefijo and not v.startswith(prefijo):
+                inf.error(f"{et}: {clave} debe empezar con \"{prefijo}\"")
+            elif len(v) > tope:
+                inf.error(f"{et}: {clave} pasa de {tope} caracteres")
 
 
 def validar_sin_media(raiz: Path, inf: Informe) -> None:
