@@ -773,7 +773,7 @@ class Publicador:
         carga, anot = armar_carga(plataforma, canal, textos["texto"], textos.get("titulo"),
                                   url_video, cuando, self.esquema)
         self.reconciliar()
-        plazo.tiempo_para(60)            # si no cabe createPost, se sale ANTES de reservar nada en el libro
+        plazo.tiempo_para(60, minimo=60)  # si no caben 60 s para createPost, se sale ANTES de reservar nada en el libro
         due = iso_utc(cuando)
         id_envio = f"{plataforma}|{toma.get('numero')}|{due}"
         entrada = {"id": id_envio, "plataforma": plataforma, "toma": toma.get("numero"), "dueAt": due,
