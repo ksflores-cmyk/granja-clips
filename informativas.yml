@@ -15,3 +15,54 @@ informativas:
     vigente_desde: "2026-11-17T12:00:00-06:00"
     vigente_hasta: "2026-11-18T23:59:00-06:00"
     usada: true
+
+  # Tarea #14 (20 nov 2026): datos del estreno. Vigencia de 48 h desde la lectura (regla de hechos.md).
+  - id: gta6-record-twitch
+    gancho: "GTA 6 bate récord en Twitch"
+    palabra_lapiz: "RÉCORD"
+    titular: "bate el récord de espectadores de un juego en Twitch"
+    datos:
+      - "3,31 millones viéndolo a la vez en Twitch."
+      - "Supera a League of Legends: 3,11 millones (2022)."
+      - "Más de 7,91 millones sumando todas las plataformas."
+    escena: "INT. TWITCH — NOCHE DEL ESTRENO"
+    credito: "Fuente: Streams Charts (preliminar)"
+    acotacion: "según Streams Charts"
+    fuente_url: https://streamscharts.com/news/gta-6-streaming-records
+    verificado_el: 2026-11-20      # Streams Charts, publicado el 18 nov 2026, leído el 20 nov 2026
+    vigente_desde: "2026-11-20T06:00:00-06:00"
+    vigente_hasta: "2026-11-21T23:59:00-06:00"
+    usada: false
+
+  - id: gta6-metacritic-99
+    gancho: "GTA 6 saca 99 en Metacritic"
+    palabra_lapiz: "99"
+    titular: "99 en Metacritic, empata el récord histórico"
+    datos:
+      - "99 de 100 en PS5 (147 reseñas, al 18 nov)."
+      - "118 de esas reseñas son notas perfectas."
+      - "Empata con Zelda: Ocarina of Time (1998)."
+    escena: "INT. LA CRÍTICA — DÍA DEL ESTRENO"
+    credito: "Fuente: Metacritic (18 nov)"
+    acotacion: "según Metacritic"
+    fuente_url: https://www.techpowerup.com/354998/gta-6-review-roundup-99-on-metacritic-and-118-perfect-scores
+    verificado_el: 2026-11-20      # TechPowerUp y The Next Web (18 nov 2026), leídos el 20 nov 2026
+    vigente_desde: "2026-11-20T06:00:00-06:00"
+    vigente_hasta: "2026-11-21T23:59:00-06:00"
+    usada: false
+
+  - id: gta6-espacio-ps5
+    gancho: "GTA 6 pide 212 GB"
+    palabra_lapiz: "212"
+    titular: "pide al menos 212 GB libres en PS5"
+    datos:
+      - "Mínimo 212 GB libres en PS5."
+      - "Voces en inglés; menús y textos en español."
+      - "Todo el diálogo hablado lleva subtítulos."
+    credito: "Fuente: PlayStation Store"
+    acotacion: "según PlayStation Store"
+    fuente_url: https://www.playstation.com/games/grand-theft-auto-vi
+    verificado_el: 2026-11-20      # PlayStation Store, leída el 20 nov 2026
+    vigente_desde: "2026-11-20T06:00:00-06:00"
+    vigente_hasta: "2026-11-21T23:59:00-06:00"
+    usada: false
