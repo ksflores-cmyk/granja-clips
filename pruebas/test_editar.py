@@ -25,8 +25,9 @@ HASHES_FUENTES = {
 
 
 @pytest.fixture(scope="module")
-def marca():
-    return Marca.cargar(RAIZ_REAL)
+def marca(raiz_musica):
+    """La marca real, en una copia ligera con 3 pistas CC0 falsas (las reales aún están en `candidata`)."""
+    return Marca.cargar(raiz_musica[0])
 
 
 def pixeles(img):
@@ -287,8 +288,17 @@ PLAN = {
 }
 
 
+def pista_falsa(marca, n=0):
+    return next(x for x in yaml.safe_load((marca.raiz / "marca/musica/pistas.yml").read_text())["pistas"]
+                if x["id"] == f"tono-{n}")
+
+
 def plan_con(marca, **cambios_toma):
     p = json.loads(json.dumps(PLAN))
+    pista = pista_falsa(marca)
+    p["audio"] = {"tipo": "musica", "pista": pista["id"], "sha256": pista["sha256"],
+                  "licencia": f"marca/musica/{pista['id']}/LICENCIA.md", "lufs": -16, "inicio_s": 0.0}
+    p["movimiento"] = "entrada_texto"
     p["toma"].update(cambios_toma)
     p["colores"] = dict(marca.datos["colores"])
     p["fuente"] = {"familia": marca.datos["fuente"]["familia"], "archivos": dict(marca.datos["fuente"]["archivos"])}
@@ -296,16 +306,16 @@ def plan_con(marca, **cambios_toma):
 
 
 @pytest.fixture(scope="module")
-def mp4_sintetico(tmp_path_factory):
+def mp4_sintetico(tmp_path_factory, marca, raiz_musica):
     """Toma tipográfica de 8 s hecha con componer: trae la página de cierre del PLAN."""
     if not hay_ffmpeg:
         pytest.skip("ffmpeg no está instalado")
     base = tmp_path_factory.mktemp("sint")
     ruta = base / "sint.mp4"
-    m = Marca.cargar()
     t = lienzo.Toma(**PLAN["toma"])
     ln = [componer.Linea(0.0, 3.6, "EL DATO", "Medianoche local del 19 de noviembre.")]
-    componer.componer(m, t, ln, ruta, duracion=8.0, trabajo=base / "w")
+    pista = {**pista_falsa(marca), "ruta": str(raiz_musica[1] / "tono-0.wav")}
+    componer.componer(marca, t, ln, ruta, duracion=8.0, trabajo=base / "w", musica=pista, movimiento=True)
     return ruta
 
 
@@ -374,17 +384,20 @@ def test_estilo_cli_sale_0_y_1(marca, mp4_sintetico, tmp_path):
     bueno.write_text(json.dumps(plan_con(marca)), encoding="utf-8")
     malo = tmp_path / "malo.json"
     malo.write_text(json.dumps(plan_con(marca, gancho="Esto cambia todo", palabra_lapiz="TODO")), encoding="utf-8")
-    assert estilo.main([str(mp4_sintetico), str(bueno)]) == 0
-    assert estilo.main([str(mp4_sintetico), str(malo)]) == 1
+    raiz = ["--raiz", str(marca.raiz)]
+    assert estilo.main([str(mp4_sintetico), str(bueno), *raiz]) == 0
+    assert estilo.main([str(mp4_sintetico), str(malo), *raiz]) == 1
 
 
 @pytest.mark.slow
 @necesita_ffmpeg
-def test_render_completo_de_una_toma_sin_video(marca, tmp_path):
+def test_render_completo_de_una_toma_sin_video(marca, raiz_musica, tmp_path):
     t = toma(gancho="GTA 6 llega esta medianoche", palabra_lapiz="MEDIANOCHE", lapiz="circulo")
     ln = [componer.Linea(0.0, 4.0, "EL DATO", "Medianoche local del 19 de noviembre.", "según Rockstar")]
     mp4 = tmp_path / "t.mp4"
-    plan = componer.componer(marca, t, ln, mp4, duracion=8.0, trabajo=tmp_path / "w", plan_salida=tmp_path / "t.json")
+    pista = {**pista_falsa(marca, 1), "ruta": str(raiz_musica[1] / "tono-1.wav")}
+    plan = componer.componer(marca, t, ln, mp4, duracion=8.0, trabajo=tmp_path / "w", plan_salida=tmp_path / "t.json",
+                             musica=pista, movimiento=True)
     assert mp4.stat().st_size > 1000 and plan["duracion"] == 8.0
     assert all(ok for _, ok, _ in estilo.revisar(mp4, json.loads((tmp_path / "t.json").read_text()), marca))
 

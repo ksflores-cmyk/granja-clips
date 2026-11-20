@@ -61,3 +61,50 @@ def editar_yaml():
         ruta.write_text(yaml.safe_dump(resultado if resultado is not None else datos,
                                        allow_unicode=True), encoding="utf-8")
     return _editar
+
+
+LICENCIA_FALSA = ("# Licencia\n\n- Fuente: https://opengameart.org/content/falsa\n- Autor: Prueba\n"
+                  "- Licencia: CC0\n- Enlace: https://creativecommons.org/publicdomain/zero/1.0/\n")
+
+
+@pytest.fixture(scope="session")
+def raiz_musica(tmp_path_factory):
+    """(raíz, carpeta de audio): copia ligera del repo (marca.yml y marca/) con 3 pistas CC0 falsas ya verificadas.
+
+    Los audios son tonos `sine` de ffmpeg en una carpeta temporal; el repo real no se toca ni recibe audio. Sirve a
+    las pruebas que renderizan una pieza sin audio propio y deben pasar la puerta de estilo completa.
+    """
+    import hashlib
+    import subprocess
+    base = tmp_path_factory.mktemp("raiz-musica")
+    raiz, audio = base / "repo", base / "audio"
+    audio.mkdir()
+    raiz.mkdir()
+    shutil.copy(RAIZ_REAL / "marca.yml", raiz / "marca.yml")
+    shutil.copytree(RAIZ_REAL / "marca", raiz / "marca", ignore=shutil.ignore_patterns("musica"))
+    pistas = []
+    for i in range(3):
+        ruta = audio / f"tono-{i}.wav"
+        subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                        f"sine=frequency={300 + 100 * i}:duration=14", str(ruta)], check=True)
+        pistas.append({"id": f"tono-{i}", "titulo": f"Tono {i}", "autor": "Prueba",
+                       "pagina": f"https://opengameart.org/content/tono-{i}", "archivo": "x.ogg", "licencia": "CC0",
+                       "estilo": "tono", "inicio_s": 0, "asset": ruta.name,
+                       "sha256": hashlib.sha256(ruta.read_bytes()).hexdigest(), "estado": "verificada"})
+        carpeta = raiz / "marca" / "musica" / f"tono-{i}"
+        carpeta.mkdir(parents=True)
+        (carpeta / "LICENCIA.md").write_text(LICENCIA_FALSA, encoding="utf-8")
+    (raiz / "marca" / "musica" / "pistas.yml").write_text(
+        yaml.safe_dump({"licencias_permitidas": ["CC0"], "release": "musica", "pistas": pistas},
+                       allow_unicode=True), encoding="utf-8")
+    return raiz, audio
+
+
+@pytest.fixture
+def repo_con_musica(repo, raiz_musica, monkeypatch):
+    """La copia temporal del repo con las 3 pistas falsas verificadas, y GRANJA_MUSICA_DIR apuntando a sus tonos."""
+    raiz, audio = raiz_musica
+    shutil.rmtree(repo / "marca" / "musica", ignore_errors=True)
+    shutil.copytree(raiz / "marca" / "musica", repo / "marca" / "musica")
+    monkeypatch.setenv("GRANJA_MUSICA_DIR", str(audio))
+    return repo
