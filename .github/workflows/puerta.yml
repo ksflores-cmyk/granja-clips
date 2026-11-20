@@ -1,8 +1,13 @@
 name: puerta
 
 on:
+  # Ahorro de minutos (20 nov): antes corría dos veces por cada push a una rama con PR.
   push:
+    branches: [main]
+    paths-ignore: ["**.md", "estado/**", "marcador.csv", "envios-pendientes.csv", "PAUSA"]
   pull_request:
+    paths-ignore: ["**.md", "estado/**", "marcador.csv", "envios-pendientes.csv", "PAUSA"]
+  workflow_dispatch:
 
 permissions:
   contents: read
