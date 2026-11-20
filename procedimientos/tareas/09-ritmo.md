@@ -1,0 +1,17 @@
+# Tarea #9 `ritmo` (rama `claude/clips-ritmo`)
+
+Decisión de Kevin (19 nov, 8:00 p. m.): **6 clips al día por red**. Esta tarea cambia el calendario de la fábrica para cumplirla sin amontonar, sin pasar el tope de Buffer gratis y sin repetir clips.
+
+## Criterios de aceptación (binarios)
+
+1. `config/horarios.yml` tiene `huecos: ["09:00","11:00","13:00","16:00","19:00","22:00"]` (hora GT) que valen **todos los días, también dentro de `ventana_estreno`**. Ya no existen `huecos_normales` ni `huecos_estreno` (ni en el código, ni en `validar.py`, ni en las pruebas).
+2. `temporada.yml`: `cupos.por_dia_por_plataforma: 6` y `cupos.estreno_max_por_dia_por_plataforma: 6`.
+3. Cada corrida programa **como máximo un hueco** (el que le toca). Con corridas cada hora al minuto 23, cada uno de los 6 huecos del día lo toma exactamente una corrida (la de la hora anterior), en estreno y fuera de él.
+4. **Relleno sin amontonar.** Si un hueco de hoy ya pasó (o está a menos de `margen_min`) sin publicarse en alguna red, y no hay hueco normal en la ventana de esta corrida, la corrida lo rellena a `ahora + margen_min` redondeado hacia arriba a 5 min, sólo si: (a) cae el mismo día local y no después de `relleno.ultima_hora`; (b) queda a `relleno.separacion_min_minutos` o más de **todos** los huecos normales del día y de toda publicación ya programada de esa red ese día; (c) el hueco lleva menos de `relleno.max_intentos_por_hueco` intentos. El hueco normal de la ventana siempre gana al relleno. El relleno se anota con la hora del hueco original (`estado/huecos-cerrados.json`), así no se rellena dos veces.
+5. **Cola de Buffer ≤ `cola_buffer_max` (10) por canal.** Antes de subir el video, por cada red: posts pendientes = máximo entre (a) envíos del libro `estado/buffer-envios.json` de esa red con estado `enviando`, `incierto` o `creado` y `dueAt` futuro, y (b) los posts `scheduled` del canal según Buffer (si la consulta responde bien; si falla, vale (a) y se dice en el log). Si pendientes ≥ tope, esa red se salta con motivo «cola de Buffer llena (n/10)».
+6. **No se repite el mismo clip en 24 h por red.** Cada toma lleva `claves` (el `id_origen` del candidato, los `ids_origen` si el candidato trae varios, o `informativa:<id>` en el respaldo) y se guardan en el libro (`datos.toma`). Un candidato cuyas claves salieron en esa red dentro de `no_repetir_horas` (24) de la hora a programar se descarta antes de editar («repetido en 24 h»), y hay una comprobación final por red antes de subir.
+7. Cupo: un candidato extra en la misma corrida es suplente, no otra publicación. `puertas.filtrar` descarta por cupo sólo si las filas del día ya llegan al cupo (no cuenta los aprobados de la corrida).
+8. Tope de Actions configurable: `actions.tope_minutos_dia` en `config/horarios.yml` (90; por defecto 60 si falta). Con 6 `producir` de ~8 min y un `decidir` por hora el día cabe (prueba).
+9. `.github/workflows/fabrica.yml`: cron `23 * * * *` (minuto impar, respaldo del disparador de cron-job.org), comentario al día.
+10. `fabrica.validar` revisa el nuevo `horarios.yml`: `huecos` lista no vacía de HH:MM, ordenada, sin repetidos, 8 como máximo; `cola_buffer_max` entero de 1 a 10; `no_repetir_horas` entero ≥ 24; `relleno.*` con tipos válidos; `actions.tope_minutos_dia` entero de 30 a 100; y que los cupos de `temporada.yml` no pasen del número de huecos.
+11. Pruebas de calendario en `pruebas/test_ritmo.py` (sin red) y la suite entera en verde.

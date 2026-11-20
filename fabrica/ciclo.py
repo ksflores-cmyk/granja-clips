@@ -4,6 +4,10 @@
 El orden de los pasos no se cambia: 1) PAUSA, 2) puerta de configuración, 3) cadencia, 4) tope de Actions,
 5) hueco, 6) candidatos, 7) respaldo informativo, 8) publicar (vivo) o ensayo, 9) --ensayo-forzado, 10) alerta roja.
 
+Calendario (config/horarios.yml): cada corrida programa como máximo un hueco, el normal que cae en su ventana o,
+si no hay, el relleno de un hueco perdido de hoy a ahora+margen (sin amontonar, sin repetir clips en 24 h y sin
+pasar la cola de Buffer gratis).
+
 Cadencia: la corrida con un hueco por cubrir siempre sigue; la cadencia (cada hora del 18 al 20, desde el 21
 sólo en horas múltiplo de 3) frena las corridas sin hueco. El número de toma avanza si al menos una plataforma
 quedó programada (o incierta): las que fallaron pierden esa toma y ese hueco, nunca se reintenta la misma toma.
@@ -40,8 +44,8 @@ PLATAFORMAS = publicar.PLATAFORMAS
 SECRETOS = ("BUFFER_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY", "TWITCH_CLIENT_ID",
             "TWITCH_CLIENT_SECRET", "GEMINI_API_KEY")
 DIA_CADENCIA_LENTA = date(2026, 11, 21)      # desde este día (GT) sólo corre en horas múltiplo de 3
-TOPE_MINUTOS_DIA = 60
-MARGEN_MIN_S, MARGEN_MAX_S = 15 * 60, 75 * 60    # el hueco debe caer de ahora+15 a ahora+75 min
+TOPE_MINUTOS_DIA = 60                            # valor por defecto: el de verdad es actions.tope_minutos_dia
+MARGEN_MIN_S, MARGEN_MAX_S = 15 * 60, 75 * 60    # por defecto: el hueco cae de ahora+15 a ahora+75 min
 MAX_INTENTOS = 3
 RE_CUENTA = re.compile(r"suspend|restrict|bloquead|blocked|disabled|deshabilitad", re.IGNORECASE)
 RE_HTTP_CUENTA = re.compile(r"código (401|403)\b")
@@ -118,7 +122,7 @@ def en_cadencia(ahora: datetime) -> bool:
     """Del 18 al 20 de nov (GT), cada hora; desde el 21, sólo en las horas múltiplo de 3.
 
     Un hueco a cubrir siempre cuenta: la cadencia sólo frena las corridas sin hueco (el mantenimiento),
-    así los huecos de las 11:00, 15:00 y 19:00 se cubren aunque su corrida caiga en otra hora."""
+    así los huecos de horarios.yml se cubren aunque su corrida caiga en otra hora."""
     local = ahora.astimezone(ZONA)
     return local.date() < DIA_CADENCIA_LENTA or local.hour % 3 == 0
 
@@ -164,9 +168,14 @@ def minutos_usados(raiz, ahora: datetime, run_id=None) -> float:
     return minutos_del_dia(raiz, ahora, run_id) + minutos_de_decidir(ahora)
 
 
+def tope_minutos(raiz) -> int:
+    """actions.tope_minutos_dia de horarios.yml (60 si falta)."""
+    return int(_cfg_horarios(raiz)["tope_minutos_dia"])
+
+
 def admite_producir(raiz, ahora: datetime, run_id=None) -> bool:
-    """`producir` sólo entra si quedan al menos 20 minutos del tope de 60."""
-    return minutos_usados(raiz, ahora, run_id) + MINUTOS_PRODUCIR <= TOPE_MINUTOS_DIA
+    """`producir` sólo entra si quedan al menos 20 minutos del tope diario de Actions."""
+    return minutos_usados(raiz, ahora, run_id) + MINUTOS_PRODUCIR <= tope_minutos(raiz)
 
 
 def marcar_inicio(raiz, ahora: datetime, run_id) -> None:
@@ -219,8 +228,9 @@ def cerrar_hueco(raiz, hueco, plataforma: str) -> None:
 
 @dataclass
 class Hueco:
-    cuando: datetime                  # hora local de Guatemala
+    cuando: datetime                  # hora local de Guatemala del hueco ORIGINAL (es la que se cierra y se anota)
     plataformas: list[str]
+    publicar_en: datetime | None = None    # hora local real del post si es un relleno
 
     @property
     def fecha(self) -> str:
@@ -230,36 +240,139 @@ class Hueco:
     def hora(self) -> str:
         return self.cuando.strftime("%H:%M")
 
+    @property
+    def programar_en(self) -> datetime:
+        return self.publicar_en or self.cuando
 
-def _en_estreno(t: dict, cuando: datetime) -> bool:
-    v = t["ventana_estreno"]
-    return datetime.fromisoformat(str(v["inicio"])) <= cuando <= datetime.fromisoformat(str(v["fin"]))
+    @property
+    def relleno(self) -> bool:
+        return self.publicar_en is not None and self.publicar_en != self.cuando
+
+    def descripcion(self) -> str:
+        extra = f" (relleno a las {self.publicar_en.strftime('%H:%M')})" if self.relleno else ""
+        return f"hueco {self.fecha} {self.hora}{extra}"
+
+
+def _cfg_horarios(raiz) -> dict:
+    """horarios.yml con valores por defecto para lo opcional. Obligatorias: zona y huecos."""
+    h = cargar_yaml("config/horarios.yml", raiz) or {}
+    rel = h.get("relleno") or {}
+    act = h.get("actions") or {}
+    return {
+        "zona": h.get("zona"),
+        "huecos": [str(x) for x in h.get("huecos") or []],
+        "margen_min_s": int(h.get("margen_min_minutos", MARGEN_MIN_S // 60)) * 60,
+        "margen_max_s": int(h.get("margen_max_minutos", MARGEN_MAX_S // 60)) * 60,
+        "separacion_s": int(rel.get("separacion_min_minutos", 60)) * 60,
+        "ultima_hora": str(rel.get("ultima_hora", "23:00")),
+        "max_intentos": int(rel.get("max_intentos_por_hueco", 2)),
+        "cola_max": int(h.get("cola_buffer_max", 10)),
+        "no_repetir_horas": int(h.get("no_repetir_horas", 24)),
+        "tope_minutos_dia": int(act.get("tope_minutos_dia", TOPE_MINUTOS_DIA)),
+    }
+
+
+def _hhmm(texto: str) -> tuple[int, int]:
+    h, m = (int(x) for x in str(texto).split(":"))
+    return h, m
+
+
+def _a_las(dia: date, texto: str) -> datetime:
+    h, m = _hhmm(texto)
+    return datetime(dia.year, dia.month, dia.day, h, m, tzinfo=ZONA)
+
+
+def _ruta_intentos(raiz) -> Path:
+    return raiz_repo(raiz) / "estado" / "huecos-intentos.json"
+
+
+def intentos_de_huecos(raiz) -> dict[tuple, int]:
+    datos = _leer_json(_ruta_intentos(raiz), [])
+    if not isinstance(datos, list):
+        return {}
+    return {(d.get("fecha"), d.get("hora")): int(d.get("intentos") or 0) for d in datos if isinstance(d, dict)}
+
+
+def sumar_intento(raiz, hueco: Hueco) -> int:
+    """Anota un intento más del hueco ORIGINAL (se poda a 100). Devuelve cuántos lleva."""
+    datos = _leer_json(_ruta_intentos(raiz), [])
+    datos = [d for d in datos if isinstance(d, dict)] if isinstance(datos, list) else []
+    for d in datos:
+        if d.get("fecha") == hueco.fecha and d.get("hora") == hueco.hora:
+            d["intentos"] = int(d.get("intentos") or 0) + 1
+            n = d["intentos"]
+            break
+    else:
+        datos.append({"fecha": hueco.fecha, "hora": hueco.hora, "intentos": 1})
+        n = 1
+    _escribir_json(_ruta_intentos(raiz), datos[-100:])
+    return n
+
+
+def _redondear_5(t: datetime) -> datetime:
+    """Hacia arriba al siguiente múltiplo de 5 minutos (sin segundos)."""
+    base = t.replace(second=0, microsecond=0)
+    if t != base:
+        base += timedelta(minutes=1)
+    return base + timedelta(minutes=(-base.minute) % 5)
+
+
+def _horas_de_la_red(raiz, filas: list[dict], plataforma: str, dia: date) -> list[datetime]:
+    """Horas (GT) de lo ya publicado o programado en esa red ese día: marcador y libro de envíos."""
+    horas = []
+    for f in filas:
+        if f.get("plataforma") == plataforma and f.get("fecha") == dia.isoformat():
+            try:
+                horas.append(_a_las(dia, f.get("hora") or ""))
+            except (ValueError, TypeError):
+                continue
+    for e in _libro(raiz):
+        if e.get("plataforma") != plataforma or e.get("estado") in ("rechazado", "no_creado"):
+            continue
+        try:
+            t = publicar._a_utc(e["dueAt"]).astimezone(ZONA)
+        except (KeyError, ValueError, TypeError):
+            continue
+        if t.date() == dia:
+            horas.append(t)
+    return horas
 
 
 def buscar_hueco(raiz, ahora: datetime, activas: list[str]) -> Hueco | None:
-    """El primer hueco de horarios.yml entre ahora+15 y ahora+75 min con alguna plataforma sin fila."""
+    """El hueco de esta corrida. Primero el normal de horarios.yml entre ahora+margen_min y ahora+margen_max con
+    alguna red libre. Si no hay, el relleno: un hueco de hoy ya perdido, a ahora+margen_min (redondeado a 5 min),
+    sólo si no se amontona con lo demás del día. Sin nada, None."""
     if not activas:
         return None
-    horarios = cargar_yaml("config/horarios.yml", raiz)
-    t = cargar_yaml("temporada.yml", raiz)
+    hz = _cfg_horarios(raiz)
     local = ahora.astimezone(ZONA)
     filas = puertas._filas_marcador(raiz)
     ocupados = {(f.get("fecha"), f.get("hora"), f.get("plataforma")) for f in filas} | huecos_cerrados(raiz)
-    candidatos = []
-    for dia in (local.date(), local.date() + timedelta(days=1)):
-        for lista in ("huecos_normales", "huecos_estreno"):
-            for hhmm in horarios.get(lista) or []:
-                h, m = (int(x) for x in str(hhmm).split(":"))
-                cuando = datetime(dia.year, dia.month, dia.day, h, m, tzinfo=ZONA)
-                if (lista == "huecos_estreno") != _en_estreno(t, cuando):
-                    continue          # los de estreno sólo dentro de la ventana; los normales, fuera
-                seg = (cuando - local).total_seconds()
-                if MARGEN_MIN_S <= seg <= MARGEN_MAX_S:
-                    candidatos.append(cuando)
-    for cuando in sorted(set(candidatos)):
+    huecos = [(dia, hhmm) for dia in (local.date(), local.date() + timedelta(days=1)) for hhmm in hz["huecos"]]
+    candidatos = sorted({_a_las(dia, hhmm) for dia, hhmm in huecos
+                         if hz["margen_min_s"] <= (_a_las(dia, hhmm) - local).total_seconds() <= hz["margen_max_s"]})
+    for cuando in candidatos:
         libres = [p for p in activas if (cuando.date().isoformat(), cuando.strftime("%H:%M"), p) not in ocupados]
         if libres:
             return Hueco(cuando, libres)
+    # relleno
+    hoy = local.date()
+    t = _redondear_5(local + timedelta(seconds=hz["margen_min_s"]))
+    if t.date() != hoy or t > _a_las(hoy, hz["ultima_hora"]):
+        return None
+    intentos = intentos_de_huecos(raiz)
+    horas_red = {p: _horas_de_la_red(raiz, filas, p, hoy) for p in activas}
+    perdidos = sorted((c for c in (_a_las(hoy, hhmm) for hhmm in hz["huecos"])
+                       if (c - local).total_seconds() < hz["margen_min_s"]), reverse=True)
+    for cuando in perdidos:
+        if intentos.get((cuando.date().isoformat(), cuando.strftime("%H:%M")), 0) >= hz["max_intentos"]:
+            continue
+        otros = [_a_las(hoy, hhmm) for hhmm in hz["huecos"] if _a_las(hoy, hhmm) != cuando]
+        aptas = [p for p in activas
+                 if (cuando.date().isoformat(), cuando.strftime("%H:%M"), p) not in ocupados
+                 and all(abs((t - x).total_seconds()) >= hz["separacion_s"] for x in otros + horas_red[p])]
+        if aptas:
+            return Hueco(cuando, aptas, publicar_en=t)
     return None
 
 
@@ -399,11 +512,36 @@ class Toma:
     entrada: dict | None = None   # entrada de informativas.yml, si es el respaldo
 
 
+def _claves_de(c) -> list[str]:
+    """Las claves de origen de un candidato (su id y, si trae varios, sus ids), ordenadas y sin repetir."""
+    return sorted({str(x) for x in [c.id_origen, *(getattr(c, "ids_origen", None) or [])] if x})
+
+
 def _toma_dict(r, c, ficha: dict) -> dict:
     f = r.fila
     return {"numero": f["toma"], "gancho": f["gancho"], "pilar": f["pilar"], "fuente_id": ficha.get("id"),
             "campana": ficha.get("campana") or "", "duracion_s": f["duracion_s"],
-            "creador": c.creador or ficha.get("creador")}
+            "creador": c.creador or ficha.get("creador"), "id_origen": c.id_origen, "claves": _claves_de(c)}
+
+
+def claves_recientes(raiz, plataforma: str, cuando: datetime, horas: int) -> set[str]:
+    """Claves de los clips ya programados en esa red a menos de `horas` de `cuando` (lee el libro de envíos)."""
+    cuando = cuando.astimezone(timezone.utc)
+    vistas: set[str] = set()
+    for e in _libro(raiz):
+        if e.get("plataforma") != plataforma or e.get("estado") in ("rechazado", "no_creado"):
+            continue
+        try:
+            due = publicar._a_utc(e["dueAt"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        if abs((due - cuando).total_seconds()) >= horas * 3600:
+            continue
+        toma = (e.get("datos") or {}).get("toma") or {}
+        vistas.update(str(x) for x in toma.get("claves") or [])
+        if toma.get("id_origen"):
+            vistas.add(str(toma["id_origen"]))
+    return vistas
 
 
 def descarte_definitivo(r) -> bool:
@@ -438,11 +576,11 @@ def ensayo_de_carga(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer,
     if simulado:
         out("Buffer: ensayo simulado con respuestas inventadas, pendiente de Kevin (alta de la clave)")
     esquema = cliente.introspeccion()
-    cuando = hueco.cuando.astimezone(timezone.utc)
+    cuando = hueco.programar_en.astimezone(timezone.utc)
     todo_ok = True
     for plat in hueco.plataformas:
         try:
-            tx = publicar.textos(toma.toma, toma.ficha, plat, raiz, hueco.cuando.date())
+            tx = publicar.textos(toma.toma, toma.ficha, plat, raiz, hueco.programar_en.date())
             _, anot = publicar.armar_carga(plat, cfg[plat]["buffer_channel_id"], tx["texto"], tx["titulo"],
                                            "https://ejemplo.invalid/ensayo.mp4", cuando, esquema)
             out(f"ensayo {plat}: carga válida contra el esquema" + (f" ({'; '.join(anot)})" if anot else ""))
@@ -454,7 +592,7 @@ def ensayo_de_carga(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer,
 
 def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer, transporte_almacen,
                      reloj, al_resolver=None) -> tuple[list[str], list[str], list[str]]:
-    """Sube el MP4, comprueba la URL y programa en cada plataforma, a la hora exacta del hueco.
+    """Sube el MP4, comprueba la URL y programa en cada plataforma, a la hora exacta del hueco (o del relleno).
 
     Devuelve (programadas, falladas, inciertas). Lanza AlertaRojaCiclo ante canal ajeno, 401/403 o cuenta restringida.
 
@@ -504,12 +642,23 @@ def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer
                           cargar_yaml("config/almacen.yml", raiz), transporte_almacen)
         pub = publicar.Publicador(cliente, almacen, raiz, "vivo", reloj, ids,
                                   orgs=publicar.organizaciones_de(canales_api, ids))
-        cuando = publicar.hueco_a_utc(date.fromisoformat(hueco.fecha), hueco.hora,
-                                      cargar_yaml("config/horarios.yml", raiz)["zona"])
+        cuando = hueco.programar_en.astimezone(timezone.utc)
+        hz = _cfg_horarios(raiz)
         listos = {}
         for plat in destinos:            # todo se valida ANTES de subir
             try:
                 publicar.validar_futuro(cuando, reloj())
+                claves = set(toma.toma.get("claves") or []) | ({toma.toma["id_origen"]} if toma.toma.get("id_origen") else set())
+                choque = claves & claves_recientes(raiz, plat, cuando, hz["no_repetir_horas"])
+                if choque:
+                    out(f"{plat}: descartada, repetido en {hz['no_repetir_horas']} h ({', '.join(sorted(choque))})")
+                    fallo(plat)
+                    continue
+                pendientes, detalle = pub.cola_pendiente(plat)
+                if pendientes >= hz["cola_max"]:
+                    out(f"{plat}: cola de Buffer llena ({pendientes}/{hz['cola_max']}): se salta ({detalle})")
+                    fallo(plat)
+                    continue
                 tx = publicar.textos(toma.toma, toma.ficha, plat, raiz, hoy)
                 publicar.armar_carga(plat, ids[plat], tx["texto"], tx["titulo"],
                                      "https://ejemplo.invalid/previa.mp4", cuando, pub.esquema)
@@ -621,7 +770,7 @@ def ejecutar(raiz=None, *, decidir=False, ensayo_forzado=False, ahora=None, sali
     if not sim:
         usados = minutos_usados(raiz, ahora, env.get("GITHUB_RUN_ID"))
         if not admite_producir(raiz, ahora, env.get("GITHUB_RUN_ID")):
-            out(f"tope diario de Actions ({usados:g} min usados; hacen falta {MINUTOS_PRODUCIR} libres de {TOPE_MINUTOS_DIA})")
+            out(f"tope diario de Actions ({usados:g} min usados; hacen falta {MINUTOS_PRODUCIR} libres de {tope_minutos(raiz)})")
             return terminar(COD_OK)
     # 5) hueco.
     activas = list(modo_cfg.get("plataformas_activas") or [])
@@ -640,8 +789,9 @@ def ejecutar(raiz=None, *, decidir=False, ensayo_forzado=False, ahora=None, sali
         return _con_alerta(raiz, out, env, ahora, lambda: _solo_mantenimiento(
             raiz, env, out, pendiente, transporte_buffer, transporte_almacen, reloj))
     if decidir:
-        out(f"hueco {hueco.fecha} {hueco.hora} en {', '.join(hueco.plataformas)}")
+        out(f"{hueco.descripcion()} en {', '.join(hueco.plataformas)}")
         return terminar(COD_OK, "si")
+    out(f"{hueco.descripcion()} en {', '.join(hueco.plataformas)}")
     return _con_alerta(raiz, out, env, ahora, lambda: _producir(
         raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detectar_fn, hacer_toma_fn,
         transporte_buffer, transporte_almacen, transporte_twitch))
@@ -682,10 +832,21 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
     carpeta = Path(salida_dir) if salida_dir else (Path(tempfile.gettempdir()) / "fabrica-ensayo" if sim else temporal)
     carpeta.mkdir(parents=True, exist_ok=True)
     try:
+        if not sim:
+            sumar_intento(raiz, hueco)            # cuenta aunque no salga toma: el relleno tiene tope de intentos
         cliente = mod_detectar.cliente_desde_entorno(tt) if not sim or env.get("TWITCH_CLIENT_ID") else None
         toma = None
         cands = elegir_candidatos(raiz, ahora, hueco.plataformas, out, detectar_fn, cliente)
-        for i, c in enumerate(cands[:MAX_INTENTOS], 1):
+        horas = _cfg_horarios(raiz)["no_repetir_horas"]
+        recientes = {p: claves_recientes(raiz, p, hueco.programar_en, horas) for p in hueco.plataformas}
+        i = 0
+        for c in cands:
+            if i >= MAX_INTENTOS:
+                break
+            if set(_claves_de(c)) & set().union(*recientes.values()):
+                out(f"{c.id_origen}: repetido en {horas} h: se salta")
+                continue
+            i += 1
             ficha = fichas.get(c.fuente_id) or {}
             r = hacer(raiz, c, ficha, ahora, salida=carpeta / f"intento-{i}")
             if r.ok:
@@ -718,7 +879,7 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
             if not sim:      # el ensayo forzado es una prueba fuera del repo: no deja huella en registro.md
                 registro.anotar_registro(raiz, f"ciclo: ensayo, toma {toma.toma['numero']} "
                                                f"({toma.toma['pilar']}) {'validada' if ok else 'con cargas no válidas'}"
-                                               f" para {hueco.fecha} {hueco.hora}; sin createPost")
+                                               f" para {hueco.fecha} {hueco.programar_en.strftime('%H:%M')}; sin createPost")
             return COD_OK if ok else COD_ERROR
         hecho = {"gastada": False}
 
@@ -763,7 +924,9 @@ def _respaldo(raiz, ahora, carpeta: Path, fichas, out) -> Toma | None:
         out("respaldo: la informativa no pasó: " + "; ".join(r.motivos))
         return None
     ficha = fichas.get(informativa.FICHA_ID) or {}
-    return Toma(r, informativa.toma_dict(entrada, r.fila["toma"]), ficha, None, entrada)
+    toma = informativa.toma_dict(entrada, r.fila["toma"])
+    toma["claves"] = [f"informativa:{entrada['id']}"]
+    return Toma(r, toma, ficha, None, entrada)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -1,5 +1,15 @@
 zona: America/Guatemala
-huecos_normales: ["11:00", "15:00", "19:00"]
-# Máximo 8, sólo dentro de la ventana_estreno de temporada.yml
-huecos_estreno: ["07:00", "09:00", "11:00", "13:00", "15:00", "17:00", "19:00", "21:00"]
+# Decisión de Kevin (19 nov 2026, 8:00 p. m.): 6 clips al día por red, todos los días (también en estreno).
+# Horas GT, ordenadas y sin repetir (8 como máximo). Cada corrida programa a lo sumo un hueco.
+huecos: ["09:00", "11:00", "13:00", "16:00", "19:00", "22:00"]
 # 18 nov 00:43: Kevin pidió que los clips salgan antes de las 11:00, siempre con las puertas en verde.
+margen_min_minutos: 15      # el hueco debe caer de ahora+15 ...
+margen_max_minutos: 75      # ... a ahora+75 min
+relleno:                    # un hueco de hoy que se perdió se rellena sin amontonar
+  separacion_min_minutos: 60
+  ultima_hora: "23:00"
+  max_intentos_por_hueco: 2
+cola_buffer_max: 10         # plan gratis de Buffer: 10 programados por canal
+no_repetir_horas: 24
+actions:
+  tope_minutos_dia: 90      # 6 producir + decidir; Pro = 3000 min/mes

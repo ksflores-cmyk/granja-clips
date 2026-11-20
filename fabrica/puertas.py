@@ -191,8 +191,9 @@ def filtrar(raiz, candidatos: list[Candidato], ahora: datetime, plataforma: str,
             lambda: puerta_duracion(raiz, c),
             lambda: puerta_no_repetido(raiz, c),
             lambda: (False, "repetido en esta corrida") if c.id_origen in aprobados_ids else (True, "ok"),
-            lambda: (False, f"cupo del día lleno en {plataforma} ({base + len(aprobados)}/{cupo})")
-            if base + len(aprobados) >= cupo else (True, "ok"),
+            # Cada corrida publica una sola toma: los demás aprobados son suplentes, no otra publicación.
+            lambda: (False, f"cupo del día lleno en {plataforma} ({base}/{cupo})")
+            if base >= cupo else (True, "ok"),
         ]
         motivo = None
         for p in pruebas:

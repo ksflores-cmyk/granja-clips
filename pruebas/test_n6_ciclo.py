@@ -261,7 +261,7 @@ def test_fuera_de_cadencia_sin_hueco_sale_sin_llamadas_ni_mantenimiento(r):
     (r / "estado").mkdir(exist_ok=True)
     (r / "estado" / "buffer-envios.json").write_text(
         json.dumps([{"id": "a", "estado": "incierto", "plataforma": "shorts", "toma": 3}]), encoding="utf-8")
-    cod, sal, e = correr_con_espias(r, ahora=datetime(2026, 11, 21, 11, 7, tzinfo=ZONA))   # sin hueco y 11 no es múltiplo de 3
+    cod, sal, e = correr_con_espias(r, ahora=datetime(2026, 11, 21, 1, 7, tzinfo=ZONA))    # sin hueco y 1 no es múltiplo de 3
     assert cod == 0 and "fuera de cadencia" in sal and sin_llamadas(e)
 
 
@@ -271,12 +271,13 @@ def test_en_hora_multiplo_de_3_sin_hueco_si_hace_el_mantenimiento(r, monkeypatch
     (r / "estado").mkdir(exist_ok=True)
     (r / "estado" / "buffer-envios.json").write_text(
         json.dumps([{"id": "a", "estado": "creado", "ruta": "tomas/x.mp4", "plataforma": "shorts"}]), encoding="utf-8")
-    cod, sal = correr(r, ahora=datetime(2026, 11, 21, 12, 7, tzinfo=ZONA))
+    cod, sal = correr(r, ahora=datetime(2026, 11, 21, 3, 7, tzinfo=ZONA))     # sin hueco y 3 sí es múltiplo de 3
     assert "sin hueco" in sal and llamadas == [1]
 
 
-@pytest.mark.parametrize("corrida_gt,hueco", [((10, 7), "11:00"), ((14, 7), "15:00"), ((18, 7), "19:00")])
-def test_desde_el_21_los_tres_huecos_normales_se_cubren(r, corrida_gt, hueco):
+@pytest.mark.parametrize("corrida_gt,hueco", [((8, 7), "09:00"), ((10, 7), "11:00"), ((12, 7), "13:00"),
+                                              ((15, 7), "16:00"), ((18, 7), "19:00"), ((21, 7), "22:00")])
+def test_desde_el_21_los_seis_huecos_se_cubren(r, corrida_gt, hueco):
     ahora = datetime(2026, 11, 21, *corrida_gt, tzinfo=ZONA)
     h = ciclo.buscar_hueco(r, ahora, ["shorts"])
     assert h is not None and h.hora == hueco
@@ -285,7 +286,8 @@ def test_desde_el_21_los_tres_huecos_normales_se_cubren(r, corrida_gt, hueco):
 
 
 def test_desde_el_21_el_decidir_dice_si_en_cada_hueco_y_no_en_las_demas_horas(r, tmp_path):
-    for hh, esperado in ((10, "si"), (11, "no"), (12, "no"), (14, "si"), (18, "si"), (19, "no")):
+    for hh, esperado in ((8, "si"), (10, "si"), (12, "si"), (15, "si"), (18, "si"), (21, "si"),
+                         (1, "no"), (2, "no"), (4, "no")):
         salida = tmp_path / f"gh{hh}"
         correr(r, decidir=True, ahora=datetime(2026, 11, 21, hh, 7, tzinfo=ZONA),
                env={**ENV, "GITHUB_OUTPUT": str(salida)})
@@ -298,12 +300,31 @@ def minutos(r, **datos):
 
 
 # AHORA es 10:07 GT: ese día ya corrieron 11 `decidir` de 1 minuto (los de las 0:07 a las 10:07).
-def test_el_tope_exige_20_minutos_libres_de_los_60(r):
+def poner_tope(r, tope):
+    ruta = r / "config" / "horarios.yml"
+    d = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    d["actions"] = {"tope_minutos_dia": tope}
+    ruta.write_text(yaml.safe_dump(d, allow_unicode=True), encoding="utf-8")
+
+
+def test_el_tope_exige_20_minutos_libres_del_tope_configurado(r):
+    poner_tope(r, 60)
     minutos(r, **{"2026-11-18": 30})                       # 30 + 11 de decidir = 41: quedan 19
     cod, sal, e = correr_con_espias(r)
-    assert cod == 0 and "tope diario de Actions" in sal and sin_llamadas(e)
+    assert cod == 0 and "tope diario de Actions" in sal and "de 60)" in sal and sin_llamadas(e)
     minutos(r, **{"2026-11-18": 60})
     assert "tope diario" in correr_con_espias(r)[1]
+
+
+def test_el_tope_es_el_de_horarios_yml_y_por_defecto_60(r):
+    minutos(r, **{"2026-11-18": 30})                       # 41 usados: con el tope de 90 caben los 20
+    assert ciclo.tope_minutos(r) == 90 and ciclo.admite_producir(r, AHORA, "1") is True
+    poner_tope(r, 60)
+    assert ciclo.tope_minutos(r) == 60 and ciclo.admite_producir(r, AHORA, "1") is False
+    d = yaml.safe_load((r / "config" / "horarios.yml").read_text(encoding="utf-8"))
+    del d["actions"]
+    (r / "config" / "horarios.yml").write_text(yaml.safe_dump(d), encoding="utf-8")
+    assert ciclo.tope_minutos(r) == 60
 
 
 def test_con_29_minutos_y_11_de_decidir_quedan_20_y_aun_corre(r):
@@ -343,6 +364,7 @@ def test_la_marca_de_inicio_vieja_entra_en_la_admision(r):
     minutos_json["2026-11-18"] = 10
     (r / "estado" / "actions-minutos.json").write_text(json.dumps(minutos_json))
     assert ciclo.minutos_usados(r, AHORA, "222") == 41            # 10 anotados + 20 de la marca + 11 de decidir
+    poner_tope(r, 60)
     assert ciclo.admite_producir(r, AHORA, "222") is False        # 41 + 20 > 60
 
 
@@ -363,19 +385,13 @@ def test_sumar_minutos_acumula_por_dia_y_poda(r):
 def test_hueco_de_estreno_dentro_de_la_ventana(r):
     h = ciclo.buscar_hueco(r, AHORA, ["shorts", "tiktok"])
     assert (h.fecha, h.hora, h.plataformas) == ("2026-11-18", "11:00", ["shorts", "tiktok"])
+    assert h.relleno is False and h.programar_en == h.cuando
 
 
-def test_el_hueco_de_estreno_de_las_13_no_existe_fuera_de_la_ventana(r):
-    # 22 nov, 12:07 GT: el 13:00 es hueco de estreno y la ventana terminó el 20; el 15:00 queda a más de 75 min.
-    assert ciclo.buscar_hueco(r, datetime(2026, 11, 22, 12, 7, tzinfo=ZONA), ["shorts"]) is None
-    # y el 11:00 normal sí cuenta fuera de la ventana
-    h = ciclo.buscar_hueco(r, datetime(2026, 11, 22, 10, 7, tzinfo=ZONA), ["shorts"])
-    assert (h.fecha, h.hora) == ("2026-11-22", "11:00")
-
-
-def test_un_hueco_normal_no_cuenta_dentro_de_la_ventana_si_no_esta_en_estreno(r, editar_yaml):
-    editar_yaml(r, "config/horarios.yml", lambda d: {**d, "huecos_estreno": ["13:00"], "huecos_normales": ["11:00"]})
-    assert ciclo.buscar_hueco(r, AHORA, ["shorts"]) is None        # 11:00 normal, pero estamos en estreno
+def test_los_mismos_huecos_valen_dentro_y_fuera_de_la_ventana_de_estreno(r):
+    for dia in (18, 22):                       # el 18 es estreno; el 22 ya no
+        h = ciclo.buscar_hueco(r, datetime(2026, 11, dia, 12, 7, tzinfo=ZONA), ["shorts"])
+        assert (h.fecha, h.hora, h.relleno) == (f"2026-11-{dia}", "13:00", False)
 
 
 def test_hueco_ocupado_en_el_marcador_no_cuenta_para_esa_plataforma(r):
@@ -387,10 +403,11 @@ def test_hueco_ocupado_en_el_marcador_no_cuenta_para_esa_plataforma(r):
 @pytest.mark.parametrize("hh,mm,esperado", [(10, 44, True), (10, 45, True), (10, 46, False), (9, 45, True),
                                             (9, 44, False), (9, 46, True), (10, 50, False)])
 def test_ventana_de_15_a_75_minutos(r, hh, mm, esperado):
-    # El hueco es 11:00 GT; "ahora" va de 9:44 (76 min) a 10:50 (10 min).
+    # El hueco normal es el de las 11:00 GT; "ahora" va de 9:44 (76 min) a 10:50 (10 min). Fuera de la ventana
+    # puede haber un relleno, pero no un hueco normal.
     ahora = datetime(2026, 11, 18, hh, mm, tzinfo=ZONA)
-    # En 9:46 el siguiente hueco antes de las 11:00 sería ninguno (el de las 11:00 está a 74 min).
-    assert (ciclo.buscar_hueco(r, ahora, ["shorts"]) is not None) == esperado
+    h = ciclo.buscar_hueco(r, ahora, ["shorts"])
+    assert (h is not None and not h.relleno and h.hora == "11:00") == esperado
 
 
 def test_sin_plataformas_activas_no_hay_hueco(r):
@@ -402,7 +419,7 @@ def test_decidir_escribe_si_o_no_en_github_output(r, tmp_path):
     cod, sal = correr(r, decidir=True, env={**ENV, "GITHUB_OUTPUT": str(salida)})
     assert cod == 0 and salida.read_text() == "trabajo=si\n" and "trabajo=si" in sal
     salida2 = tmp_path / "gh2"
-    cod, sal = correr(r, decidir=True, ahora=datetime(2026, 11, 18, 11, 7, tzinfo=ZONA),
+    cod, sal = correr(r, decidir=True, ahora=datetime(2026, 11, 18, 3, 7, tzinfo=ZONA),
                       env={**ENV, "GITHUB_OUTPUT": str(salida2)})
     assert salida2.read_text() == "trabajo=no\n" and "sin hueco" in sal
 
@@ -417,7 +434,7 @@ def test_decidir_dice_si_cuando_hay_envios_pendientes_aunque_no_haya_hueco(r, tm
     (r / "estado" / "buffer-envios.json").write_text(
         json.dumps([{"id": "a", "estado": "incierto", "plataforma": "shorts", "toma": 3}]), encoding="utf-8")
     salida = tmp_path / "gh"
-    correr(r, decidir=True, ahora=datetime(2026, 11, 18, 11, 7, tzinfo=ZONA), env={**ENV, "GITHUB_OUTPUT": str(salida)})
+    correr(r, decidir=True, ahora=datetime(2026, 11, 18, 3, 7, tzinfo=ZONA), env={**ENV, "GITHUB_OUTPUT": str(salida)})
     assert salida.read_text() == "trabajo=si\n"
 
 
@@ -656,12 +673,12 @@ def test_sin_hueco_pero_con_envios_abiertos_hace_el_mantenimiento(r, monkeypatch
     (r / "estado").mkdir(exist_ok=True)
     (r / "estado" / "buffer-envios.json").write_text(
         json.dumps([{"id": "a", "estado": "creado", "ruta": "tomas/x.mp4", "plataforma": "shorts"}]), encoding="utf-8")
-    cod, sal = correr(r, ahora=datetime(2026, 11, 18, 11, 7, tzinfo=ZONA))
+    cod, sal = correr(r, ahora=datetime(2026, 11, 18, 3, 7, tzinfo=ZONA))
     assert "sin hueco" in sal and llamadas == [1]
 
 
 def test_sin_hueco_y_sin_pendientes_no_hay_llamadas(r):
-    cod, sal, e = correr_con_espias(r, ahora=datetime(2026, 11, 18, 11, 7, tzinfo=ZONA))
+    cod, sal, e = correr_con_espias(r, ahora=datetime(2026, 11, 18, 3, 7, tzinfo=ZONA))
     assert "sin hueco" in sal and sin_llamadas(e)
 
 
@@ -794,7 +811,7 @@ def wf():
 
 def test_workflow_cron_y_disparo_manual(wf):
     on = wf[True]
-    assert on["schedule"] == [{"cron": "7 */1 * * *"}]   # cada hora, minuto 7
+    assert on["schedule"] == [{"cron": "23 * * * *"}]   # cada hora, minuto 23 (impar)
     entrada = on["workflow_dispatch"]["inputs"]["ensayo_forzado"]
     assert entrada["type"] == "boolean" and entrada["default"] is False
 

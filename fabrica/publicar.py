@@ -653,6 +653,8 @@ class ResultadoIncierto(Exception):
 RE_EXITO_BORRADO = re.compile(r"^\w*Success$")
 ESTADOS_ABIERTOS = ("enviando", "incierto")
 PAGINAS_MAX, TAM_PAGINA = 5, 50
+ESTADOS_COLA = ("enviando", "incierto", "creado")
+RE_HTTP_CUENTA = re.compile(r"código (401|403)\b")
 HORAS_ABANDONO = 24
 
 
@@ -803,6 +805,39 @@ class Publicador:
             # queda `enviando` o `creado` sin registrar y la próxima reconciliación lo termina.
             pass
         return {"id": post["id"], "dueAt": post.get("dueAt"), "anotaciones": anot}
+
+    def cola_pendiente(self, plataforma: str) -> tuple[int, str]:
+        """Posts por salir en el canal de esa red: el máximo entre el libro y los `scheduled` de Buffer.
+
+        Libro: envíos `enviando`, `incierto` o `creado` con `dueAt` futuro. Buffer: se consulta si hay canal y
+        organización; si la respuesta no sirve o falla (salvo 401/403, que se propaga), vale sólo el libro y
+        el texto lo dice. Devuelve (pendientes, texto para el log)."""
+        ahora = self.ahora().astimezone(timezone.utc)
+        en_libro = 0
+        for e in self._libro():
+            if e.get("plataforma") != plataforma or e.get("estado") not in ESTADOS_COLA:
+                continue
+            try:
+                if _a_utc(e["dueAt"]) > ahora:
+                    en_libro += 1
+            except (KeyError, ValueError, TypeError):
+                continue
+        canal, org = self.canales.get(plataforma), self.orgs.get(plataforma)
+        if not (canal and org):
+            return en_libro, f"libro {en_libro}; sin canal u organización para consultar Buffer"
+        q = ("query { posts(input: { organizationId: %s, filter: { status: [scheduled], channelIds: [%s] } }, "
+             "first: 50) { edges { node { id } } } }" % (_lit(org), _lit(canal)))
+        try:
+            data = self.cliente.consulta(q, canal=canal).get("posts")
+        except ErrorBuffer as e:
+            if RE_HTTP_CUENTA.search(str(e)):
+                raise
+            return en_libro, f"libro {en_libro}; la consulta a Buffer falló, vale el libro"
+        if not (isinstance(data, dict) and isinstance(data.get("edges"), list)):
+            return en_libro, f"libro {en_libro}; la respuesta de Buffer no sirvió, vale el libro"
+        en_buffer = sum(1 for x in data["edges"] if isinstance(x, dict) and isinstance(x.get("node"), dict)
+                        and x["node"].get("status", "scheduled") == "scheduled")
+        return max(en_libro, en_buffer), f"libro {en_libro}, Buffer {en_buffer}"
 
     def _intentar_transicion(self, entrada: dict, a: str) -> None:
         try:

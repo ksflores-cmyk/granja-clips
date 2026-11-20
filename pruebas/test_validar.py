@@ -159,13 +159,13 @@ def test_zona_invalida(repo, editar_yaml):
 
 
 def test_hora_mal_formada(repo, editar_yaml):
-    editar_yaml(repo, "config/horarios.yml", lambda d: d.update(huecos_normales=["25:00", "9am"]))
+    editar_yaml(repo, "config/horarios.yml", lambda d: d.update(huecos=["25:00", "9am"]))
     assert hay(repo, "hora inválida")
 
 
-def test_mas_de_8_huecos_de_estreno(repo, editar_yaml):
+def test_mas_de_8_huecos(repo, editar_yaml):
     editar_yaml(repo, "config/horarios.yml",
-                lambda d: d.update(huecos_estreno=[f"{h:02d}:00" for h in range(9)]))
+                lambda d: d.update(huecos=[f"{h:02d}:00" for h in range(9)]))
     assert hay(repo, "8 como máximo")
 
 
