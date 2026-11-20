@@ -419,3 +419,90 @@ def test_cli_sin_token_sale_1(monkeypatch, capsys):
     monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
     assert release.main(["faltan", "--ficha", "sega-fm27", "--tag", TAG, "--raiz", str(RAIZ_REAL)]) == 1
     assert "sin GITHUB_TOKEN" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------- ronda 1
+
+def test_un_asset_ajeno_no_cuenta_para_completo(tmp_path, capsys):
+    ya = [asset(n, i + 1) for i, n in enumerate(NOMBRES[:4])] + [asset("otra-cosa.mp4", 99)]
+    codigo, gh, drive, salida, _ = correr(tmp_path, api=Api(assets=ya))
+    assert codigo == 0 and drive.pedidas == [NOMBRES[4]]
+    assert salida.read_text() == "completo=si\n" and "5 de 5 subidos" in capsys.readouterr().out
+    # con 4 de la ficha + 1 ajeno y Drive caído: 4 de 5, no completo
+    tmp2 = tmp_path / "otro"
+    codigo, _, _, salida, _ = correr(tmp2, api=Api(assets=ya), drive=Drive(cuota={NOMBRES[4]}))
+    assert salida.read_text() == "completo=no\n" and "4 de 5 subidos" in capsys.readouterr().out
+
+
+def test_drive_octet_stream_se_presenta_como_video_solo_en_drive():
+    for nombre, esperado in (("fm27-habemus-gamer.mov", "video/quicktime"), ("fm27-daro.mp4", "video/mp4")):
+        a = release._abrir_drive(nombre, lambda u: Resp(tipo="application/octet-stream"))
+        with a(f"https://{d.DRIVE}/download?id=X") as r:
+            assert r.headers["Content-Type"] == esperado and r.read(5) == CONTENIDO[:5]
+        with a("https://otro.example.com/x") as r:      # otro host: no se toca
+            assert r.headers["Content-Type"] == "application/octet-stream"
+    a = release._abrir_drive("x.mp4", lambda u: Resp(tipo="text/html"))
+    with a(f"https://{d.DRIVE}/download?id=X") as r:     # html sigue siendo html (aviso de virus)
+        assert r.headers["Content-Type"] == "text/html"
+
+
+def test_bajar_https_de_drive_acepta_el_mov_octet_stream(tmp_path):
+    a = release._abrir_drive("fm27-habemus-gamer.mov", lambda u: Resp(tipo="application/octet-stream"))
+    r = d.bajar_https(f"https://{d.DRIVE}/download?id=X&export=download&confirm=t", tmp_path / "v.mov", abrir=a)
+    assert r.read_bytes() == CONTENIDO
+
+
+def test_subir_pasa_el_envoltorio_a_bajar_https(tmp_path, monkeypatch):
+    vistos = []
+
+    def falso(url, destino, *, abrir=None, **k):
+        vistos.append(abrir is not None)
+        destino.write_bytes(CONTENIDO)
+        return destino
+    monkeypatch.setattr(d, "bajar_https", falso)
+    tmp_path.mkdir(exist_ok=True)
+    release.orden_subir("sega-fm27", TAG, raiz=RAIZ_REAL, entorno=ENTORNO, transporte=Api(assets=[]), ejecutor=Gh(),
+                        sondear=lambda r: 5.0, carpeta=tmp_path / "t")
+    assert vistos == [True] * 5
+
+
+def test_un_oserror_de_disco_no_aborta_el_bucle(tmp_path, capsys):
+    llamadas = []
+
+    def sondear(ruta):
+        llamadas.append(ruta.name)
+        if len(llamadas) == 1:
+            raise OSError("disco")
+        return 9.0
+    gh = Gh()
+    codigo = release.orden_subir("sega-fm27", TAG, raiz=RAIZ_REAL, entorno=ENTORNO, transporte=Api(assets=[]),
+                                 ejecutor=gh, bajar_drive=Drive(), sondear=sondear, carpeta=tmp_path / "t")
+    assert codigo == 0 and len(gh.subidas()) == 4 and capsys.readouterr().out.count("::warning::") == 1
+
+
+def test_repo_en_otra_capitalizacion_se_acepta_y_punto_se_rechaza():
+    entorno = {**ENTORNO, "GITHUB_REPOSITORY": REPO.upper()}
+    assert release.resolver(URL, entorno=entorno, transporte=Api()).url_firmada == FIRMADA
+    assert not release.es_url_release(f"https://github.com/{REPO}/releases/download/./x.mp4")
+    assert not release.es_url_release(f"https://github.com/./granja-clips/releases/download/{TAG}/x.mp4")
+
+
+def test_faltan_sin_material_de_ese_tag_sale_0(capsys):
+    assert release.orden_faltan("sega-fm27", "otro-tag", raiz=RAIZ_REAL, entorno=ENTORNO, transporte=Api()) == 0
+    assert "nada que faltar" in capsys.readouterr().out
+
+
+def test_vistos_con_la_url_de_drive_bloquea_al_candidato_del_release(repo):
+    from fabrica import puertas
+    from fabrica.detectar import detectar
+    from test_n8 import AHORA
+    ficha = next(f for f in fuentes.cargar_fuentes(repo) if f["id"] == "sega-fm27")
+    cands = {c.creador: c for c in detectar(repo, AHORA, None) if c.fuente_id == "sega-fm27"}
+    eric, daro = cands["ERIC ZZETA"], cands["DARO"]
+    drive_eric = fuentes.entrada_material(ficha, url=eric.url)["drive_url"]
+    assert puertas.puerta_no_repetido(repo, eric)[0] and puertas.puerta_no_repetido(repo, daro)[0]
+    puertas.anotar_visto(repo, drive_eric)
+    assert not puertas.puerta_no_repetido(repo, eric)[0]
+    assert puertas.puerta_no_repetido(repo, daro)[0]
+    puertas.anotar_visto(repo, daro.url)                   # y la URL nueva sigue valiendo
+    assert not puertas.puerta_no_repetido(repo, daro)[0]

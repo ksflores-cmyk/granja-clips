@@ -57,7 +57,7 @@ def partes(url) -> tuple[str, str, str]:
     if len(seg) != 7 or seg[0] != "" or seg[3] != "releases" or seg[4] != "download":
         raise ErrorDescarga("la URL no tiene la forma /dueño/repo/releases/download/tag/nombre")
     for s in (seg[1], seg[2], seg[5], seg[6]):
-        if not RE_SEGMENTO.fullmatch(s) or ".." in s:
+        if not RE_SEGMENTO.fullmatch(s) or ".." in s or s == ".":
             raise ErrorDescarga("la URL del release trae caracteres no permitidos")
     return f"{seg[1]}/{seg[2]}", seg[5], seg[6]
 
@@ -101,7 +101,7 @@ def _encabezados(tok: str, aceptar: str) -> dict:
 def _comprobar_repo(repo: str, entorno) -> str:
     e = os.environ if entorno is None else entorno
     actual = e.get("GITHUB_REPOSITORY")
-    if actual and actual != repo:
+    if actual and actual.lower() != repo.lower():
         raise ErrorDescarga(f"el release es de {repo} y este repo es {actual}: no se usa el token con otro repo")
     tok = token(entorno)
     if not tok:
@@ -247,6 +247,39 @@ def _desplazamiento(entorno, ahora=None) -> int:
         return (ahora or datetime.now(timezone.utc)).hour
 
 
+class _ConTipo:
+    """Respuesta de Drive que presenta `application/octet-stream` como el tipo de video de la extensión."""
+
+    def __init__(self, r, tipo: str):
+        self._r = r
+        self.headers = {**dict(r.headers), "Content-Type": tipo}
+
+    def __enter__(self):
+        self._r.__enter__()
+        return self
+
+    def __exit__(self, *a):
+        return self._r.__exit__(*a)
+
+    def read(self, n=-1):
+        return self._r.read(n)
+
+
+def _abrir_drive(nombre: str, abrir_base=None):
+    """`abrir` para `bajar_https`: Drive sirve algunos .mov/.mp4 como octet-stream. Sólo en su host y sólo
+    con ese tipo se presenta como video por la extensión; ffprobe sigue siendo la prueba de que lo es."""
+    abrir_base = abrir_base or descargar._abrir_urllib
+    tipo_video = "video/quicktime" if nombre.lower().endswith(".mov") else "video/mp4"
+
+    def abrir(url):
+        r = abrir_base(url)
+        crudo = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        if descargar._host(url) == descargar.DRIVE and crudo == "application/octet-stream":
+            return _ConTipo(r, tipo_video)
+        return r
+    return abrir
+
+
 def _ejecutor_gh(orden: list[str]):
     return subprocess.run(orden, capture_output=True, text=True, timeout=1800)
 
@@ -279,8 +312,8 @@ def orden_faltan(ficha_id, tag, *, raiz=None, entorno=None, transporte=None) -> 
     t0 = _ahora_s()
     entradas = _entradas(ficha_id, tag, raiz_repo(raiz), con_drive=False)
     if not entradas:
-        print(f"la ficha {ficha_id} no tiene material en el release {tag}", flush=True)
-        return 1
+        print(f"la ficha {ficha_id} no tiene material en el release {tag}: nada que faltar", flush=True)
+        return 0
     repo = partes(entradas[0]["url"])[0]
     subidos = assets_subidos(repo, tag, entorno=entorno, transporte=transporte) or set()
     faltan = [partes(m["url"])[2] for m in entradas if partes(m["url"])[2] not in subidos]
@@ -290,7 +323,7 @@ def orden_faltan(ficha_id, tag, *, raiz=None, entorno=None, transporte=None) -> 
 
 
 def orden_subir(ficha_id, tag, *, raiz=None, entorno=None, transporte=None, ejecutor=None,
-                bajar_drive=None, sondear=None, carpeta=None, ahora=None) -> int:
+                bajar_drive=None, sondear=None, carpeta=None, ahora=None, abrir_drive=None) -> int:
     entorno = os.environ if entorno is None else entorno
     ejecutor = ejecutor or _ejecutor_gh
     bajar_drive = bajar_drive or descargar.bajar_https
@@ -303,7 +336,8 @@ def orden_subir(ficha_id, tag, *, raiz=None, entorno=None, transporte=None, ejec
     repo = partes(entradas[0]["url"])[0]
     subidos = assets_subidos(repo, tag, entorno=entorno, transporte=transporte)
     existe = subidos is not None
-    subidos = set(subidos or ())
+    nombres = {partes(m["url"])[2] for m in entradas}
+    subidos = set(subidos or ()) & nombres          # un asset ajeno en el release no cuenta
     total = len(entradas)
     filas: list[tuple[str, str, str, str]] = []
     hay_error_gh = False
@@ -334,9 +368,12 @@ def orden_subir(ficha_id, tag, *, raiz=None, entorno=None, transporte=None, ejec
             ruta = base / n
             t0 = _ahora_s()
             try:
-                bajar_drive(m["drive_url"], ruta)
+                if bajar_drive is descargar.bajar_https:
+                    bajar_drive(m["drive_url"], ruta, abrir=_abrir_drive(n, abrir_drive))
+                else:
+                    bajar_drive(m["drive_url"], ruta)
                 t1 = _ahora_s()
-                print(f"{n}: Drive bajó {ruta.stat().st_size} bytes en {t1 - t0:.1f} s", flush=True)
+                print(f"{n}: Drive bajó en {t1 - t0:.1f} s", flush=True)
                 try:
                     dur = sondear(ruta)
                 except (subprocess.SubprocessError, ValueError, KeyError, StopIteration, OSError) as e:
@@ -345,7 +382,9 @@ def orden_subir(ficha_id, tag, *, raiz=None, entorno=None, transporte=None, ejec
                     raise ErrorDescarga("ffprobe devolvió una duración no válida")
                 tam = ruta.stat().st_size
                 h = _sha256(ruta)
-            except ErrorDescarga as e:
+            except (ErrorDescarga, OSError) as e:
+                if isinstance(e, OSError):
+                    e = f"fallo de disco ({type(e).__name__})"
                 print(f"::warning::{n}: {e} (se reintenta en la próxima corrida)", flush=True)
                 filas.append((n, f"Drive falló: {e}", "", ""))
                 ruta.unlink(missing_ok=True)
