@@ -9,7 +9,7 @@ permissions:
 jobs:
   diagnostico:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
@@ -72,3 +72,14 @@ jobs:
               "https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent" || true)
             echo "Gemini $m: HTTP $cod en $(( $(date +%s) - ini )) s"
           done
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Instalar dependencias
+        shell: bash
+        run: pip install PyYAML==6.0.3 tzdata==2025.2
+      - name: Buscador T, diagnóstico (no escribe en el repo, no imprime claves)
+        continue-on-error: false
+        shell: bash
+        run: python -m fabrica.detectar --diagnostico-t --n 10

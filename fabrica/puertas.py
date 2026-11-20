@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import csv
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
 from .config import cargar_yaml, raiz_repo
-from .detectar import Candidato, ClienteTwitch, ErrorTwitch
+from .detectar import Candidato, ClienteTwitch, ErrorTwitch, config_t
 from .fuentes import cargar_fuentes, entrada_material, es_publicable
+from .vetados import logins_vetados
 from .registro import ZONA
 
 
@@ -22,6 +23,35 @@ def puerta_ficha(raiz, cand: Candidato, ahora: datetime, plataforma: str,
     if ficha is None:
         return False, f"la fuente {cand.fuente_id} no está en fuentes.yml"
     return es_publicable(ficha, ahora.astimezone(ZONA).date(), plataforma, pilar)
+
+
+def puerta_vetado(raiz, cand: Candidato) -> tuple[bool, str]:
+    """Ficha T con el login vetado (config/vetados.yml o retiros.md): no pasa."""
+    ficha = _ficha(raiz, cand.fuente_id)
+    if ficha is not None and ficha.get("tipo") == "T":
+        if str(ficha.get("twitch_login", "")).lower() in logins_vetados(raiz):
+            return False, "streamer vetado"
+    return True, "ok"
+
+
+def puerta_cupo_streamer(raiz, cand: Candidato, ahora: datetime, plataforma: str,
+                         en_corrida: int = 0) -> tuple[bool, str]:
+    """Ficha T: máximo de clips por streamer al día en esa plataforma (marcador de hoy + esta corrida).
+
+    El marcador fecha cada fila con el día del hueco, que de noche puede ser mañana: se cuentan las
+    filas de hoy y de mañana (de más, nunca de menos)."""
+    ficha = _ficha(raiz, cand.fuente_id)
+    if ficha is None or ficha.get("tipo") != "T":
+        return True, "ok"
+    tope = int(config_t(raiz)["max_clips_por_streamer_dia"])
+    d = ahora.astimezone(ZONA).date()
+    dias = {d.isoformat(), (d + timedelta(days=1)).isoformat()}
+    usados = sum(1 for f in _filas_marcador(raiz)
+                 if f.get("fecha") in dias and f.get("plataforma") == plataforma
+                 and f.get("fuente_id") == cand.fuente_id) + en_corrida
+    if usados >= tope:
+        return False, f"cupo del streamer lleno ({usados}/{tope})"
+    return True, "ok"
 
 
 def id_juego_temporada(raiz, cliente: ClienteTwitch | None = None) -> str | None:
@@ -194,6 +224,9 @@ def filtrar(raiz, candidatos: list[Candidato], ahora: datetime, plataforma: str,
     for c in candidatos:
         pruebas = [
             lambda: puerta_ficha(raiz, c, ahora, plataforma, c.pilar or pilar),
+            lambda: puerta_vetado(raiz, c),
+            lambda: puerta_cupo_streamer(
+                raiz, c, ahora, plataforma, sum(1 for a in aprobados if a.fuente_id == c.fuente_id)),
             # el id del juego se resuelve aquí, sólo si la ficha ya pasó la primera puerta
             lambda: puerta_juego(c, *(juego() if c.origen != "brief" else (None, None))),
             lambda: puerta_duracion(raiz, c),

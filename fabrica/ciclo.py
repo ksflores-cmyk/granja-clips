@@ -421,16 +421,18 @@ def _pilar_de(c, ficha: dict | None, temporada: dict) -> str | None:
     return max(pilares, key=lambda p: _peso(temporada, p), default=None)
 
 
-def ordenar(candidatos: list, temporada: dict) -> list:
-    """Primero los pilares con más peso; a igual pilar, el más reciente."""
+def ordenar(candidatos: list, temporada: dict, pagadas=frozenset()) -> list:
+    """Primero el material de una campaña pagada (`pagadas`: ids de ficha); luego los pilares con más peso;
+    a igual pilar, más vistas por hora; luego, el más reciente."""
     sin_fecha = datetime.min.replace(tzinfo=timezone.utc)
-    return sorted(candidatos, key=lambda c: (-_peso(temporada, c.pilar),
+    return sorted(candidatos, key=lambda c: (not (c.fuente_id in pagadas and c.origen == "brief"),
+                                             -_peso(temporada, c.pilar),
+                                             -(c.vistas_por_hora or 0.0),
                                              -(c.creado_en or sin_fecha).timestamp()))
 
 
 def elegir_candidatos(raiz, ahora, plataformas, out, detectar_fn=None, cliente=None) -> list:
     t = cargar_yaml("temporada.yml", raiz)
-    fichas = {f.get("id"): f for f in cargar_fuentes(raiz)}
     try:
         cands, saltos = (detectar_fn or mod_detectar.detectar_con_motivos)(raiz, ahora, cliente)
     except plazo.SinTiempo:
@@ -438,6 +440,7 @@ def elegir_candidatos(raiz, ahora, plataformas, out, detectar_fn=None, cliente=N
     except Exception as e:  # noqa: BLE001 (un fallo del detector no debe tumbar el ciclo)
         out(f"detectar: {type(e).__name__}: {e}")
         return []
+    fichas = {f.get("id"): f for f in cargar_fuentes(raiz)}      # después de detectar: incluye las fichas T nuevas
     for s in saltos:
         out(f"detectar: {s}")
     for c in cands:
@@ -449,7 +452,9 @@ def elegir_candidatos(raiz, ahora, plataformas, out, detectar_fn=None, cliente=N
             out(f"descartado {c.id_origen} en {plat}: {motivo}")
         ids = {c.id_origen for c in ap}
         aprobados = ap if aprobados is None else [c for c in aprobados if c.id_origen in ids]
-    return ordenar(aprobados or [], t)
+    pagadas = {fid for fid, f in fichas.items()
+               if f.get("tipo") == "A" and f.get("campana") and f.get("material")}
+    return ordenar(aprobados or [], t, pagadas)
 
 
 # ------------------------------------------------------------------ el ciclo
@@ -779,7 +784,6 @@ def _con_alerta(raiz, out: Salida, env, ahora, fn) -> int:
 
 def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detectar_fn, hacer_toma_fn,
               tb, ta, tt) -> int:
-    fichas = {f.get("id"): f for f in cargar_fuentes(raiz)}
     hacer = hacer_toma_fn or mod_toma.hacer_toma
     temporal = Path(tempfile.mkdtemp(prefix="fabrica-ciclo-"))
     carpeta = Path(salida_dir) if salida_dir else (Path(tempfile.gettempdir()) / "fabrica-ensayo" if sim else temporal)
@@ -790,6 +794,8 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
         cliente = mod_detectar.cliente_desde_entorno(tt) if not sim or env.get("TWITCH_CLIENT_ID") else None
         with plazo.etapa("detectar"):
             cands = elegir_candidatos(raiz, ahora, hueco.plataformas, out, detectar_fn, cliente)
+        # Después de detectar: las fichas T nuevas ya están en estado/fichas-t.yml.
+        fichas = {f.get("id"): f for f in cargar_fuentes(raiz)}
         if not sim:                   # cuarentena: no se llama a `hacer` con fuentes que fallan por red/tiempo/máquina
             libres = []
             for c in cands:

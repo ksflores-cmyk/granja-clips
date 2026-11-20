@@ -1,14 +1,69 @@
 """Una sola regla de "ficha publicable" y de "ficha descargable" (lista blanca)."""
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
+from urllib.parse import urlparse
 
-from .config import cargar_yaml
+from .config import cargar_yaml, raiz_repo
+from .vetados import logins_vetados
+
+RUTA_FICHAS_T = "estado/fichas-t.yml"
+RE_ID_T = re.compile(r"^t-[a-z0-9]+(-[a-z0-9]+)*$")
+
+
+def _fuentes_yml(raiz=None) -> list[dict]:
+    datos = cargar_yaml("fuentes.yml", raiz)
+    return [f for f in (datos or []) if isinstance(f, dict)]
+
+
+def fichas_t_guardadas(raiz=None) -> list[dict]:
+    """Fichas T de estado/fichas-t.yml (sólo tipo T con id t-...). Archivo ausente o ilegible: lista vacía."""
+    ruta = raiz_repo(raiz) / RUTA_FICHAS_T
+    try:
+        import yaml
+        datos = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return []
+    if isinstance(datos, dict):
+        datos = datos.get("fichas")
+    return [f for f in (datos or []) if isinstance(f, dict) and f.get("tipo") == "T"
+            and isinstance(f.get("id"), str) and RE_ID_T.match(f["id"])]
 
 
 def cargar_fuentes(raiz=None) -> list[dict]:
-    datos = cargar_yaml("fuentes.yml", raiz)
-    return [f for f in (datos or []) if isinstance(f, dict)]
+    """fuentes.yml más las fichas T generadas por el buscador. Una ficha T cuyo login esté vetado
+    (config/vetados.yml o retiros.md) sale vetada y no publicable."""
+    fichas = _fuentes_yml(raiz)
+    ids = {f.get("id") for f in fichas}
+    t = [f for f in fichas_t_guardadas(raiz) if f["id"] not in ids]
+    if t:
+        vetados = logins_vetados(raiz)
+        for f in t:
+            if str(f.get("twitch_login", "")).lower() in vetados:
+                f["estado"] = "vetada"
+                f["publicable"] = False
+        fichas = fichas + t
+    return fichas
+
+
+def id_clip_twitch(url, canal: str | None = None) -> str | None:
+    """Id de un clip de Twitch (clips.twitch.tv/<id> o twitch.tv/<canal>/clip/<id>, sólo https);
+    None si no lo es o si `canal` se pide y no coincide."""
+    if not isinstance(url, str):
+        return None
+    u = urlparse(url)
+    if u.scheme != "https":
+        return None
+    host = (u.hostname or "").lower()
+    partes = [x for x in u.path.split("/") if x]
+    if host == "clips.twitch.tv" and len(partes) == 1:
+        return partes[0]
+    if host in ("twitch.tv", "www.twitch.tv", "m.twitch.tv") and len(partes) == 3 and partes[1] == "clip":
+        if canal is not None and partes[0].lower() != canal.lower():
+            return None
+        return partes[2]
+    return None
 
 
 def _a_fecha(v) -> date | None:
@@ -47,6 +102,11 @@ def es_publicable(ficha: dict, hoy: date, plataforma: str | None = None,
     if plataforma is not None and plataforma not in (reglas.get("plataformas") or []):
         return False, f"plataforma {plataforma} no está en reglas.plataformas"
     pilares = ficha.get("pilares")
+    if ficha.get("tipo") == "T":
+        if not (isinstance(ficha.get("creador"), str) and ficha["creador"].startswith("twitch.tv/")):
+            return False, "ficha T: el creador debe empezar por twitch.tv/"
+        if not ficha.get("twitch_login"):
+            return False, "ficha T: falta twitch_login"
     if ficha.get("tipo") == "D" and pilar != "informativa":
         return False, f"tipo D exige pilar informativa (recibió {pilar!r})"
     if pilar is not None and pilares and pilar not in pilares:
@@ -95,6 +155,8 @@ def puede_descargar(ficha: dict) -> tuple[bool, str]:
         return True, "material propio"
     if tipo == "D":
         return False, "tipo D no descarga video"
+    if tipo == "T":
+        return True, "ficha T: sólo el clip de Twitch"
     if tipo in ("A", "B"):
         material = urls_material(ficha)
         if material and all(_es_https(u) for u in material):
@@ -133,6 +195,9 @@ def autoriza_descarga(ficha: dict | None, hoy: date, uso: str, url: str | None =
                 return False, f"uso muestras no autorizado: la ficha no es de muestras ni publicable ({motivo})"
     else:
         return False, f"uso {uso!r} desconocido (produccion o muestras)"
+    if ficha.get("tipo") == "T":
+        if id_clip_twitch(url, ficha.get("twitch_login") or "") is None:
+            return False, "ficha T sólo autoriza el clip de Twitch"
     material = urls_material(ficha) if ficha.get("material") is not None else None
     if material is not None and (url is None or url not in material):
         return False, f"url fuera de material: {url!r}"

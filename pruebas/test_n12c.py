@@ -284,7 +284,7 @@ def _tocar_ficha(repo, editar_yaml, **cambios):
 
 def test_validar_tipo_como_lista_da_error_claro(repo, editar_yaml):
     _tocar_ficha(repo, editar_yaml, tipo=["A", "B"])
-    assert _hay(repo, "tipo debe ser A, B, C o D")
+    assert _hay(repo, "tipo debe ser A, B, C, D o T")
 
 
 def test_validar_ventana_con_zonas_mezcladas_se_normaliza(repo, editar_yaml):
