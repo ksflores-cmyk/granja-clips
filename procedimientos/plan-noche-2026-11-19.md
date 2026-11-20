@@ -11,6 +11,7 @@ Lo escribe el jefe de Clips el 19 nov, 8:30 p. m. GT. Cada tarea programada de e
 - Twitch: claves presentes; id de Grand Theft Auto VI = `1867279146`.
 - 847 pruebas en verde en `main`.
 - **Instagram: el canal está DESCONECTADO en Buffer** (`isDisconnected: true`, 19 nov 7:28 p. m.) y el perfil @guionvivo sale «no disponible» sin sesión. Hasta que Kevin revise la cuenta y reconecte en Buffer, la fábrica publica sólo en Shorts y TikTok: ninguna tarea intenta reconectar ni crea cuentas. Si sigue así a las 6:45, va como alerta en el reporte.
+- `PAUSA` puesta el 19 nov 7:30 p. m. para que no salga nada con el estilo viejo. La quita la tarea #13.
 - Toma 1: borrada de YouTube el 19 nov 7:26 p. m. (Studio, Guion Vivo). TikTok e Instagram: el navegador interno no tiene sesión; la borra Kevin desde la app.
 
 ## Decisiones de Kevin (19 nov, 8:00 p. m.)
@@ -60,7 +61,7 @@ Lo escribe el jefe de Clips el 19 nov, 8:30 p. m. GT. Cada tarea programada de e
 | 10 | 2:30 a. m. | `retiros` | Cada ciclo revisa en Buffer los posts con error o retirados; un retiro o reclamo veta al streamer en `config/vetados.yml`, anota en `retiros.md` y abre un aviso de alerta roja (issue con etiqueta `alerta-roja`); pruebas |
 | 11 | 3:15 a. m. | `ensayo` | Corrida en modo ensayo de punta a punta con 1 ficha T real, 1 FM27 y 1 informativa con música; las 3 pasan la puerta de estilo; MP4 en el artefacto de la corrida y enlace en la bitácora |
 | 12 | 4:00 a. m. | `revision` | Codex y un revisor leen todo lo fusionado esta noche (`git diff` desde `3fa9695`); se corrigen los hallazgos que rompen algo (máx 2 rondas); 847 + nuevas en verde |
-| 13 | 4:45 a. m. | `encendido` | Sin `PAUSA`, `modo: vivo`; corrida real de `fabrica` que programa el hueco de las 9:00 en las 3 redes; comprobación del disparador (cron-job.org si Kevin lo creó; si no, lo dice); cola de Buffer con las tomas de 9:00 a 13:00 |
+| 13 | 4:45 a. m. | `encendido` | Quita el `PAUSA` que puso el jefe el 19 nov (sólo si el estilo v2 de las tareas #5 y #6 está fusionado y su ensayo en verde; si no, lo deja y lo dice) y deja sin `PAUSA`, `modo: vivo`; corrida real de `fabrica` que programa el hueco de las 9:00 en las 3 redes; comprobación del disparador (cron-job.org si Kevin lo creó; si no, lo dice); cola de Buffer con las tomas de 9:00 a 13:00 |
 | 14 | 5:30 a. m. | `informativas` | 3 informativas del día de GTA 6 con datos de fuentes verificadas en `hechos.md` (con enlace y fecha), con música y movimiento; nada de spoilers ni filtraciones |
 | 15 | 6:45 a. m. | reporte | Reporte corto para Kevin: qué se publicó (enlaces), qué falló, qué decide él (palabras clave). Único aviso de la mañana |
 | 16 | cada 3 h | vigilante | Si van más de 3 h sin publicar en horario (9 a 22 h), diagnostica con los logs, repara lo pequeño, lanza `fabrica` con `gh workflow run`; nunca más de 1 lanzamiento por pasada |
