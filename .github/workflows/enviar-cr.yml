@@ -1,0 +1,49 @@
+name: enviar-cr
+
+# Prueba manual del robot de Content Rewards. Sin "real", llega hasta el botón Enviar y NO lo pulsa.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Enlace publicado (TikTok, Reels o Shorts)"
+        required: true
+      campana:
+        description: "cr_campaign_id (la parte final de contentrewards.com/c/campaigns/...)"
+        required: true
+      real:
+        description: "Pulsar Enviar de verdad"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PYTHONUNBUFFERED: "1"
+      CR_SESION: ${{ secrets.CR_SESION }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt playwright==1.65.2 && python -m playwright install --with-deps chromium
+      - name: Probar
+        env:
+          URL: ${{ inputs.url }}
+          CAMPANA: ${{ inputs.campana }}
+          REAL: ${{ inputs.real }}
+        run: |
+          extra=""; [ "$REAL" = "true" ] && extra="--real"
+          python -m fabrica.enviar_cr --url "$URL" --campana "$CAMPANA" --capturas "$RUNNER_TEMP/cr" $extra
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capturas-cr-prueba
+          path: ${{ runner.temp }}/cr
+          retention-days: 3
+          if-no-files-found: ignore
