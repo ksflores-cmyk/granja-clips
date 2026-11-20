@@ -25,16 +25,22 @@ class Descartada(Exception):
 
 # ---------------------------------------------------------------- utilidades de texto
 
-_EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿⭐⭕⌀-⏿\U0001F1E6-\U0001F1FF]")
+_EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿⭐⭕⬛⬜⌀-⏿\U0001F1E6-\U0001F1FF]")
+_TAGS = re.compile("[\U000E0020-\U000E007F]")   # banderas como la de Escocia: 🏴 + caracteres de etiqueta
 _RESTO_EMOJI = re.compile("[️‍⃣]")
 _GTA = re.compile(r"(?<![#\w])GTA\s*(?:6|VI)\b|(?<![#\w])GTA6\b", re.IGNORECASE)
-_HASHTAG_INCRUSTADO = re.compile(r"#\S*")
+_HASHTAG_INCRUSTADO = re.compile(r"#(?=[^\W\d_])\S*")   # sólo los que empiezan con letra: «#1» se queda
 _HASHTAG_VALIDO = re.compile(r"#\w+")
 _PALABRA = re.compile(r"\w+")
 
 
+def nfc(s) -> str:
+    """Todas las entradas de texto en NFC (un `#Cancún` escrito con tilde suelta sigue siendo un hashtag)."""
+    return unicodedata.normalize("NFC", str(s or ""))
+
+
 def contar_emojis(texto: str) -> int:
-    return len(_EMOJI.findall(texto))
+    return len(_EMOJI.findall(_TAGS.sub("", texto)))
 
 
 def utf16(s: str) -> int:
@@ -44,8 +50,8 @@ def utf16(s: str) -> int:
 
 def _sin_marcas(s) -> str:
     """Sin `<` ni `>`, sin emojis y con los espacios colapsados."""
-    s = str(s or "").replace("<", "").replace(">", "")
-    s = _RESTO_EMOJI.sub("", _EMOJI.sub("", s))
+    s = nfc(str(s or "")).replace("<", "").replace(">", "")
+    s = _RESTO_EMOJI.sub("", _TAGS.sub("", _EMOJI.sub("", s)))
     return " ".join(s.split())
 
 
@@ -104,58 +110,110 @@ def largo(texto: str, plataforma: str, cfg: dict | None = None) -> int:
 
 # ---------------------------------------------------------------- gancho
 
-def _oracion(g: str, siglas: dict) -> str:
-    """Un gancho que llega todo en mayúsculas pasa a tipo oración, conservando las siglas."""
+def _nombres_del_creador(toma: dict, ficha: dict) -> dict[str, str]:
+    """{palabra normalizada: forma original} del creador de la toma (nombre, login o etiqueta)."""
+    crudos = [toma.get("creador"), *(toma.get("creadores") or []), ficha.get("twitch_login")]
+    out: dict[str, str] = {}
+    for c in crudos:
+        c = _sin_marcas(c)
+        if not c:
+            continue
+        if "twitch.tv/" in c.lower():
+            c = _login_twitch(c, estricto=False)
+        for m in _PALABRA.finditer(c):
+            out.setdefault(_n(m.group(0)), m.group(0))
+    return out
+
+
+def _oracion(g: str, siglas: dict, nombres: dict | None = None) -> str:
+    """Un gancho que llega todo en mayúsculas pasa a tipo oración: mayúscula al empezar y tras `. ! ?`
+    (también tras `¡` y `¿`), con las siglas y el nombre del creador como se escriben de verdad."""
     if not any(c.isalpha() for c in g) or g != g.upper():
         return g
-    g = _PALABRA.sub(lambda m: siglas.get(_n(m.group(0)), m.group(0).lower()), g)
-    for i, c in enumerate(g):
-        if c.isalpha():
-            return g[:i] + c.upper() + g[i + 1:]
-    return g
+    nombres = nombres or {}
+    g = _PALABRA.sub(lambda m: siglas.get(_n(m.group(0))) or nombres.get(_n(m.group(0)))
+                     or m.group(0).lower(), g)
+    out, cap = [], True
+    for c in g:
+        if c.isalpha() and cap:
+            c, cap = c.upper(), False
+        elif c in ".!?":
+            cap = True
+        elif c.isalnum():
+            cap = False
+        out.append(c)
+    return "".join(out)
 
 
-def _nombres_a_ignorar(toma: dict, ficha: dict) -> set[str]:
-    """Palabras del creador, del login y del juego: no cuentan como contenido del gancho."""
-    fuentes = [toma.get("creador"), ficha.get("creador"), ficha.get("twitch_login"), ficha.get("juego"),
-               ficha.get("credito"), *(toma.get("creadores") or [])]
-    palabras: set[str] = set()
+def _nombres_a_ignorar(toma: dict, ficha: dict, plataforma: str | None = None) -> set[str]:
+    """Palabras que no cuentan como contenido: el creador de la toma (nombre, login o etiqueta),
+    `twitch_login`, el `credito` de una ficha T y el juego. NO el texto libre de `ficha.creador`."""
+    palabras = set(_nombres_del_creador(toma, ficha))
+    fuentes = [ficha.get("juego")]
+    if ficha.get("tipo") == "T":
+        fuentes.append(_login_twitch(ficha.get("credito"), estricto=False))
+    if es_de_campana(ficha):
+        for c in [toma.get("creador"), *(toma.get("creadores") or [])]:
+            for red in ([plataforma] if plataforma else PLATAFORMAS):
+                fuentes.append(etiqueta_creador(ficha, _limpio(c), red))
     for f in fuentes:
         palabras.update(_palabras(str(f or "")))
-    palabras.update({"twitch", "tv", "https", "www"} if palabras else set())
     return palabras
 
 
-def comprobar_gancho(gancho: str, toma: dict, ficha: dict, cfg: dict) -> None:
-    """Descarta (con motivo) un gancho genérico, vacío de contenido o con relleno en inglés."""
-    plano = " ".join(_palabras(gancho))
+def _contiene(palabras: list[str], frase: list[str]) -> bool:
+    """La frase (lista de palabras) aparece completa y seguida dentro de las palabras."""
+    n = len(frase)
+    return n > 0 and any(palabras[i:i + n] == frase for i in range(len(palabras) - n + 1))
+
+
+def comprobar_gancho(gancho: str, toma: dict, ficha: dict, cfg: dict, plataforma: str | None = None) -> None:
+    """Descarta (con motivo) un gancho genérico, sin contenido o con relleno en inglés.
+
+    Las frases genéricas se buscan por palabras completas, sin acentos ni mayúsculas. Sin contenido:
+    0 palabras con contenido, o 1 sola y menos de 3 palabras en total.
+    """
+    todas = _palabras(gancho)
     for frase in cfg["_genericos"]:
-        if " ".join(_palabras(frase)) in plano and _palabras(frase):
+        if _contiene(todas, _palabras(frase)):
             raise Descartada(f"gancho genérico: «{frase}»")
-    ignorar = cfg["_vacias"] | _nombres_a_ignorar(toma, ficha)
-    contenido = [p for p in _palabras(gancho) if p not in ignorar]
-    if len(contenido) < 2:
-        raise Descartada(f"gancho sin contenido: quedan {len(contenido)} palabra(s) con contenido (mínimo 2)")
-    ingles = [p for p in _palabras(gancho) if p in cfg["_ingles"]]
+    ignorar = cfg["_vacias"] | _nombres_a_ignorar(toma, ficha, plataforma)
+    contenido = [p for p in todas if p not in ignorar]
+    if len(contenido) == 0 or (len(contenido) == 1 and len(todas) < 3):
+        raise Descartada(f"gancho sin contenido: {len(contenido)} palabra(s) con contenido de {len(todas)}")
+    ingles = [p for p in todas if p in cfg["_ingles"]]
     if len(ingles) >= 2:
         raise Descartada(f"gancho en inglés: {', '.join(ingles)}")
 
 
-def _preparar_gancho(bruto, toma: dict, ficha: dict, cfg: dict) -> str:
+def limpiar_gancho(bruto, toma: dict, ficha: dict, cfg: dict) -> str:
+    """El gancho tal como sale en el texto (sin emojis, `<>` ni hashtags; «GTA 6»; tipo oración)."""
     g = _limpio(_sin_hashtags(_sin_marcas(bruto)))
-    g = _oracion(g, cfg["_siglas"])
+    return _oracion(g, cfg["_siglas"], _nombres_del_creador(toma, ficha))
+
+
+def _preparar_gancho(bruto, toma: dict, ficha: dict, cfg: dict, plataforma: str | None = None) -> str:
+    g = limpiar_gancho(bruto, toma, ficha, cfg)
     if not g:
         raise Descartada("sin gancho")
-    comprobar_gancho(g, toma, ficha, cfg)
+    comprobar_gancho(g, toma, ficha, cfg, plataforma)
     return g
 
 
 # ---------------------------------------------------------------- crédito
 
-def _login_twitch(valor) -> str:
+_LOGIN_VALIDO = re.compile(r"[A-Za-z0-9_]{1,25}")
+
+
+def _login_twitch(valor, estricto: bool = True) -> str:
+    """Login de Twitch de un texto como `https://www.twitch.tv/ibai/clip/x?a=1`. Vacío si no hay.
+    Con `estricto`, lanza Descartada si no cumple `[A-Za-z0-9_]{1,25}`."""
     v = _sin_marcas(valor)
     v = re.sub(r"^(?:https?://)?(?:www\.)?(?:twitch\.tv/)?@?", "", v, flags=re.IGNORECASE)
-    return v.strip("/ ")
+    v = re.split(r"[?#]", v, maxsplit=1)[0].split("/")[0].strip()
+    if estricto and v and not _LOGIN_VALIDO.fullmatch(v):
+        raise Descartada(f"sin crédito: login de Twitch inválido «{v}» (de «{_sin_marcas(valor)}»)")
+    return v
 
 
 def _creditos(toma: dict, ficha: dict) -> list[str]:
@@ -165,7 +223,7 @@ def _creditos(toma: dict, ficha: dict) -> list[str]:
     if not crudos:
         if es_t:
             crudos = [next((v for v in (ficha.get("credito"), ficha.get("creador"), ficha.get("twitch_login"),
-                                        toma.get("creador")) if _login_twitch(v)), "")]
+                                        toma.get("creador")) if _login_twitch(v, estricto=False)), "")]
         else:
             crudos = [toma.get("creador") or ficha.get("creador")]
     if es_t:
@@ -187,7 +245,12 @@ def _titulo_youtube(linea: str, maximo: int = 100) -> str:
     linea = _sin_hashtags(_sin_marcas(linea))
     if utf16(linea) <= maximo:
         return linea
-    corte = linea[:maximo - 1].rsplit(" ", 1)[0].rstrip(" ,.;:")
+    corte = ""
+    for c in linea:
+        if utf16(corte + c) > maximo - 1:
+            break
+        corte += c
+    corte = corte.rsplit(" ", 1)[0].rstrip(" ,.;:") if " " in corte else corte
     return corte + "…"
 
 
@@ -211,9 +274,9 @@ def _comprobar_final(texto: str, ficha: dict, plataforma: str, cfg: dict) -> int
     lim = cfg["limites"][plataforma]
     if contar_emojis(texto) > 1:
         raise Descartada("el texto lleva más de un emoji")
-    plano = _n(texto)
+    plano = _palabras(texto)
     for p in (ficha.get("reglas") or {}).get("palabras_evitar") or []:
-        if _n(p) and _n(p) in plano:
+        if _contiene(plano, _palabras(p)):
             raise Descartada(f"el texto contiene la palabra a evitar «{p}»")
     n = largo(texto, plataforma, cfg)
     if n > lim["max_texto"]:
@@ -250,16 +313,17 @@ def _campana(toma: dict, ficha: dict, plataforma: str, cfg: dict) -> dict:
     for c in creadores:
         nombre = _limpio(c)
         e = etiqueta_creador(ficha, nombre, plataforma)
+        e = nfc(e) if e else e
         if not e:
             raise Descartada(f"sin etiqueta del creador {nombre or '(vacío)'} para {plataforma}: no se publica")
         etiquetas_creador.append(e)
-    gancho = _preparar_gancho(toma.get("gancho"), toma, ficha, cfg)
-    obligatorias = [str(e).strip() for e in reglas.get("etiquetas_obligatorias") or [] if str(e).strip()]
-    divulgacion = str(reglas.get("divulgacion") or "").strip()
+    gancho = _preparar_gancho(toma.get("gancho"), toma, ficha, cfg, plataforma)
+    obligatorias = [nfc(e).strip() for e in reglas.get("etiquetas_obligatorias") or [] if nfc(e).strip()]
+    divulgacion = nfc(reglas.get("divulgacion")).strip()
     if not es_hashtag(divulgacion):
         raise Descartada("la campaña exige una divulgación en hashtag (reglas.divulgacion)")
     vistos = {divulgacion.lower(), *(o.lower() for o in obligatorias)}
-    crudos = [str(x).strip() for x in (toma.get("etiquetas") or []) + (reglas.get("hashtags") or [])]
+    crudos = [nfc(x).strip() for x in (reglas.get("hashtags") or []) + (toma.get("etiquetas") or [])]   # primero las del brief
     candidatos = _sin_repetir([e for e in crudos if es_hashtag(e)], vistos)
     tope = int(cfg.get("max_relacionados_campana", 3))
     if plataforma == "reels":  # en Instagram #Publicidad y las del brief cuentan dentro del tope de 5
@@ -271,7 +335,7 @@ def _campana(toma: dict, ficha: dict, plataforma: str, cfg: dict) -> dict:
     primera = f"Toma {_numero(toma)}. {gancho}"
     cola = [*obligatorias, *etiquetas_creador, divulgacion] + ([" ".join(extras)] if extras else [])
     texto = primera + "\n\n" + "\n".join(cola)
-    if "#" in texto.split("\n" + divulgacion, 1)[0]:
+    if any("#" in linea for linea in cola[:cola.index(divulgacion)]):
         raise Descartada("hay un # antes de la divulgación: #Publicidad debe ser el primer hashtag")
     credito = " · ".join(etiquetas_creador)
     return _resultado(texto, _titulo_de(primera, plataforma, cfg), credito,
@@ -307,12 +371,12 @@ def armar(toma: dict, ficha: dict, plataforma: str, cfg: dict | None = None) -> 
     if not refs:
         raise Descartada("sin crédito: no se publica")
     credito = "🎥 " + " · ".join(refs)
-    divulgacion = str(reglas.get("divulgacion") or "").strip()
+    divulgacion = nfc(reglas.get("divulgacion")).strip()
     aviso = [] if divulgacion.lower() in ("", "ninguna") else [_sin_marcas(divulgacion)]
     # Etiquetas: las del brief van siempre (los hashtags de más sobre el tope de la red se quitan);
     # después las de la toma hasta llenar el tope. Un aviso que es un solo hashtag cuenta en el tope.
     tope = lim["max_hashtags"] - sum(1 for a in aviso if es_hashtag(a))
-    obligatorias = _validas([str(e).strip() for e in reglas.get("etiquetas_obligatorias") or [] if str(e).strip()])
+    obligatorias = _validas([nfc(e).strip() for e in reglas.get("etiquetas_obligatorias") or [] if nfc(e).strip()])
     vistos: set[str] = set()
     obligatorias = _sin_repetir(obligatorias, vistos)
     etiquetas, n_hash = [], 0
@@ -322,7 +386,7 @@ def armar(toma: dict, ficha: dict, plataforma: str, cfg: dict | None = None) -> 
                 continue
             n_hash += 1
         etiquetas.append(e)
-    for e in _sin_repetir(_validas([str(e).strip() for e in toma.get("etiquetas") or [] if str(e).strip()]), vistos):
+    for e in _sin_repetir(_validas([nfc(e).strip() for e in toma.get("etiquetas") or [] if nfc(e).strip()]), vistos):
         if n_hash < tope and e.startswith("#"):
             etiquetas.append(e)
             n_hash += 1
@@ -331,14 +395,14 @@ def armar(toma: dict, ficha: dict, plataforma: str, cfg: dict | None = None) -> 
                          "etiquetas y no hay suficientes")
     valor, datos = [], []
     if informativa:
-        titular = _preparar_gancho(toma.get("titular") or toma.get("gancho"), toma, ficha, cfg) \
+        titular = _preparar_gancho(toma.get("titular") or toma.get("gancho"), toma, ficha, cfg, plataforma) \
             if (toma.get("titular") or toma.get("gancho")) else ""
         if not titular:
             raise Descartada("la informativa necesita titular")
         primera = f"GTA 6: {titular}"
         datos = [d for d in (_limpio(_sin_hashtags(str(d))) for d in toma.get("datos") or []) if d]
     else:
-        gancho = _preparar_gancho(toma.get("gancho"), toma, ficha, cfg)
+        gancho = _preparar_gancho(toma.get("gancho"), toma, ficha, cfg, plataforma)
         primera = f"Toma {_numero(toma)}. {gancho}"
         if plataforma == "reels":
             valor = [v for v in (_limpio(_sin_hashtags(str(v))) for v in toma.get("valor") or []) if v][:2]

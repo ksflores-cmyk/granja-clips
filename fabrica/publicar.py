@@ -487,7 +487,10 @@ def _comprobar_repetido(raiz, texto: str, plataforma: str, toma: dict, hoy: date
     marcador = Path(raiz_repo(raiz) / "marcador.csv")
     if marcador.exists():
         import csv
-        gancho = _cuerpo_sin_toma(f"Toma 0. {_limpio(toma.get('gancho'))}")
+        # El gancho nuevo y el del marcador pasan por la misma limpieza (sin emojis, hashtags ni <>; «GTA 6»).
+        cfg, ficha = mod_textos.cargar_config(), {}
+        limpiar = lambda g: _cuerpo_sin_toma(f"Toma 0. {mod_textos.limpiar_gancho(g, toma, ficha, cfg)}")  # noqa: E731
+        gancho = limpiar(toma.get("gancho"))
         with open(marcador, newline="", encoding="utf-8") as f:
             for fila in csv.DictReader(f):
                 try:
@@ -496,7 +499,7 @@ def _comprobar_repetido(raiz, texto: str, plataforma: str, toma: dict, hoy: date
                     continue
                 if fecha > desde and fila.get("plataforma") == plataforma \
                         and str(fila.get("toma")) != str(toma.get("numero")) \
-                        and _cuerpo_sin_toma(f"Toma 0. {fila.get('gancho', '')}") == gancho:
+                        and limpiar(fila.get("gancho", "")) == gancho:
                     raise Descartada(f"gancho repetido: ya salió el {fila['fecha']} (no se repite en 7 días)")
 
 
@@ -1011,41 +1014,81 @@ FICHA_T_MUESTRA = {"id": "t-ejemplo", "tipo": "T", "creador": "twitch.tv/ejemplo
                    "campana": None, "estado": "vigente", "uso": "produccion"}
 
 
-def _casos_de_muestra(raiz) -> list[tuple[str, dict, dict]]:
-    """Los tres casos de muestra (T, A con la ficha real de SEGA FM27, informativa): (nombre, ficha, toma)."""
+def _casos_de_muestra(raiz, avisos: list | None = None) -> list[tuple[str, dict, dict]]:
+    """Los casos de muestra (T, A con la ficha real de SEGA FM27, informativa): (nombre, ficha, toma).
+    Si falta una ficha (o no se puede leer fuentes.yml) lo anota en `avisos` y sigue con los demás casos."""
+    avisos = avisos if avisos is not None else []
     from .fuentes import cargar_fuentes
-    fichas = {f.get("id"): f for f in cargar_fuentes(raiz)}
+    try:
+        fichas = {f.get("id"): f for f in cargar_fuentes(raiz)}
+    except Exception as e:  # noqa: BLE001 - un fuentes.yml roto no debe esconder los otros casos
+        avisos.append(f"no se pudo leer fuentes.yml ({e}): sólo los casos que no dependen de él")
+        fichas = {}
+    casos = [("T", FICHA_T_MUESTRA,
+              {"numero": 1, "gancho": "El NPC le contesta al streamer", "pilar": "momentos",
+               "creador": "twitch.tv/ejemplo", "valor": ["Nadie esperaba esa respuesta.", "Pasó en directo."],
+               "etiquetas": ["#GTA6", "#Gaming", "#Clips"]})]
     ficha_a = fichas.get("sega-fm27")
     if ficha_a is None:
-        raise Descartada("falta la ficha sega-fm27 en fuentes.yml para la muestra de textos")
+        avisos.append("falta la ficha sega-fm27 en fuentes.yml: no se muestra el caso A")
+    else:
+        casos.append(("A", ficha_a,
+                      {"numero": 2, "gancho": "Sebas ficha al delantero", "pilar": "momentos",
+                       "creador": "SEBASBERON", "campana": ficha_a.get("campana"),
+                       "valor": ["Un fichaje de última hora."]}))
     ficha_i = fichas.get("propio-tipografico") or {"id": "muestra", "creador": "@guionvivo", "reglas": {}}
-    return [
-        ("T", FICHA_T_MUESTRA,
-         {"numero": 1, "gancho": "El NPC le contesta al streamer", "pilar": "momentos",
-          "creador": "twitch.tv/ejemplo", "valor": ["Nadie esperaba esa respuesta.", "Pasó en directo."],
-          "etiquetas": ["#GTA6", "#Gaming", "#Clips"]}),
-        ("A", ficha_a,
-         {"numero": 2, "gancho": "Sebas ficha al delantero", "pilar": "momentos", "creador": "SEBASBERON",
-          "campana": ficha_a.get("campana"), "valor": ["Un fichaje de última hora."]}),
-        ("informativa", ficha_i,
-         {"numero": 3, "gancho": "Llega el 19 de noviembre", "titular": "Llega el 19 de noviembre",
-          "pilar": "informativa", "datos": ["Sale en PS5", "Sale en Xbox Series X|S"],
-          "etiquetas": ["#GTA6", "#Gaming", "#Clips"]}),
-    ]
+    casos.append(("informativa", ficha_i,
+                  {"numero": 3, "gancho": "Llega el 19 de noviembre", "titular": "Llega el 19 de noviembre",
+                   "pilar": "informativa", "datos": ["Sale en PS5", "Sale en Xbox Series X|S"],
+                   "etiquetas": ["#GTA6", "#Gaming", "#Clips"]}))
+    return casos
+
+
+def ensayo_textos(raiz, salida=print) -> int:
+    """Imprime los 9 textos de muestra (offline, sin llamadas) y comprueba los límites de config/textos.yml.
+    Devuelve COD_ERROR si alguno no cumple (o si falta un caso); no escribe nada en `estado/`."""
+    cfg = mod_textos.cargar_config()
+    avisos: list[str] = []
+    casos = _casos_de_muestra(raiz, avisos)
+    codigo = COD_OK
+    for a in avisos:
+        salida(f"Textos: {a}")
+        codigo = COD_ERROR
+    for nombre, ficha, toma in casos:
+        for plat in PLATAFORMAS:
+            lim = cfg["limites"][plat]
+            try:
+                tx = textos(toma, ficha, plat)
+            except Descartada as e:
+                salida(f"Texto {nombre}/{plat}: DESCARTADO: {e}")
+                codigo = COD_ERROR
+                continue
+            fallos = []
+            if tx["largo"] > lim["max_texto"]:
+                fallos.append("pasa el límite de texto")
+            if tx["titulo"] and mod_textos.utf16(tx["titulo"]) > lim["max_titulo"]:
+                fallos.append("título largo")
+            if "<" in tx["texto"] or ">" in tx["texto"]:
+                fallos.append("lleva < o >")
+            extra = 1 if es_de_campana(ficha) and plat != "reels" else 0     # #Publicidad va aparte
+            if not lim["min_hashtags"] <= len(tx["hashtags"]) <= lim["max_hashtags"] + extra:
+                fallos.append(f"{len(tx['hashtags'])} hashtags fuera de {lim['min_hashtags']}-{lim['max_hashtags']}")
+            salida(f"Texto {nombre}/{plat}: {tx['largo']}/{lim['max_texto']} (UTF-16"
+                   f"{', saltos x2' if plat == 'reels' else ''})"
+                   + (f", título {mod_textos.utf16(tx['titulo'])}/{lim['max_titulo']}" if tx["titulo"] else "")
+                   + (f" ... FALLA: {'; '.join(fallos)}" if fallos else " ... ok"))
+            for linea in tx["texto"].split("\n"):
+                salida(f"    | {linea}")
+            if fallos:
+                codigo = COD_ERROR
+    return codigo
 
 
 def _muestra(raiz, plataforma: str, esquema: dict, canal_id: str, ahora: datetime,
-             caso: str | None = None, salida=None) -> tuple[dict, list[str]]:
+             caso: str | None = None) -> tuple[dict, list[str]]:
     """Arma (sin enviar) una carga de ejemplo y la valida contra el esquema. No escribe nada en `estado/`."""
     nombre, ficha, toma = next(c for c in _casos_de_muestra(raiz) if caso in (None, c[0]))
     tx = textos(toma, ficha, plataforma)
-    if salida:
-        lim = mod_textos.cargar_config()["limites"][plataforma]["max_texto"]
-        salida(f"Texto {nombre}/{plataforma}: {tx['largo']}/{lim} (UTF-16"
-               f"{', saltos x2' if plataforma == 'reels' else ''})"
-               + (f", título {len(tx['titulo'])}/100" if tx["titulo"] else ""))
-        for linea in tx["texto"].split("\n"):
-            salida(f"    | {linea}")
     cuando = ahora + timedelta(days=1)
     return armar_carga(plataforma, canal_id, tx["texto"], tx["titulo"],
                        "https://ejemplo.invalid/prueba.mp4", cuando, esquema)
@@ -1066,7 +1109,7 @@ def ensayo(raiz, env, salida=print, transporte_buffer=None, transporte_almacen=N
         salida("Buffer: ensayo simulado con respuestas inventadas, pendiente de Kevin (alta de la clave)")
     if sim_a:
         salida("Almacén: ensayo simulado en memoria, pendiente de Kevin (alta de Supabase)")
-    codigo = COD_OK
+    codigo = ensayo_textos(raiz, salida)     # primero los textos: offline, sin claves ni llamadas
     cfg_canales = cargar_yaml("config/canales.yml", raiz)
     try:
         # Simulado: la cuota de mentira va a una carpeta temporal para no mezclarse con la real.
@@ -1086,7 +1129,7 @@ def ensayo(raiz, env, salida=print, transporte_buffer=None, transporte_almacen=N
         for caso, _, _ in _casos_de_muestra(raiz):
             for plat in PLATAFORMAS:
                 try:
-                    _, anot = _muestra(raiz, plat, esquema, ids[plat], ahora(), caso, salida)
+                    _, anot = _muestra(raiz, plat, esquema, ids[plat], ahora(), caso)
                     salida(f"Carga {caso}/{plat}: válida contra el esquema"
                            + (f" ({'; '.join(anot)})" if anot else ""))
                 except Descartada as e:
@@ -1279,8 +1322,12 @@ def ejecutar(raiz=None, ensayo_forzado=False, con_borrador=False, entrada: str |
     env = os.environ if env is None else env
     pausada, motivo = esta_pausada(raiz)
     if pausada:
+        # En ensayo, con PAUSA también se ven (y se comprueban) los textos: son offline, sin llamadas.
+        codigo = COD_OK
+        if ensayo_forzado or cargar_yaml("config/modo.yml", raiz).get("modo") == "ensayo":
+            codigo = ensayo_textos(raiz, salida)
         salida(f"PAUSA: {motivo or 'sin motivo'}. No se hace ninguna llamada.")
-        return COD_OK
+        return codigo
     if con_borrador:
         return borrador(raiz, env, salida, transportes.get("transporte_buffer"), transportes.get("ahora"),
                         transportes.get("transporte_almacen"))
