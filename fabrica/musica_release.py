@@ -59,7 +59,7 @@ def _bloque(pagina: str, campo: str) -> str:
     if i < 0:
         return ""
     j = pagina.find("field-name-", i + len(campo) + 11)
-    return pagina[i: j if j > 0 else i + 6000]
+    return re.sub(r"<[^>]*$", "", pagina[i: j if j > 0 else i + 6000])
 
 
 def leer_pagina(pagina: str, base: str) -> dict:
