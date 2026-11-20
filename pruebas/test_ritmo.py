@@ -86,23 +86,36 @@ def test_dos_corridas_en_la_misma_hora_la_segunda_no_repite(r):
 
 # ---------------------------------------------------------------- 2. relleno
 
-def test_corrida_perdida_se_rellena_a_ahora_mas_15_redondeado_y_el_normal_gana(r):
+def test_corrida_perdida_se_rellena_a_ahora_mas_28_redondeado_y_el_normal_gana(r):
     h = ciclo.buscar_hueco(r, gt(25, 9, 23), ["shorts"])          # la de las 8:23 se perdió
-    assert (h.hora, h.relleno, h.publicar_en) == ("09:00", True, gt(25, 9, 40))
-    assert h.programar_en == gt(25, 9, 40) and h.fecha == "2026-11-25"
+    assert (h.hora, h.relleno, h.publicar_en) == ("09:00", True, gt(25, 9, 55))
+    assert h.programar_en == gt(25, 9, 55) and h.fecha == "2026-11-25"
     h = ciclo.buscar_hueco(r, gt(25, 10, 23), ["shorts"])         # el normal de las 11:00 gana al relleno
     assert (h.hora, h.relleno) == ("11:00", False)
 
 
+def test_el_relleno_siempre_sobrevive_a_validar_futuro_al_publicar(r):
+    """Contrato: aunque el ciclo dure LIMITE_CICLO_S, el relleno sigue cayendo a >= 10 min cuando se publica."""
+    from fabrica import plazo, publicar
+    vistos = 0
+    for minutos_dia in range(8 * 60, 23 * 60, 7):
+        ahora = gt(25, minutos_dia // 60, minutos_dia % 60)
+        h = ciclo.buscar_hueco(r, ahora, ["shorts"])
+        if h is not None and h.relleno:
+            vistos += 1
+            publicar.validar_futuro(h.publicar_en, ahora + timedelta(seconds=plazo.LIMITE_CICLO_S))
+    assert vistos > 0
+
+
 def test_el_relleno_no_se_amontona_con_los_huecos_del_dia(r):
     ciclo.cerrar_hueco(r, ciclo.Hueco(gt(25, 11, 0), ["shorts"]), "shorts")   # el 11:00 ya salió
-    assert ciclo.buscar_hueco(r, gt(25, 11, 23), ["shorts"]) is None          # 11:40 queda a 40 min del 11:00
+    assert ciclo.buscar_hueco(r, gt(25, 11, 23), ["shorts"]) is None          # 11:55 queda a 55 min del 11:00
     h = ciclo.buscar_hueco(r, gt(25, 12, 23), ["shorts"])                    # gana el normal de las 13:00
     assert (h.hora, h.relleno) == ("13:00", False)
     ciclo.cerrar_hueco(r, ciclo.Hueco(gt(25, 13, 0), ["shorts"]), "shorts")   # el 13:00 ya salió
-    assert ciclo.buscar_hueco(r, gt(25, 13, 23), ["shorts"]) is None          # 13:40 queda a 40 min del 13:00
+    assert ciclo.buscar_hueco(r, gt(25, 13, 23), ["shorts"]) is None          # 13:55 queda a 55 min del 13:00
     h = ciclo.buscar_hueco(r, gt(25, 14, 23), ["shorts"])
-    assert (h.hora, h.relleno, h.publicar_en) == ("09:00", True, gt(25, 14, 40))
+    assert (h.hora, h.relleno, h.publicar_en) == ("09:00", True, gt(25, 14, 55))
 
 
 def test_el_relleno_tampoco_se_amontona_con_lo_ya_programado_de_esa_red(r):
@@ -115,9 +128,9 @@ def test_el_relleno_tampoco_se_amontona_con_lo_ya_programado_de_esa_red(r):
 
 def test_el_relleno_nunca_pasa_de_las_23_ni_cae_al_dia_siguiente(r):
     h = ciclo.buscar_hueco(r, gt(25, 22, 23), ["shorts"])
-    assert h.hora == "22:00" and h.publicar_en == gt(25, 22, 40)               # 22:40 < 23:00
-    assert ciclo.buscar_hueco(r, gt(25, 22, 50), ["shorts"]) is None           # 23:05 pasa de las 23:00
-    assert ciclo.buscar_hueco(r, gt(25, 23, 50), ["shorts"]) is None           # 00:05 ya es otro día
+    assert h.hora == "22:00" and h.publicar_en == gt(25, 22, 55)               # 22:55 < 23:00
+    assert ciclo.buscar_hueco(r, gt(25, 22, 50), ["shorts"]) is None           # 23:20 pasa de las 23:00
+    assert ciclo.buscar_hueco(r, gt(25, 23, 50), ["shorts"]) is None           # 00:20 ya es otro día
     assert ciclo.buscar_hueco(r, gt(25, 23, 23), ["shorts"]) is None
 
 
@@ -151,8 +164,8 @@ def test_un_relleno_cerrado_no_vuelve(r):
 def test_un_relleno_en_vivo_programa_a_la_hora_del_relleno_y_cierra_el_hueco_original(r):
     cambiar_modo(r, "vivo", ["shorts"])
     cod, sal = correr(r, ahora=gt(25, 9, 23), hacer=Hacer(r), cands=[cand("a")])
-    assert "hueco 2026-11-25 09:00 (relleno a las 09:40)" in sal and "shorts: programada" in sal
-    assert [(f["fecha"], f["hora"]) for f in filas(r)] == [("2026-11-25", "09:40")]
+    assert "hueco 2026-11-25 09:00 (relleno a las 09:55)" in sal and "shorts: programada" in sal
+    assert [(f["fecha"], f["hora"]) for f in filas(r)] == [("2026-11-25", "09:55")]
     assert ciclo.buscar_hueco(r, gt(25, 9, 23), ["shorts"]) is None
 
 
@@ -339,6 +352,7 @@ def editar(repo, editar_yaml, **cambios):
     ({"huecos": "09:00"}, "lista no vacía"),
     ({"huecos": [f"{h:02d}:00" for h in range(9)]}, "8 como máximo"),
     ({"no_repetir_horas": 23}, "no_repetir_horas"),
+    ({"margen_min_minutos": 9}, "margen_min_minutos no puede ser menor"),
     ({"relleno": {"separacion_min_minutos": "x"}}, "separacion_min_minutos"),
     ({"relleno": {"max_intentos_por_hueco": 0}}, "max_intentos_por_hueco"),
     ({"relleno": {"ultima_hora": "25:99"}}, "ultima_hora"),
