@@ -466,6 +466,115 @@ def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
     return mejor > 0.9, f"correlación con el audio de la fuente {mejor:.2f} (mínimo 0.90)"
 
 
+# --- Música CC0 y movimiento (decisión de Kevin del 19 nov 2026) ---------------------------------------------
+TOL_LUFS = 2.0          # sonoridad integrada medida: objetivo ± 2 LU (loudnorm de una pasada en piezas cortas)
+TOL_PICO_DB = 0.5       # pico verdadero medido: techo de marca.yml + 0.5 dB (el AAC añade algo de pico)
+UMBRAL_MOVIMIENTO = 0.3  # diferencia media absoluta (gris, 0-255) de la zona del diálogo entre dos instantes
+ENTRADA_MOV_S = 0.04    # el primer instante se mide apenas empieza la entrada, con el texto casi invisible
+
+
+def pista_verificada(raiz: Path, pista_id: str, sha: str | None) -> tuple[bool, str]:
+    """La pista existe en pistas.yml como verificada, con LICENCIA.md y el sha256 igual al del plan."""
+    from . import musica as mod_musica
+    p = next((x for x in (mod_musica.manifiesto(raiz).get("pistas") or [])
+              if isinstance(x, dict) and x.get("id") == pista_id), None)
+    if p is None:
+        return False, f"la pista {pista_id!r} no está en pistas.yml"
+    if p.get("estado") != "verificada":
+        return False, f"la pista {pista_id!r} está {p.get('estado')!r}, no verificada"
+    if not mod_musica.ruta_licencia(raiz, pista_id).is_file():
+        return False, f"falta marca/musica/{pista_id}/LICENCIA.md"
+    if not p.get("sha256") or str(p["sha256"]).lower() != str(sha or "").lower():
+        return False, f"el sha256 del plan no coincide con el de pistas.yml para {pista_id!r}"
+    return True, f"pista {pista_id} verificada (CC0), licencia en marca/musica/{pista_id}/LICENCIA.md"
+
+
+def musica_en_plan(plan: dict, marca: Marca, ficha: dict | None) -> tuple[bool, str]:
+    """[plan] Música CC0 en pieza sin audio propio (y nunca encima del audio de un video)."""
+    tipo = (plan.get("audio") or {}).get("tipo")
+    sin_musica = bool(((ficha or {}).get("reglas") or {}).get("sin_musica")
+                      or (plan.get("campana") or {}).get("sin_musica"))
+    camp = plan.get("campana") or {}
+    sin_audio_propio = (not plan.get("origen")) or camp.get("audio") == "silencio" or tipo == "silencio"
+    if sin_musica:
+        return True, "la ficha tiene sin_musica: no aplica"
+    if not sin_audio_propio:
+        if tipo == "musica":
+            return False, "la pieza trae audio de origen y el plan declara música"
+        return True, "la pieza trae audio de origen: sin música"
+    if tipo != "musica":
+        return False, f"pieza sin audio propio: el plan declara audio {tipo!r}, debe llevar música CC0"
+    a = plan["audio"]
+    return pista_verificada(marca.raiz, str(a.get("pista")), a.get("sha256"))
+
+
+def sin_musica_en_plan(plan: dict, ficha: dict | None) -> tuple[bool, str]:
+    """[plan] Con sin_musica, el plan no declara música."""
+    tipo = (plan.get("audio") or {}).get("tipo")
+    return tipo != "musica", f"audio {tipo!r}"
+
+
+def medir_sonoridad(video: Path) -> tuple[dict | None, str | None]:
+    """({"I": LUFS integrados, "pico": pico verdadero en dBTP}, motivo del error) con ebur128 de ffmpeg."""
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(video), "-vn", "-af",
+                        "ebur128=peak=true", "-f", "null", "-"], capture_output=True, text=True)
+    if r.returncode != 0:
+        return None, f"ffmpeg falló (código {r.returncode})"
+    # El resumen final sale después de la línea "Summary:"; las líneas de progreso también traen "I:".
+    resumen = r.stderr.rpartition("Summary:")[2]
+    mi = re.search(r"\bI:\s*(-?[0-9.]+|-inf)\s*LUFS", resumen)
+    mp = re.search(r"True peak:.*?\bPeak:\s*(-?[0-9.]+|-inf)\s*dBFS", resumen, re.S) \
+        or re.search(r"\bPeak:\s*(-?[0-9.]+|-inf)\s*dBFS", resumen)
+    if not (mi and mp):
+        return None, "ebur128 no dio el resumen (I y Peak)"
+    return {"I": float(mi.group(1)), "pico": float(mp.group(1))}, None
+
+
+def volumen_normalizado(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
+    cfg = marca.datos.get("musica") or {}
+    if not cfg:
+        return False, "marca.yml no define la sección musica"
+    lufs, techo = float(cfg["lufs"]), float(cfg["pico_db"])
+    med, error = medir_sonoridad(Path(video))
+    if med is None:
+        return False, f"no se pudo medir el volumen: {error}"
+    ok_i = lufs - TOL_LUFS <= med["I"] <= lufs + TOL_LUFS
+    ok_p = med["pico"] <= techo + TOL_PICO_DB
+    return ok_i and ok_p, (f"sonoridad {med['I']:.1f} LUFS (objetivo {lufs:g} ± {TOL_LUFS:g}); "
+                           f"pico {med['pico']:.1f} dBTP (máximo {techo + TOL_PICO_DB:g})")
+
+
+def movimiento_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
+    """Sin video, la zona del diálogo cambia entre el inicio de la entrada y el punto medio de la primera línea."""
+    lineas = plan.get("lineas", [])
+    if not lineas:
+        return True, "sin líneas de diálogo"
+    geo = _geometria(plan, marca)
+    if geo is None:
+        return False, "el plan no trae la geometría del diálogo"
+    ln = lineas[0]
+    t0, t1 = float(ln.get("t0", 0)), float(ln.get("t1", 0))
+    dur = float(plan.get("duracion") or 0)
+    t_ini = t0 + ENTRADA_MOV_S
+    t_med = (t0 + t1) / 2
+    if dur > 0:
+        t_med = min(t_med, dur - float(marca.m("cierre_s")) - 0.1)
+    y0 = int(geo["y_dialogo"])
+    y1 = min(marca.alto, y0 + int(alto_zona(marca)))
+    a, b = _fotograma(Path(video), t_ini), _fotograma(Path(video), t_med)
+    if a is None or b is None or a.size != b.size:
+        return False, "no se pudo leer los fotogramas del movimiento"
+    za = np.asarray(a.convert("L").crop((0, y0, marca.ancho, y1)), dtype=np.float32)
+    zb = np.asarray(b.convert("L").crop((0, y0, marca.ancho, y1)), dtype=np.float32)
+    d = float(np.abs(za - zb).mean())
+    return d > UMBRAL_MOVIMIENTO, f"diferencia {d:.2f} entre {t_ini:.2f} s y {t_med:.2f} s (mínimo {UMBRAL_MOVIMIENTO:g})"
+
+
+def alto_zona(marca: Marca) -> int:
+    return int(marca.m("alto_nombre") + marca.m("alto_acotacion") + marca.max_lineas_frase * marca.m("alto_linea_frase"))
+
+
+
 def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     """El cuerpo del MP4 es el metraje de origen en el mismo instante (miniaturas en gris)."""
     origen = plan.get("origen")
@@ -632,6 +741,17 @@ def revisar(video: Path, plan: dict, marca: Marca, ficha: dict | None = None) ->
     if ((ficha or {}).get("reglas") or {}).get("sin_musica") or (plan.get("campana") or {}).get("sin_musica"):
         ok_au, det_au = audio_original(Path(video), plan)
         punto("fotograma", "Audio sólo el original (sin música)", ok_au, det_au)
+    ok_mu, det_mu = musica_en_plan(plan, marca, ficha)
+    punto("plan", "Música CC0 en pieza sin audio propio", ok_mu, det_mu)
+    if (((ficha or {}).get("reglas") or {}).get("sin_musica") or (plan.get("campana") or {}).get("sin_musica")):
+        ok_sm, det_sm = sin_musica_en_plan(plan, ficha)
+        punto("plan", "Sin música por sin_musica", ok_sm, det_sm)
+    if (plan.get("audio") or {}).get("tipo") == "musica":
+        ok_vo, det_vo = volumen_normalizado(Path(video), plan, marca)
+        punto("fotograma", "Volumen normalizado", ok_vo, det_vo)
+    if not plan.get("origen") and plan.get("lineas"):
+        ok_mo, det_mo = movimiento_visible(Path(video), plan, marca)
+        punto("fotograma", "Movimiento en pieza sin video", ok_mo, det_mo)
 
     col = plan.get("colores", {})
     colores_ok = all(str(col.get(k, "")).lower() == str(marca.datos["colores"][k]).lower()
