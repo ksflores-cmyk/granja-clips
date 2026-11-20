@@ -86,7 +86,7 @@ def test_temporada_tiene_el_pilar_compilados_y_suma_uno(temporada):
 # ---------------------------------------------------------------- elegir candidatos
 
 def ficha_t(fid="twitch-a", **cambios):
-    f = {"id": fid, "tipo": "T", "creador": "streamers", "origen": "twitch", "estado": "vigente",
+    f = {"id": fid, "tipo": "T", "creador": "twitch.tv/streamers", "twitch_login": "streamers", "origen": "twitch", "estado": "vigente",
          "uso": "produccion", "publicable": True, "vence": None, "pilares": ["momentos", "primeras_veces"],
          "campana": None, "presupuesto_restante": None,
          "reglas": {"duracion_s": [7, 30], "plataformas": ["shorts", "tiktok", "reels"], "permite_descarga": True,
@@ -263,7 +263,8 @@ def test_textos_de_reacciones_y_hashtags_de_la_temporada(cfg, temporada):
     assert t["etiquetas"] == ["#GTA6", "#GTAVI", "#Rockstar", "#Gaming", "#Reacciones"]
     assert "3 reacciones de hoy" in t["texto"] and "Mejores reacciones del día en GTA 6" in t["texto"]
     s = formatos.textos_compilado(compilado_de_texto(), "shorts", temp, cfg)
-    assert s["etiquetas"] == ["#GTA6", "#GTAVI", "#Rockstar"]
+    # Con tope de 3 y 4 hashtags de temporada, el del formato conserva su lugar (decisión al fusionar #7 con #8).
+    assert s["etiquetas"] == ["#GTA6", "#GTAVI", "#MejoresMomentos"]
 
 
 def test_textos_sin_un_creador_en_la_linea_es_descartada(cfg, temporada, monkeypatch):
@@ -391,7 +392,7 @@ def segmentos_sinteticos(carpeta, n=3, dur=DUR_SEG, fecha=HOY, formato=None, cfg
         dur = duraciones[i] if duraciones else dur
         fuente = fuente_sintetica(carpeta / f"f{i}.mp4", dur + 2.0, tono, patron=patrones[i])
         propia = Toma(7, f"Clip {'uno dos tres'.split()[i]} del día", "CLIP", escena=f"INT. STREAM {i + 1} — TARDE")
-        ficha = ficha_t(f"twitch-{creador}", creador=creador)
+        ficha = ficha_t(f"twitch-{creador}", creador=f"twitch.tv/{creador}", twitch_login=creador)
         toma = formatos.toma_de_segmento(propia, formato, 7, i, creador, ficha) if formato else propia
         segs.append(formatos.Segmento(
             fuente=fuente, inicio=1.0, duracion=dur, toma=toma,
@@ -595,7 +596,7 @@ def candidatos_falsos(n=3, vph=(30, 20, 10)):
 
 
 def fichas_falsas():
-    return [ficha_t(f"twitch-{c}", creador=c) for c in CREADORES]
+    return [ficha_t(f"twitch-{c}", creador=f"twitch.tv/{c}", twitch_login=c) for c in CREADORES]
 
 
 def segmento_falso_fn(carpeta, dur=DUR_SEG, duraciones=None, falla=()):

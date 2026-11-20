@@ -27,15 +27,13 @@ from .detectar import Candidato
 from .editar.lienzo import Toma, _limpia
 from .editar.marca import Marca
 from .editar.toma import Resultado, armar, copia_para_ojos, lapiz_de
-from .publicar import (MAX_TEXTO, Descartada, _comprobar_repetido, _limpio, _titulo_youtube,
-                       contar_emojis)
+from . import textos as mod_textos   # la tarea #8: límites por red, título, hashtags y comprobaciones finales
+from .publicar import Descartada, _comprobar_repetido, _limpio
 from .registro import ZONA, contador_toma
 
 TIPOS_APTOS = ("T", "A")
 TIPOS_MUESTRA = ("T", "A", "B")
 PLATAFORMAS = ("shorts", "tiktok", "reels")
-HASHTAGS_MAX = {"shorts": 3, "tiktok": 3, "reels": 5}
-HASHTAGS_MIN_REELS = 3
 SEP_CREDITOS = " · "
 MARGEN_DURACION_S = 0.1     # el relleno del AAC alarga el MP4 unos 37 ms: la suma deja margen en los dos bordes
 
@@ -300,7 +298,9 @@ def textos_compilado(compilado: Compilado, plataforma: str, temporada: dict, cfg
         <divulgación de cada ficha, si la hay>
         #GTA6 #MejoresMomentos #Streamers
     """
-    if plataforma not in HASHTAGS_MAX:
+    cfg_t = mod_textos.cargar_config()
+    lim = cfg_t["limites"].get(plataforma)
+    if lim is None:
         raise Descartada(f"plataforma desconocida: {plataforma}")
     formato = cfg["formatos"].get(compilado.formato)
     if formato is None:
@@ -339,29 +339,35 @@ def textos_compilado(compilado: Compilado, plataforma: str, temporada: dict, cfg
             e = str(e).strip()
             if e and e.lower() not in {x.lower() for x in obligatorias}:
                 obligatorias.append(e)
-    deseadas = [str(h).strip() for h in (temporada.get("hashtags") or [])]
+    deseadas = [mod_textos.nfc(h).strip() for h in (temporada.get("hashtags") or [])]
     if not deseadas:
         deseadas = [_hashtag_del_juego(temporada.get("nombre"))]
-    deseadas += [str(h).strip() for h in formato["hashtags"]]
-    etiquetas = list(obligatorias)
-    tope = HASHTAGS_MAX[plataforma]
+    del_formato = [mod_textos.nfc(h).strip() for h in formato["hashtags"]]
+    tope = lim["max_hashtags"]
+    etiquetas = mod_textos._sin_repetir(mod_textos._validas(list(obligatorias)), set())
     visto = {e.lower() for e in etiquetas}
+    n_tags = lambda: len([e for e in etiquetas if e.startswith("#")])  # noqa: E731
+    # El hashtag propio del formato (#MejoresMomentos) siempre cabe: con 3 del juego en la temporada y tope 3
+    # en Shorts/TikTok, el orden «temporada y luego formato» lo dejaría fuera (decisión al fusionar #7 con #8).
+    propio = next((h for h in del_formato if mod_textos.es_hashtag(h) and h.lower() not in visto), None)
+    reservado = 1 if propio else 0
     for h in deseadas:
-        if h.startswith("#") and len(h) > 1 and h.lower() not in visto \
-                and len([e for e in etiquetas if e.startswith("#")]) < tope:
+        if mod_textos.es_hashtag(h) and h.lower() not in visto and n_tags() < tope - reservado:
             visto.add(h.lower())
             etiquetas.append(h)
-    n_tags = len([e for e in etiquetas if e.startswith("#")])
-    if plataforma == "reels" and n_tags < HASHTAGS_MIN_REELS:
-        raise Descartada("Instagram necesita de 3 a 5 etiquetas y no hay suficientes")
+    for h in ([propio] if propio else []) + del_formato:
+        if mod_textos.es_hashtag(h) and h.lower() not in visto and n_tags() < tope:
+            visto.add(h.lower())
+            etiquetas.append(h)
+    if n_tags() < lim["min_hashtags"]:
+        raise Descartada(f"{plataforma} necesita de {lim['min_hashtags']} a {lim['max_hashtags']} "
+                         "etiquetas y no hay suficientes")
     if etiquetas:
         cola.append(" ".join(etiquetas))
     texto = "\n\n".join(bloques) + "\n\n" + "\n".join(cola)
-    if contar_emojis(texto) > 1:
-        raise Descartada("el texto lleva más de un emoji")
-    if len(texto) > MAX_TEXTO:
-        raise Descartada(f"el texto pasa de {MAX_TEXTO} caracteres")
-    titulo = _titulo_youtube(primera) if plataforma == "shorts" else None
+    for s in segs:   # un emoji, palabras a evitar de cada ficha y largo de la red, como en toda toma (textos.py)
+        mod_textos._comprobar_final(texto, s.ficha, plataforma, cfg_t)
+    titulo = mod_textos._titulo_de(primera, plataforma, cfg_t)
     if raiz is not None:
         # El gancho del formato se repite a propósito cada día: lo que no se repite es el compilado del mismo
         # día, así que para el control de «gancho repetido» el gancho lleva la fecha del compilado.

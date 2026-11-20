@@ -276,7 +276,7 @@ def test_la_toma_lleva_id_origen_y_claves_ordenadas_y_se_guardan_en_el_libro(r):
 def test_la_comprobacion_final_por_red_descarta_la_red_con_clave_repetida(r, monkeypatch):
     """El respaldo informativo no pasa por el filtro de candidatos: lo para la comprobación previa a subir."""
     cambiar_modo(r, "vivo", ["shorts", "tiktok"])
-    entrada = {"id": "inf-x", "gancho": "Un dato", "titular": "Un dato", "datos": ["uno", "dos"]}
+    entrada = {"id": "inf-x", "gancho": "Rockstar confirma nuevo mapa", "titular": "Rockstar confirma nuevo mapa", "datos": ["uno", "dos"]}
     monkeypatch.setattr(ciclo.informativa, "elegir", lambda raiz, ahora: entrada)
     monkeypatch.setattr(ciclo.informativa, "cabe_en_el_tope", lambda raiz, ahora: (True, ""))
     monkeypatch.setattr(ciclo.informativa, "armar", armar_falso)
