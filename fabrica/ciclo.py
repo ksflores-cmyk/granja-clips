@@ -401,7 +401,7 @@ def _horas_de_la_red(raiz, filas: list[dict], plataforma: str, dia: date) -> lis
 
 def buscar_hueco(raiz, ahora: datetime, activas: list[str]) -> Hueco | None:
     """El hueco de esta corrida. Primero el normal de horarios.yml entre ahora+margen_min y ahora+margen_max con
-    alguna red libre. Si no hay, el relleno: un hueco de hoy ya perdido, a ahora+margen_min (redondeado a 5 min),
+    alguna red libre. Si no hay, el relleno: un hueco de hoy ya perdido, a ahora+margen_min+duración máxima del ciclo (redondeado a 5 min),
     sólo si no se amontona con lo demás del día. Sin nada, None."""
     if not activas:
         return None
@@ -418,7 +418,8 @@ def buscar_hueco(raiz, ahora: datetime, activas: list[str]) -> Hueco | None:
             return Hueco(cuando, libres)
     # relleno
     hoy = local.date()
-    t = _redondear_5(local + timedelta(seconds=hz["margen_min_s"]))
+    # el relleno debe seguir siendo futuro (>= MINUTOS_MINIMOS_FUTURO) cuando termine el ciclo, que puede durar LIMITE_CICLO_S
+    t = _redondear_5(local + timedelta(seconds=hz["margen_min_s"] + plazo.LIMITE_CICLO_S))
     if t.date() != hoy or t > _a_las(hoy, hz["ultima_hora"]):
         return None
     intentos = intentos_de_huecos(raiz)
