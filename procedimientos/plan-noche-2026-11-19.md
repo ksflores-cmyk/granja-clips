@@ -10,6 +10,8 @@ Lo escribe el jefe de Clips el 19 nov, 8:30 p. m. GT. Cada tarea programada de e
 - `ojos-prueba` falla siempre: su muestra pesa 21.3 MB y el tope en línea es 14 MB.
 - Twitch: claves presentes; id de Grand Theft Auto VI = `1867279146`.
 - 847 pruebas en verde en `main`.
+- **Instagram: el canal está DESCONECTADO en Buffer** (`isDisconnected: true`, 19 nov 7:28 p. m.) y el perfil @guionvivo sale «no disponible» sin sesión. Hasta que Kevin revise la cuenta y reconecte en Buffer, la fábrica publica sólo en Shorts y TikTok: ninguna tarea intenta reconectar ni crea cuentas. Si sigue así a las 6:45, va como alerta en el reporte.
+- Toma 1: borrada de YouTube el 19 nov 7:26 p. m. (Studio, Guion Vivo). TikTok e Instagram: el navegador interno no tiene sesión; la borra Kevin desde la app.
 
 ## Decisiones de Kevin (19 nov, 8:00 p. m.)
 
@@ -71,4 +73,5 @@ Lo escribe el jefe de Clips el 19 nov, 8:30 p. m. GT. Cada tarea programada de e
 
 ## Bitácora de la noche
 
-- 19 nov 8:20 p. m. — jefe: ping de Gemini añadido a `diagnostico.yml` (corrida 44652467169). Plan escrito y tareas programadas.
+- 19 nov 8:20 p. m. — jefe: ping de Gemini añadido a `diagnostico.yml` (corrida 44652467169). Plan escrito y 18 tareas programadas (ids `trig_01UG3M…` a `trig_01VCGM…`).
+- 19 nov 7:28 p. m. — jefe: toma 1 borrada de YouTube; Instagram desconectado en Buffer (ver Estado).
