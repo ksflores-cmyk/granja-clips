@@ -269,16 +269,19 @@ def test_la_puerta_de_estilo_usa_la_duracion_de_la_ficha(marca, sin_logo):
 def test_el_plan_declara_la_capa_y_el_logo_esta_en_el_lugar_de_marca_yml(marca, con_logo):
     mp4, plan = con_logo
     m = plan["campana"]["marca_agua"]
-    cuerpo = plan["geometria"]["cuerpo"]
-    cfg = marca.marca_agua
+    seg, acc = marca.pc["zona_segura"], marca.pc["zona_accion"]
     assert m["archivo"] == "marca/campanas/fm27/logo.png"
-    assert cfg["posicion"] == "cuerpo_inferior_derecha"
-    # esquina inferior derecha del cuerpo, a `margen` del borde, y dentro de él
-    assert m["caja"]["x"] + m["caja"]["ancho"] == cuerpo["x"] + cuerpo["ancho"] - cfg["margen"]
-    assert m["caja"]["y"] + m["caja"]["alto"] == cuerpo["y"] + cuerpo["alto"] - cfg["margen"]
+    # v2: esquina superior derecha de la zona segura, bajo la mosca, y sin tocar la zona de acción
+    assert m["caja"]["x"] + m["caja"]["ancho"] == seg["x1"]
+    assert m["caja"]["y"] == marca.pc["agua"]["y"] and m["caja"]["y"] + m["caja"]["alto"] <= acc["y0"]
+    capas = {c["tipo"]: c for c in plan["geometria"]["capas"]}
+    assert (capas["marca_agua"]["x"], capas["marca_agua"]["y"]) == (m["caja"]["x"], m["caja"]["y"])
     # nunca sobre la cabecera, el diálogo ni la mosca
-    assert m["caja"]["y"] >= plan["geometria"]["y_contenido"]
-    assert m["caja"]["y"] + m["caja"]["alto"] <= plan["geometria"]["y_dialogo"]
+    assert m["caja"]["y"] >= capas["mosca"]["y"] + capas["mosca"]["alto"]
+    for tipo in ("fila", "cabecera", "dialogo_1"):
+        c = capas[tipo]
+        assert (c["x"] + c["ancho"] <= m["caja"]["x"] or m["caja"]["x"] + m["caja"]["ancho"] <= c["x"]
+                or c["y"] + c["alto"] <= m["caja"]["y"] or m["caja"]["y"] + m["caja"]["alto"] <= c["y"]), tipo
 
 
 def test_la_puerta_acepta_el_logo_si_la_ficha_lo_declara(marca, con_logo):
@@ -416,7 +419,7 @@ def test_con_sin_musica_el_audio_es_el_original(marca, con_logo):
     assert plan["campana"]["sin_musica"] is True and plan["campana"]["audio"] == "original"
     ok, det = estilo.audio_original(mp4, plan)
     assert ok, det
-    assert punto(estilo.revisar(mp4, plan, marca, ficha=ficha_real()), "Audio sólo el original (sin música)")[0]
+    assert punto(estilo.revisar(mp4, plan, marca, ficha=ficha_real()), "Audio original del clip")[0]
 
 
 def test_la_orden_de_ffmpeg_no_mezcla_audio_nuevo(marca, video, tmp_path, monkeypatch):
@@ -432,7 +435,7 @@ def test_la_orden_de_ffmpeg_no_mezcla_audio_nuevo(marca, video, tmp_path, monkey
                           fuente_video=video, inicio=2.0, ficha=ficha_real())
     orden = next(c for c in cmds if "-filter_complex" in c)
     maps = [orden[i + 1] for i, x in enumerate(orden) if x == "-map"]
-    assert maps == ["[out]", "1:a"]                                   # el audio es el de la fuente
+    assert maps == ["[out]", "0:a:0"]                                 # el audio es el de la fuente
     assert "amix" not in orden[orden.index("-filter_complex") + 1] and not any("anullsrc" in x for x in orden)
 
 
@@ -612,7 +615,7 @@ def test_ensayo_de_punta_a_punta_con_la_ficha_sega_fm27(repo, tmp_path, video):
     # la puerta de estilo en verde, con la marca de agua y el audio original demostrados
     assert all(ok for _, ok, _ in r.puntos), [n for n, ok, _ in r.puntos if not ok]
     assert punto(r.puntos, "Marca de agua de la campaña")[0]
-    assert punto(r.puntos, "Audio sólo el original (sin música)")[0]
+    assert punto(r.puntos, "Audio original del clip")[0]
     assert punto(r.puntos, "Duración de 10 a 30 s")[0]
     assert (repo / "marca.yml").read_text(encoding="utf-8") == antes
     # Gemini recibió el juego de la ficha y el recorte de la ficha, no el de la temporada

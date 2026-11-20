@@ -23,7 +23,7 @@ from .. import plazo
 from . import agua as mod_agua
 from . import cierre as mod_cierre
 from . import dialogo as mod_dialogo
-from . import lienzo
+from . import lienzo, placas
 from .lienzo import Toma, _limpia, partir
 from .marca import Marca
 
@@ -53,6 +53,16 @@ TOL_AGUA = 8.0
 SALTO_AGUA = 5.0       # lo esperado debe parecerse al fotograma al menos esto más que la fuente limpia
 UMBRAL_LOGO_EXTRA = 12.0
 DURACION_FORMATO_S = (7.0, 30.0)
+
+# Plantilla v2 (pantalla completa). La tolerancia de los bordes es la diferencia media en gris, tras 1 px de desenfoque,
+# entre las 4 franjas del borde del MP4 y de la fuente recortada y escalada como dice el plan (fuera de las placas).
+PLANTILLA_V2 = "v2-pantalla-completa"
+BORDE_PX = 24
+TOL_BORDE = 6.0
+
+# El MP4 sale a 30 fps y la fuente puede traer 24 o 25: el fotograma del MP4 en `t` puede ser el de la fuente un paso antes
+# o después. En las comparaciones con la fuente se acepta el mejor de estos desfases (en segundos).
+DESFASES_FUENTE_S = (0.0, -1 / 24, 1 / 24)
 
 RE_EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿⬀-⯿️‍⃣\U0001F1E6-\U0001F1FF]")
 
@@ -186,13 +196,270 @@ def discrepancia_local(real: Image.Image, esperado: Image.Image, papel: Image.Im
     return int(sumas.max())
 
 
+def es_v2(plan: dict) -> bool:
+    """True si el plan es de la plantilla v2 (toma con video a pantalla completa)."""
+    return plan.get("plantilla") == PLANTILLA_V2
+
+
+def _placas_del_plan(plan: dict, marca: Marca) -> list[placas.Placa]:
+    """Las placas que el plan debe llevar, dibujadas desde el texto del plan y marca.yml. ValueError si no se pueden."""
+    en_plan = (plan.get("campana") or {}).get("marca_agua")
+    logo = None
+    if en_plan and (marca.raiz / en_plan["archivo"]).is_file():
+        logo = marca.raiz / en_plan["archivo"]
+    return placas.construir(marca, _toma(plan), plan.get("lineas", []), float(plan.get("duracion") or 0), logo)
+
+
+def _comparar_placa(real: Image.Image, placa: placas.Placa, papel: Image.Image) -> dict[str, int]:
+    """Discrepancia por región (la placa entera, o sus regiones con nombre) entre el fotograma y la placa esperada."""
+    esperado = real.copy()
+    esperado.paste(placa.imagen.convert("RGB"), (placa.x, placa.y))
+    regiones = placa.regiones or {"placa": placa.caja()}
+    return {n: discrepancia_local(real, esperado, papel, caja) for n, caja in regiones.items()}
+
+
+def _placas_visibles(video: Path, plan: dict, marca: Marca, pedidas: list[tuple[placas.Placa, float]]) -> tuple[bool, str]:
+    """Cada placa pedida, en su instante, está en el MP4 tal como el plan la dibuja (dentro de su caja)."""
+    papel = lienzo.papel(marca)
+    fallos, detalle = [], []
+    for placa, t in pedidas:
+        real = _fotograma(Path(video), t)
+        if real is None or real.size != papel.size:
+            fallos.append(f"{placa.tipo}: no se pudo leer el fotograma en {t:.2f} s")
+            continue
+        try:
+            difs = _comparar_placa(real, placa, papel)
+        except ValueError as e:
+            fallos.append(f"{placa.tipo}: {e}")
+            continue
+        d = max(difs.values())
+        detalle.append(f"{placa.tipo} {d}")
+        if not d < K_BLOQUE:
+            fallos.append(f"{placa.tipo} distinta en {t:.2f} s ({d} px discrepantes)")
+    if fallos:
+        return False, "; ".join(fallos) + f" (máximo {K_BLOQUE} px por bloque)"
+    return True, f"diferencias {', '.join(detalle)} (máximo {K_BLOQUE} px por bloque)"
+
+
+def _instante_medio(plan: dict, marca: Marca, frac: float = 0.5) -> float:
+    dur = float(plan.get("duracion") or 0)
+    return max(0.0, min(dur * frac, dur - float(marca.m("cierre_s")) - 0.1))
+
+
+def _del_tipo(esperadas: list[placas.Placa], *tipos: str) -> list[placas.Placa]:
+    return [p for p in esperadas if p.tipo in tipos or (p.tipo.startswith("dialogo") and "dialogo" in tipos)]
+
+
+def _fuente_encuadrada(ruta: Path, t_fuente: float, recorte: dict, marca: Marca) -> Image.Image | None:
+    """Fotograma de la fuente recortado con el recorte del plan y escalado a cuadro completo (RGBA)."""
+    f = _fotograma(ruta, t_fuente)
+    if f is None:
+        return None
+    x, y, w, h = (int(recorte[k]) for k in ("x", "y", "ancho", "alto"))
+    if w <= 0 or h <= 0 or x < 0 or y < 0 or x + w > f.width or y + h > f.height:
+        return None
+    return f.crop((x, y, x + w, y + h)).resize((marca.ancho, marca.alto), Image.LANCZOS).convert("RGBA")
+
+
+def _fuente_esperada(plan: dict, marca: Marca, t: float) -> Image.Image | None:
+    """Fotograma de la fuente en el instante `t` de la toma, tal como el plan dice que se ve (sin placas)."""
+    origen, geo = plan.get("origen") or {}, plan.get("geometria") or {}
+    ruta, t_fuente = Path(origen["archivo"]), float(origen["inicio"]) + t
+    if es_v2(plan):
+        return _fuente_encuadrada(ruta, t_fuente, geo.get("recorte") or {}, marca)
+    return _fuente_en_cuerpo(ruta, t_fuente, geo["cuerpo"])
+
+
+def _mejor_contra_fuente(plan: dict, marca: Marca, t: float, medir, tope: float) -> float | None:
+    """Menor valor de `medir(fuente)` con la fuente en `t` y en un paso de fotograma antes o después.
+
+    Se detiene en cuanto baja de `tope`. None si no se pudo leer la fuente.
+    """
+    mejor = None
+    for desfase in DESFASES_FUENTE_S:
+        fuente = _fuente_esperada(plan, marca, max(0.0, t + desfase))
+        if fuente is None:
+            continue
+        d = medir(fuente)
+        mejor = d if mejor is None else min(mejor, d)
+        if mejor < tope:
+            break
+    return mejor
+
+
+def _mascara_placas(plan: dict, t: float, marca: Marca) -> np.ndarray:
+    """Máscara (alto, ancho) True donde NO hay placa activa en el instante `t` (según las capas del plan)."""
+    libre = np.ones((marca.alto, marca.ancho), dtype=bool)
+    for c in (plan.get("geometria") or {}).get("capas", []):
+        if float(c.get("t0", 0)) <= t < float(c.get("t1", 0)):
+            x0, y0 = max(0, int(c["x"])), max(0, int(c["y"]))
+            libre[y0:int(c["y"] + c["alto"]), x0:int(c["x"] + c["ancho"])] = False
+    return libre
+
+
+def pantalla_completa(plan: dict, marca: Marca) -> tuple[bool, str]:
+    """[plan] El cuerpo es el cuadro entero y el recorte cubre el cuadro dentro de la fuente (sin franjas)."""
+    if not es_v2(plan):
+        return False, "la toma lleva video y el plan no es de la plantilla v2 de pantalla completa"
+    geo, origen = plan.get("geometria") or {}, plan.get("origen") or {}
+    esperado = {"x": 0, "y": 0, "ancho": marca.ancho, "alto": marca.alto}
+    if geo.get("cuerpo") != esperado:
+        return False, f"el cuerpo es {geo.get('cuerpo')} y debe ser {esperado}"
+    r = geo.get("recorte") or {}
+    try:
+        x, y, w, h, esc = (float(r[k]) for k in ("x", "y", "ancho", "alto", "escala"))
+    except (KeyError, TypeError, ValueError):
+        return False, f"el plan no trae el recorte completo: {r}"
+    ruta = Path(str(origen.get("archivo", "")))
+    if not ruta.is_file():
+        return False, f"el archivo de origen no está: {ruta}"
+    from .componer import sondear_video
+    info = sondear_video(ruta)
+    cubrir = max(marca.ancho / info["ancho"], marca.alto / info["alto"])
+    if esc < cubrir - 1e-3:
+        return False, f"escala {esc:.3f} menor que la de cubrir {cubrir:.3f}: quedarían franjas"
+    if abs(w * esc - marca.ancho) > 2 * esc or abs(h * esc - marca.alto) > 2 * esc:
+        return False, f"el recorte {w:g}x{h:g} a escala {esc:.3f} no llena {marca.ancho}x{marca.alto}"
+    if x < 0 or y < 0 or x + w > info["ancho"] or y + h > info["alto"]:
+        return False, f"el recorte {r} se sale de la fuente {info['ancho']}x{info['alto']}"
+    return True, f"cuerpo {marca.ancho}x{marca.alto}, recorte {int(w)}x{int(h)} en ({int(x)}, {int(y)}), modo {r.get('modo')}"
+
+
+def capas_fuera_de_la_accion(plan: dict, marca: Marca) -> tuple[bool, str]:
+    """[plan] Ninguna placa toca la zona de acción, todas van en la zona segura y suman menos del tope del cuadro."""
+    capas = (plan.get("geometria") or {}).get("capas")
+    if not isinstance(capas, list) or not capas:
+        return False, "el plan no trae geometria.capas"
+    malas = placas.problemas_capas(capas, marca)
+    return not malas, "; ".join(malas) if malas else f"{len(capas)} placas dentro de la zona segura y fuera de la zona de acción"
+
+
+def capas_coinciden(plan: dict, marca: Marca) -> tuple[bool, str]:
+    """[plan] Las capas del plan son las placas que marca.yml dibuja para ese texto (misma caja y mismos tiempos)."""
+    try:
+        esperadas = [p.capa() for p in _placas_del_plan(plan, marca)]
+    except ValueError as e:
+        return False, f"el plan no se puede dibujar: {e}"
+    capas = (plan.get("geometria") or {}).get("capas")
+    if capas == esperadas:
+        return True, f"{len(esperadas)} placas iguales a las de marca.yml"
+    dif = [f"{a.get('tipo')}" for a, b in zip(capas or [], esperadas) if a != b]
+    if len(capas or []) != len(esperadas):
+        dif.append(f"el plan trae {len(capas or [])} placas y marca.yml dibuja {len(esperadas)}")
+    return False, "capas distintas de las de marca.yml: " + ", ".join(dif)
+
+
+def bordes_coinciden(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
+    """[fotograma] Las 4 franjas del borde (fuera de las placas) coinciden con la fuente recortada y escalada.
+
+    Un video con franjas negras o de papel falla; una escena oscura de verdad no, porque se compara contra la fuente.
+    """
+    origen, geo = plan.get("origen") or {}, plan.get("geometria") or {}
+    if not origen or not geo.get("recorte"):
+        return False, "el plan no trae origen y recorte"
+    dur = float(plan.get("duracion") or 0)
+    ruta = Path(str(origen.get("archivo", "")))
+    if not ruta.is_file():
+        return False, f"el archivo de origen no está: {ruta}"
+    w, h = marca.ancho, marca.alto
+    franjas = {"arriba": (slice(0, BORDE_PX), slice(0, w)), "abajo": (slice(h - BORDE_PX, h), slice(0, w)),
+               "izquierda": (slice(0, h), slice(0, BORDE_PX)), "derecha": (slice(0, h), slice(w - BORDE_PX, w))}
+    peor, donde = 0.0, ""
+    for frac in (0.3, 0.7):
+        t = _instante_medio(plan, marca, frac)
+        real = _fotograma(Path(video), t)
+        if real is None:
+            return False, f"no se pudo leer el fotograma en {t:.2f} s"
+        libre = _mascara_placas(plan, t, marca)
+        a = _gris_desenfocado(real)
+
+        def medir(fuente: Image.Image) -> float:
+            if fuente.size != real.size:
+                return float("inf")
+            b = _gris_desenfocado(fuente)
+            peores = [(float(np.abs(a[fy, fx] - b[fy, fx])[libre[fy, fx]].mean()), n)
+                      for n, (fy, fx) in franjas.items() if libre[fy, fx].any()]
+            medir.donde = max(peores)[1] if peores else ""
+            return max((d for d, _ in peores), default=0.0)
+        d = _mejor_contra_fuente(plan, marca, t, medir, TOL_BORDE)
+        if d is None:
+            return False, f"no se pudo leer el fotograma de la fuente en {t:.2f} s"
+        if d > peor:
+            peor, donde = d, f"{medir.donde} a {t:.1f} s"
+    return peor < TOL_BORDE, f"franja más distinta {peor:.1f} ({donde or 'ninguna'}; máximo {TOL_BORDE:g})"
+
+
+def _cierre_v2(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
+    dur = float(plan.get("duracion") or 0)
+    if dur <= 0:
+        return False, "el plan no trae la duración"
+    dur_real = sondear(Path(video))["duracion"]
+    if abs(dur_real - dur) > TOL_DURACION_S:
+        return False, f"el MP4 dura {dur_real:.2f} s y el plan {dur:.2f} s (tolerancia {TOL_DURACION_S:.2f})"
+    try:
+        cierre = _del_tipo(_placas_del_plan(plan, marca), "cierre")[0]
+    except ValueError as e:
+        return False, f"el plan no se puede dibujar: {e}"
+    cuadros = {"en duración − 0.2 s": _fotograma(Path(video), max(0.0, dur_real - 0.2)),
+               "último fotograma": _ultimo_fotograma(Path(video))}
+    papel = lienzo.papel(marca)
+    fallan: list[str] = []
+    det: list[str] = []
+    for cuando, real in cuadros.items():
+        if real is None:
+            return False, f"no se pudo leer el fotograma ({cuando})"
+        if real.size != papel.size:
+            return False, f"tamaño {real.size} distinto de {papel.size} ({cuando})"
+        try:
+            difs = _comparar_placa(real, cierre, papel)
+        except ValueError as e:
+            return False, str(e)
+        det.append(f"{cuando}: " + ", ".join(f"{n} {d}" for n, d in difs.items()))
+        fallan += [f"{n} ({cuando})" for n, d in difs.items() if not d < K_BLOQUE]
+    texto = "; ".join(det) + f" (máximo {K_BLOQUE} px por bloque)"
+    if fallan:
+        texto += "; falla: " + " y ".join(fallan)
+    return not fallan, texto
+
+
+def _gancho_se_va(video: Path, plan: dict, marca: Marca, cabecera: list[placas.Placa]) -> tuple[bool, str]:
+    """Pasado `gancho_s`, el fotograma trae la fuente en la caja del gancho (la placa ya no está)."""
+    dur = float(plan.get("duracion") or 0)
+    t = float(marca.pc["gancho_s"]) + 0.5
+    if not cabecera or t > dur - float(marca.m("cierre_s")) - 0.1:
+        return True, ""
+    p = cabecera[0]
+    real = _fotograma(Path(video), t)
+    if real is None:
+        return False, f"no se pudo leer el fotograma en {t:.2f} s"
+    caja = {"x": p.x, "y": p.y, "ancho": p.ancho, "alto": p.alto}
+    cuerpo = {"x": 0, "y": 0, "ancho": marca.ancho, "alto": marca.alto}
+    d = _mejor_contra_fuente(plan, marca, t, lambda f: _diff_region(real, f, cuerpo, caja), UMBRAL_LOGO_EXTRA)
+    if d is None:
+        return False, f"no se pudo leer la fuente en {t:.2f} s"
+    return d < UMBRAL_LOGO_EXTRA, f"gancho fuera a los {t:.1f} s: diferencia con la fuente {d:.1f} (máximo {UMBRAL_LOGO_EXTRA:g})"
+
+
+def mosca_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
+    """[fotograma] La mosca GUION VIVO está en su esquina, dentro de su placa, a mitad de la toma."""
+    try:
+        esperadas = _del_tipo(_placas_del_plan(plan, marca), "mosca")
+    except ValueError as e:
+        return False, f"el plan no se puede dibujar: {e}"
+    return _placas_visibles(Path(video), plan, marca,
+                            [(p, _instante_medio(plan, marca, f)) for p in esperadas for f in (0.3, 0.5, 0.7)])
+
+
 def cierre_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     """Demuestra en el video, no en el plan, que el cierre trae CORTE. y el crédito.
 
     Saca el fotograma de duración − 0.2 s y el último fotograma decodificable (un MP4 con los
     últimos cuadros en negro y la misma duración no debe pasar) y compara en cada uno, por separado,
     la región de CORTE. y la del crédito con la página de cierre del plan (sólo sobre la tinta esperada).
+    En la plantilla v2 el cierre es una placa sobre el video y se compara dentro de su caja.
     """
+    if es_v2(plan):
+        return _cierre_v2(video, plan, marca)
     dur = float(plan.get("duracion") or 0)
     if dur <= 0:
         return False, "el plan no trae la duración"
@@ -227,8 +494,24 @@ def cierre_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
 
 
 def cabecera_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
-    """El fotograma en t = 0.5 s trae la cabecera (gancho, lápiz, fila, escena) del plan."""
+    """El fotograma en t = 0.5 s trae la cabecera (gancho, lápiz, fila, escena) del plan.
+
+    En la plantilla v2 son dos placas (fila con TOMA y crédito, y el gancho con escena) y se comparan dentro de su caja.
+    """
     dur = float(plan.get("duracion") or 0)
+    if es_v2(plan):
+        try:
+            esperadas = _del_tipo(_placas_del_plan(plan, marca), "fila", "cabecera")
+        except ValueError as e:
+            return False, f"el plan no se puede dibujar: {e}"
+        t = min(T_CABECERA_S, dur / 2) if dur > 0 else T_CABECERA_S
+        ok, det = _placas_visibles(Path(video), plan, marca, [(p, t) for p in esperadas])
+        # la fila (TOMA y crédito) se queda en pantalla toda la toma: también a 30 % y 70 %
+        fila = _del_tipo(esperadas, "fila")
+        ok2, det2 = _placas_visibles(Path(video), plan, marca,
+                                     [(p, _instante_medio(plan, marca, f)) for p in fila for f in (0.3, 0.7)])
+        ok3, det3 = _gancho_se_va(Path(video), plan, marca, _del_tipo(esperadas, "cabecera"))
+        return ok and ok2 and ok3, "; ".join(x for x in (det, det2, det3) if x)
     try:
         esperado, y_cont = lienzo.cabecera(marca, _toma(plan))
     except ValueError as e:
@@ -263,6 +546,16 @@ def dialogo_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     lineas = plan.get("lineas", [])
     if not lineas:
         return True, "sin líneas de diálogo"
+    if es_v2(plan):
+        try:
+            esperadas = _del_tipo(_placas_del_plan(plan, marca), "dialogo")
+        except ValueError as e:
+            return False, str(e)
+        dur = float(plan.get("duracion") or 0)
+        tope = dur - float(marca.m("cierre_s")) - 0.1
+        return _placas_visibles(Path(video), plan, marca,
+                                [(p, min((p.t0 + p.t1) / 2, tope) if dur > 0 else (p.t0 + p.t1) / 2)
+                                 for p in esperadas])
     geo = _geometria(plan, marca)
     if geo is None:
         return False, "el plan no trae la geometría del diálogo"
@@ -355,7 +648,7 @@ def marca_agua_visible(video: Path, plan: dict, marca: Marca, ficha: dict | None
         return False, "el plan declara marca de agua pero no trae el cuerpo de video"
     placa = mod_agua.logo(ruta_logo, marca)
     try:
-        esperada = mod_agua.caja(marca, cuerpo, placa.size)
+        esperada = mod_agua.caja_pantalla(marca, placa.size) if es_v2(plan) else mod_agua.caja(marca, cuerpo, placa.size)
     except ValueError as e:
         return False, str(e)
     if esperada != en_plan.get("caja"):
@@ -366,41 +659,55 @@ def marca_agua_visible(video: Path, plan: dict, marca: Marca, ficha: dict | None
     for frac in (0.3, 0.7):
         t = min(dur * frac, tope)
         real = _fotograma(Path(video), t)
-        fuente = _fuente_en_cuerpo(Path(origen["archivo"]), float(origen["inicio"]) + t, cuerpo)
-        if real is None or fuente is None:
+        if real is None:
             return False, f"no se pudo leer el fotograma en {t:.2f} s"
-        limpia = fuente.copy()
-        fuente.alpha_composite(placa, (esperada["x"] - cuerpo["x"], esperada["y"] - cuerpo["y"]))
-        d_con = _diff_region(real, fuente, cuerpo, esperada)
-        d_sin = _diff_region(real, limpia, cuerpo, esperada)
-        detalle.append(f"{t:.1f} s: con logo {d_con:.1f}, sin logo {d_sin:.1f}")
-        if not (d_con < TOL_AGUA and d_sin >= d_con + SALTO_AGUA):
+        ok_t, txt = False, ""
+        for desfase in DESFASES_FUENTE_S:        # el fotograma de la fuente puede ir un paso antes o después
+            fuente = _fuente_esperada(plan, marca, max(0.0, t + desfase))
+            if fuente is None:
+                return False, f"no se pudo leer el fotograma de la fuente en {t:.2f} s"
+            limpia = fuente.copy()
+            fuente.alpha_composite(placa, (esperada["x"] - cuerpo["x"], esperada["y"] - cuerpo["y"]))
+            d_con = _diff_region(real, fuente, cuerpo, esperada)
+            d_sin = _diff_region(real, limpia, cuerpo, esperada)
+            txt = f"{t:.1f} s: con logo {d_con:.1f}, sin logo {d_sin:.1f}"
+            if d_con < TOL_AGUA and d_sin >= d_con + SALTO_AGUA:
+                ok_t = True
+                break
+        detalle.append(txt)
+        if not ok_t:
             return False, "el logo no aparece en el fotograma (" + "; ".join(detalle) + ")"
     return True, "; ".join(detalle) + f" (tolerancia {TOL_AGUA:g})"
 
 
-def logo_extra_en_esquina(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
-    """Sin capa declarada, la esquina de marca.yml donde iría el logo debe seguir siendo la de la fuente."""
+def logo_extra_en_esquina(video: Path, plan: dict, marca: Marca, cuerpo_ok: bool | None = None) -> tuple[bool, str]:
+    """Sin capa declarada, la esquina de marca.yml donde iría el logo debe seguir siendo la de la fuente.
+
+    En la plantilla v2 la mosca declarada (arriba) no cuenta como logo extra: el logo va debajo de ella.
+    """
     origen, geo = plan.get("origen") or {}, plan.get("geometria") or {}
     cuerpo = geo.get("cuerpo")
     if not origen or not cuerpo:
         return True, "no aplica"
-    if not cuerpo_coincide(video, plan, marca)[0]:      # si el cuerpo ya está en rojo, ese punto lo dice; no se duplica
+    if cuerpo_ok is None:
+        cuerpo_ok = cuerpo_coincide(video, plan, marca)[0]
+    if not cuerpo_ok:      # si el cuerpo ya está en rojo, ese punto lo dice; no se duplica
         return True, "no aplica (el cuerpo ya sale en rojo en su propio punto)"
     cfg = marca.marca_agua
     w = int(cfg["ancho"]) + 2 * int(cfg["placa"])
     h = int(round(w * 0.4))
     try:
-        c = mod_agua.caja(marca, cuerpo, (w, h))
+        c = mod_agua.caja_pantalla(marca, (w, h)) if es_v2(plan) else mod_agua.caja(marca, cuerpo, (w, h))
     except ValueError:
         return True, "no aplica (el cuerpo es más chico que el logo)"
     dur = float(plan.get("duracion") or 0)
     t = min(dur * 0.5, dur - float(marca.m("cierre_s")) - 0.2)
     real = _fotograma(Path(video), t)
-    fuente = _fuente_en_cuerpo(Path(origen["archivo"]), float(origen["inicio"]) + t, cuerpo)
-    if real is None or fuente is None:
+    if real is None:
         return False, f"no se pudo leer el fotograma en {t:.2f} s"
-    d = _diff_region(real, fuente, cuerpo, c)
+    d = _mejor_contra_fuente(plan, marca, t, lambda fuente: _diff_region(real, fuente, cuerpo, c), UMBRAL_LOGO_EXTRA)
+    if d is None:
+        return False, f"no se pudo leer el fotograma de la fuente en {t:.2f} s"
     return d < UMBRAL_LOGO_EXTRA, f"esquina del logo {d:.1f} (máximo {UMBRAL_LOGO_EXTRA:g})"
 
 
@@ -430,10 +737,25 @@ def _pistas_de_audio(video: Path) -> int:
 
 
 def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
-    """Con sin_musica el audio del MP4 es el de la fuente (correlación alta), sin audio añadido."""
+    """El audio del MP4 es el de la fuente (correlación alta), sin audio añadido; sin audio de origen, silencio.
+
+    En la plantilla v2 se comprueba siempre. El plan declara `audio` ("original" o "silencio") y la fuente lo confirma.
+    """
     camp = plan.get("campana") or {}
     origen = plan.get("origen") or {}
-    if camp.get("audio") == "silencio":
+    declarado = plan.get("audio") or camp.get("audio")
+    if es_v2(plan):
+        ruta = Path(str(origen.get("archivo", "")))
+        if not ruta.is_file():
+            return False, f"el archivo de origen no está: {ruta}"
+        tiene = _pistas_de_audio(ruta) > 0
+        if tiene and declarado != "original":
+            return False, f"la fuente trae audio y el plan declara {declarado!r}: debe ser el original"
+        if tiene and _pistas_de_audio(Path(video)) != 1:
+            return False, f"el MP4 trae {_pistas_de_audio(Path(video))} pistas de audio y debe traer exactamente una"
+        if not tiene and declarado != "silencio":
+            return False, f"la fuente no trae audio y el plan declara {declarado!r}: debe ser silencio"
+    if declarado == "silencio":
         pistas = _pistas_de_audio(Path(video))
         if pistas != 1:
             return False, f"el MP4 trae {pistas} pistas de audio y debe traer exactamente una (silencio)"
@@ -442,8 +764,8 @@ def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
             return False, f"no se pudo medir el audio: {error}"
         return pico <= UMBRAL_SILENCIO_DB, (f"la fuente no trae audio: el MP4 debe ir en silencio; pico "
                                             f"{pico:.1f} dB (máximo {UMBRAL_SILENCIO_DB:g} dB)")
-    if camp.get("audio") != "original" or not origen:
-        return False, f"el plan declara audio {camp.get('audio')!r}, no el original de la fuente"
+    if declarado != "original" or not origen:
+        return False, f"el plan declara audio {declarado!r}, no el original de la fuente"
     dur = float(plan.get("duracion") or 0)
     inicio = float(origen.get("inicio", 0))
 
@@ -501,6 +823,8 @@ def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     dur = float(plan.get("duracion") or 0)
     inicio = float(origen.get("inicio", 0))
     tope = dur - float(marca.m("cierre_s")) - 0.2
+    if es_v2(plan):
+        return _cuerpo_v2(video, plan, marca, tope)
     caja = (cuerpo["x"], cuerpo["y"], cuerpo["x"] + cuerpo["ancho"], cuerpo["y"] + cuerpo["alto"])
     alto_min = max(1, int(round(MINIATURA_ANCHO * cuerpo["alto"] / cuerpo["ancho"])))
     difs = []
@@ -525,12 +849,44 @@ def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
         f"diferencias {', '.join(f'{d:.1f}' for d in difs)} (tolerancia {UMBRAL_CUERPO:.1f})"
 
 
+def _cuerpo_v2(video: Path, plan: dict, marca: Marca, tope: float) -> tuple[bool, str]:
+    """Cuadro completo del MP4 contra la fuente recortada y escalada, fuera de las placas activas en ese instante."""
+    dur = float(plan.get("duracion") or 0)
+    alto_min = max(1, int(round(MINIATURA_ANCHO * marca.alto / marca.ancho)))
+    difs = []
+    for frac in (0.3, 0.7):
+        t = min(dur * frac, tope)
+        real = _fotograma(Path(video), t)
+        if real is None:
+            return False, f"no se pudo leer el fotograma en {t:.2f} s"
+        a = _miniatura_gris(real, MINIATURA_ANCHO, alto_min)
+        tapado = Image.fromarray(np.where(_mascara_placas(plan, t, marca), 0, 255).astype(np.uint8))
+        tapado = np.asarray(tapado.resize((MINIATURA_ANCHO, alto_min), Image.BOX)) > 0      # toca alguna placa
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):                                     # el reescalado se desborda
+            tapado = tapado | np.roll(tapado, (dy, dx), axis=(0, 1))
+        libre = ~tapado
+        if not libre.any():
+            return False, "las placas tapan todo el cuadro"
+
+        def medir(fuente: Image.Image) -> float:
+            if fuente.size != real.size:
+                return float("inf")
+            return float(np.abs(a - _miniatura_gris(fuente, MINIATURA_ANCHO, alto_min))[libre].mean())
+        d = _mejor_contra_fuente(plan, marca, t, medir, UMBRAL_CUERPO)
+        if d is None:
+            return False, f"no se pudo leer el fotograma de la fuente en {t:.2f} s"
+        difs.append(d)
+    return max(difs) < UMBRAL_CUERPO, \
+        f"diferencias {', '.join(f'{d:.1f}' for d in difs)} (tolerancia {UMBRAL_CUERPO:.1f})"
+
+
 def textos_caben(plan: dict, marca: Marca) -> tuple[bool, str]:
     """Ningún texto se sale de sus márgenes (ni una palabra sola más ancha que la línea)."""
     t = plan.get("toma", {})
     malos: list[str] = []
     util = marca.ancho - 2 * marca.m("margen")
     ancho_col = marca.columna[1] - marca.columna[0]
+    pc = marca.pc if es_v2(plan) else None
 
     def partible(nombre: str, texto: str, f, ancho: float) -> None:
         try:
@@ -542,6 +898,26 @@ def textos_caben(plan: dict, marca: Marca) -> tuple[bool, str]:
         if texto and f.getlength(texto) > ancho:
             malos.append(f"{nombre} mide {f.getlength(texto):.0f} px y caben {ancho:.0f}")
 
+    if pc is not None:
+        rel = 2 * pc["relleno_placa"]
+        partible("gancho", str(t.get("gancho", "")).upper(), marca.fuente("bold", pc["cabecera"]["tam_gancho"]),
+                 pc["ancho_max_encabezado"] - rel - 2 * pc["lapiz"]["reserva"])
+        una_linea("escena", str(t.get("escena", "")).upper(), marca.fuente("regular", pc["cabecera"]["tam_escena"]),
+                  pc["ancho_max_encabezado"] - rel)
+        fila = marca.fuente("bold", pc["fila"]["tam_toma"]).getlength("TOMA 000") + pc["fila"]["separacion"]
+        una_linea("crédito", str(t.get("credito", "")), marca.fuente("regular", pc["fila"]["tam_credito"]),
+                  pc["ancho_max_encabezado"] - rel - fila)
+        seg = pc["zona_segura"]
+        una_linea("crédito del cierre", str(t.get("credito", "")), marca.fuente("regular", pc["cierre"]["tam_credito"]),
+                  seg["x1"] - seg["x0"] - 2 * pc["cierre"]["relleno_x"])
+        d = pc["dialogo"]
+        ancho_col = d["columna_dialogo"][1] - d["columna_dialogo"][0]
+        for i, ln in enumerate(plan.get("lineas", []), 1):
+            if ln.get("frase"):
+                partible(f"frase {i}", str(ln["frase"]), marca.fuente("regular", d["tam_frase"]), ancho_col)
+            una_linea(f"nombre {i}", str(ln.get("nombre") or "").upper(), marca.fuente("regular", d["tam_nombre"]),
+                      ancho_col)
+        return not malos, "; ".join(malos)
     partible("gancho", str(t.get("gancho", "")).upper(), marca.fuente("bold", marca.m("tam_gancho")), util)
     una_linea("escena", str(t.get("escena", "")).upper(), marca.fuente("regular", marca.m("tam_escena")), util)
     una_linea("crédito", str(t.get("credito", "")), marca.fuente("regular", marca.m("tam_credito")), util)
@@ -597,9 +973,16 @@ def revisar(video: Path, plan: dict, marca: Marca, ficha: dict | None = None) ->
     palabras = gancho.split()
     punto("plan", f"Gancho de {marca.max_palabras_gancho} palabras o menos",
           0 < len(palabras) <= marca.max_palabras_gancho, f"{len(palabras)} palabras")
-    f_g = marca.fuente("bold", marca.m("tam_gancho"))
+    v2 = es_v2(plan)
+    if v2:
+        f_g = marca.fuente("bold", marca.pc["cabecera"]["tam_gancho"])
+        ancho_g = (marca.pc["ancho_max_encabezado"] - 2 * marca.pc["relleno_placa"]
+                   - 2 * marca.pc["lapiz"]["reserva"])
+    else:
+        f_g = marca.fuente("bold", marca.m("tam_gancho"))
+        ancho_g = marca.ancho - 2 * marca.m("margen")
     try:
-        lineas_g = partir(gancho.upper(), f_g, marca.ancho - 2 * marca.m("margen"))
+        lineas_g = partir(gancho.upper(), f_g, ancho_g)
         punto("plan", "Gancho en 2 líneas como máximo", 0 < len(lineas_g) <= 2, f"{len(lineas_g)} líneas")
     except ValueError as e:
         punto("plan", "Gancho en 2 líneas como máximo", False, str(e))
@@ -610,7 +993,8 @@ def revisar(video: Path, plan: dict, marca: Marca, ficha: dict | None = None) ->
     malas = []
     for ln in plan.get("lineas", []):
         try:
-            mod_dialogo.validar_bloque(marca, ln.get("nombre"), ln.get("frase"), ln.get("acotacion"))
+            mod_dialogo.validar_bloque(marca, ln.get("nombre"), ln.get("frase"), ln.get("acotacion"),
+                                       marca.pc["dialogo"] if v2 else None)
         except ValueError as e:
             malas.append(str(e))
     punto("plan", f"Frases de {marca.max_lineas_frase} líneas o menos en la columna", not malas, "; ".join(malas))
@@ -618,12 +1002,26 @@ def revisar(video: Path, plan: dict, marca: Marca, ficha: dict | None = None) ->
     punto("plan", "Textos caben en sus márgenes", ok_caben, det_caben)
 
     punto("plan", "Crédito presente y no vacío", bool(str(t.get("credito", "")).strip()), str(t.get("credito", "")))
+    con_video = bool(plan.get("origen")) or v2
+    if con_video:
+        ok_pc, det_pc = pantalla_completa(plan, marca)
+        punto("plan", "Pantalla completa (cuerpo 1080x1920, sin franjas)", ok_pc, det_pc)
+    if v2:
+        ok_ca, det_ca = capas_fuera_de_la_accion(plan, marca)
+        punto("plan", "Capas fuera de la zona de acción", ok_ca, det_ca)
+        ok_cc, det_cc = capas_coinciden(plan, marca)
+        punto("plan", "Capas del plan coinciden con las placas de marca.yml", ok_cc, det_cc)
+        ok_bo, det_bo = bordes_coinciden(Path(video), plan, marca)
+        punto("fotograma", "Bordes coinciden con la fuente (sin franjas)", ok_bo, det_bo)
     ok_cierre, det_cierre = cierre_visible(Path(video), plan, marca)
     punto("fotograma", "Cierre visible en el video (CORTE. y crédito)", ok_cierre, det_cierre)
     ok_cab, det_cab = cabecera_visible(Path(video), plan, marca)
     punto("fotograma", "Cabecera en el video", ok_cab, det_cab)
     ok_dia, det_dia = dialogo_visible(Path(video), plan, marca)
     punto("fotograma", "Diálogo en el video", ok_dia, det_dia)
+    if v2:
+        ok_mo, det_mo = mosca_visible(Path(video), plan, marca)
+        punto("fotograma", "Mosca en el video", ok_mo, det_mo)
     ok_cue, det_cue = cuerpo_coincide(Path(video), plan, marca)
     punto("fotograma", "Cuerpo coincide con el origen", ok_cue, det_cue)
 
@@ -631,9 +1029,12 @@ def revisar(video: Path, plan: dict, marca: Marca, ficha: dict | None = None) ->
         ok_ma, det_ma = marca_agua_visible(Path(video), plan, marca, ficha)
         punto("fotograma", "Marca de agua de la campaña", ok_ma, det_ma)
     elif plan.get("origen"):
-        ok_ex, det_ex = logo_extra_en_esquina(Path(video), plan, marca)
+        ok_ex, det_ex = logo_extra_en_esquina(Path(video), plan, marca, ok_cue)
         punto("fotograma", "Sin logos extra no declarados", ok_ex, det_ex)
-    if ((ficha or {}).get("reglas") or {}).get("sin_musica") or (plan.get("campana") or {}).get("sin_musica"):
+    if v2:
+        ok_au, det_au = audio_original(Path(video), plan)
+        punto("fotograma", "Audio original del clip", ok_au, det_au)
+    elif ((ficha or {}).get("reglas") or {}).get("sin_musica") or (plan.get("campana") or {}).get("sin_musica"):
         ok_au, det_au = audio_original(Path(video), plan)
         punto("fotograma", "Audio sólo el original (sin música)", ok_au, det_au)
 

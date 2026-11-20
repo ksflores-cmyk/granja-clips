@@ -46,6 +46,20 @@ def caja(marca: Marca, cuerpo: dict, tam: tuple[int, int]) -> dict:
     return {"x": int(x), "y": int(y), "ancho": int(w), "alto": int(h)}
 
 
+def caja_pantalla(marca: Marca, tam: tuple[int, int]) -> dict:
+    """{x, y, ancho, alto} del logo en la plantilla v2: bajo la mosca, pegado al borde de la zona segura."""
+    seg, acc = marca.pc["zona_segura"], marca.pc["zona_accion"]
+    w, h = tam
+    izquierda = marca.mosca["esquina"] == "superior_izquierda"
+    x = int(seg["x0"]) if izquierda else int(seg["x1"]) - int(w)
+    x, y = x - x % 2, int(marca.pc["agua"]["y"])      # posiciones pares: ffmpeg redondea a par en yuv420
+    if x < seg["x0"] or x + w > seg["x1"] or y < seg["y0"] or y + h > seg["y1"]:
+        raise ValueError("la marca de agua no cabe dentro de la zona segura")
+    if x < acc["x1"] and x + w > acc["x0"] and y < acc["y1"] and y + h > acc["y0"]:
+        raise ValueError("la marca de agua toca la zona de acción: el logo es demasiado alto para su lugar")
+    return {"x": int(x), "y": y, "ancho": int(w), "alto": int(h)}
+
+
 def capa(marca: Marca, ruta: Path, cuerpo: dict) -> tuple[Image.Image, dict]:
     """(capa del tamaño del cuadro, caja). La capa va entera como una más de las del compositor."""
     placa = logo(ruta, marca)

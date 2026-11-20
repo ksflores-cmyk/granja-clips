@@ -11,7 +11,7 @@ from PIL import Image
 
 from conftest import RAIZ_REAL
 from fabrica import validar
-from fabrica.editar import cierre, componer, dialogo, estilo, lapiz, lienzo, muestras
+from fabrica.editar import cierre, componer, dialogo, estilo, lapiz, lienzo, muestras, placas
 from fabrica.editar.marca import Marca
 
 hay_ffmpeg = shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
@@ -242,39 +242,36 @@ ARGS = dict(salida="s.mp4", duracion=14.0, ancho=1080, cierre_s=0.5, pagina="p.p
             capas=[("d0.png", 7.5, 13.4)])
 
 
-def test_orden_ffmpeg_con_video():
-    cmd = componer.orden_ffmpeg(**ARGS, video={"ruta": "v.mp4", "inicio": 40.0, "alto": 608, "y": 530, "audio": True})
+def test_orden_ffmpeg_sin_video_usa_audio_silencioso():
+    cmd = componer.orden_ffmpeg(**ARGS)
     txt = " ".join(cmd)
     assert cmd[0] == "ffmpeg" and cmd[-1] == "s.mp4"
-    assert "-ss 40 -t 14 -i v.mp4" in txt
-    assert "scale=1080:608:flags=lanczos" in txt and "overlay=0:530:shortest=1" in txt
-    assert "between(t,7.5,13.4)" in txt and "gte(t,13.50)" in txt
-    assert "-map [out] -map 1:a" in txt
-    for trozo in ("-preset veryfast", "-crf 20", "-profile:v high", "-pix_fmt yuv420p", "-r 30",
-                  "-c:a aac", "-b:a 128k", "-ar 48000", "-movflags +faststart"):
-        assert trozo in txt
-    assert "anullsrc" not in txt
-
-
-def test_orden_ffmpeg_sin_video_usa_audio_silencioso():
-    cmd = componer.orden_ffmpeg(**ARGS, video=None)
-    txt = " ".join(cmd)
     assert "anullsrc=r=48000" in txt and "[0:v]null[c0]" in txt
     assert "[1:v]overlay=0:0:enable='between(t,7.5,13.4)'" in txt
     assert "[2:v]overlay=0:0:enable='gte(t,13.50)'" in txt
     assert "-map [out] -map 3:a" in txt
     assert "-ss" not in cmd
+    for trozo in ("-preset veryfast", "-crf 20", "-profile:v high", "-pix_fmt yuv420p", "-r 30",
+                  "-c:a aac", "-b:a 128k", "-ar 48000", "-movflags +faststart"):
+        assert trozo in txt
 
 
-def test_orden_ffmpeg_video_sin_audio_usa_silencio():
-    cmd = componer.orden_ffmpeg(**ARGS, video={"ruta": "v.mp4", "inicio": 0, "alto": 600, "y": 500, "audio": False})
-    assert "anullsrc=r=48000:cl=stereo" in " ".join(cmd) and "1:a" not in cmd
+def test_orden_ffmpeg_pantalla_completa_con_video():
+    video = {"ruta": "v.mp4", "inicio": 40.0, "audio": True, "recorte": {"x": 218, "y": 0, "ancho": 202, "alto": 360}}
+    cmd = componer.orden_ffmpeg_pantalla_completa(salida="s.mp4", duracion=14.0, ancho=1080, alto=1920, video=video,
+                                                  placas=[("d0.png", 60, 150, 7.5, 13.4)])
+    txt = " ".join(cmd)
+    assert cmd[0] == "ffmpeg" and cmd[-1] == "s.mp4"
+    assert "-ss 40 -t 14 -i v.mp4" in txt
+    assert "crop=202:360:218:0,scale=1080:1920:flags=lanczos" in txt and "overlay=60:150:enable=" in txt
+    assert "-map [out] -map 0:a" in txt and "anullsrc" not in txt
 
 
-def test_alto_escalado_es_par_y_sin_recorte():
-    assert componer.alto_escalado(1080, 640, 360) == 608
-    assert componer.alto_escalado(1080, 720, 306) == 460
-    assert componer.alto_escalado(1080, 720, 306) % 2 == 0
+def test_orden_ffmpeg_pantalla_completa_sin_audio_usa_silencio():
+    video = {"ruta": "v.mp4", "inicio": 0, "audio": False, "recorte": {"x": 0, "y": 0, "ancho": 202, "alto": 360}}
+    cmd = componer.orden_ffmpeg_pantalla_completa(salida="s.mp4", duracion=14.0, ancho=1080, alto=1920, video=video,
+                                                  placas=[("d0.png", 60, 150, 0.0, 14.0)])
+    assert "anullsrc=r=48000:cl=stereo" in " ".join(cmd) and "0:a" not in cmd
 
 
 # ---------------------------------------------------------------- puerta de estilo
@@ -400,17 +397,18 @@ def test_fuentes_de_marca_con_sumas_esperadas():
 
 def test_muestras_yml_tiene_las_3_muestras_exactas():
     m = {x["id"]: x for x in muestras.cargar_muestras()}
-    assert list(m) == ["dialogo-sintel", "momento-bbb", "informativa-gta6"]
+    assert list(m) == ["dialogo-sintel", "momento-bbb", "pajaro-bbb"]
     assert m["dialogo-sintel"]["recorte"] == {"inicio": 39.6, "duracion": 17.0}
     assert m["dialogo-sintel"]["toma"]["gancho"] == "Ella busca a un dragón"
     assert len(m["dialogo-sintel"]["lineas"]) == 4
     assert m["momento-bbb"]["lineas"][0]["acotacion"] == "(sale sin prisa)"
-    assert m["informativa-gta6"]["duracion"] == 11.0 and m["informativa-gta6"]["video"] is None
+    assert all(x["video"] for x in m.values())                  # las 3 con video: plantilla v2
+    assert m["pajaro-bbb"]["recorte"]["duracion"] >= 7.0
     marca = Marca.cargar(RAIZ_REAL)
-    for x in m.values():  # todas caben en la maqueta
-        lienzo.preparar_gancho(marca, x["toma"]["gancho"], x["toma"]["palabra_lapiz"])
+    for x in m.values():  # todas caben en la plantilla de pantalla completa
+        placas.preparar_gancho(marca, x["toma"]["gancho"], x["toma"]["palabra_lapiz"])
         for ln in x["lineas"]:
-            dialogo.validar_bloque(marca, ln.get("nombre"), ln.get("frase"), ln.get("acotacion"))
+            dialogo.validar_bloque(marca, ln.get("nombre"), ln.get("frase"), ln.get("acotacion"), marca.pc["dialogo"])
 
 
 def test_muestras_rechaza_salida_dentro_del_repo(tmp_path):

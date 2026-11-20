@@ -86,6 +86,16 @@ def papel(marca: Marca) -> Image.Image:
     return Image.fromarray(arr, "RGB").convert("RGBA")
 
 
+def papel_region(marca: Marca, x: int, y: int, ancho: int, alto: int) -> Image.Image:
+    """El mismo papel de `papel()` recortado en (x, y, ancho, alto): las placas de la plantilla v2 salen de aquí."""
+    if not (0 <= x and 0 <= y and ancho > 0 and alto > 0 and x + ancho <= marca.ancho and y + alto <= marca.alto):
+        raise ValueError(f"la placa {ancho}x{alto} en ({x}, {y}) se sale del cuadro")
+    g = marca.m("grano")
+    arr = _papel_cache(marca.ancho, marca.alto, marca.color("papel"), float(g["papel"]),
+                       float(g["fibra"]), int(g["bloque_fibra"]), int(g["semilla"]))
+    return Image.fromarray(arr[y:y + alto, x:x + ancho], "RGB").convert("RGBA")
+
+
 def fila_superior(img: Image.Image, marca: Marca, numero: int) -> None:
     """`TOMA nnn` a un lado y la mosca en la esquina superior elegida en marca.yml."""
     f = marca.fuente("bold", marca.m("tam_fila"))
