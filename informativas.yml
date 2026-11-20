@@ -18,9 +18,9 @@ informativas:
 
   # Tarea #14 (20 nov 2026): datos del estreno. Vigencia de 48 h desde la lectura (regla de hechos.md).
   - id: gta6-record-twitch
-    gancho: "GTA 6 bate récord en Twitch"
+    gancho: "Récord de un juego en Twitch"
     palabra_lapiz: "RÉCORD"
-    titular: "bate el récord de espectadores de un juego en Twitch"
+    titular: "récord de espectadores a la vez para un juego en Twitch"
     datos:
       - "3,31 millones viéndolo a la vez en Twitch."
       - "Supera a League of Legends: 3,11 millones (2022)."
@@ -52,7 +52,7 @@ informativas:
     usada: false
 
   - id: gta6-espacio-ps5
-    gancho: "GTA 6 pide 212 GB"
+    gancho: "GTA 6 pide 212 GB libres"
     palabra_lapiz: "212"
     titular: "pide al menos 212 GB libres en PS5"
     datos:

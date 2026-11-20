@@ -175,3 +175,53 @@ def test_armar_real_no_escribe_en_el_repo(repo_con_musica, tmp_path):
     r = informativa.armar(repo_con_musica, entrada(), AHORA, tmp_path / "s")
     assert isinstance(r, Resultado)
     assert huella(repo_con_musica) == antes
+
+
+# --- Ronda 2: la fuente también en el texto publicado, y ensayo de entradas futuras ---
+
+def test_toma_dict_lleva_la_fuente_de_la_entrada():
+    from fabrica import informativa as inf
+    e = {"gancho": "Récord de un juego en Twitch", "titular": "t", "datos": ["a.", "b."],
+         "credito": "Fuente: Streams Charts (preliminar)"}
+    assert inf.toma_dict(e, 7)["fuente"] == "Fuente: Streams Charts (preliminar)"
+    sin = {k: v for k, v in e.items() if k != "credito"}
+    assert inf.toma_dict(sin, 7)["fuente"] == inf.CREDITO
+
+
+def test_texto_de_informativa_cita_la_fuente_en_las_tres_redes():
+    from fabrica import informativa as inf
+    from fabrica import publicar
+    e = {"gancho": "GTA 6 saca 99 en Metacritic", "titular": "99 en Metacritic, empata el récord histórico",
+         "datos": ["99 de 100 en PS5 (147 reseñas, al 18 nov).", "118 de esas reseñas son notas perfectas."],
+         "credito": "Fuente: Metacritic vía TechPowerUp"}
+    toma = inf.toma_dict(e, 12)
+    for red in ("shorts", "tiktok", "reels"):
+        texto = publicar.textos(toma, {}, red)["texto"]
+        assert "Fuente: Metacritic vía TechPowerUp" in texto
+        assert texto.index("Fuente:") < texto.index("🎥")
+
+
+def test_ensayo_incluye_entradas_futuras_y_salta_vencidas(tmp_path, monkeypatch):
+    from datetime import datetime
+    from fabrica import informativa as inf
+    from fabrica.editar.toma import Resultado
+    ahora = datetime.fromisoformat("2026-11-20T09:00:00-06:00")
+    base = {"gancho": "g", "palabra_lapiz": "G", "titular": "t", "datos": ["a.", "b."], "usada": False}
+    entradas = [
+        {**base, "id": "futura", "vigente_desde": "2026-11-25T00:00:00-06:00", "vigente_hasta": "2026-11-26T00:00:00-06:00"},
+        {**base, "id": "vencida", "vigente_desde": "2026-11-10T00:00:00-06:00", "vigente_hasta": "2026-11-11T00:00:00-06:00"},
+    ]
+    monkeypatch.setattr(inf, "cargar", lambda raiz=None: entradas)
+    vistos = []
+    monkeypatch.setattr(inf, "armar", lambda raiz, e, ah, sal: vistos.append(e["id"]) or Resultado(True, []))
+    assert inf.ensayo(tmp_path, tmp_path / "s", ahora, imprimir=lambda *_: None) == 0
+    assert vistos == ["futura"]
+
+
+def test_ensayo_sin_entradas_con_vacio_ok_sale_cero(tmp_path, monkeypatch):
+    from datetime import datetime
+    from fabrica import informativa as inf
+    monkeypatch.setattr(inf, "cargar", lambda raiz=None: [])
+    ahora = datetime.fromisoformat("2026-11-20T09:00:00-06:00")
+    assert inf.ensayo(tmp_path, tmp_path / "a", ahora, imprimir=lambda *_: None) == 1
+    assert inf.ensayo(tmp_path, tmp_path / "b", ahora, imprimir=lambda *_: None, vacio_ok=True) == 0

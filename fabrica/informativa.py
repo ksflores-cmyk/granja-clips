@@ -106,7 +106,8 @@ def toma_dict(entrada: dict, numero: int) -> dict:
     """La toma tal como la espera `publicar.textos` (pilar informativa, titular y datos)."""
     return {"numero": numero, "gancho": entrada["gancho"], "pilar": "informativa",
             "titular": entrada["titular"], "datos": list(entrada["datos"]),
-            "fuente_id": FICHA_ID, "campana": "", "duracion_s": DURACION_S, "etiquetas": list(ETIQUETAS)}
+            "fuente_id": FICHA_ID, "campana": "", "duracion_s": DURACION_S, "etiquetas": list(ETIQUETAS),
+            "fuente": str(entrada.get("credito") or CREDITO).strip()}
 
 
 def _lineas(entrada: dict) -> list[Linea]:
@@ -178,8 +179,17 @@ def marcar_usada(raiz, id_entrada: str) -> bool:
     return hecho
 
 
-def ensayo(raiz, salida: Path, ahora: datetime, ids: list[str] | None = None, imprimir=print) -> int:
-    """Compone las entradas vigentes (o las de `ids`) sin usar y escribe `informe.md` en `salida`.
+def _por_ensayar(entrada: dict, ahora: datetime) -> bool:
+    """Sin usar y sin vencer (vigente ya o más adelante): así una PR ensaya también las entradas nuevas."""
+    hasta = _dt(entrada.get("vigente_hasta"))
+    return entrada.get("usada") is False and hasta is not None and ahora <= hasta
+
+
+def ensayo(raiz, salida: Path, ahora: datetime, ids: list[str] | None = None, imprimir=print,
+           vacio_ok: bool = False) -> int:
+    """Compone las entradas sin usar y sin vencer (o las de `ids`) y escribe `informe.md` en `salida`.
+
+    Sin ninguna por ensayar sale 1, salvo con `vacio_ok` (el check de PR no se pone rojo cuando todas ya se usaron).
 
     Nunca marca `usada` ni escribe en el repo: `armar` sólo lee marca.yml y la música, y todo sale a `salida`."""
     raiz = raiz_repo(raiz)
@@ -189,7 +199,7 @@ def ensayo(raiz, salida: Path, ahora: datetime, ids: list[str] | None = None, im
         entradas = [e for e in cargar(raiz) if e.get("id") in ids and e.get("usada") is not True]
         faltan = [i for i in ids if i not in {e.get("id") for e in entradas}]
     else:
-        entradas = [e for e in cargar(raiz) if vigente(e, ahora)]
+        entradas = [e for e in cargar(raiz) if _por_ensayar(e, ahora)]
         faltan = []
     secciones = [f"# Ensayo de informativas ({ahora.isoformat()})", ""]
     fallas = 0
@@ -207,8 +217,8 @@ def ensayo(raiz, salida: Path, ahora: datetime, ids: list[str] | None = None, im
                 cuerpo += "\n" + estilo.informe_md("Puerta de estilo", r.puntos)
         secciones += [f"## {e.get('id')}: {'EN VERDE' if r.ok else 'EN ROJO'}", "", cuerpo]
     if not entradas and not faltan:
-        fallas += 1
-        secciones += ["No hay ninguna entrada vigente y sin usar.", ""]
+        fallas += 0 if vacio_ok else 1
+        secciones += ["No hay ninguna entrada sin usar y sin vencer.", ""]
     (salida / "informe.md").write_text("\n".join(secciones), encoding="utf-8")
     imprimir(f"ensayo: {len(entradas)} entradas, {fallas} fallas; informe en {salida / 'informe.md'}")
     return 1 if fallas else 0
@@ -220,13 +230,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--salida", required=True)
     ap.add_argument("--ahora", help="fecha ISO; por omisión, ahora")
     ap.add_argument("--id", action="append", dest="ids", help="entrada concreta (repetible)")
+    ap.add_argument("--vacio-ok", action="store_true", help="sale 0 si no hay ninguna entrada por ensayar")
     a = ap.parse_args(argv)
     if not a.ensayo:
         ap.error("sólo existe el modo --ensayo")
     ahora = _dt(a.ahora) if a.ahora else datetime.now(ZONA)
     if ahora is None:
         ap.error("--ahora no es una fecha ISO")
-    return ensayo(None, Path(a.salida), ahora, a.ids)
+    return ensayo(None, Path(a.salida), ahora, a.ids, vacio_ok=a.vacio_ok)
 
 
 if __name__ == "__main__":
