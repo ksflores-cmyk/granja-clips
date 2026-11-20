@@ -35,6 +35,10 @@ Lo escribe el jefe de Clips el 19 nov, 8:30 p. m. GT. Cada tarea programada de e
 
 ## Ciclo de cada tarea
 
+> **Aviso (20 nov, 1:15 a. m.):** las sesiones programadas no pueden empujar a `main` (sólo los commits de bitácora pasan). Deja tu rama con una PR **lista para revisión (no borrador)** contra `main`, puerta en verde, y escribe en la bitácora «lista para fusionar». El jefe la fusiona en sus pasadas de las 2:40, 4:20 y 6:20. Construye siempre sobre `main` actualizado; si dependes de una PR sin fusionar, apila tu rama sobre ella y dilo.
+> **Instagram suspendido** (20 nov, 1:00 a. m.): Meta inhabilitó @guionvivo y Kevin ya apeló. Nadie toca Instagram (ni Buffer ni navegador) hasta nuevo aviso; la fábrica publica sólo en Shorts y TikTok.
+> **Toma 1 borrada también en TikTok** (Kevin, 20 nov).
+
 1. Preparación: `add_repo` de `ksflores-cmyk/granja-clips` (push) y `ksflores-cmyk/cuartel-general` (push); clonar con `--depth 50`. `gh` funciona por el proxy aunque `gh auth status` diga que el token no vale.
 2. Leer este archivo, `PLAYBOOK.md` (secciones 3, 5B, 8 y 12), `aprendizajes.md` y la sección "Bitácora de la noche" de abajo.
 3. Rama `claude/clips-<tema>` en granja-clips. Si otra rama `claude/clips-*` abierta toca los mismos archivos, rebasar sobre `main` antes de fusionar.
@@ -61,7 +65,7 @@ Lo escribe el jefe de Clips el 19 nov, 8:30 p. m. GT. Cada tarea programada de e
 | 10 | 2:30 a. m. | `retiros` | Cada ciclo revisa en Buffer los posts con error o retirados; un retiro o reclamo veta al streamer en `config/vetados.yml`, anota en `retiros.md` y abre un aviso de alerta roja (issue con etiqueta `alerta-roja`); pruebas |
 | 11 | 3:15 a. m. | `ensayo` | Corrida en modo ensayo de punta a punta con 1 ficha T real, 1 FM27 y 1 informativa con música; las 3 pasan la puerta de estilo; MP4 en el artefacto de la corrida y enlace en la bitácora |
 | 12 | 4:00 a. m. | `revision` | Codex y un revisor leen todo lo fusionado esta noche (`git diff` desde `3fa9695`); se corrigen los hallazgos que rompen algo (máx 2 rondas); 847 + nuevas en verde |
-| 13 | 4:45 a. m. | `encendido` | Quita el `PAUSA` que puso el jefe el 19 nov (sólo si el estilo v2 de las tareas #5 y #6 está fusionado y su ensayo en verde; si no, lo deja y lo dice) y deja sin `PAUSA`, `modo: vivo`; corrida real de `fabrica` que programa el hueco de las 9:00 en las 3 redes; comprobación del disparador (cron-job.org si Kevin lo creó; si no, lo dice); cola de Buffer con las tomas de 9:00 a 13:00 |
+| 13 | 4:45 a. m. | `encendido` | Si no puedes empujar a `main`, prepara una PR que quite el `PAUSA` y deja todo lo demás comprobado; el jefe la fusiona a las 6:20. Quita el `PAUSA` que puso el jefe el 19 nov (sólo si el estilo v2 de las tareas #5 y #6 está fusionado y su ensayo en verde; si no, lo deja y lo dice) y deja sin `PAUSA`, `modo: vivo`; corrida real de `fabrica` que programa el hueco de las 9:00 en las 3 redes; comprobación del disparador (cron-job.org si Kevin lo creó; si no, lo dice); cola de Buffer con las tomas de 9:00 a 13:00 |
 | 14 | 5:30 a. m. | `informativas` | 3 informativas del día de GTA 6 con datos de fuentes verificadas en `hechos.md` (con enlace y fecha), con música y movimiento; nada de spoilers ni filtraciones |
 | 15 | 6:45 a. m. | reporte | Reporte corto para Kevin: qué se publicó (enlaces), qué falló, qué decide él (palabras clave). Único aviso de la mañana |
 | 16 | cada 3 h | vigilante | Si van más de 3 h sin publicar en horario (9 a 22 h), diagnostica con los logs, repara lo pequeño, lanza `fabrica` con `gh workflow run`; nunca más de 1 lanzamiento por pasada |
