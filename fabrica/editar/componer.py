@@ -3,7 +3,8 @@
 MP4 1080x1920 H.264 high yuv420p 30 fps, `-preset veryfast -crf 20`, AAC 128 kb/s 48 kHz,
 `+faststart`. El video se escala para caber entero en la caja del cuerpo (ancho de página por el alto libre entre
 la cabecera y el diálogo), sin recortar, centrado en horizontal y pegado a la cabecera.
-Sin video, el audio es silencio.
+Sin video y sin música, el audio es silencio. Con `musica` (pista CC0, sólo piezas sin audio propio) el audio sale
+de la pista, con fundidos y sonoridad normalizada; el audio de un video de origen nunca se mezcla con música.
 """
 from __future__ import annotations
 
@@ -148,14 +149,28 @@ def alto_escalado(ancho_pagina: int, ancho: int, alto: int) -> int:
     return int(round(ancho_pagina * alto / ancho / 2) * 2)
 
 
+def _filtro_musica(musica: dict, duracion: float) -> str:
+    """Cadena de filtros del audio de la pista: formato, fundidos, sonoridad y remuestreo."""
+    e, sal = float(musica["entrada_s"]), float(musica["salida_s"])
+    return (f"aformat=sample_rates=48000:channel_layouts=stereo,afade=t=in:d={e:g},"
+            f"afade=t=out:st={max(0.0, duracion - sal):g}:d={sal:g},"
+            f"loudnorm=I={float(musica['lufs']):g}:TP={float(musica['pico_db']):g}:LRA=11,aresample=48000")
+
+
 def orden_ffmpeg(*, salida: str, duracion: float, ancho: int, cierre_s: float,
                  pagina: str, cierre: str, capas: list[tuple[str, float, float]],
-                 video: dict | None = None) -> list[str]:
+                 video: dict | None = None, musica: dict | None = None,
+                 entrada_texto: dict | None = None) -> list[str]:
     """Arma la orden de ffmpeg (función pura; no corre nada).
 
     `capas`: [(ruta PNG, t0, t1)]. `video`: None o {ruta, inicio, alto, y, audio (bool)}.
-    El audio es siempre el del video de origen (nunca música ni voz añadidas); sin audio de origen, silencio.
+    Sin `musica`, el audio es el del video de origen (nunca voz añadida); sin audio de origen, silencio.
+    `musica`: {ruta, inicio_s, entrada_s, salida_s, lufs, pico_db, bucle (bool)}: el audio sale de la pista
+    (nunca mezclada con el de un video). `entrada_texto`: {duracion_s, subida_px}: cada capa entra con un
+    fundido de opacidad y una subida corta (sólo piezas sin video).
     """
+    if musica is not None and video is not None and video.get("audio", True):
+        raise ValueError("el video trae audio propio: no se le añade música")
     d = f"{duracion:g}"
     entradas = ["-loop", "1", "-framerate", "30", "-t", d, "-i", pagina]
     filtros: list[str] = []
@@ -170,12 +185,25 @@ def orden_ffmpeg(*, salida: str, duracion: float, ancho: int, cierre_s: float,
     for i, (ruta, t0, t1) in enumerate(capas):
         entradas += ["-loop", "1", "-framerate", "30", "-t", d, "-i", ruta]
         sig = f"c{i + 1}"
-        filtros.append(f"[{actual}][{base + i}:v]overlay=0:0:enable='between(t,{t0:g},{t1:g})'[{sig}]")
+        ent = f"{base + i}:v"
+        if entrada_texto is not None:
+            dur_e, px = float(entrada_texto["duracion_s"]), float(entrada_texto["subida_px"])
+            filtros.append(f"[{ent}]format=rgba,fade=t=in:st={t0:g}:d={dur_e:g}:alpha=1[l{i}]")
+            filtros.append(f"[{actual}][l{i}]overlay=x=0:y='if(lt(t,{t0:g}+{dur_e:g}),{px:g}*(1-(t-{t0:g})/{dur_e:g}),0)'"
+                           f":eval=frame:enable='between(t,{t0:g},{t1:g})'[{sig}]")
+        else:
+            filtros.append(f"[{actual}][{ent}]overlay=0:0:enable='between(t,{t0:g},{t1:g})'[{sig}]")
         actual = sig
     entradas += ["-loop", "1", "-framerate", "30", "-t", d, "-i", cierre]
     idx_cierre = base + len(capas)
     filtros.append(f"[{actual}][{idx_cierre}:v]overlay=0:0:enable='gte(t,{duracion - cierre_s:.2f})',format=yuv420p[out]")
-    if video is not None and video.get("audio", True):
+    if musica is not None:
+        if musica.get("bucle"):
+            entradas += ["-stream_loop", "-1"]
+        entradas += ["-ss", f"{float(musica.get('inicio_s', 0)):g}", "-t", d, "-i", str(musica["ruta"])]
+        filtros.append(f"[{idx_cierre + 1}:a]{_filtro_musica(musica, duracion)}[aud]")
+        mapa_audio = "[aud]"
+    elif video is not None and video.get("audio", True):
         mapa_audio = "1:a"
     else:
         entradas += ["-f", "lavfi", "-t", d, "-i", "anullsrc=r=48000:cl=stereo"]
@@ -188,12 +216,21 @@ def orden_ffmpeg(*, salida: str, duracion: float, ancho: int, cierre_s: float,
             "-movflags", "+faststart", salida]
 
 
+def duracion_audio(ruta: Path) -> float:
+    """Duración en segundos del audio de un archivo (ffprobe)."""
+    out = subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                   "-of", "json", str(ruta)])
+    return float(json.loads(out)["format"]["duration"])
+
+
 def plan_json(marca: Marca, t: Toma, lineas: list[Linea], duracion: float, *,
-              geometria: dict | None = None, origen: dict | None = None, campana: dict | None = None) -> dict:
+              geometria: dict | None = None, origen: dict | None = None, campana: dict | None = None,
+              audio: dict | None = None, movimiento: str | None = None) -> dict:
     """Plan de la toma (lo que lee la puerta de estilo): textos, colores y fuente de marca.yml.
 
     `origen` es {archivo, sha256, inicio, duracion} cuando hay video de fuente y None si no. `campana`
     ({id, duracion_s, marca_agua, sin_musica, audio}) sólo se escribe si la toma es de una campaña.
+    `audio`: {"tipo": "musica"|"original"|"silencio", ...}; `movimiento`: "entrada_texto" o None.
     """
     plan = {
         "toma": {"numero": t.numero, "gancho": t.gancho, "palabra_lapiz": t.palabra_lapiz,
@@ -206,6 +243,8 @@ def plan_json(marca: Marca, t: Toma, lineas: list[Linea], duracion: float, *,
                    "archivos": dict(marca.datos["fuente"]["archivos"])},
         "origen": origen,
         "geometria": geometria,
+        "audio": audio,
+        "movimiento": movimiento,
     }
     if campana is not None:
         plan["campana"] = campana
@@ -214,14 +253,23 @@ def plan_json(marca: Marca, t: Toma, lineas: list[Linea], duracion: float, *,
 
 def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duracion: float,
              trabajo: Path, fuente_video: Path | None = None, inicio: float = 0.0,
-             plan_salida: Path | None = None, ficha: dict | None = None) -> dict:
+             plan_salida: Path | None = None, ficha: dict | None = None,
+             musica: dict | None = None, movimiento: bool = False) -> dict:
     """Renderiza la toma. Devuelve el plan. Lanza ValueError si algún texto no cabe.
+
+    `musica`: pista CC0 ({id, ruta, sha256, inicio_s, ...}, de `editar.musica`) para piezas sin audio propio;
+    ValueError si el video trae audio o la ficha tiene `sin_musica`. `movimiento`: entrada de texto sobria
+    (sólo piezas sin video).
 
     `ficha`: si trae `marca_agua`, el logo va en el lugar fijo de `marca.yml`; `reglas.sin_musica` deja el audio
     original de la fuente tal cual (nunca se añade audio). Ambas cosas quedan declaradas en `plan["campana"]`.
     """
     trabajo = Path(trabajo)
     trabajo.mkdir(parents=True, exist_ok=True)
+    if musica is not None and ((ficha or {}).get("reglas") or {}).get("sin_musica"):
+        raise ValueError("la ficha tiene sin_musica: no se añade música")
+    if movimiento and fuente_video is not None:
+        raise ValueError("el movimiento de entrada de texto es sólo para piezas sin video")
     # Validar todo antes de pintar o correr ffmpeg
     lienzo.preparar_gancho(marca, t.gancho, t.palabra_lapiz)
     for ln in lineas:
@@ -243,6 +291,8 @@ def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duraci
                  "x": cuerpo["x"], "y": cuerpo["y"], "audio": info["audio"]}
         origen = {"archivo": str(fuente_video), "sha256": sha256_archivo(Path(fuente_video)),
                   "inicio": inicio, "duracion": duracion}
+    if musica is not None and video is not None and video["audio"]:
+        raise ValueError("el video trae audio propio: no se le añade música")
     geo = geometria(marca, y_contenido, cuerpo)
     campana = None
     capa_agua = None
@@ -276,12 +326,35 @@ def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duraci
         mod_dialogo.bloque(marca, y_dialogo, nombre=ln.nombre, frase=ln.frase, acotacion=ln.acotacion).save(ruta)
         capas.append((str(ruta), ln.t0, ln.t1))
     mod_cierre.pagina_cierre(marca, t).save(trabajo / "cierre.png")
+    cfg_musica = marca.datos.get("musica") or {}
+    cfg_texto = (marca.datos.get("movimiento") or {}).get("entrada_texto")
+    if movimiento and not cfg_texto:
+        raise ValueError("marca.yml no define movimiento.entrada_texto")
+    musica_ff = None
+    if musica is not None:
+        if not cfg_musica:
+            raise ValueError("marca.yml no define la sección musica")
+        inicio_m = float(musica.get("inicio_s") or 0)
+        musica_ff = {"ruta": str(musica["ruta"]), "inicio_s": inicio_m,
+                     "entrada_s": cfg_musica["entrada_s"], "salida_s": cfg_musica["salida_s"],
+                     "lufs": cfg_musica["lufs"], "pico_db": cfg_musica["pico_db"],
+                     "bucle": duracion_audio(Path(musica["ruta"])) - inicio_m < duracion}
     cmd = orden_ffmpeg(salida=str(salida), duracion=duracion, ancho=marca.ancho,
                        cierre_s=float(marca.m("cierre_s")), pagina=str(trabajo / "pagina.png"),
-                       cierre=str(trabajo / "cierre.png"), capas=capas, video=video)
+                       cierre=str(trabajo / "cierre.png"), capas=capas, video=video, musica=musica_ff,
+                       entrada_texto=cfg_texto if movimiento else None)
     Path(salida).parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(cmd, check=True)
-    plan = plan_json(marca, t, lineas, duracion, geometria=geo, origen=origen, campana=campana)
+    if musica is not None:
+        audio = {"tipo": "musica", "pista": musica["id"], "sha256": musica["sha256"],
+                 "licencia": f"marca/musica/{musica['id']}/LICENCIA.md", "lufs": cfg_musica["lufs"],
+                 "inicio_s": float(musica.get("inicio_s") or 0)}
+    elif video is not None and video["audio"]:
+        audio = {"tipo": "original"}
+    else:
+        audio = {"tipo": "silencio"}
+    plan = plan_json(marca, t, lineas, duracion, geometria=geo, origen=origen, campana=campana, audio=audio,
+                     movimiento="entrada_texto" if movimiento else None)
     if plan_salida is not None:
         Path(plan_salida).write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
     return plan
