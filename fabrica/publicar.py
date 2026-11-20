@@ -24,9 +24,10 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from . import envios_campana, plazo, red
+from . import textos as mod_textos
 from .candado import candado
 from .config import cargar_yaml, raiz_repo
-from .fuentes import etiqueta_creador
+from .textos import Descartada, _limpio, contar_emojis, es_de_campana  # noqa: F401 (reexport)
 from .pausa import ZONA, crear_pausa, esta_pausada
 
 ENDPOINT = "https://api.buffer.com"
@@ -77,10 +78,6 @@ class SinConfirmar(ErrorBuffer):
 
 class ErrorCuota(ErrorBuffer):
     """Se llegó al 80 % de algún tope de la API: no se llama más."""
-
-
-class Descartada(Exception):
-    """Esta publicación se descarta con su motivo; no frena el resto."""
 
 
 class AlertaRoja(Exception):
@@ -438,155 +435,28 @@ def guardar_ids_de_canales(raiz, ids: dict, orgs: dict | None = None) -> None:
 
 
 # ---------------------------------------------------------------- textos (playbook, sección 10)
+# La lógica vive en `textos.py`; aquí quedan los nombres de siempre (otras partes los importan) y la
+# comprobación de «no se repite en 7 días», que necesita el estado del repo.
 
-_EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿⭐⭕⌀-⏿\U0001F1E6-\U0001F1FF]")
-_GTA = re.compile(r"\bGTA\s*(?:6|VI)\b|\bGTA6\b", re.IGNORECASE)
-_TOMA = re.compile(r"^Toma\s+\d+\.\s*")
 DIAS_SIN_REPETIR = 7
 MAX_TEXTO = 2200
 MAX_TITULO = 100
-
-
-def contar_emojis(texto: str) -> int:
-    return len(_EMOJI.findall(texto))
-
-
-def _limpio(s) -> str:
-    return _GTA.sub("GTA 6", " ".join(str(s or "").split()))
-
-
-def _titulo_youtube(linea: str) -> str:
-    if len(linea) <= MAX_TITULO:
-        return linea
-    corte = linea[:MAX_TITULO - 1].rsplit(" ", 1)[0].rstrip(" ,.;:")
-    return corte + "…"
-
-
-def _hashtags(etiquetas) -> list[str]:
-    return [e for e in etiquetas if e.startswith("#")]
-
-
-def es_de_campana(ficha: dict) -> bool:
-    """Ficha de campaña con brief: tiene `campana` y su material trae el creador y sus etiquetas por red."""
-    return bool(ficha.get("campana")) and any(isinstance(m, dict) for m in ficha.get("material") or [])
-
-
-MAX_HASHTAGS_EXTRA = 3
-_HASHTAG = re.compile(r"#\S*")
-
-
-def _sin_hashtags(t: str) -> str:
-    """Quita los hashtags incrustados (el único `#` antes de la divulgación sería un error de brief)."""
-    return " ".join(_HASHTAG.sub("", t).split())
-
-
-def _textos_campana(toma: dict, ficha: dict, plataforma: str, raiz=None, hoy: date | None = None) -> dict:
-    """Texto de una campaña con brief (SEGA FM27). Orden fijo:
-
-        Toma nnn. <gancho en español>
-        <blanco>
-        @footballmanager            (etiquetas_obligatorias, tal cual)
-        <etiqueta del creador>      (la de su red; sustituye al crédito propio 🎥)
-        #Publicidad                 (reglas.divulgacion: su propia línea, justo después del texto, primer hashtag)
-        #uno #dos #tres             (hasta 3 hashtags relacionados: los de la toma y luego reglas.hashtags)
-    """
-    reglas = ficha.get("reglas") or {}
-    creador = _limpio(toma.get("creador"))
-    etiqueta = etiqueta_creador(ficha, creador, plataforma)
-    if not etiqueta:
-        raise Descartada(f"sin etiqueta del creador {creador or '(vacío)'} para {plataforma}: no se publica")
-    gancho = _sin_hashtags(_limpio(toma.get("gancho")))
-    if not gancho:
-        raise Descartada("sin gancho")
-    obligatorias = [str(e).strip() for e in reglas.get("etiquetas_obligatorias") or [] if str(e).strip()]
-    divulgacion = str(reglas.get("divulgacion") or "").strip()
-    if not divulgacion.startswith("#"):
-        raise Descartada("la campaña exige una divulgación en hashtag (reglas.divulgacion)")
-    vistos = {divulgacion.lower()}
-    extras = []
-    for e in [str(x).strip() for x in (toma.get("etiquetas") or []) + (reglas.get("hashtags") or [])]:
-        if e.startswith("#") and e.lower() not in vistos and len(extras) < MAX_HASHTAGS_EXTRA:
-            vistos.add(e.lower())
-            extras.append(e)
-    num = f"{int(toma['numero']):03d}" if str(toma.get("numero", "")).isdigit() else str(toma.get("numero", ""))
-    primera = f"Toma {num}. {gancho}"
-    bloques = [primera]
-    cola = [*obligatorias, etiqueta, divulgacion] + ([" ".join(extras)] if extras else [])
-    texto = "\n\n".join(bloques) + "\n\n" + "\n".join(cola)
-    if "#" in texto.split("\n" + divulgacion, 1)[0]:
-        raise Descartada("hay un # antes de la divulgación: #Publicidad debe ser el primer hashtag")
-    if contar_emojis(texto) > 1:
-        raise Descartada("el texto lleva más de un emoji")
-    if len(texto) > MAX_TEXTO:
-        raise Descartada(f"el texto pasa de {MAX_TEXTO} caracteres")
-    titulo = _titulo_youtube(primera) if plataforma == "shorts" else None
-    if raiz is not None:
-        _comprobar_repetido(raiz, texto, plataforma, toma, hoy)
-    return {"texto": texto, "titulo": titulo, "credito": etiqueta,
-            "etiquetas": [*obligatorias, divulgacion, *extras]}
+_TOMA = re.compile(r"^Toma\s+\d+\.\s*")
 
 
 def textos(toma: dict, ficha: dict, plataforma: str, raiz=None, hoy: date | None = None) -> dict:
     """Texto de la publicación según el playbook (sección 10).
 
-    `toma`: numero, gancho, pilar, creador (opcional), valor (frases, Instagram), etiquetas (del brief),
-    titular y datos (informativa). Devuelve {texto, titulo, credito, etiquetas}; Descartada si no cumple.
+    `toma`: numero, gancho, pilar, creador o creadores (opcional), valor (frases, Instagram), etiquetas,
+    titular y datos (informativa). Devuelve {texto, titulo, credito, etiquetas, descripcion, hashtags,
+    largo}; Descartada si no cumple. Con `raiz`, también comprueba que no se repita en 7 días.
     """
     if plataforma not in SERVICIOS:
         raise Descartada(f"plataforma desconocida: {plataforma}")
-    reglas = ficha.get("reglas") or {}
-    if es_de_campana(ficha):
-        return _textos_campana(toma, ficha, plataforma, raiz, hoy)
-    informativa = toma.get("pilar") == "informativa"
-    creador = "@RockstarGames" if informativa else _limpio(toma.get("creador") or ficha.get("creador"))
-    if not creador:
-        raise Descartada("sin crédito: no se publica")
-    credito = f"🎥 {creador}"
-    obligatorias = [str(e).strip() for e in reglas.get("etiquetas_obligatorias") or []]  # tal cual
-    extra = [str(e).strip() for e in toma.get("etiquetas") or []]
-    visto = {e.lower() for e in obligatorias}
-    extra = [e for e in extra if not (e.lower() in visto or visto.add(e.lower()))]
-    # Shorts y TikTok: pocas etiquetas (hasta 3 hashtags); Instagram: de 3 a 5. Las del brief van siempre.
-    tope = 5 if plataforma == "reels" else 3
-    etiquetas = list(obligatorias)
-    for e in extra:
-        if len(_hashtags(etiquetas)) < tope:
-            etiquetas.append(e)
-    if plataforma == "reels" and not 3 <= len(_hashtags(etiquetas)):
-        raise Descartada("Instagram necesita de 3 a 5 etiquetas y no hay suficientes")
-    divulgacion = str(reglas.get("divulgacion") or "").strip()
-    aviso = [] if divulgacion.lower() in ("", "ninguna") else [divulgacion]
-    num = f"{int(toma['numero']):03d}" if str(toma.get("numero", "")).isdigit() else str(toma.get("numero", ""))
-    gancho = _limpio(toma.get("gancho"))
-    if informativa:
-        titular = _limpio(toma.get("titular") or gancho)
-        if not titular:
-            raise Descartada("la informativa necesita titular")
-        primera = f"GTA 6: {titular}"
-        cuerpo = ["- " + _limpio(d) for d in toma.get("datos") or []]
-        bloques = [primera] + ([("\n".join(cuerpo))] if cuerpo else [])
-    else:
-        if not gancho:
-            raise Descartada("sin gancho")
-        primera = f"Toma {num}. {gancho}"
-        bloques = [primera]
-        if plataforma == "reels":
-            valor = [_limpio(v) for v in (toma.get("valor") or [])][:2]
-            if valor:
-                bloques.append(" ".join(valor))
-    bloques.append(credito)
-    cola = list(aviso)
-    if etiquetas:
-        cola.append(" ".join(etiquetas))
-    texto = "\n\n".join(bloques[:-1]) + "\n\n" + "\n".join([bloques[-1]] + cola)
-    if contar_emojis(texto) > 1:
-        raise Descartada("el texto lleva más de un emoji")
-    if len(texto) > MAX_TEXTO:
-        raise Descartada(f"el texto pasa de {MAX_TEXTO} caracteres")
-    titulo = _titulo_youtube(primera) if plataforma == "shorts" else None
+    r = mod_textos.armar(toma, ficha, plataforma)
     if raiz is not None:
-        _comprobar_repetido(raiz, texto, plataforma, toma, hoy)
-    return {"texto": texto, "titulo": titulo, "credito": credito, "etiquetas": etiquetas}
+        _comprobar_repetido(raiz, r["texto"], plataforma, toma, hoy)
+    return r
 
 
 def _cuerpo_sin_toma(texto: str) -> str:
@@ -1135,14 +1005,47 @@ SECRETOS_ALMACEN = ("SUPABASE_URL", "SUPABASE_SERVICE_KEY")
 COD_OK, COD_ERROR, COD_ALERTA = 0, 1, 3
 
 
-def _muestra(raiz, plataforma: str, esquema: dict, canal_id: str, ahora: datetime) -> tuple[dict, list[str]]:
-    """Arma (sin enviar) una carga de ejemplo con la ficha propia y la valida contra el esquema."""
+FICHA_T_MUESTRA = {"id": "t-ejemplo", "tipo": "T", "creador": "twitch.tv/ejemplo", "credito": "twitch.tv/ejemplo",
+                   "twitch_login": "ejemplo", "origen": "twitch",
+                   "reglas": {"etiquetas_obligatorias": ["#GTA6", "#Gaming"], "divulgacion": "ninguna"},
+                   "campana": None, "estado": "vigente", "uso": "produccion"}
+
+
+def _casos_de_muestra(raiz) -> list[tuple[str, dict, dict]]:
+    """Los tres casos de muestra (T, A con la ficha real de SEGA FM27, informativa): (nombre, ficha, toma)."""
     from .fuentes import cargar_fuentes
-    ficha = next((f for f in cargar_fuentes(raiz) if f.get("id") == "propio-tipografico"),
-                 {"id": "muestra", "creador": "@guionvivo", "reglas": {}})
-    toma = {"numero": 1, "gancho": "Prueba de ensayo", "pilar": "momentos", "creador": "@guionvivo",
-            "valor": ["Una frase de valor de ejemplo."], "etiquetas": ["#GTA6", "#Gaming", "#Clips"]}
+    fichas = {f.get("id"): f for f in cargar_fuentes(raiz)}
+    ficha_a = fichas.get("sega-fm27")
+    if ficha_a is None:
+        raise Descartada("falta la ficha sega-fm27 en fuentes.yml para la muestra de textos")
+    ficha_i = fichas.get("propio-tipografico") or {"id": "muestra", "creador": "@guionvivo", "reglas": {}}
+    return [
+        ("T", FICHA_T_MUESTRA,
+         {"numero": 1, "gancho": "El NPC le contesta al streamer", "pilar": "momentos",
+          "creador": "twitch.tv/ejemplo", "valor": ["Nadie esperaba esa respuesta.", "Pasó en directo."],
+          "etiquetas": ["#GTA6", "#Gaming", "#Clips"]}),
+        ("A", ficha_a,
+         {"numero": 2, "gancho": "Sebas ficha al delantero", "pilar": "momentos", "creador": "SEBASBERON",
+          "campana": ficha_a.get("campana"), "valor": ["Un fichaje de última hora."]}),
+        ("informativa", ficha_i,
+         {"numero": 3, "gancho": "Llega el 19 de noviembre", "titular": "Llega el 19 de noviembre",
+          "pilar": "informativa", "datos": ["Sale en PS5", "Sale en Xbox Series X|S"],
+          "etiquetas": ["#GTA6", "#Gaming", "#Clips"]}),
+    ]
+
+
+def _muestra(raiz, plataforma: str, esquema: dict, canal_id: str, ahora: datetime,
+             caso: str | None = None, salida=None) -> tuple[dict, list[str]]:
+    """Arma (sin enviar) una carga de ejemplo y la valida contra el esquema. No escribe nada en `estado/`."""
+    nombre, ficha, toma = next(c for c in _casos_de_muestra(raiz) if caso in (None, c[0]))
     tx = textos(toma, ficha, plataforma)
+    if salida:
+        lim = mod_textos.cargar_config()["limites"][plataforma]["max_texto"]
+        salida(f"Texto {nombre}/{plataforma}: {tx['largo']}/{lim} (UTF-16"
+               f"{', saltos x2' if plataforma == 'reels' else ''})"
+               + (f", título {len(tx['titulo'])}/100" if tx["titulo"] else ""))
+        for linea in tx["texto"].split("\n"):
+            salida(f"    | {linea}")
     cuando = ahora + timedelta(days=1)
     return armar_carga(plataforma, canal_id, tx["texto"], tx["titulo"],
                        "https://ejemplo.invalid/prueba.mp4", cuando, esquema)
@@ -1180,13 +1083,15 @@ def ensayo(raiz, env, salida=print, transporte_buffer=None, transporte_almacen=N
             guardar_ids_de_canales(raiz, ids, organizaciones_de(canales_api, ids))
         esquema = cliente.introspeccion()
         salida(f"Introspección: {len(esquema['tipos'])} tipo(s) de entrada leídos")
-        for plat in PLATAFORMAS:
-            try:
-                _, anot = _muestra(raiz, plat, esquema, ids[plat], ahora())
-                salida(f"Carga {plat}: válida contra el esquema" + (f" ({'; '.join(anot)})" if anot else ""))
-            except Descartada as e:
-                salida(f"Carga {plat}: FALTA o SOBRA algo: {e}")
-                codigo = COD_ERROR if not sim_b else codigo
+        for caso, _, _ in _casos_de_muestra(raiz):
+            for plat in PLATAFORMAS:
+                try:
+                    _, anot = _muestra(raiz, plat, esquema, ids[plat], ahora(), caso, salida)
+                    salida(f"Carga {caso}/{plat}: válida contra el esquema"
+                           + (f" ({'; '.join(anot)})" if anot else ""))
+                except Descartada as e:
+                    salida(f"Carga {caso}/{plat}: FALTA o SOBRA algo: {e}")
+                    codigo = COD_ERROR if not sim_b else codigo
     except AlertaRoja as e:
         salida(f"ALERTA ROJA: {e}")
         salida("Se creó PAUSA y estado/alerta-roja.json; no se programó nada." if not sim_b
