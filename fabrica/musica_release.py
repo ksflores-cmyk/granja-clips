@@ -73,9 +73,14 @@ def leer_pagina(pagina: str, base: str) -> dict:
     autor = _texto(autor_bl.split(">", 1)[1] if ">" in autor_bl else autor_bl)
     autor = re.sub(r"^.*?Author:\s*", "", autor).strip()
     archivos = {}
-    for href in re.findall(r"href=['\"]([^'\"]*/sites/default/files/[^'\"]+)['\"]", _bloque(pagina, "field-art-files")):
+    # Drupal guarda el archivo con sufijo (_0, _1...) si el nombre ya existía: vale el nombre del enlace
+    # tal como lo muestra "File(s):" o el del archivo guardado.
+    patron = r"<a\s[^>]*href=['\"]([^'\"]*/sites/default/files/[^'\"]+)['\"][^>]*>([^<]*)</a>"
+    for href, texto in re.findall(patron, _bloque(pagina, "field-art-files")):
         url = urllib.parse.urljoin(base, html.unescape(href))
         archivos[urllib.parse.unquote(url.rsplit("/", 1)[-1])] = url
+        if html.unescape(texto).strip():
+            archivos.setdefault(html.unescape(texto).strip(), url)
     return {"licencias": licencias, "autor": autor, "archivos": archivos,
             "texto_licencia": _texto(bl)[:200]}
 
