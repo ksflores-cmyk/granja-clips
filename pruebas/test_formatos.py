@@ -429,7 +429,9 @@ def test_compilar_produce_un_mp4_valido_y_todo_en_verde(compilado_ok):
     assert abs(info["duracion"] - 3 * DUR_SEG) <= 0.15 * 3
     plan = json.loads(c["mp4"].with_suffix(".plan.json").read_text(encoding="utf-8"))
     assert plan["tipo"] == "compilado" and plan["formato"] == "mejores-momentos" and plan["pilar"] == "compilados"
-    assert plan["plantilla"] == "v1-pagina" and plan["numero"] == 7 and plan["fecha"] == HOY.isoformat()
+    # La plantilla es la vigente de componer (v1 en main; v2 al fusionar la tarea #5): la del segmento.
+    assert plan["plantilla"] == plan["segmentos"][0]["plan"].get("plantilla", "v1-pagina")
+    assert plan["numero"] == 7 and plan["fecha"] == HOY.isoformat()
     assert plan["creditos"] == [f"Con: twitch.tv/{x}" for x in CREADORES]
     assert [s["n"] for s in plan["segmentos"]] == [1, 2, 3]
     assert all(s["puerta_ok"] and len(s["sha256_mp4"]) == 64 for s in plan["segmentos"])
