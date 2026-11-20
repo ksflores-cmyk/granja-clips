@@ -1,0 +1,53 @@
+name: musica
+
+# Biblioteca de música CC0 de Guion Vivo (decisión de Kevin del 19 nov 2026).
+# Dentro de Actions: lee la página de cada pista de marca/musica/pistas.yml, comprueba que su licencia
+# sea CC0, baja el archivo, anota el sha256 y lo sube al release privado `musica`.
+# El audio nunca entra al repo ni a la PC de Kevin.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/clips-musica", "main"]
+    paths:
+      - "marca/musica/pistas.yml"
+      - "fabrica/musica_release.py"
+      - ".github/workflows/musica.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: musica
+  cancel-in-progress: false
+
+jobs:
+  musica:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalar ffmpeg
+        timeout-minutes: 12
+        uses: ./.github/actions/ffmpeg
+      - run: pip install -r requirements.txt
+      - name: Leer licencias, bajar y subir al release
+        timeout-minutes: 10
+        run: python -m fabrica.musica_release --salida "$RUNNER_TEMP/musica" --subir
+      - name: Resumen
+        if: always()
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY" || true
+          import json, os
+          d = json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "musica", "lecturas.json"), encoding="utf-8"))
+          print("### Música CC0\n\n| pista | licencia leída | autor leído | s | sha256 |\n|---|---|---|---|---|")
+          for x in d["verificadas"]:
+              print(f"| {x['id']} | {', '.join(x['licencias_leidas'])} | {x['autor_leido']} | {x['duracion_s']} | `{x['sha256']}` |")
+          for x in d["rechazadas"]:
+              print(f"| {x['id']} | RECHAZADA | {x['motivo']} | | |")
+          PY
