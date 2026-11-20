@@ -1,0 +1,52 @@
+name: formatos
+
+# Renderiza los compilados de muestra («Mejores momentos» y «Mejores reacciones») en la nube y los deja como
+# artefacto (3 días). No escribe en ninguna rama: el video nunca entra al repo ni a la PC de Kevin.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/clips-formatos", "main"]
+    paths:
+      - "fabrica/**"
+      - "config/formatos.yml"
+      - "marca/**"
+      - "marca.yml"
+      - "temporada.yml"
+      - ".github/workflows/formatos.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: formatos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  formatos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalar ffmpeg
+        timeout-minutes: 12
+        uses: ./.github/actions/ffmpeg
+      - run: pip install -r requirements.txt
+      - name: Renderizar los compilados de muestra fuera del repo
+        run: python -m fabrica.editar.compilado --muestras --salida "$RUNNER_TEMP/formatos"
+      - name: Resumen de la puerta y de los textos
+        if: always()
+        run: |
+          cat "$RUNNER_TEMP/formatos/puerta-formatos.md" >> "$GITHUB_STEP_SUMMARY" || true
+          cat "$RUNNER_TEMP/formatos/textos.md" >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Subir los compilados como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: formatos
+          path: ${{ runner.temp }}/formatos
+          retention-days: 3
+          if-no-files-found: error

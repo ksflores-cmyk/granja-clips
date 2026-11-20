@@ -23,7 +23,8 @@ cupos:
   por_dia_por_plataforma: 3
   estreno_max_por_dia_por_plataforma: 8
 pilares:                # sección 6 del playbook
-  primeras_veces: 0.6
+  primeras_veces: 0.5
   momentos: 0.2
   dato_util: 0.1
   informativa: 0.1      # máximo
+  compilados: 0.1       # Mejores momentos / Mejores reacciones: 2-3 clips del día, 30-60 s
