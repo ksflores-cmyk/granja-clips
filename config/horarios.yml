@@ -7,6 +7,7 @@ margen_min_minutos: 15      # el hueco debe caer de ahora+15 ...
 margen_max_minutos: 75      # ... a ahora+75 min
 relleno:                    # un hueco de hoy que se perdió se rellena sin amontonar
   separacion_min_minutos: 60
+  anticipacion_minutos: 35    # el relleno se propone a ahora+35 (producir tarda 8-20 min)
   ultima_hora: "23:00"
   max_intentos_por_hueco: 2
 cola_buffer_max: 10         # plan gratis de Buffer: 10 programados por canal
