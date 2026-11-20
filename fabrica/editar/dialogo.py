@@ -7,29 +7,36 @@ from .lienzo import partir
 from .marca import Marca
 
 
-def lineas_frase(marca: Marca, frase: str) -> list[str]:
-    ancho = marca.columna[1] - marca.columna[0]
-    return partir(frase, marca.fuente("regular", marca.m("tam_frase")), ancho)
+def lineas_frase(marca: Marca, frase: str, medidas: dict | None = None) -> list[str]:
+    """Líneas de la frase en la columna. `medidas`: las de la plantilla de pantalla completa (por omisión, la maqueta)."""
+    m = medidas or marca.maqueta
+    ancho = m["columna_dialogo"][1] - m["columna_dialogo"][0]
+    return partir(frase, marca.fuente("regular", m["tam_frase"]), ancho)
 
 
 def texto_acotacion(acotacion: str) -> str:
     return f"({acotacion.strip().strip('()').strip()})"
 
 
-def validar_bloque(marca: Marca, nombre: str | None, frase: str | None, acotacion: str | None) -> list[str]:
-    """Valida el bloque y devuelve las líneas de la frase. ValueError con el motivo si no vale."""
+def validar_bloque(marca: Marca, nombre: str | None, frase: str | None, acotacion: str | None,
+                   medidas: dict | None = None) -> list[str]:
+    """Valida el bloque y devuelve las líneas de la frase. ValueError con el motivo si no vale.
+
+    `medidas`: las de `pantalla_completa.dialogo` (por omisión, las de la maqueta de la página de guion).
+    """
+    m = medidas or marca.maqueta
     if not frase and not acotacion:
         raise ValueError("el bloque de diálogo no tiene frase ni acotación")
     if frase and not nombre:
         raise ValueError(f"la frase necesita un nombre; sin nombre sólo va acotación: {frase!r}")
     lineas: list[str] = []
     if frase:
-        lineas = lineas_frase(marca, frase)
+        lineas = lineas_frase(marca, frase, medidas)
         if len(lineas) > marca.max_lineas_frase:
             raise ValueError(f"frase de {len(lineas)} líneas (máximo {marca.max_lineas_frase}): {frase!r}")
     if acotacion:
-        f = marca.fuente("italic", marca.m("tam_acotacion"))
-        if f.getlength(texto_acotacion(acotacion)) > marca.columna[1] - marca.columna[0]:
+        f = marca.fuente("italic", m["tam_acotacion"])
+        if f.getlength(texto_acotacion(acotacion)) > m["columna_dialogo"][1] - m["columna_dialogo"][0]:
             raise ValueError(f"la acotación no cabe en una línea: {acotacion!r}")
     return lineas
 
