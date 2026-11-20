@@ -360,20 +360,21 @@ def _pilar_de(c, ficha: dict | None, temporada: dict) -> str | None:
 
 
 def ordenar(candidatos: list, temporada: dict) -> list:
-    """Primero los pilares con más peso; a igual pilar, el más reciente."""
+    """Primero los pilares con más peso; a igual pilar, más vistas por hora; luego, el más reciente."""
     sin_fecha = datetime.min.replace(tzinfo=timezone.utc)
     return sorted(candidatos, key=lambda c: (-_peso(temporada, c.pilar),
+                                             -(c.vistas_por_hora or 0.0),
                                              -(c.creado_en or sin_fecha).timestamp()))
 
 
 def elegir_candidatos(raiz, ahora, plataformas, out, detectar_fn=None, cliente=None) -> list:
     t = cargar_yaml("temporada.yml", raiz)
-    fichas = {f.get("id"): f for f in cargar_fuentes(raiz)}
     try:
         cands, saltos = (detectar_fn or mod_detectar.detectar_con_motivos)(raiz, ahora, cliente)
     except Exception as e:  # noqa: BLE001 (un fallo del detector no debe tumbar el ciclo)
         out(f"detectar: {type(e).__name__}: {e}")
         return []
+    fichas = {f.get("id"): f for f in cargar_fuentes(raiz)}      # después de detectar: incluye las fichas T nuevas
     for s in saltos:
         out(f"detectar: {s}")
     for c in cands:
@@ -676,7 +677,6 @@ def _con_alerta(raiz, out: Salida, env, ahora, fn) -> int:
 
 def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detectar_fn, hacer_toma_fn,
               tb, ta, tt) -> int:
-    fichas = {f.get("id"): f for f in cargar_fuentes(raiz)}
     hacer = hacer_toma_fn or mod_toma.hacer_toma
     temporal = Path(tempfile.mkdtemp(prefix="fabrica-ciclo-"))
     carpeta = Path(salida_dir) if salida_dir else (Path(tempfile.gettempdir()) / "fabrica-ensayo" if sim else temporal)
@@ -685,6 +685,8 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
         cliente = mod_detectar.cliente_desde_entorno(tt) if not sim or env.get("TWITCH_CLIENT_ID") else None
         toma = None
         cands = elegir_candidatos(raiz, ahora, hueco.plataformas, out, detectar_fn, cliente)
+        # Después de detectar: las fichas T nuevas ya están en estado/fichas-t.yml.
+        fichas = {f.get("id"): f for f in cargar_fuentes(raiz)}
         for i, c in enumerate(cands[:MAX_INTENTOS], 1):
             ficha = fichas.get(c.fuente_id) or {}
             r = hacer(raiz, c, ficha, ahora, salida=carpeta / f"intento-{i}")

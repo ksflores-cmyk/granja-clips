@@ -18,7 +18,7 @@ from .config import ARCHIVOS, raiz_repo
 from .fuentes import _a_fecha, es_publicable
 from .registro import CABECERA_ENVIOS, CABECERA_MARCADOR
 
-TIPOS = {"A", "B", "C", "D"}
+TIPOS = {"A", "B", "C", "D", "T"}
 ORIGENES = {"twitch", "youtube", "kick", "drive", "propio", "web"}
 ESTADOS = {"vigente", "vencida", "pausada", "vetada"}
 USOS = {"produccion", "muestras"}
@@ -145,7 +145,7 @@ def validar_fuentes(f, inf: Informe) -> None:
             vistos.add(fid)
         tipo = ficha.get("tipo")
         if not _en(tipo, TIPOS):
-            inf.error(f"{et}: tipo debe ser A, B, C o D")
+            inf.error(f"{et}: tipo debe ser A, B, C, D o T")
         if not _en(ficha.get("origen"), ORIGENES):
             inf.error(f"{et}: origen inválido (permitidos: {', '.join(sorted(ORIGENES))})")
         if not _en(ficha.get("estado"), ESTADOS):
@@ -178,6 +178,13 @@ def validar_fuentes(f, inf: Informe) -> None:
                 inf.error(f"{et}: tipo A exige tarifa_usd_por_mil")
             if not ficha.get("vence"):
                 inf.error(f"{et}: tipo A exige vence")
+        if tipo == "T":
+            tl = ficha.get("twitch_login")
+            if not (isinstance(tl, str) and tl):
+                inf.error(f"{et}: tipo T exige twitch_login")
+            cr = ficha.get("creador")
+            if not (isinstance(cr, str) and cr.startswith("twitch.tv/")):
+                inf.error(f"{et}: tipo T exige creador 'twitch.tv/<login>'")
         if tipo == "D":
             if ficha.get("pilares") != ["informativa"]:
                 inf.error(f"{et}: tipo D sólo con pilar informativa")
