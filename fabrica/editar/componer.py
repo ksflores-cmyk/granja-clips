@@ -14,6 +14,7 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from .. import plazo
 from . import agua as mod_agua
 from . import cierre as mod_cierre
 from . import dialogo as mod_dialogo
@@ -57,7 +58,7 @@ def _duracion_pista_video(ruta: Path, v: dict, formato: dict) -> float:
         return n / fps
     paquetes = json.loads(subprocess.check_output([
         "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time,duration_time",
-        "-of", "json", str(ruta)])).get("packets", [])
+        "-of", "json", str(ruta)], timeout=plazo.tiempo_para(60))).get("packets", [])
     # Intervalo desde el primer PTS válido hasta el final del último paquete (no "mayor PTS + duración":
     # con una pista que no arranca en 0 eso suma el desfase inicial a la duración).
     pts = []
@@ -83,7 +84,7 @@ def sondear_video(ruta: Path) -> dict:
     out = json.loads(subprocess.check_output([
         "ffprobe", "-v", "error", "-show_entries",
         "stream=codec_type,width,height,duration,nb_frames,r_frame_rate:format=duration",
-        "-of", "json", str(ruta)]))
+        "-of", "json", str(ruta)], timeout=plazo.tiempo_para(60)))
     v = next(s for s in out["streams"] if s["codec_type"] == "video")
     audio = any(s["codec_type"] == "audio" for s in out["streams"])
     return {"ancho": int(v["width"]), "alto": int(v["height"]), "audio": audio,
@@ -280,7 +281,7 @@ def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duraci
                        cierre_s=float(marca.m("cierre_s")), pagina=str(trabajo / "pagina.png"),
                        cierre=str(trabajo / "cierre.png"), capas=capas, video=video)
     Path(salida).parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, timeout=plazo.tiempo_para(300))
     plan = plan_json(marca, t, lineas, duracion, geometria=geo, origen=origen, campana=campana)
     if plan_salida is not None:
         Path(plan_salida).write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")

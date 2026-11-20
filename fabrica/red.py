@@ -12,6 +12,8 @@ import urllib.parse
 import urllib.request
 from urllib.parse import urlsplit
 
+from . import plazo
+
 REINTENTABLES = {429, 500, 502, 503, 504}
 
 
@@ -88,14 +90,19 @@ def solicitar(transporte, metodo, url, encabezados, cuerpo=None, tiempo=60, dorm
     Respeta `retry-after` (hasta 30 s). Devuelve (estado, encabezados, bytes).
     """
     for intento in (1, 2):
+        # Antes de enviar (y antes de contar la cuota): si no cabe en el plazo del ciclo, SinTiempo y nada
+        # queda a medias.
+        tiempo_real = plazo.tiempo_para(tiempo)
         if alerta:
             alerta()
-        estado, cabeceras, datos = transporte(metodo, url, encabezados, cuerpo, tiempo)
+        estado, cabeceras, datos = transporte(metodo, url, encabezados, cuerpo, tiempo_real)
         if reintentar and estado in REINTENTABLES and intento == 1:
             try:
                 espera = min(float(cabeceras.get("retry-after", espera_s)), 30.0)
             except (TypeError, ValueError):
                 espera = espera_s
+            if plazo.activo():
+                espera = max(0.0, min(espera, plazo.restante() - plazo.MARGEN_S))
             dormir(espera)
             continue
         return estado, cabeceras, datos

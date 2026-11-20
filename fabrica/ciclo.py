@@ -27,7 +27,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from . import detectar as mod_detectar
-from . import informativa, publicar, puertas, red, registro
+from . import informativa, plazo, publicar, puertas, red, registro
 from . import validar as mod_validar
 from .almacen import Almacen, ErrorAlmacen
 from .config import cargar_yaml, raiz_repo
@@ -43,6 +43,8 @@ DIA_CADENCIA_LENTA = date(2026, 11, 21)      # desde este día (GT) sólo corre 
 TOPE_MINUTOS_DIA = 60
 MARGEN_MIN_S, MARGEN_MAX_S = 15 * 60, 75 * 60    # el hueco debe caer de ahora+15 a ahora+75 min
 MAX_INTENTOS = 3
+TIEMPO_MIN_INTENTO_S = 240      # menos que esto del plazo: no se empieza otro intento de toma
+TIEMPO_MIN_PUBLICAR_S = 120     # menos que esto: no se publica (la fuente no se gasta)
 RE_CUENTA = re.compile(r"suspend|restrict|bloquead|blocked|disabled|deshabilitad", re.IGNORECASE)
 RE_HTTP_CUENTA = re.compile(r"código (401|403)\b")
 ESTADOS_AVISO = ("incierto", "abandonado")
@@ -55,11 +57,16 @@ class AlertaRojaCiclo(Exception):
     """Algo que obliga a parar: se crea PAUSA y estado/alerta.json."""
 
 
+def imprimir_con_flush(texto) -> None:
+    """print con flush: si la corrida se cancela, el log que ya se escribió no se pierde en el búfer."""
+    print(texto, flush=True)
+
+
 class Salida:
     """Imprime cada línea sin claves y guarda el texto crudo para buscar fugas."""
 
-    def __init__(self, imprimir=print, env=None):
-        self.imprimir = imprimir
+    def __init__(self, imprimir=None, env=None):
+        self.imprimir = imprimir or imprimir_con_flush
         self.valores = {k: v for k in SECRETOS if len(v := (env or {}).get(k, "")) >= 8}
         self.secretos = list(self.valores.values())
         self.lineas: list[str] = []
@@ -371,6 +378,8 @@ def elegir_candidatos(raiz, ahora, plataformas, out, detectar_fn=None, cliente=N
     fichas = {f.get("id"): f for f in cargar_fuentes(raiz)}
     try:
         cands, saltos = (detectar_fn or mod_detectar.detectar_con_motivos)(raiz, ahora, cliente)
+    except plazo.SinTiempo:
+        raise                # el plazo del ciclo no es un fallo del detector: lo maneja el ciclo
     except Exception as e:  # noqa: BLE001 (un fallo del detector no debe tumbar el ciclo)
         out(f"detectar: {type(e).__name__}: {e}")
         return []
@@ -519,17 +528,19 @@ def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer
                 fallo(plat)
         if not listos:
             return programadas, falladas, inciertas
-        almacen.asegurar_bucket()
         try:
-            ruta, url = almacen.subir(mp4, toma.toma["numero"], hueco.fecha)
-            almacen.comprobar(url)
+            with plazo.etapa("subida al almacén"):
+                almacen.asegurar_bucket()
+                ruta, url = almacen.subir(mp4, toma.toma["numero"], hueco.fecha)
+                almacen.comprobar(url)
         except ErrorAlmacen as e:
             out(f"subida fallida: se salta el hueco ({e})")
             fallo(*listos)
             return programadas, falladas, inciertas
         for plat, tx in listos.items():
             try:
-                r = pub.programar(plat, toma.toma, url, tx, cuando, ruta, toma.ficha)
+                with plazo.etapa(f"buffer {plat}"):
+                    r = pub.programar(plat, toma.toma, url, tx, cuando, ruta, toma.ficha)
                 out(f"{plat}: programada {r['id']} para {r['dueAt']}")
                 resolver(plat, "programada")
             except publicar.ResultadoIncierto as e:
@@ -583,11 +594,33 @@ def mantenimiento(raiz, env, out, transporte_buffer, transporte_almacen, reloj) 
 
 
 def ejecutar(raiz=None, *, decidir=False, ensayo_forzado=False, ahora=None, salida_dir=None, env=None,
-             imprimir=print, detectar_fn=None, hacer_toma_fn=None, transporte_buffer=None,
-             transporte_almacen=None, transporte_twitch=None, validar_fn=None, solo_ensayo=False) -> int:
+             imprimir=None, detectar_fn=None, hacer_toma_fn=None, transporte_buffer=None,
+             transporte_almacen=None, transporte_twitch=None, validar_fn=None, solo_ensayo=False,
+             limite_s=None, alarma_s=None, inicio_epoch=None) -> int:
+    """Un ciclo. `limite_s` (plazo cooperativo) y `alarma_s` (alarma dura) son opcionales: con None no hay plazo.
+
+    Si se da `inicio_epoch` (la variable INICIO_S del workflow), ambos cuentan desde el inicio del job."""
+    out = Salida(imprimir, dict(os.environ if env is None else env))
+    plazo.registrar(out)
+    plazo.iniciar(limite_s, inicio_epoch=inicio_epoch)
+    resto = None
+    if alarma_s is not None:
+        resto = max(0.001, float(alarma_s) - plazo._ya_pasado(inicio_epoch))
+    try:
+        with plazo.alarma(resto):
+            return _ejecutar(raiz, out, decidir=decidir, ensayo_forzado=ensayo_forzado, ahora=ahora,
+                             salida_dir=salida_dir, env=env, detectar_fn=detectar_fn, hacer_toma_fn=hacer_toma_fn,
+                             transporte_buffer=transporte_buffer, transporte_almacen=transporte_almacen,
+                             transporte_twitch=transporte_twitch, validar_fn=validar_fn, solo_ensayo=solo_ensayo)
+    finally:
+        plazo.detener()
+        plazo.registrar(None)
+
+
+def _ejecutar(raiz, out, *, decidir, ensayo_forzado, ahora, salida_dir, env, detectar_fn, hacer_toma_fn,
+              transporte_buffer, transporte_almacen, transporte_twitch, validar_fn, solo_ensayo) -> int:
     raiz = raiz_repo(raiz)
     env = dict(os.environ if env is None else env)
-    out = Salida(imprimir, env)
     fijo = ahora is not None
     ahora = _ahora(ahora)
     reloj = (lambda: ahora) if fijo else (lambda: datetime.now(timezone.utc))
@@ -649,7 +682,8 @@ def ejecutar(raiz=None, *, decidir=False, ensayo_forzado=False, ahora=None, sali
 
 def _solo_mantenimiento(raiz, env, out, pendiente, tb, ta, reloj) -> int:
     if pendiente:
-        mantenimiento(raiz, env, out, tb, ta, reloj)
+        with plazo.etapa("mantenimiento"):
+            mantenimiento(raiz, env, out, tb, ta, reloj)
     return COD_OK
 
 
@@ -661,6 +695,9 @@ def _con_alerta(raiz, out: Salida, env, ahora, fn) -> int:
     if motivo is None:
         try:
             codigo = fn()
+        except plazo.SinTiempo as e:      # un SinTiempo residual (p. ej. del mantenimiento): no es alerta roja
+            out(f"SIN TIEMPO: {e}. El ciclo termina solo; no se crea PAUSA.")
+            codigo = COD_OK
         except AlertaRojaCiclo as e:
             motivo = str(e)
         except publicar.AlertaRoja as e:
@@ -681,21 +718,33 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
     temporal = Path(tempfile.mkdtemp(prefix="fabrica-ciclo-"))
     carpeta = Path(salida_dir) if salida_dir else (Path(tempfile.gettempdir()) / "fabrica-ensayo" if sim else temporal)
     carpeta.mkdir(parents=True, exist_ok=True)
+    hecho = {"gastada": False, "programadas": []}
+    toma = None
     try:
         cliente = mod_detectar.cliente_desde_entorno(tt) if not sim or env.get("TWITCH_CLIENT_ID") else None
-        toma = None
-        cands = elegir_candidatos(raiz, ahora, hueco.plataformas, out, detectar_fn, cliente)
+        with plazo.etapa("detectar"):
+            cands = elegir_candidatos(raiz, ahora, hueco.plataformas, out, detectar_fn, cliente)
         for i, c in enumerate(cands[:MAX_INTENTOS], 1):
+            if not plazo.queda(TIEMPO_MIN_INTENTO_S):
+                out("sin tiempo para otro intento")
+                break
             ficha = fichas.get(c.fuente_id) or {}
-            r = hacer(raiz, c, ficha, ahora, salida=carpeta / f"intento-{i}")
+            with plazo.etapa(f"toma, intento {i}"):
+                r = hacer(raiz, c, ficha, ahora, salida=carpeta / f"intento-{i}")
             if r.ok:
                 toma = Toma(r, _toma_dict(r, c, ficha), ficha, c)
                 break
             out(f"intento {i}: {c.id_origen} descartado: " + "; ".join(r.motivos))
-            if descarte_definitivo(r) and not sim:
-                puertas.anotar_visto(raiz, c.id_origen)       # no se gasta cuota repitiéndolo
+            # Regla de gasto: la fuente sólo se anota si el fallo es del MATERIAL; nunca por red, tiempo o máquina.
+            if r.gastar or descarte_definitivo(r):
+                out("la fuente se gasta (fallo del material)")
+                if not sim:
+                    puertas.anotar_visto(raiz, c.id_origen)       # no se gasta cuota repitiéndolo
+            else:
+                out("la fuente no se gasta (red, tiempo o máquina)")
         if toma is None:
-            toma = _respaldo(raiz, ahora, carpeta, fichas, out)
+            with plazo.etapa("respaldo"):
+                toma = _respaldo(raiz, ahora, carpeta, fichas, out)
         if toma is None:
             if not sim:
                 registro.anotar_registro(raiz, "ciclo: sin toma")
@@ -720,9 +769,14 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
                                                f"({toma.toma['pilar']}) {'validada' if ok else 'con cargas no válidas'}"
                                                f" para {hueco.fecha} {hueco.hora}; sin createPost")
             return COD_OK if ok else COD_ERROR
-        hecho = {"gastada": False}
+        if not plazo.queda(TIEMPO_MIN_PUBLICAR_S):
+            out("sin tiempo para publicar: la fuente no se gasta")
+            registro.anotar_registro(raiz, "ciclo: sin tiempo, no se publicó")
+            return COD_OK
 
         def al_resolver(plat, estado):
+            if estado == "programada":
+                hecho["programadas"].append(plat)
             cerrar_hueco(raiz, hueco, plat)               # el hueco de esa plataforma se cierra, salga o falle
             # El número de toma se gasta en cuanto una plataforma quedó programada (o su resultado es incierto,
             # y entonces el post puede existir). Las que fallaron pierden esa toma y ese hueco: la misma toma
@@ -737,13 +791,30 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
             elif estado == "programada" and toma.entrada is not None:
                 informativa.marcar_usada(raiz, toma.entrada["id"])
 
-        programadas, falladas, inciertas = publicar_en_vivo(raiz, env, toma, hueco, out, tb, ta, reloj, al_resolver)
+        with plazo.etapa("publicar"):
+            programadas, falladas, inciertas = publicar_en_vivo(raiz, env, toma, hueco, out, tb, ta, reloj,
+                                                                al_resolver)
         registro.anotar_registro(raiz, f"ciclo: toma {toma.toma['numero']} ({toma.toma['pilar']}) programada en "
                                        f"{', '.join(programadas) or 'ninguna'}"
                                        + (f"; falló {', '.join(falladas)}" if falladas else ""))
         if modo == "vivo":
-            mantenimiento(raiz, env, out, tb, ta, reloj)
+            try:
+                with plazo.etapa("mantenimiento"):
+                    mantenimiento(raiz, env, out, tb, ta, reloj)
+            except plazo.SinTiempo as e:      # ya se publicó: el mantenimiento se retoma en el próximo ciclo
+                out(f"mantenimiento: sin tiempo ({e}); se retoma en el próximo ciclo")
         return COD_OK
+    except plazo.SinTiempo as e:
+        if hecho["gastada"]:
+            out(f"SIN TIEMPO: {e}. El ciclo termina solo; lo ya programado queda registrado.")
+            if not sim:
+                registro.anotar_registro(raiz, f"ciclo: sin tiempo; programada en "
+                                               f"{', '.join(hecho['programadas']) or 'ninguna'}")
+        else:
+            out(f"SIN TIEMPO: {e}. El ciclo termina solo; la fuente no se gasta.")
+            if not sim:
+                registro.anotar_registro(raiz, "ciclo: sin tiempo, no se publicó")
+        return COD_ERROR if sim else COD_OK
     finally:
         shutil.rmtree(temporal, ignore_errors=True)
 
@@ -795,8 +866,15 @@ def main(argv: list[str] | None = None) -> int:
         for clave in abrir_avisos(a.raiz):
             print(f"issue abierto: {clave}")
         return COD_OK
+    plazos = {}
+    if not a.decidir:          # el plazo sólo vale para `producir`; INICIO_S es el inicio del job (date +%s)
+        plazos = {"limite_s": plazo.LIMITE_CICLO_S, "alarma_s": plazo.ALARMA_S}
+        try:
+            plazos["inicio_epoch"] = float(os.environ["INICIO_S"])
+        except (KeyError, ValueError):
+            pass
     return ejecutar(a.raiz, decidir=a.decidir, ensayo_forzado=a.ensayo_forzado, ahora=ahora,
-                    salida_dir=a.salida, solo_ensayo=a.modo_ensayo)
+                    salida_dir=a.salida, solo_ensayo=a.modo_ensayo, **plazos)
 
 
 if __name__ == "__main__":

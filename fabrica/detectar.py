@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 from zoneinfo import ZoneInfo
 
+from . import plazo
 from .fuentes import cargar_fuentes, es_publicable
 
 ZONA = ZoneInfo("America/Guatemala")
@@ -33,7 +34,7 @@ def transporte_urllib(metodo: str, url: str, encabezados: dict, cuerpo: bytes | 
     """Transporte real. Devuelve (estado_http, texto)."""
     req = urllib.request.Request(url, data=cuerpo, headers=encabezados, method=metodo)
     try:
-        with urllib.request.urlopen(req, timeout=20) as r:  # noqa: S310 (URLs fijas https)
+        with urllib.request.urlopen(req, timeout=plazo.tiempo_para(20)) as r:  # noqa: S310 (URLs fijas https)
             return r.status, r.read().decode("utf-8")
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode("utf-8", errors="replace")
