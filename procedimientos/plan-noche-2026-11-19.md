@@ -72,7 +72,17 @@ Lo escribe el jefe de Clips el 19 nov, 8:30 p. m. GT. Cada tarea programada de e
 
 (detalles que no bloquean, uno por línea)
 
+- #1 blindaje: `ciclo.py` ~598: `programar` y `resolver(plat, "programada")` no comparten un `plazo.critico()` (ventana de milisegundos: post creado sin gastar la toma).
+- #1 blindaje: `al_resolver` sin `critico()`: la alarma entre `anotar_visto` y `avanzar_toma` repetiría el número de toma.
+- #1 blindaje: `publicar._alerta` (~368): la alarma puede cortar `crear_pausa` del canal ajeno; la alerta salta otra vez en el ciclo siguiente.
+- #1 blindaje: clave de Gemini revocada (401/403/API_KEY_INVALID) no gasta fuentes, pero no avisa: todo entra en cuarentena en silencio. Proponer aviso tras 2 corridas y saltar descargas.
+- #1 blindaje: un SinTiempo causado por un intento anterior se cuenta como fallo de la fuente en curso (puede meterla en cuarentena sin culpa).
+- #1 blindaje: en ensayo forzado el log dice «la fuente se gasta» aunque no escribe en `vistos.txt` (sim). Ajustar el texto.
+- #1 blindaje: `timeout-minutes: 15` del paso quedó redundante con `timeout -k`; actualizar su comentario.
+- #1 blindaje: las tres FM27 probadas en ensayo fallan por material (puerta «cuerpo coincide con el origen» y frases que no caben en 2 líneas): lo resuelven #5 y #2.
+
 ## Bitácora de la noche
 
 - 19 nov 8:20 p. m. — jefe: ping de Gemini añadido a `diagnostico.yml` (corrida 44652467169). Plan escrito y 18 tareas programadas (ids `trig_01UG3M…` a `trig_01VCGM…`).
 - 19 nov 7:28 p. m. — jefe: toma 1 borrada de YouTube; Instagram desconectado en Buffer (ver Estado).
+- 19 nov 9:20 p. m. — #1 `blindaje` (rama `claude/clips-blindaje`, PR #1 en borrador). Plazo de 13 min + alarma 14 + `timeout -k` 870 s; tiempo límite en Drive, Gemini, yt-dlp, Buffer, Supabase, Twitch y ffmpeg; log `[etapa]` con segundos y flush; la fuente sólo se gasta si se programó o si falló el material; cuarentena de 24 h tras 3 fallos no-material; SinTiempo en createPost → `incierto`; ERIC ZZETA fuera de `vistos.txt`. Puerta: 923 en verde (76 nuevas, con el cuelgue simulado). Corridas: `fabrica` 44659555654 VERDE (ensayo forzado, 6,6 min, todas las etapas en el log); `publicar-ensayo` 44665615975 VERDE; `fabrica` 44664056458 y 44665612415 se cortaron solas a los ~10 min con el log completo, en rojo sólo porque el ensayo no entregó toma (Gemini sin respuesta o material descartado, sin gastar fuentes). Revisores: `revisor` Sonnet y segunda mirada Opus (APROBADO en la ronda 2); Codex no disponible (sin PC). **No fusionado**: el permiso de esta sesión no dejó hacer push a `main` ni borrar la rama; falta que el Cuartel o Kevin fusionen la PR #1. OPINIÓN: el cuelgue mudo y la fuente gastada sin publicar quedan cerrados; el cuello real ahora es Gemini (hasta 420 s) y el material que no pasa la puerta. APORTE: guardar el `id_origen` real en el libro de envíos para que `reconciliar` gaste la fuente de un post huérfano.
