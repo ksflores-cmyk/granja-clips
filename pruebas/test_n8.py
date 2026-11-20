@@ -391,11 +391,12 @@ def test_creador_sin_etiqueta_no_se_publica():
         textos({**TOMA_FM, "creador": ""}, ficha_real(), "tiktok")
 
 
-def test_los_hashtags_de_la_toma_van_primero_sin_pasar_de_tres_ni_repetir_publicidad():
+def test_los_hashtags_del_brief_van_primero_sin_pasar_de_tres_ni_repetir_publicidad():
     tx = textos({**TOMA_FM, "creador": "DARO", "etiquetas": ["#publicidad", "#Barça", "#Liga", "#Otro", "#Mas"]},
                 ficha_real(), "tiktok")
     ultima = tx["texto"].split("\n")[-1]
-    assert ultima == "#Barça #Liga #Otro"
+    # Tarea #8 (ronda 2): los hashtags del brief (reglas.hashtags) van antes que los de la toma.
+    assert ultima == "#FootballManager #FM27 #FootballManager27"
     assert tx["texto"].lower().count("#publicidad") == 1
 
 
