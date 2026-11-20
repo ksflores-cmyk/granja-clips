@@ -138,13 +138,12 @@ def malos(puntos):
 
 
 @necesita_ffmpeg
-def test_fuente_9_16_cabe_y_el_dialogo_queda_dentro_del_cuadro(vertical, marca):
+def test_fuente_9_16_cubre_el_cuadro_completo(vertical, marca):
     plan = vertical["plan"]
-    c = plan["geometria"]["cuerpo"]
-    assert c["alto"] <= componer.alto_caja_cuerpo(marca, plan["geometria"]["y_contenido"])
-    assert c["ancho"] < marca.ancho and abs(c["ancho"] / c["alto"] - 9 / 16) < 0.01
-    assert c["x"] == (marca.ancho - c["ancho"]) // 2
-    assert plan["geometria"]["y_dialogo"] + componer.alto_zona_dialogo(marca) <= marca.alto
+    assert plan["plantilla"] == "v2-pantalla-completa"
+    assert plan["geometria"]["cuerpo"] == {"x": 0, "y": 0, "ancho": 1080, "alto": 1920}
+    r = plan["geometria"]["recorte"]
+    assert (r["x"], r["y"], r["ancho"], r["alto"], r["modo"]) == (0, 0, 1080, 1920, "centro") and r["escala"] == 1.0
     info = estilo.sondear(vertical["mp4"])
     assert (info["video"]["width"], info["video"]["height"]) == (1080, 1920)
     assert abs(info["duracion"] - 4.0) <= 0.1
@@ -153,9 +152,20 @@ def test_fuente_9_16_cabe_y_el_dialogo_queda_dentro_del_cuadro(vertical, marca):
     assert plan["origen"]["sha256"] == componer.sha256_archivo(vertical["fuente"])
 
 
-def test_fuente_16_9_conserva_el_ancho_completo(marca):
-    c = componer.ajustar_cuerpo(marca, 530, 640, 360)
-    assert (c["x"], c["ancho"], c["alto"]) == (0, 1080, 608)
+@necesita_ffmpeg
+def test_fuente_16_9_cubre_el_cuadro_con_recorte_fijo(tmp_path, marca):
+    fuente = fuente_sintetica(tmp_path / "ancha.mp4", 640, 360, 4)
+    mp4 = tmp_path / "t.mp4"
+    plan = componer.componer(marca, lienzo.Toma(**TOMA), LINEAS, mp4, duracion=4.0, trabajo=tmp_path / "w",
+                             fuente_video=fuente, inicio=0.0)
+    info = estilo.sondear(mp4)
+    assert (info["video"]["width"], info["video"]["height"]) == (1080, 1920)
+    assert plan["geometria"]["cuerpo"] == {"x": 0, "y": 0, "ancho": 1080, "alto": 1920}
+    r = plan["geometria"]["recorte"]
+    assert r["escala"] >= max(1080 / 640, 1920 / 360) - 1e-3             # cubre, no encaja
+    assert r["alto"] == 360 and abs(r["ancho"] * r["escala"] - 1080) <= 2 * r["escala"]
+    assert 0 <= r["x"] and r["x"] + r["ancho"] <= 640 and r["x"] % 2 == 0 and r["ancho"] % 2 == 0
+    assert estilo.pantalla_completa(plan, marca)[0]
 
 
 def test_fuente_corta_da_error_antes_de_ffmpeg(tmp_path, marca, monkeypatch):
@@ -173,9 +183,12 @@ def test_puerta_en_verde_con_video_de_fuente(vertical, marca):
     assert malos(puntos) == [], [p for p in puntos if not p[1]]
     assert all(n.startswith(("[fotograma] ", "[plan] ")) for n, _, _ in puntos)
     assert any("sha256 del MP4" in n and len(d) == 64 for n, _, d in puntos)
-    for n in ("Cabecera en el video", "Diálogo en el video", "Cuerpo coincide con el origen"):
+    for n in ("Cabecera en el video", "Diálogo en el video", "Cuerpo coincide con el origen", "Mosca en el video",
+              "Bordes coinciden con la fuente (sin franjas)", "Audio original del clip"):
         assert any(x == f"[fotograma] {n}" for x, _, _ in puntos)
     assert any(x == "[plan] Textos caben en sus márgenes" for x, _, _ in puntos)
+    for n in ("Pantalla completa (cuerpo 1080x1920, sin franjas)", "Capas fuera de la zona de acción"):
+        assert any(x == f"[plan] {n}" for x, _, _ in puntos)
 
 
 @pytest.mark.slow
@@ -196,7 +209,9 @@ def test_cuerpo_de_otra_fuente_con_cierre_valido_sale_en_rojo(vertical, marca):
                       fuente_video=otra, inicio=0.0)
     plan = json.loads(json.dumps(vertical["plan"]))        # el plan dice que el origen es testsrc
     m = malos(estilo.revisar(mp4, plan, marca))
-    assert m == ["[fotograma] Cuerpo coincide con el origen"], m
+    assert "[fotograma] Cuerpo coincide con el origen" in m
+    # lo demás (cabecera, diálogo, cierre, audio) sigue en verde: sólo la imagen de fondo es de otra fuente
+    assert set(m) <= {"[fotograma] Cuerpo coincide con el origen", "[fotograma] Bordes coinciden con la fuente (sin franjas)"}, m
 
 
 @necesita_ffmpeg
@@ -235,8 +250,8 @@ def test_cierre_correcto_pasa_corte_sin_credito_falla_y_credito_distinto_falla(v
     sin = tmp_path / "sin-credito.mp4"
     componer.componer(marca, lienzo.Toma(**{**TOMA, "credito": ""}), LINEAS, sin, duracion=4.0,
                       trabajo=tmp_path / "w", fuente_video=vertical["fuente"], inicio=0.0)
-    ok, det = estilo.cierre_visible(sin, plan, marca)
-    assert not ok and "falla: crédito" in det and "CORTE." not in det.split("falla:")[1]
+    ok, det = estilo.cierre_visible(sin, plan, marca)        # la placa del cierre ya no es la del plan
+    assert not ok and "falla: " in det
     # crédito distinto
     otro = dict(plan, toma=dict(plan["toma"], credito="Con: @otro_creador_distinto"))
     ok, det = estilo.cierre_visible(vertical["mp4"], otro, marca)
@@ -425,11 +440,13 @@ def test_dif_tinta_rechaza_cajas_vacias_o_fuera_del_cuadro(marca):
 
 
 @necesita_ffmpeg
-def test_dialogo_con_geometria_fuera_del_cuadro_sale_en_rojo(vertical, marca):
+def test_dialogo_con_capa_fuera_del_cuadro_sale_en_rojo(vertical, marca):
     plan = json.loads(json.dumps(vertical["plan"]))
-    plan["geometria"]["y_dialogo"] = 5000
-    ok, det = estilo.dialogo_visible(vertical["mp4"], plan, marca)
-    assert not ok and "fuera del cuadro" in det
+    capa = next(c for c in plan["geometria"]["capas"] if c["tipo"] == "dialogo_1")
+    capa["y"] = 5000
+    ok, det = estilo.capas_fuera_de_la_accion(plan, marca)
+    assert not ok and "zona segura" in det
+    assert not estilo.capas_coinciden(plan, marca)[0]
 
 
 def test_tinta_extra_en_el_fotograma_se_detecta(marca):
