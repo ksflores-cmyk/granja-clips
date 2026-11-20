@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageFilter
 
+from .. import plazo
 from . import agua as mod_agua
 from . import cierre as mod_cierre
 from . import dialogo as mod_dialogo
@@ -64,7 +65,7 @@ def sondear(ruta: Path) -> dict:
     out = json.loads(subprocess.check_output([
         "ffprobe", "-v", "error", "-show_entries",
         "stream=codec_type,codec_name,width,height,pix_fmt,r_frame_rate,profile:format=duration",
-        "-of", "json", str(ruta)]))
+        "-of", "json", str(ruta)], timeout=plazo.tiempo_para(60)))
     v = next((s for s in out["streams"] if s["codec_type"] == "video"), {})
     a = next((s for s in out["streams"] if s["codec_type"] == "audio"), {})
     num, _, den = str(v.get("r_frame_rate", "0/1")).partition("/")
@@ -115,7 +116,8 @@ def _fotograma(video: Path, seg: float) -> Image.Image | None:
     with tempfile.TemporaryDirectory(prefix="cuadro-") as tmp:
         png = Path(tmp) / "f.png"
         r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{max(0.0, seg):.3f}",
-                            "-i", str(video), "-frames:v", "1", str(png)], capture_output=True)
+                            "-i", str(video), "-frames:v", "1", str(png)], capture_output=True,
+                           timeout=plazo.tiempo_para(60))
         if r.returncode != 0 or not png.is_file():
             return None
         img = Image.open(png).convert("RGB")
@@ -129,7 +131,7 @@ def _ultimo_fotograma(video: Path) -> Image.Image | None:
         png = Path(tmp) / "u.png"
         r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-sseof", "-0.5",
                             "-i", str(video), "-an", "-update", "1", "-f", "image2", str(png)],
-                           capture_output=True)
+                           capture_output=True, timeout=plazo.tiempo_para(60))
         if r.returncode != 0 or not png.is_file():
             return None
         img = Image.open(png).convert("RGB")
@@ -408,7 +410,7 @@ UMBRAL_SILENCIO_DB = -45.0      # sobre el pico: un tramo corto de voz o música
 def picos_audio(video: Path) -> tuple[float | None, str | None]:
     """(pico en dB con volumedetect, motivo del error). El silencio digital marca -91 dB o menos."""
     r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(video), "-vn", "-af", "volumedetect",
-                        "-f", "null", "-"], capture_output=True, text=True)
+                        "-f", "null", "-"], capture_output=True, text=True, timeout=plazo.tiempo_para(120))
     if r.returncode != 0:
         return None, f"ffmpeg falló (código {r.returncode}): {(r.stderr or '').strip().splitlines()[-1:] or ['sin detalle']}"
     m = re.search(r"max_volume:\s*(-?[0-9.]+|-inf)\s*dB", r.stderr)
@@ -419,7 +421,8 @@ def picos_audio(video: Path) -> tuple[float | None, str | None]:
 
 def _pistas_de_audio(video: Path) -> int:
     out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index",
-                          "-of", "json", str(video)], capture_output=True, text=True)
+                          "-of", "json", str(video)], capture_output=True, text=True,
+                         timeout=plazo.tiempo_para(60))
     try:
         return len(json.loads(out.stdout).get("streams", []))
     except json.JSONDecodeError:
@@ -446,7 +449,8 @@ def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
 
     def pcm(ruta: Path, ss: float, t: float) -> np.ndarray:
         r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{ss:.3f}", "-t", f"{t:.3f}", "-i", str(ruta),
-                            "-vn", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"], capture_output=True)
+                            "-vn", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"], capture_output=True,
+                           timeout=plazo.tiempo_para(120))
         return np.frombuffer(r.stdout, dtype=np.int16).astype(np.float32)
     largo = max(1.0, dur - float(0.5))
     a, b = pcm(Path(video), 0.0, largo), pcm(Path(origen["archivo"]), inicio, largo)

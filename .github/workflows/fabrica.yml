@@ -24,6 +24,8 @@ jobs:
   decidir:
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    env:
+      PYTHONUNBUFFERED: "1"
     outputs:
       trabajo: ${{ steps.decidir.outputs.trabajo }}
     steps:
@@ -43,6 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
+      PYTHONUNBUFFERED: "1"      # sin búfer: si GitHub cancela la corrida, el log ya escrito se conserva
       ENSAYO_FORZADO: ${{ inputs.ensayo_forzado }}
       BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -84,14 +87,19 @@ jobs:
             fi
           fi
       - name: Ciclo
+        timeout-minutes: 15      # el ciclo se corta solo a los 13 (plazo) y 14 min (alarma); el job tiene 20 para cerrar
         run: |
           # Fuera de main (un dispatch desde otra rama) sólo se hace ensayo y no se guarda nada.
           extra=""
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then extra="--modo-ensayo"; fi
+          # Tercera capa: `timeout -k` mata el proceso (y a sus hijos al soltar la sesión) 870 s después del
+          # INICIO_S del job, aunque Python siga bloqueado. Mínimo 30 s.
+          resto=$(( 870 - ( $(date +%s) - INICIO_S ) ))
+          if [ "$resto" -lt 30 ]; then resto=30; fi
           if [ "$ENSAYO_FORZADO" = "true" ]; then
-            python -m fabrica.ciclo $extra --ensayo-forzado --salida "$RUNNER_TEMP/ensayo"
+            timeout -k 10 "${resto}s" python -m fabrica.ciclo $extra --ensayo-forzado --salida "$RUNNER_TEMP/ensayo"
           else
-            python -m fabrica.ciclo $extra
+            timeout -k 10 "${resto}s" python -m fabrica.ciclo $extra
           fi
       - name: Subir el ensayo (MP4, plan e informe de la puerta)
         if: ${{ always() && inputs.ensayo_forzado }}

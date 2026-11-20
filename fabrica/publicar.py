@@ -23,7 +23,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import envios_campana, red
+from . import envios_campana, plazo, red
 from .candado import candado
 from .config import cargar_yaml, raiz_repo
 from .fuentes import etiqueta_creador
@@ -771,6 +771,7 @@ class Publicador:
         carga, anot = armar_carga(plataforma, canal, textos["texto"], textos.get("titulo"),
                                   url_video, cuando, self.esquema)
         self.reconciliar()
+        plazo.tiempo_para(60)            # si no cabe createPost, se sale ANTES de reservar nada en el libro
         due = iso_utc(cuando)
         id_envio = f"{plataforma}|{toma.get('numero')}|{due}"
         entrada = {"id": id_envio, "plataforma": plataforma, "toma": toma.get("numero"), "dueAt": due,
@@ -778,31 +779,44 @@ class Publicador:
                    "intento": uuid.uuid4().hex,
                    "registrado": False, "texto": textos["texto"],
                    "datos": {"toma": toma, "textos": textos, "ficha_id": (ficha or {}).get("id")}}
-        with self._candado():                       # lectura, comprobación y reserva, de una vez
-            libro = self._libro()
-            previo = next((e for e in libro if e["estado"] != "rechazado" and e["plataforma"] == plataforma
-                           and (str(e.get("toma")) == str(toma.get("numero")) or e.get("dueAt") == due)), None)
-            if previo:
-                raise Descartada(f"ya hay un envío {previo['estado']} para {plataforma} (toma "
-                                 f"{previo.get('toma')}, {previo.get('dueAt')}): no se repite")
-            libro = [e for e in libro if e["id"] != id_envio]   # sólo quedaba un `rechazado`
-            libro.append(entrada)
-            self._guardar_libro(libro)              # si falla, no se envía nada
+        resultado = None
         try:
-            post = self._crear(carga, canal)
-        except ErrorIncierto as e:
-            self._intentar_transicion(entrada, "incierto")
-            raise ResultadoIncierto(str(e)) from None
-        except (Descartada, ErrorBuffer):
-            self._intentar_transicion(entrada, "rechazado")
-            raise
-        try:
-            self._cerrar_creado(entrada, post)
-        except Exception:
-            # Falló el libro o el marcador tras un createPost correcto: no se pierde ni se repite. El envío
-            # queda `enviando` o `creado` sin registrar y la próxima reconciliación lo termina.
-            pass
-        return {"id": post["id"], "dueAt": post.get("dueAt"), "anotaciones": anot}
+            with plazo.critico():           # la alarma dura no corta la reserva, el envío ni el cierre
+                with self._candado():                   # lectura, comprobación y reserva, de una vez
+                    libro = self._libro()
+                    previo = next((e for e in libro if e["estado"] != "rechazado" and e["plataforma"] == plataforma
+                                   and (str(e.get("toma")) == str(toma.get("numero")) or e.get("dueAt") == due)), None)
+                    if previo:
+                        raise Descartada(f"ya hay un envío {previo['estado']} para {plataforma} (toma "
+                                         f"{previo.get('toma')}, {previo.get('dueAt')}): no se repite")
+                    libro = [e for e in libro if e["id"] != id_envio]   # sólo quedaba un `rechazado`
+                    libro.append(entrada)
+                    self._guardar_libro(libro)          # si falla, no se envía nada
+                try:
+                    post = self._crear(carga, canal)
+                except ErrorIncierto as e:
+                    self._intentar_transicion(entrada, "incierto")
+                    raise ResultadoIncierto(str(e)) from None
+                except plazo.SinTiempo:
+                    self._intentar_transicion(entrada, "incierto")
+                    raise ResultadoIncierto("sin tiempo durante createPost; el resultado es incierto, "
+                                            "no se repite") from None
+                except (Descartada, ErrorBuffer):
+                    self._intentar_transicion(entrada, "rechazado")
+                    raise
+                try:
+                    self._cerrar_creado(entrada, post)
+                except Exception:
+                    # Falló el libro o el marcador tras un createPost correcto: no se pierde ni se repite. El envío
+                    # queda `enviando` o `creado` sin registrar y la próxima reconciliación lo termina.
+                    pass
+                resultado = {"id": post["id"], "dueAt": post.get("dueAt"), "anotaciones": anot}
+        except plazo.SinTiempo:
+            if resultado is None:
+                raise
+            # La alarma sonó durante la sección crítica y el post YA existe y está cerrado: se devuelve el
+            # resultado (si no, el ciclo no gastaría la toma). El plazo cooperativo ya cortará lo siguiente.
+        return resultado
 
     def _intentar_transicion(self, entrada: dict, a: str) -> None:
         try:
@@ -914,8 +928,11 @@ class Publicador:
         for e in self._libro():
             if e["estado"] == "creado" and not e.get("registrado") and e.get("post_id") and e.get("datos"):
                 try:
-                    self._cerrar_creado(e, {"id": e["post_id"]})
+                    with plazo.critico():          # el cierre no se corta a medias; la alarma se lanza al terminar
+                        self._cerrar_creado(e, {"id": e["post_id"]})
                     resultado[e["id"]] = "creado"
+                except plazo.SinTiempo:
+                    raise
                 except Exception:
                     pass
         abiertos = [e for e in self._libro() if e["estado"] in ESTADOS_ABIERTOS and e.get("canal")]
@@ -938,8 +955,11 @@ class Publicador:
             hallado = next((p for p in posts if _mismo_post(p, e)), None)
             if hallado:
                 try:
-                    self._cerrar_creado(e, hallado)
+                    with plazo.critico():
+                        self._cerrar_creado(e, hallado)
                     resultado[e["id"]] = "creado"
+                except plazo.SinTiempo:
+                    raise
                 except Exception:
                     pass
             elif concluyente and self.ahora().astimezone(timezone.utc) > _a_utc(e["dueAt"]) + timedelta(hours=HORAS_ABANDONO):

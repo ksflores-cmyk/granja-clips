@@ -18,6 +18,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import plazo
 from .config import cargar_yaml
 from .editar import dialogo as mod_dialogo
 from .editar.lienzo import PUNTUACION, partir
@@ -26,7 +27,9 @@ from .editar.marca import Marca
 URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
 RUTA_PROMPT = Path(__file__).resolve().parent / "ojos_prompt.md"
 ESPERA_REINTENTO_S = 8.0
-TIEMPO_ESPERA_S = 180
+TIEMPO_ESPERA_S = 120                    # por petición
+TOPE_OJOS_S = 420                        # para todo `mirar` (intentos y esperas)
+MINIMO_INTENTO_S = 15                    # con menos que esto no se envía otra petición
 TOPE_PETICION_BYTES = 20 * 1024 * 1024   # límite de la API para una petición en línea
 RECORTE_MIN_S, RECORTE_MAX_S = 7.0, 30.0
 TOL_S = 0.05
@@ -46,6 +49,23 @@ class Mirada:
     motivo: str | None = None          # por qué no hay datos
     intentos: list[str] = field(default_factory=list)   # un renglón por intento (sin claves)
     pasajero: bool = False             # falló Gemini (429, 5xx, red), no el clip: la fuente no se gasta
+    del_material: bool = False         # el fallo es de ESTE video (400, sin candidatos, muy pesado): la fuente se gasta
+
+
+def _error_de_clave(texto) -> bool:
+    """Un 400 de Gemini cuyo `error.status` o `details[].reason` habla de clave o permiso (no del video)."""
+    try:
+        err = (json.loads(texto) or {}).get("error") or {}
+    except (ValueError, TypeError, AttributeError):
+        return False
+    if not isinstance(err, dict):
+        return False
+    marcas = [str(err.get("status") or "")]
+    for d in err.get("details") or []:
+        if isinstance(d, dict):
+            marcas.append(str(d.get("reason") or ""))
+    junto = " ".join(marcas).upper()
+    return any(m in junto for m in ("API_KEY", "PERMISSION_DENIED", "FAILED_PRECONDITION", "UNAUTHENTICATED"))
 
 
 def esquema_respuesta() -> dict:
@@ -133,11 +153,11 @@ def cuerpo_peticion(instr: str, video: bytes, temperatura: float) -> bytes:
     return json.dumps(cuerpo).encode("utf-8")
 
 
-def transporte_urllib(url: str, encabezados: dict, cuerpo: bytes) -> tuple[int, str]:
+def transporte_urllib(url: str, encabezados: dict, cuerpo: bytes, tiempo: float | None = None) -> tuple[int, str]:
     """Transporte real: POST. Devuelve (estado_http, texto). Nunca deja la clave en un error."""
     req = urllib.request.Request(url, data=cuerpo, headers=encabezados, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=TIEMPO_ESPERA_S) as r:  # noqa: S310 (URL fija https)
+        with urllib.request.urlopen(req, timeout=tiempo or TIEMPO_ESPERA_S) as r:  # noqa: S310 (URL fija https)
             return r.status, r.read().decode("utf-8")
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode("utf-8", errors="replace")
@@ -177,13 +197,22 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
     tope = float(cfg["max_mb_en_linea"]) * 1024 * 1024
     if tam > tope:
         return Mirada(None, motivo=f"el video pesa {tam / 1048576:.1f} MB y el máximo en línea es "
-                                   f"{cfg['max_mb_en_linea']} MB")
+                                   f"{cfg['max_mb_en_linea']} MB", del_material=True)
     cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego, nota, recorte), ruta_video.read_bytes(),
                              float(cfg["temperatura"]))
     if len(cuerpo) > TOPE_PETICION_BYTES:     # el base64 infla un tercio: se mide lo que de verdad se envía
         return Mirada(None, motivo=f"la petición serializada pesa {len(cuerpo) / 1048576:.1f} MB y el tope es "
-                                   f"{TOPE_PETICION_BYTES // 1048576} MB")
-    transporte = transporte or transporte_urllib
+                                   f"{TOPE_PETICION_BYTES // 1048576} MB", del_material=True)
+    inicio_ojos = time.monotonic()
+
+    def presupuesto() -> float:
+        """Segundos que quedan: lo que resta del tope de ojos y lo que resta del plazo del ciclo."""
+        return min(TOPE_OJOS_S - (time.monotonic() - inicio_ojos), plazo.restante() - plazo.MARGEN_S)
+
+    def llamar(url, encabezados, cuerpo, tiempo):
+        if transporte is None:
+            return transporte_urllib(url, encabezados, cuerpo, tiempo=tiempo)
+        return transporte(url, encabezados, cuerpo)      # los transportes inyectados reciben 3 argumentos
     encabezados = {"Content-Type": "application/json", "x-goog-api-key": clave}
     mirada = Mirada(None)
     respaldos_por_falla = 1      # ante 429/5xx/red persistentes se prueba UN modelo más (18 nov: 503 y timeouts)
@@ -192,20 +221,28 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
         estado, texto = None, ""
         caida = None
         for intento in (1, 2):
+            quedan = presupuesto()
+            if quedan < MINIMO_INTENTO_S:
+                mirada.motivo = (f"sin tiempo para Gemini (quedan {max(quedan, 0):.0f} s del presupuesto de "
+                                 f"{TOPE_OJOS_S} s o del plazo del ciclo)")
+                mirada.pasajero = True
+                mirada.datos = None
+                mirada.intentos.append(f"{modelo}: {mirada.motivo}")
+                return mirada
             try:
-                estado, texto = transporte(url, encabezados, cuerpo)
+                estado, texto = llamar(url, encabezados, cuerpo, min(TIEMPO_ESPERA_S, quedan))
             except ErrorOjos as e:
                 mirada.intentos.append(f"{modelo}: {e} (intento {intento})")
                 caida = str(e)
                 if intento == 1:
-                    espera(ESPERA_REINTENTO_S)
+                    espera(max(0.0, min(ESPERA_REINTENTO_S, presupuesto() - MINIMO_INTENTO_S)))
                     continue
                 break
             caida = None
             if estado == 429 or 500 <= estado < 600:
                 mirada.intentos.append(f"{modelo}: HTTP {estado} (intento {intento})")
                 if intento == 1:
-                    espera(ESPERA_REINTENTO_S)
+                    espera(max(0.0, min(ESPERA_REINTENTO_S, presupuesto() - MINIMO_INTENTO_S)))
                     continue
             break
         if caida is not None or estado == 429 or (estado is not None and 500 <= estado < 600):
@@ -223,6 +260,8 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
         if estado != 200:
             mirada.motivo = f"Gemini respondió HTTP {estado} con {modelo}"
             mirada.pasajero = False
+            # 401/403 y los 400 de clave o permiso son de la máquina; sólo 400 INVALID_ARGUMENT y 413 son del video.
+            mirada.del_material = estado not in (401, 403) and not (estado == 400 and _error_de_clave(texto))
             return mirada
         mirada.modelo = modelo
         mirada.pasajero = False
@@ -231,14 +270,17 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
             crudo = _texto_de_respuesta(texto)
         except ErrorOjos as e:
             mirada.motivo = str(e)
+            mirada.del_material = True
             return mirada
         try:
             datos = json.loads(crudo)
         except json.JSONDecodeError:
             mirada.motivo = "la respuesta del modelo no es JSON válido"
+            mirada.del_material = True
             return mirada
         if not isinstance(datos, dict):
             mirada.motivo = "la respuesta del modelo no es un objeto JSON"
+            mirada.del_material = True
             return mirada
         mirada.datos = datos
         return mirada

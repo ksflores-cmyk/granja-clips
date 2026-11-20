@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote, urlparse
 
-from . import red
+from . import plazo, red
 from .config import cargar_yaml
 from .pausa import ZONA
 
@@ -68,12 +68,12 @@ class Almacen:
         h.update(extra or {})
         return h
 
-    def _pedir(self, metodo, url, extra=None, cuerpo=None, esperados=(200,), anonimo=False):
+    def _pedir(self, metodo, url, extra=None, cuerpo=None, esperados=(200,), anonimo=False, tiempo=60):
         """Petición con reintento único; si el código no es el esperado, ErrorAlmacen sin secretos.
 
         `anonimo`: sin `apikey` ni `Authorization` (la URL pública no necesita clave, y así se demuestra)."""
         cab = dict(extra or {}) if anonimo else self._cabeceras(extra)
-        estado, cab, datos = red.solicitar(self.transporte, metodo, url, cab, cuerpo, dormir=self.dormir)
+        estado, cab, datos = red.solicitar(self.transporte, metodo, url, cab, cuerpo, tiempo=tiempo, dormir=self.dormir)
         if estado not in esperados:
             raise ErrorAlmacen(f"{metodo} {red.ruta_de(url)}: código {estado}")
         return estado, cab, datos
@@ -122,9 +122,10 @@ class Almacen:
             raise ErrorAlmacen(f"{mp4.name}: pesa {peso / 1048576:.1f} MB y el tope es "
                                f"{self.max_bytes // 1048576} MB; no se sube")
         ruta = self.ruta_objeto(mp4, toma, fecha)
+        tiempo = min(300, max(60, peso / 1048576 * 4))     # la subida escala con el peso (recortada al plazo)
         self._pedir("POST", f"{self.url}/storage/v1/object/{self.bucket}/{quote(ruta, safe='/')}",
                     {"Content-Type": "video/mp4", "x-upsert": "true"}, mp4.read_bytes(),
-                    esperados=(200, 201))
+                    esperados=(200, 201), tiempo=tiempo)
         return ruta, self.url_publica(ruta)
 
     def comprobar(self, url) -> None:
@@ -203,7 +204,7 @@ def crear_mp4_vertical_de_prueba(destino, segundos: int = 5) -> Path:
            "-t", str(segundos), "-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", "veryfast",
            "-c:a", "aac", "-shortest", "-movflags", "+faststart", str(destino)]
     try:
-        r = subprocess.run(cmd, capture_output=True, timeout=120)
+        r = subprocess.run(cmd, capture_output=True, timeout=plazo.tiempo_para(120))
     except (OSError, subprocess.TimeoutExpired) as e:
         raise ErrorAlmacen(f"ffmpeg no pudo crear el MP4 vertical de prueba ({type(e).__name__})") from None
     if r.returncode != 0 or not destino.exists():
@@ -218,7 +219,7 @@ def crear_mp4_de_prueba(destino) -> Path:
            "testsrc=duration=1:size=320x240:rate=15", "-pix_fmt", "yuv420p", "-c:v", "libx264",
            "-movflags", "+faststart", str(destino)]
     try:
-        r = subprocess.run(cmd, capture_output=True, timeout=60)
+        r = subprocess.run(cmd, capture_output=True, timeout=plazo.tiempo_para(60))
     except (OSError, subprocess.TimeoutExpired) as e:
         raise ErrorAlmacen(f"ffmpeg no pudo crear el MP4 de prueba ({type(e).__name__})") from None
     if r.returncode != 0 or not destino.exists():

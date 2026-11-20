@@ -89,14 +89,15 @@ def mp4_falso(carpeta: Path, nombre="toma.mp4") -> Path:
 class Hacer:
     """hacer_toma falso: espía los intentos y devuelve ok o descarte."""
 
-    def __init__(self, repo, oks=(True,), motivo="ojos: descartado", gemini=None):
+    def __init__(self, repo, oks=(True,), motivo="ojos: descartado", gemini=None, gastar=False):
         self.repo, self.oks, self.motivo, self.gemini, self.llamadas = repo, list(oks), motivo, gemini, []
+        self.gastar = gastar
 
     def __call__(self, raiz, c, ficha, ahora, salida=None, **kw):
         self.llamadas.append(c.id_origen)
         ok = self.oks[min(len(self.llamadas), len(self.oks)) - 1]
         if not ok:
-            return Resultado(False, [self.motivo], gemini=self.gemini)
+            return Resultado(False, [self.motivo], gemini=self.gemini, gastar=self.gastar)
         n = registro.contador_toma(raiz)
         fila = {"toma": n, "fecha": "2026-11-18", "hora": "10:07", "pilar": c.pilar or "momentos",
                 "fuente_id": ficha.get("id"), "campana": None, "gancho": f"Gancho de prueba {n}",
@@ -524,12 +525,20 @@ def test_un_descarte_definitivo_de_gemini_se_anota_como_visto(r, monkeypatch):
 
 
 @pytest.mark.parametrize("motivo,gemini", [("ojos: sin GEMINI_API_KEY", None), ("ojos: Gemini respondió 429", None),
-                                           ("descarga: fallo de conexión", None),
-                                           ("puerta de estilo: algo", {"gancho": "x"})])
-def test_un_fallo_de_red_cuota_o_estilo_no_se_anota_como_visto(r, monkeypatch, motivo, gemini):
+                                           ("descarga: fallo de conexión", None)])
+def test_un_fallo_de_red_cuota_o_clave_no_se_anota_como_visto(r, monkeypatch, motivo, gemini):
+    # Regla de gasto (blindaje): sin `gastar` (red, tiempo o máquina) la fuente no se anota.
     monkeypatch.setattr(ciclo.informativa, "armar", armar_falso)
     correr(r, cands=[cand("c1")], hacer=Hacer(r, oks=(False,), motivo=motivo, gemini=gemini))
     assert "c1" not in vistos(r)
+
+
+def test_un_fallo_del_material_con_gastar_se_anota_como_visto(r, monkeypatch):
+    # Regla de gasto (blindaje): puerta de estilo roja es del material (`gastar=True`): la fuente se gasta.
+    monkeypatch.setattr(ciclo.informativa, "armar", armar_falso)
+    cod, sal = correr(r, cands=[cand("c1")], hacer=Hacer(r, oks=(False,), motivo="puerta de estilo: algo",
+                                                          gemini={"gancho": "x"}, gastar=True))
+    assert "c1" in vistos(r) and "la fuente se gasta (fallo del material)" in sal
 
 
 # ---------------------------------------------------------------- 5. vivo y ensayo

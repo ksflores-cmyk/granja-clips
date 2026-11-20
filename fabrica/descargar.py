@@ -2,8 +2,11 @@
 
 Orden fijo: (1) `fuentes.autoriza_descarga` y `fuentes.puede_descargar` ANTES de abrir una conexión;
 (2) descarga; (3) ffprobe mide la duración y se vuelve a comprobar contra `reglas.duracion_s`.
-Si la descarga salió bien se llama a `puertas.anotar_visto` (aunque la duración no cumpla, para no
-volver a bajar el mismo archivo). La carpeta temporal se borra al salir del `with`, pase lo que pase.
+Aquí NO se anota la fuente en `estado/vistos.txt` (no hay «reserva»): quien decide si la fuente se gasta es
+el ciclo, con `ErrorDescarga.del_material`: True si el fallo es del archivo (no es video, pesa de más, vacío,
+404/410, duración inválida o fuera de rango); False si es de red, tiempo o máquina (conexión, tiempos, otros
+HTTP, página de cuota de Drive, yt-dlp que no corrió). La carpeta temporal se borra al salir del `with`.
+Todo está acotado en tiempo: socket por lectura, `TOPE_DESCARGA_S` en total y el plazo del ciclo (`plazo`).
 
 Dos caminos, sin más:
 - `material` (o ficha propia) con URL https directa: streaming con tope de 300 MB y `Content-Type` de video.
@@ -15,6 +18,7 @@ from __future__ import annotations
 import math
 import shutil
 import subprocess
+import time
 import tempfile
 import urllib.error
 import urllib.request
@@ -24,7 +28,7 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import fuentes, puertas
+from . import fuentes, plazo, puertas
 from .editar.componer import sondear_video
 
 TOPE_BYTES = 800 * 1024 * 1024         # el material de campaña pesa hasta ~550 MB (FM27, 18 nov)
@@ -32,11 +36,19 @@ TOPE_FUENTE_S = 600.0                   # fuente más larga que esto no se mira:
 TOPE_TWITCH_S = 120
 BLOQUE = 1 << 20
 TIEMPO_ESPERA_S = 60
+TOPE_DESCARGA_S = 360                   # tope TOTAL de una descarga https (Drive puede ser lento)
+TOPE_YTDLP_S = 180
 FORMATO_TWITCH = "best[height<=1080][ext=mp4]/best[height<=1080]"   # todas las alternativas con tope de 1080p
 
 
 class ErrorDescarga(RuntimeError):
-    """La descarga no se hizo o no sirve. El mensaje es el motivo del descarte."""
+    """La descarga no se hizo o no sirve. El mensaje es el motivo del descarte.
+
+    `del_material`: True si el fallo es del archivo (la fuente se gasta); False si es de red, tiempo o máquina."""
+
+    def __init__(self, mensaje="", del_material: bool = False):
+        super().__init__(mensaje)
+        self.del_material = del_material
 
 
 @dataclass
@@ -58,7 +70,7 @@ def _opener():
 
 def _abrir_urllib(url: str):
     req = urllib.request.Request(url, headers={"User-Agent": "granja-clips-descarga"})
-    return _opener().open(req, timeout=TIEMPO_ESPERA_S)  # noqa: S310 (https comprobado antes)
+    return _opener().open(req, timeout=plazo.tiempo_para(TIEMPO_ESPERA_S))  # noqa: S310 (https comprobado antes)
 
 
 def _es_https(url) -> bool:
@@ -110,13 +122,15 @@ def _titulo(html: str) -> str:
     return m.group(1).strip() if m else "sin título"
 
 
-def bajar_https(url: str, destino: Path, *, abrir=None, tope: int = TOPE_BYTES, _reintento: bool = True) -> Path:
+def bajar_https(url: str, destino: Path, *, abrir=None, tope: int = TOPE_BYTES, _reintento: bool = True,
+               _t0: float | None = None) -> Path:
     """Streaming a disco. Exige https y `Content-Type` de video; corta al pasar el tope.
     Con Google Drive, si llega su página de aviso, sigue una vez su formulario de confirmación
     (mismo host y mismo id; nunca otro destino)."""
     if not _es_https(url):
         raise ErrorDescarga(f"URL no https: {url!r}")
     abrir = abrir or _abrir_urllib
+    t0 = time.monotonic() if _t0 is None else _t0      # el aviso de Drive NO reinicia el tope total
     try:
         with abrir(url) as r:
             tipo = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
@@ -124,22 +138,26 @@ def bajar_https(url: str, destino: Path, *, abrir=None, tope: int = TOPE_BYTES, 
                 pagina = r.read(200_000).decode("utf-8", errors="replace")
                 siguiente = _aviso_drive(url, pagina) if _reintento else None
                 if siguiente:
-                    return bajar_https(siguiente, destino, abrir=abrir, tope=tope, _reintento=False)
-                raise ErrorDescarga(f"Google Drive devolvió una página y no el video ({_titulo(pagina)!r})")
+                    return bajar_https(siguiente, destino, abrir=abrir, tope=tope, _reintento=False, _t0=t0)
+                raise ErrorDescarga(f"Google Drive devolvió una página y no el video ({_titulo(pagina)!r})")  # cuota: no es del material
             if not tipo.startswith("video/"):
-                raise ErrorDescarga(f"Content-Type {tipo or 'ausente'!r}: no es video")
+                raise ErrorDescarga(f"Content-Type {tipo or 'ausente'!r}: no es video", del_material=True)
             largo = r.headers.get("Content-Length")
             if largo and str(largo).isdigit() and int(largo) > tope:
-                raise ErrorDescarga(f"el archivo pesa {int(largo)} bytes y el tope es {tope}")
+                raise ErrorDescarga(f"el archivo pesa {int(largo)} bytes y el tope es {tope}", del_material=True)
             total = 0
             with open(destino, "wb") as f:
                 while True:
+                    # Tope total de tiempo, acotado también por el plazo del ciclo (se mira antes de cada lectura).
+                    if time.monotonic() - t0 > TOPE_DESCARGA_S or (plazo.activo() and plazo.restante() < plazo.MARGEN_S):
+                        raise ErrorDescarga(f"la descarga pasó el tiempo límite de {TOPE_DESCARGA_S} s "
+                                            f"(o del plazo del ciclo)", del_material=False)
                     bloque = r.read(BLOQUE)
                     if not bloque:
                         break
                     total += len(bloque)
                     if total > tope:
-                        raise ErrorDescarga(f"la descarga pasó el tope de {tope} bytes")
+                        raise ErrorDescarga(f"la descarga pasó el tope de {tope} bytes", del_material=True)
                     f.write(bloque)
     except ErrorDescarga:
         destino.unlink(missing_ok=True)
@@ -148,19 +166,20 @@ def bajar_https(url: str, destino: Path, *, abrir=None, tope: int = TOPE_BYTES, 
         destino.unlink(missing_ok=True)
         if 300 <= e.code < 400:
             raise ErrorDescarga(f"redirección HTTP {e.code} rechazada: no se siguen redirecciones") from None
-        raise ErrorDescarga(f"HTTP {e.code}") from None
+        raise ErrorDescarga(f"HTTP {e.code}", del_material=e.code in (404, 410)) from None
     except OSError as e:   # incluye URLError y tiempos de espera
         destino.unlink(missing_ok=True)
         raise ErrorDescarga(f"fallo de conexión: {type(e).__name__}") from None
     if total == 0:
         destino.unlink(missing_ok=True)
-        raise ErrorDescarga("la descarga llegó vacía")
+        raise ErrorDescarga("la descarga llegó vacía", del_material=True)
     return destino
 
 
 def orden_ytdlp(url: str, carpeta: Path) -> list[str]:
     """Orden de yt-dlp: un solo clip, sin cookies ni configuración, mp4 de 1080p o menos, 120 s como máximo."""
     return ["yt-dlp", "--ignore-config", "--no-playlist", "--no-cookies", "--no-part",
+            "--socket-timeout", "30",
             "--match-filter", f"duration<={TOPE_TWITCH_S}", "--max-filesize", str(TOPE_BYTES),
             "-f", FORMATO_TWITCH, "--merge-output-format", "mp4",
             "-o", str(carpeta / "clip.%(ext)s"), "--", url]
@@ -171,14 +190,14 @@ def bajar_twitch(url: str, carpeta: Path, *, ejecutor=None) -> Path:
     if puertas._id_de_clip_twitch(url) is None:
         raise ErrorDescarga(f"no es la URL de un clip de Twitch: {url!r}")
     try:
-        r = ejecutor(orden_ytdlp(url, carpeta), capture_output=True, text=True, timeout=300)
+        r = ejecutor(orden_ytdlp(url, carpeta), capture_output=True, text=True, timeout=plazo.tiempo_para(TOPE_YTDLP_S))
     except (OSError, subprocess.TimeoutExpired) as e:
         raise ErrorDescarga(f"yt-dlp no corrió: {type(e).__name__}") from None
     if r.returncode != 0:
         raise ErrorDescarga(f"yt-dlp falló (código {r.returncode})")
     salidas = sorted(carpeta.glob("clip.*"))
     if not salidas:
-        raise ErrorDescarga("yt-dlp no dejó ningún archivo (¿duración sobre el tope de 120 s?)")
+        raise ErrorDescarga("yt-dlp no dejó ningún archivo (¿duración sobre el tope de 120 s?)", del_material=True)
     return salidas[0]
 
 
@@ -212,20 +231,25 @@ def descargar(raiz, candidato, ficha: dict | None, hoy: date, *, abrir=None, eje
             ruta = bajar_twitch(candidato.url, carpeta, ejecutor=ejecutor)
         else:
             ruta = bajar_https(candidato.url, carpeta / "origen.mp4", abrir=abrir)
-        puertas.anotar_visto(raiz, candidato.id_origen)
         try:
             duracion = float(sondear_video(ruta)["duracion"])
         except (subprocess.SubprocessError, ValueError, KeyError, StopIteration, OSError) as e:
-            raise ErrorDescarga(f"ffprobe no pudo medir el archivo ({type(e).__name__})") from None
+            # Del material sólo si ffprobe corrió y rechazó el archivo (código ≠ 0 o salida ilegible);
+            # ausente, sin permiso, disco lleno o tiempo agotado son de la máquina.
+            raise ErrorDescarga(f"ffprobe no pudo medir el archivo ({type(e).__name__})",
+                                del_material=isinstance(e, (subprocess.CalledProcessError, ValueError, KeyError,
+                                                            StopIteration))) from None
         # `reglas.duracion_s` es la duración del clip PUBLICADO: Gemini elige un recorte dentro de ese rango.
         # A la fuente sólo se le exige que alcance el mínimo y que no pase de TOPE_FUENTE_S.
         minimo = ((ficha.get("reglas") or {}).get("duracion_s") or [0])[0]
         if not math.isfinite(duracion) or duracion <= 0:
-            raise ErrorDescarga("ffprobe devolvió una duración no válida")
+            raise ErrorDescarga("ffprobe devolvió una duración no válida", del_material=True)
         if duracion < float(minimo):
-            raise ErrorDescarga(f"el archivo dura {duracion:.1f} s, menos que el mínimo de {minimo} s del clip")
+            raise ErrorDescarga(f"el archivo dura {duracion:.1f} s, menos que el mínimo de {minimo} s del clip",
+                                del_material=True)
         if duracion > TOPE_FUENTE_S:
-            raise ErrorDescarga(f"el archivo dura {duracion:.1f} s y el tope de una fuente es {TOPE_FUENTE_S:.0f} s")
+            raise ErrorDescarga(f"el archivo dura {duracion:.1f} s y el tope de una fuente es {TOPE_FUENTE_S:.0f} s",
+                                del_material=True)
         yield Descarga(ruta, duracion)
     finally:
         shutil.rmtree(carpeta, ignore_errors=True)

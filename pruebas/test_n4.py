@@ -438,12 +438,14 @@ def test_url_http_no_se_descarga(repo):
             pass
 
 
-def test_descarga_buena_mide_con_ffprobe_y_anota_visto(repo, carpetas, video20):
+def test_descarga_buena_mide_con_ffprobe_y_no_anota_visto(repo, carpetas, video20):
     with mod_descargar.descargar(repo, candidato(), ficha_propia(), HOY, abrir=abrir_con(video20)) as d:
         assert d.ruta.is_file() and abs(d.duracion - 20.0) < 0.2
         ruta = d.ruta
     assert not ruta.exists() and not any(c.exists() for c in carpetas)
-    assert "brief-n4-001" in (repo / "estado" / "vistos.txt").read_text(encoding="utf-8").split()
+    # Regla de gasto: descargar() ya no «reserva» la fuente; sólo se anota al programar o si el fallo es del material.
+    vistos = repo / "estado" / "vistos.txt"
+    assert "brief-n4-001" not in (vistos.read_text(encoding="utf-8").split() if vistos.exists() else [])
 
 
 def test_la_carpeta_temporal_se_borra_aunque_el_cuerpo_falle(repo, carpetas, video20):
@@ -453,13 +455,16 @@ def test_la_carpeta_temporal_se_borra_aunque_el_cuerpo_falle(repo, carpetas, vid
     assert carpetas and not any(c.exists() for c in carpetas)
 
 
-def test_fuente_mas_corta_que_el_minimo_se_descarta_y_queda_como_visto(repo, carpetas, video20):
+def test_fuente_mas_corta_que_el_minimo_se_descarta_y_es_del_material(repo, carpetas, video20):
     ficha = ficha_propia(reglas={"duracion_s": [25, 30], "plataformas": ["shorts"]})
-    with pytest.raises(mod_descargar.ErrorDescarga, match="dura 20"):
+    with pytest.raises(mod_descargar.ErrorDescarga, match="dura 20") as exc:
         with mod_descargar.descargar(repo, candidato(), ficha, HOY, abrir=abrir_con(video20)):
             pass
     assert not any(c.exists() for c in carpetas)
-    assert "brief-n4-001" in (repo / "estado" / "vistos.txt").read_text(encoding="utf-8").split()
+    # Regla de gasto: descargar() no anota; avisa con del_material=True y el ciclo anota la fuente.
+    assert exc.value.del_material is True
+    vistos = repo / "estado" / "vistos.txt"
+    assert "brief-n4-001" not in (vistos.read_text(encoding="utf-8").split() if vistos.exists() else [])
 
 
 def test_fuente_mas_larga_que_el_clip_pasa_porque_el_recorte_lo_elige_gemini(repo, carpetas, video20):
@@ -970,4 +975,5 @@ def test_un_descarte_por_contenido_si_gasta_la_fuente(repo, tmp_path, video20):
     r = toma.hacer_toma(repo, candidato(), ficha_propia(), AHORA, salida=tmp_path / "s", abrir=abrir_con(video20),
                         transporte=Transporte((400, "mala")), entorno={"GEMINI_API_KEY": "k"}, espera=lambda s: None)
     assert not r.ok
-    assert candidato().id_origen in (repo / "estado" / "vistos.txt").read_text(encoding="utf-8").split()
+    # Regla de gasto: hacer_toma no anota; marca gastar=True (HTTP 400 de Gemini es del material) y el ciclo anota.
+    assert r.gastar is True

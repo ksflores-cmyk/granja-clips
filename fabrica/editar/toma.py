@@ -13,12 +13,13 @@ import shutil
 import subprocess
 import tempfile
 import time
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
 from .. import descargar as mod_descargar
-from .. import fuentes, ojos, puertas
+from .. import fuentes, ojos, plazo, puertas
 from ..config import cargar_yaml, raiz_repo
 from ..registro import ZONA, contador_toma
 from . import estilo
@@ -40,6 +41,7 @@ class Resultado:
     modelo: str | None = None
     puntos: list = field(default_factory=list)   # (punto, ok, detalle) de la puerta de estilo
     fila: dict | None = None            # fila futura del marcador: N5 la pasa a registro.anotar_clip
+    gastar: bool = False                # el fallo es del MATERIAL: la fuente se anota en estado/vistos.txt
 
 
 def _nombre_seguro(id_origen: str) -> str:
@@ -59,7 +61,7 @@ def copia_para_ojos(ruta: Path, raiz, carpeta: Path) -> Path:
     subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(ruta), "-vf", "scale=-2:360,fps=15",
                     "-c:v", "libx264", "-preset", "veryfast", "-crf", "34", "-pix_fmt", "yuv420p",
                     "-c:a", "aac", "-b:a", "48k", "-ac", "1", "-movflags", "+faststart", str(destino)],
-                   check=True, capture_output=True)
+                   check=True, capture_output=True, timeout=plazo.tiempo_para(180))
     return destino
 
 
@@ -110,6 +112,10 @@ def hacer_toma(raiz, candidato, ficha: dict | None, ahora: datetime, *, salida: 
 
     `salida`: carpeta del MP4. Si no se da, se crea una temporal que sólo se conserva cuando la toma sale ok
     (en cualquier descarte o error se borra). Cualquier excepción inesperada es un descarte con su motivo.
+
+    Regla de gasto (`Resultado.gastar`): sólo es True cuando el fallo es del material (archivo que no sirve,
+    respuesta de Gemini que no valida, puerta de estilo roja, error del editor). Red, tiempo, Gemini pasajero,
+    sin clave o error inesperado dejan `gastar=False`: la fuente se puede volver a intentar.
     """
     propia = salida is None
     carpeta: Path | None = None
@@ -117,7 +123,9 @@ def hacer_toma(raiz, candidato, ficha: dict | None, ahora: datetime, *, salida: 
     try:
         carpeta = Path(salida) if salida is not None else Path(tempfile.mkdtemp(prefix="granja-toma-"))
         r = _hacer_toma(raiz, candidato, ficha, ahora, carpeta, abrir, ejecutor, transporte, espera, entorno)
-    except Exception as e:  # noqa: BLE001 (nada debe subir sin control: es un descarte)
+    except plazo.SinTiempo:
+        raise                # se acabó el plazo del ciclo: lo maneja el ciclo (la fuente no se gasta)
+    except Exception as e:  # noqa: BLE001 (nada debe subir sin control: es un descarte; gastar=False)
         r = Resultado(False, [f"error inesperado: {type(e).__name__}: {e}"])
     finally:
         if propia and carpeta is not None and not (r is not None and r.ok):
@@ -132,25 +140,35 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
     temporada = cargar_yaml("temporada.yml", raiz)
     hoy = ahora.astimezone(ZONA).date()
     try:
-        with mod_descargar.descargar(raiz, candidato, ficha, hoy, abrir=abrir, ejecutor=ejecutor) as d:
+        with ExitStack() as pila:
+            with plazo.etapa("descarga"):      # la descarga (y la medición) ocurre al entrar
+                d = pila.enter_context(
+                    mod_descargar.descargar(raiz, candidato, ficha, hoy, abrir=abrir, ejecutor=ejecutor))
             temporada = ojos.temporada_de(ficha, temporada)
             juego = ojos.juego_de(ficha, temporada)          # el de la ficha si lo declara (FM27, no GTA 6)
             recorte = ojos.rango_recorte(ficha)              # reglas.duracion_s de la ficha
             with tempfile.TemporaryDirectory(prefix="ojos-toma-") as carpeta_ojos:
-                video_ojos = copia_para_ojos(d.ruta, raiz, Path(carpeta_ojos))
-                mirada = ojos.mirar(video_ojos, marca, temporada, raiz=raiz, duracion=d.duracion,
-                                    transporte=transporte, espera=espera, entorno=entorno, juego=juego,
-                                    nota=ojos.nota_de_ficha(ficha) or None, recorte=recorte)
+                try:
+                    with plazo.etapa("copia ligera"):
+                        video_ojos = copia_para_ojos(d.ruta, raiz, Path(carpeta_ojos))
+                except subprocess.CalledProcessError as e:     # ffmpeg rechazó el archivo: es del material
+                    return Resultado(False, [f"copia ligera: ffmpeg no pudo leer el archivo ({type(e).__name__})"],
+                                     gastar=True)
+                with plazo.etapa("ojos (Gemini)"):
+                    mirada = ojos.mirar(video_ojos, marca, temporada, raiz=raiz, duracion=d.duracion,
+                                        transporte=transporte, espera=espera, entorno=entorno, juego=juego,
+                                        nota=ojos.nota_de_ficha(ficha) or None, recorte=recorte)
             if mirada.datos is None:
-                if mirada.pasajero:          # Gemini caído: la fuente se vuelve a intentar en otra corrida
-                    puertas.quitar_visto(raiz, candidato.id_origen)
+                if mirada.pasajero:          # Gemini caído o sin tiempo: la fuente no se gasta
                     return Resultado(False, [f"ojos: {mirada.motivo} (pasajero: se reintenta)"],
                                      modelo=mirada.modelo)
-                return Resultado(False, [f"ojos: {mirada.motivo}"], modelo=mirada.modelo)
+                return Resultado(False, [f"ojos: {mirada.motivo}"], modelo=mirada.modelo,
+                                 gastar=bool(mirada.del_material))
             ok, motivos = ojos.validar_respuesta(mirada.datos, marca, temporada, duracion=d.duracion,
                                               juego=juego, recorte=recorte)
             if not ok:
-                return Resultado(False, [f"ojos: {x}" for x in motivos], gemini=mirada.datos, modelo=mirada.modelo)
+                return Resultado(False, [f"ojos: {x}" for x in motivos], gemini=mirada.datos, modelo=mirada.modelo,
+                                 gastar=True)
             numero = contador_toma(raiz)
             entrada = fuentes.entrada_material(ficha, url=candidato.url)
             toma, lineas, inicio, dur = armar(mirada.datos, marca, ficha, numero,
@@ -159,20 +177,25 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             plan_ruta = mp4.with_suffix(".plan.json")
             try:
                 with tempfile.TemporaryDirectory(prefix="trabajo-toma-") as trabajo:
-                    plan = componer(marca, toma, lineas, mp4, duracion=dur, trabajo=Path(trabajo),
-                                    fuente_video=d.ruta, inicio=inicio, plan_salida=plan_ruta, ficha=ficha)
-                puntos = estilo.revisar(mp4, plan, marca, ficha=ficha)
+                    with plazo.etapa("componer"):
+                        plan = componer(marca, toma, lineas, mp4, duracion=dur, trabajo=Path(trabajo),
+                                        fuente_video=d.ruta, inicio=inicio, plan_salida=plan_ruta, ficha=ficha)
+                with plazo.etapa("puerta de estilo"):
+                    puntos = estilo.revisar(mp4, plan, marca, ficha=ficha)
             except (ValueError, subprocess.SubprocessError, OSError) as e:
                 mp4.unlink(missing_ok=True)
+                # Sólo es del material si el editor corrió y falló (ffmpeg con código ≠ 0) o dio datos inválidos
+                # (ValueError). Falta de ffmpeg, disco lleno (OSError) o tiempo agotado son de la máquina.
                 return Resultado(False, [f"editor: {type(e).__name__}: {e}"], gemini=mirada.datos,
-                                 modelo=mirada.modelo)
+                                 modelo=mirada.modelo,
+                                 gastar=isinstance(e, (subprocess.CalledProcessError, ValueError)))
             rojos = [f"puerta de estilo: {n}" + (f" ({det})" if det else "") for n, ok_p, det in puntos if not ok_p]
             if rojos:
                 mp4.unlink(missing_ok=True)
-                return Resultado(False, rojos, None, plan, mirada.datos, mirada.modelo, puntos)
+                return Resultado(False, rojos, None, plan, mirada.datos, mirada.modelo, puntos, gastar=True)
             plan["gemini"] = {"modelo": mirada.modelo, "idioma_original": mirada.datos["idioma_original"]}
             plan_ruta.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
             return Resultado(True, [], mp4, plan, mirada.datos, mirada.modelo, puntos,
                              fila_marcador(candidato, ficha, toma, dur, ahora))
     except mod_descargar.ErrorDescarga as e:
-        return Resultado(False, [f"descarga: {e}"])
+        return Resultado(False, [f"descarga: {e}"], gastar=bool(getattr(e, "del_material", False)))
