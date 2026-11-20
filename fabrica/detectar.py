@@ -158,7 +158,10 @@ class ClienteTwitch:
         datos = d.get("data") or []
         if not datos:
             raise ErrorTwitch(f"el equipo de Twitch {nombre!r} no existe o no se pudo leer")
-        return {str(u["user_login"]).lower() for u in datos[0].get("users") or [] if u.get("user_login")}
+        miembros = {str(u["user_login"]).lower() for u in datos[0].get("users") or [] if u.get("user_login")}
+        if not miembros:   # un equipo vetado sin miembros legibles no se da por bueno (falla cerrada)
+            raise ErrorTwitch(f"el equipo de Twitch {nombre!r} llegó sin miembros")
+        return miembros
 
 
 def _rfc3339(dt: datetime) -> str:
@@ -230,14 +233,17 @@ def config_t(raiz=None) -> dict:
     return cfg
 
 
-def _ficha_t(login: str, bid: str, seguidores: int, juego: str, cfg: dict, hoy) -> dict:
+def _ficha_t(login: str, bid: str, seguidores: int, juego: str, cfg: dict, hoy,
+             hashtags: list | None = None) -> dict:
     return {
         "id": "t-" + login.replace("_", "-"), "tipo": "T", "creador": f"twitch.tv/{login}",
         "credito": f"twitch.tv/{login}", "origen": "twitch", "twitch_login": login,
         "broadcaster_id": str(bid), "seguidores": int(seguidores), "seguidores_leidos": hoy.isoformat(),
         "juego": juego,
         "reglas": {"duracion_s": list(cfg["duracion_s"]), "plataformas": list(cfg["plataformas"]),
-                   "permite_descarga": True, "solo_clip": True, "etiquetas_obligatorias": [],
+                   "permite_descarga": True, "solo_clip": True,
+                   # Las de la temporada (hasta 3): Instagram exige de 3 a 5 y Shorts/TikTok admiten 3.
+                   "etiquetas_obligatorias": [str(h) for h in (hashtags or [])][:3],
                    "divulgacion": "ninguna", "audiencia": "sin restricción"},
         "pilares": list(cfg["pilares"]), "campana": None, "tarifa_usd_por_mil": None,
         "minimo_por_clip_usd": None, "tope_por_clip_usd": None, "presupuesto_restante": None,
@@ -373,7 +379,7 @@ def detectar_t_con_descartes(raiz, ahora: datetime, cliente: ClienteTwitch | Non
         if n_seg > int(cfg["seguidores_max"]):
             desc("seguidores por encima del máximo", len(lista))
             continue
-        ficha = _ficha_t(login, bid, n_seg, nombre_juego, cfg, hoy)
+        ficha = _ficha_t(login, bid, n_seg, nombre_juego, cfg, hoy, temporada.get("hashtags"))
         mejores = sorted(lista, key=lambda c: -int(c.get("view_count", 0)))[:int(cfg["max_clips_por_streamer_dia"])]
         desc("más de los permitidos por streamer", len(lista) - len(mejores))
         for c in mejores:
@@ -464,7 +470,11 @@ def detectar_con_motivos(raiz, ahora: datetime, cliente: ClienteTwitch | None = 
         except Exception as e:  # noqa: BLE001 (la ficha T nunca tumba la detección normal)
             ct, st, ft = [], [f"ficha T: {type(e).__name__}" + (f": {e}" if isinstance(e, ErrorTwitch) else "")], []
         if ft:
-            guardar_fichas_t(raiz, ft)
+            try:
+                guardar_fichas_t(raiz, ft)
+            except Exception as e:  # noqa: BLE001 (sin guardar no hay ficha: los candidatos T no pasan la puerta)
+                saltos.append(f"ficha T: no se pudo guardar estado/fichas-t.yml ({type(e).__name__})")
+                ct = []
         known = {c.id_origen for c in candidatos}
         candidatos.extend(c for c in ct if c.id_origen not in known)
         saltos.extend(st)

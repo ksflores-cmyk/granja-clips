@@ -359,10 +359,12 @@ def _pilar_de(c, ficha: dict | None, temporada: dict) -> str | None:
     return max(pilares, key=lambda p: _peso(temporada, p), default=None)
 
 
-def ordenar(candidatos: list, temporada: dict) -> list:
-    """Primero los pilares con más peso; a igual pilar, más vistas por hora; luego, el más reciente."""
+def ordenar(candidatos: list, temporada: dict, pagadas=frozenset()) -> list:
+    """Primero el material de una campaña pagada (`pagadas`: ids de ficha); luego los pilares con más peso;
+    a igual pilar, más vistas por hora; luego, el más reciente."""
     sin_fecha = datetime.min.replace(tzinfo=timezone.utc)
-    return sorted(candidatos, key=lambda c: (-_peso(temporada, c.pilar),
+    return sorted(candidatos, key=lambda c: (not (c.fuente_id in pagadas and c.origen == "brief"),
+                                             -_peso(temporada, c.pilar),
                                              -(c.vistas_por_hora or 0.0),
                                              -(c.creado_en or sin_fecha).timestamp()))
 
@@ -386,7 +388,9 @@ def elegir_candidatos(raiz, ahora, plataformas, out, detectar_fn=None, cliente=N
             out(f"descartado {c.id_origen} en {plat}: {motivo}")
         ids = {c.id_origen for c in ap}
         aprobados = ap if aprobados is None else [c for c in aprobados if c.id_origen in ids]
-    return ordenar(aprobados or [], t)
+    pagadas = {fid for fid, f in fichas.items()
+               if f.get("tipo") == "A" and f.get("campana") and f.get("material")}
+    return ordenar(aprobados or [], t, pagadas)
 
 
 # ------------------------------------------------------------------ el ciclo

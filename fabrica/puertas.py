@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import csv
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
 from .config import cargar_yaml, raiz_repo
@@ -36,14 +36,18 @@ def puerta_vetado(raiz, cand: Candidato) -> tuple[bool, str]:
 
 def puerta_cupo_streamer(raiz, cand: Candidato, ahora: datetime, plataforma: str,
                          en_corrida: int = 0) -> tuple[bool, str]:
-    """Ficha T: máximo de clips por streamer al día en esa plataforma (marcador de hoy + esta corrida)."""
+    """Ficha T: máximo de clips por streamer al día en esa plataforma (marcador de hoy + esta corrida).
+
+    El marcador fecha cada fila con el día del hueco, que de noche puede ser mañana: se cuentan las
+    filas de hoy y de mañana (de más, nunca de menos)."""
     ficha = _ficha(raiz, cand.fuente_id)
     if ficha is None or ficha.get("tipo") != "T":
         return True, "ok"
     tope = int(config_t(raiz)["max_clips_por_streamer_dia"])
-    hoy = ahora.astimezone(ZONA).date().isoformat()
+    d = ahora.astimezone(ZONA).date()
+    dias = {d.isoformat(), (d + timedelta(days=1)).isoformat()}
     usados = sum(1 for f in _filas_marcador(raiz)
-                 if f.get("fecha") == hoy and f.get("plataforma") == plataforma
+                 if f.get("fecha") in dias and f.get("plataforma") == plataforma
                  and f.get("fuente_id") == cand.fuente_id) + en_corrida
     if usados >= tope:
         return False, f"cupo del streamer lleno ({usados}/{tope})"

@@ -38,7 +38,7 @@ class Twitch:
         self.clips = list(clips)
         self.users = users or {}
         self.followers = followers or {}
-        self.teams = teams if teams is not None else {"youplanet": []}
+        self.teams = teams if teams is not None else {"youplanet": ["miembro_youplanet"]}
         self.streams = list(streams)
         self.por_streamer = por_streamer or {}
         self.paginas = paginas
@@ -281,7 +281,8 @@ def test_candidato_y_ficha_t_con_todos_los_campos(r):
     assert f["twitch_login"] == "ana" and f["broadcaster_id"] == "1" and f["seguidores"] == 5000
     assert f["seguidores_leidos"] == "2026-11-20" and f["juego"] == "GTA 6"
     assert f["reglas"] == {"duracion_s": [10, 45], "plataformas": ["shorts", "tiktok", "reels"],
-                           "permite_descarga": True, "solo_clip": True, "etiquetas_obligatorias": [],
+                           "permite_descarga": True, "solo_clip": True,
+                           "etiquetas_obligatorias": ["#GTA6", "#GTAVI", "#GrandTheftAutoVI"],
                            "divulgacion": "ninguna", "audiencia": "sin restricción"}
     assert f["pilares"] == ["primeras_veces", "momentos"] and f["campana"] is None
     assert f["vence"] == "2026-11-22" and f["estado"] == "vigente" and f["uso"] == "produccion"
@@ -592,3 +593,62 @@ def test_el_flujo_de_diagnostico_corre_el_diagnostico_t():
         encoding="utf-8")
     assert "python -m fabrica.detectar --diagnostico-t --n 10" in wf and "timeout-minutes: 10" in wf
     assert "GEMINI_API_KEY" in wf and "actions/setup-python@v5" in wf
+
+
+# ------------------------------------------------------------ ronda 1 de revisión
+
+def test_equipo_sin_miembros_apaga_la_ficha_t(r):
+    t = mundo(teams={"youplanet": []})       # Twitch responde el equipo vacío: falla cerrada
+    cands, saltos, fichas = correr_t(r, t)
+    assert cands == [] and fichas == [] and any("sin miembros" in s for s in saltos)
+
+
+def test_si_no_se_guardan_las_fichas_no_hay_candidatos_t_y_el_resto_sigue(r, monkeypatch):
+    def rompe(*a, **k):
+        raise OSError("disco lleno")
+    monkeypatch.setattr(detectar, "guardar_fichas_t", rompe)
+    cands, saltos = detectar.detectar_con_motivos(r, AHORA, cliente(mundo()))
+    assert not any(c.fuente_id.startswith("t-") for c in cands)
+    assert any("no se pudo guardar" in s for s in saltos)
+
+
+def test_la_campana_pagada_va_antes_que_la_ficha_t():
+    t = yaml.safe_load((Path(__file__).resolve().parent.parent / "temporada.yml").read_text(encoding="utf-8"))
+    pagada = cand_t("fm", fuente="sega-fm27", origen="brief", pilar="momentos", vistas_por_hora=0.0,
+                    creado_en=None)
+    tt = cand_t("tt", pilar="primeras_veces", vistas_por_hora=500.0)
+    assert ids(ciclo.ordenar([tt, pagada], t, {"sega-fm27"})) == ["fm", "tt"]
+    assert ids(ciclo.ordenar([tt, pagada], t)) == ["tt", "fm"]     # sin campaña pagada, manda el pilar
+
+
+def test_elegir_candidatos_pone_primero_la_pagada(r):
+    con_fichas(r)
+    pagada = cand_t("fm", fuente="sega-fm27", origen="brief", pilar="momentos", vistas_por_hora=0.0,
+                    creado_en=None, juego_id=None, duracion_s=None)
+    tt = cand_t("tt", pilar="primeras_veces", vistas_por_hora=500.0)
+    out = []
+    cands = ciclo.elegir_candidatos(r, AHORA, ["shorts"], out.append,
+                                    detectar_fn=lambda *a: ([tt, pagada], []), cliente=None)
+    assert ids(cands) == ["fm", "tt"], out
+
+
+def test_ficha_t_lleva_las_etiquetas_de_la_temporada_y_sale_en_reels(r):
+    cands, _, fichas = correr_t(r, mundo())
+    f = next(x for x in fichas if x["twitch_login"] == "ana")
+    temporada = yaml.safe_load((r / "temporada.yml").read_text(encoding="utf-8"))
+    assert f["reglas"]["etiquetas_obligatorias"] == temporada["hashtags"][:3]
+    toma = {"numero": 7, "gancho": "Primera persecución", "pilar": "primeras_veces",
+            "creador": "twitch.tv/ana"}           # como la arma el ciclo: sin etiquetas
+    for plat in ("shorts", "tiktok", "reels"):
+        t = publicar.textos(toma, f, plat)
+        assert "🎥 twitch.tv/ana" in t["texto"]
+
+
+def test_el_cupo_cuenta_tambien_lo_ya_programado_para_manana(r):
+    con_fichas(r)
+    noche = AHORA.astimezone(ZONA).replace(hour=23)
+    manana = (noche.date() + timedelta(days=1)).isoformat()
+    n6.anotar(r, fecha=manana, fuente_id="t-ana", plataforma="shorts")
+    n6.anotar(r, fecha=manana, fuente_id="t-ana", plataforma="shorts")
+    ap, desc = puertas.filtrar(r, [cand_t("a")], noche, "shorts")
+    assert ap == [] and "cupo del streamer lleno" in desc[0][1]
