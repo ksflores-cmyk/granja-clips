@@ -649,6 +649,15 @@ def test_sin_clave_no_hay_corte_sin_ia_y_queda_el_descarte_de_antes(repo, tmp_pa
     assert sin_ia.tomas_usadas() == 0
 
 
+@pytest.mark.parametrize("estado,cuerpo", [(403, "forbidden"), (401, "unauthorized"),
+                                           (400, json.dumps({"error": {"status": "API_KEY_INVALID"}}))])
+def test_clave_mala_no_hace_corte_sin_ia_ni_gasta_la_fuente(repo, tmp_path, video20, sin_render, monkeypatch, estado, cuerpo):
+    monkeypatch.setattr(sin_ia, "construir", lambda *a, **k: pytest.fail("no debe entrar sin IA"))
+    r = hacer(repo, tmp_path, video20, Transporte((estado, cuerpo)), CLAVE)
+    assert not r.ok and r.gastar is False and str(estado) in r.motivos[0]
+    assert not sin_render.llamadas and sin_ia.tomas_usadas() == 0
+
+
 def test_solo_una_toma_sin_ia_por_ciclo_las_demas_son_pasajeras(repo, tmp_path, video20, sin_render):
     r1 = hacer(repo, tmp_path, video20, caida(), CLAVE)
     assert sin_render.llamadas and r1.modelo == "sin-ia"

@@ -58,6 +58,7 @@ class Mirada:
     intentos: list[str] = field(default_factory=list)   # un renglón por intento (sin claves)
     pasajero: bool = False             # falló Gemini (429, 5xx, red), no el clip: la fuente no se gasta
     del_material: bool = False         # el fallo es de ESTE video (400, sin candidatos, muy pesado): la fuente se gasta
+    clave_mala: bool = False           # 401/403/400 de clave: error de configuración, no hay corte sin IA ni se gasta la fuente
 
     @property
     def sin_gemini(self) -> bool:
@@ -390,7 +391,8 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
             mirada.motivo = f"Gemini respondió HTTP {estado} con {modelo}"
             mirada.pasajero = False
             # 401/403 y los 400 de clave o permiso son de la máquina; sólo 400 INVALID_ARGUMENT y 413 son del video.
-            mirada.del_material = estado not in (401, 403) and not (estado == 400 and _error_de_clave(texto))
+            mirada.clave_mala = estado in (401, 403) or (estado == 400 and _error_de_clave(texto))
+            mirada.del_material = not mirada.clave_mala
             return mirada
         mirada.modelo = modelo
         mirada.pasajero = False

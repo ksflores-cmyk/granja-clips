@@ -89,6 +89,7 @@ jobs:
           fi
       - name: Bajar música del release
         timeout-minutes: 3       # sin música la pieza muda sale en rojo sin gastar la fuente; no debe comerse el ciclo
+        continue-on-error: true  # si se cancela por tiempo o falla, el job sigue y corre el Ciclo igual
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release download musica -D "$RUNNER_TEMP/musica" --clobber || echo "::warning::sin música del release"

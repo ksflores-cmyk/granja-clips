@@ -556,6 +556,10 @@ def validar_horarios(h, inf: Informe) -> None:
     if _entero(h.get("margen_min_minutos", 15), 1) and _entero(h.get("margen_max_minutos", 75), 1) \
             and h.get("margen_min_minutos", 15) >= h.get("margen_max_minutos", 75):
         inf.error(f"{rel}: margen_min_minutos debe ser menor que margen_max_minutos")
+    from .publicar import MINUTOS_MINIMOS_FUTURO
+    if _entero(h.get("margen_min_minutos", 15), 1) and h.get("margen_min_minutos", 15) < MINUTOS_MINIMOS_FUTURO:
+        inf.error(f"{rel}: margen_min_minutos no puede ser menor que {MINUTOS_MINIMOS_FUTURO} "
+                  "(el mínimo de publicar.validar_futuro)")
     if "cola_buffer_max" in h and not _entero(h["cola_buffer_max"], 1, 10):
         inf.error(f"{rel}: cola_buffer_max debe ser un entero de 1 a 10")
     if "no_repetir_horas" in h and not _entero(h["no_repetir_horas"], 24):

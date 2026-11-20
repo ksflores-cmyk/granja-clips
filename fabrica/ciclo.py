@@ -42,7 +42,7 @@ from .registro import ZONA
 
 PLATAFORMAS = publicar.PLATAFORMAS
 SECRETOS = ("BUFFER_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY", "TWITCH_CLIENT_ID",
-            "TWITCH_CLIENT_SECRET", "GEMINI_API_KEY")
+            "TWITCH_CLIENT_SECRET", "GEMINI_API_KEY", "GH_TOKEN", "GITHUB_TOKEN")
 DIA_CADENCIA_LENTA = date(2026, 11, 21)      # desde este día (GT) sólo corre en horas múltiplo de 3
 TOPE_MINUTOS_DIA = 60                            # valor por defecto: el de verdad es actions.tope_minutos_dia
 MARGEN_MIN_S, MARGEN_MAX_S = 15 * 60, 75 * 60    # por defecto: el hueco cae de ahora+15 a ahora+75 min
@@ -401,7 +401,7 @@ def _horas_de_la_red(raiz, filas: list[dict], plataforma: str, dia: date) -> lis
 
 def buscar_hueco(raiz, ahora: datetime, activas: list[str]) -> Hueco | None:
     """El hueco de esta corrida. Primero el normal de horarios.yml entre ahora+margen_min y ahora+margen_max con
-    alguna red libre. Si no hay, el relleno: un hueco de hoy ya perdido, a ahora+margen_min (redondeado a 5 min),
+    alguna red libre. Si no hay, el relleno: un hueco de hoy ya perdido, a ahora+margen_min+duración máxima del ciclo (redondeado a 5 min),
     sólo si no se amontona con lo demás del día. Sin nada, None."""
     if not activas:
         return None
@@ -418,7 +418,8 @@ def buscar_hueco(raiz, ahora: datetime, activas: list[str]) -> Hueco | None:
             return Hueco(cuando, libres)
     # relleno
     hoy = local.date()
-    t = _redondear_5(local + timedelta(seconds=hz["margen_min_s"]))
+    # el relleno debe seguir siendo futuro (>= MINUTOS_MINIMOS_FUTURO) cuando termine el ciclo, que puede durar LIMITE_CICLO_S
+    t = _redondear_5(local + timedelta(seconds=hz["margen_min_s"] + plazo.LIMITE_CICLO_S))
     if t.date() != hoy or t > _a_las(hoy, hz["ultima_hora"]):
         return None
     intentos = intentos_de_huecos(raiz)
@@ -1039,10 +1040,10 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
                 if toma.candidato is not None:
                     puertas.anotar_visto(raiz, toma.candidato.id_origen)
                     _borrar_reintento(raiz, toma.candidato.id_origen)
-                if toma.entrada is not None and estado == "programada":
+                if toma.entrada is not None:
                     informativa.marcar_usada(raiz, toma.entrada["id"])
                 registro.avanzar_toma(raiz)
-            elif estado == "programada" and toma.entrada is not None:
+            elif estado != "fallada" and toma.entrada is not None:
                 informativa.marcar_usada(raiz, toma.entrada["id"])
 
         with plazo.etapa("publicar"):
