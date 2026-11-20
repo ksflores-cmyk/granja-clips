@@ -177,8 +177,10 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                                         transporte=transporte, espera=espera, entorno=entorno, juego=juego,
                                         nota=ojos.nota_de_ficha(ficha) or None, recorte=recorte,
                                         transporte_lista=transporte_lista)
-                # Sin clave es un error de configuración, no una caída de Gemini: ahí no hay corte sin IA.
-                if (mirada.datos is None and mirada.sin_gemini and cfg_sin.get("activo") is True
+                # Sin clave o con clave mala (401/403) es un error de configuración, no una caída de Gemini:
+                # ahí no hay corte sin IA.
+                if (mirada.datos is None and mirada.sin_gemini and not mirada.clave_mala
+                        and cfg_sin.get("activo") is True
                         and mirada.motivo != ojos.MOTIVO_SIN_CLAVE):
                     if not sin_ia.reservar(cfg_sin.get("max_por_ciclo", sin_ia.MAX_POR_CICLO)):
                         return Resultado(False, [f"ojos: {mirada.motivo}; tope de tomas sin IA del ciclo "
