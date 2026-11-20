@@ -7,7 +7,7 @@ name: musica
 on:
   workflow_dispatch:
   push:
-    branches: ["claude/clips-musica", "main"]
+    branches: ["main"]
     paths:
       - "marca/musica/pistas.yml"
       - "fabrica/musica_release.py"

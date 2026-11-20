@@ -67,8 +67,13 @@ def test_cargar_filtra_no_verificadas_sin_sha_licencia_ajena_y_sin_licencia_md(r
     assert [p["id"] for p in mod_musica.cargar(repo)] == ["buena"]
 
 
-def test_cargar_con_el_repo_real_es_vacio_mientras_las_pistas_son_candidatas():
-    assert mod_musica.cargar(RAIZ_REAL) == []
+def test_cargar_con_el_repo_real_da_las_pistas_cc0_verificadas():
+    pistas = mod_musica.cargar(RAIZ_REAL)
+    assert 6 <= len(pistas) <= 10
+    for p in pistas:
+        assert p["licencia"] == "CC0" and len(p["sha256"]) == 64
+        lic = (RAIZ_REAL / "marca" / "musica" / p["id"] / "LICENCIA.md").read_text(encoding="utf-8")
+        assert all(c in lic for c in ("Fuente:", "Autor:", "Licencia: CC0", "Enlace: https://"))
 
 
 def test_carpeta_lee_la_variable(monkeypatch, tmp_path):
@@ -427,6 +432,13 @@ def test_validar_rechaza_licencia_md_sin_campos(repo):
     assert any("a-medias" in e and "Autor:" in e and "Enlace:" in e and "Fuente:" not in e for e in es)
 
 
+def test_validar_rechaza_licencia_md_que_no_dice_cc0(repo):
+    escribir_pistas(repo, [pista("otra", "a" * 64)])
+    (repo / "marca/musica/otra/LICENCIA.md").write_text(
+        "Fuente: x\nAutor: y\nLicencia: CC-BY 4.0\nEnlace: https://x\n", encoding="utf-8")
+    assert any("otra" in e and "debe decir CC0" in e for e in errs(repo))
+
+
 def test_validar_rechaza_verificada_sin_licencia_md(repo):
     escribir_pistas(repo, [pista("sin-md", "a" * 64)], con_licencia=False)
     assert any("exige marca/musica/sin-md/LICENCIA.md" in e for e in errs(repo))
@@ -436,6 +448,7 @@ def test_validar_rechaza_verificada_sin_licencia_md(repo):
     (dict(id="Mala_Id"), "id inválido"),
     (dict(pagina="http://x.com"), "pagina debe ser un enlace https"),
     (dict(asset="a/b.ogg"), "asset debe ser un nombre"),
+    (dict(asset=".."), "asset debe ser un nombre"),
 ])
 def test_validar_rechaza_id_pagina_y_asset_malos(repo, cambio, msg):
     escribir_pistas(repo, [{**pista("buena", None, estado="candidata"), **cambio}], con_licencia=False)

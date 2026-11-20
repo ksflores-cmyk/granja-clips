@@ -352,7 +352,8 @@ def validar_musica(raiz: Path, datos, inf: Informe) -> None:
         if not _es_https(p.get("pagina")):
             inf.error(f"{et}: pagina debe ser un enlace https")
         asset = p.get("asset")
-        if not (isinstance(asset, str) and asset and "/" not in asset and "\\" not in asset):
+        if not (isinstance(asset, str) and asset and "/" not in asset and "\\" not in asset
+                and not asset.startswith(".")):
             inf.error(f"{et}: asset debe ser un nombre de archivo sin barras")
         if p.get("estado") not in ("candidata", "verificada", "descartada"):
             inf.error(f"{et}: estado debe ser candidata, verificada o descartada")
@@ -368,6 +369,8 @@ def validar_musica(raiz: Path, datos, inf: Informe) -> None:
                           if not re.search(rf"(?m)^\s*[-*]?\s*\**{re.escape(c[:-1])}(?::\**|\**:)[ \t]*\S", texto)]
                 if faltan:
                     inf.error(f"{et}: LICENCIA.md sin las líneas {', '.join(faltan)}")
+                elif not re.search(r"(?m)^\s*[-*]?\s*\**Licencia(?::\**|\**:)[^\n]*\bCC0\b", texto):
+                    inf.error(f"{et}: la línea Licencia: de LICENCIA.md debe decir CC0")
 
 
 def validar_marca_agua(m, inf: Informe) -> None:

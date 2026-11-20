@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+import io
 import json
 import re
 import subprocess
@@ -78,6 +79,8 @@ def leer_pagina(pagina: str, base: str) -> dict:
     patron = r"<a\s[^>]*href=['\"]([^'\"]*/sites/default/files/[^'\"]+)['\"][^>]*>([^<]*)</a>"
     for href, texto in re.findall(patron, _bloque(pagina, "field-art-files")):
         url = urllib.parse.urljoin(base, html.unescape(href))
+        if urllib.parse.urlsplit(url).netloc != urllib.parse.urlsplit(base).netloc:
+            continue            # sólo archivos del mismo sitio que la página leída
         archivos[urllib.parse.unquote(url.rsplit("/", 1)[-1])] = url
         if html.unescape(texto).strip():
             archivos.setdefault(html.unescape(texto).strip(), url)
@@ -109,16 +112,18 @@ def procesar(p: dict, permitidas: set[str], salida: Path) -> dict:
     datos = _bajar(url)
     lectura["sha256_origen"] = hashlib.sha256(datos).hexdigest()
     if p.get("zip_miembro"):
-        tmp = salida / f".{p['id']}.zip"
-        tmp.write_bytes(datos)
-        with zipfile.ZipFile(tmp) as z:
+        with zipfile.ZipFile(io.BytesIO(datos)) as z:
             miembros = [n for n in z.namelist() if n.lower().endswith(p["zip_miembro"].lower())
                         and not n.startswith("__MACOSX")]
             if not miembros:
                 raise ValueError(f"el zip no trae ningún *{p['zip_miembro']}: {z.namelist()}")
+            if z.getinfo(miembros[0]).file_size > TOPE_BYTES:
+                raise ValueError(f"{miembros[0]} descomprimido pasa de {TOPE_BYTES} bytes")
             lectura["zip_miembro"] = miembros[0]
-            datos = z.read(miembros[0])
-        tmp.unlink()
+            with z.open(miembros[0]) as f:
+                datos = f.read(TOPE_BYTES + 1)
+            if len(datos) > TOPE_BYTES:
+                raise ValueError(f"{miembros[0]} descomprimido pasa de {TOPE_BYTES} bytes")
     destino = salida / p["asset"]
     destino.write_bytes(datos)
     dur = _duracion(destino)

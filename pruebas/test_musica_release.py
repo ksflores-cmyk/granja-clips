@@ -25,3 +25,9 @@ def test_licencia_ajena_no_es_cc0():
 
 def test_sin_campo_de_licencia():
     assert leer_pagina("<html></html>", "https://opengameart.org/x")["licencias"] == []
+
+
+def test_archivo_de_otro_dominio_no_cuenta():
+    ajena = PAGINA.replace('href="https://opengameart.org/sites/default/files/calm_track.ogg"',
+                           'href="https://malo.example/sites/default/files/calm_track.ogg"')
+    assert "calm_track.ogg" not in leer_pagina(ajena, "https://opengameart.org/content/calm-track")["archivos"]

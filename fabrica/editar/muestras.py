@@ -212,7 +212,9 @@ def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *
             "fuente": extra_src or {"propio": "tipográfico, sin metraje"},
             "recorte": m.get("recorte"), "licencia": m["licencia"], "enlace": m.get("enlace_licencia")}, plan)
     _muestra_con_musica(salida, marca, registrar, omitir, hoy)
-    todas = all(x["puerta_estilo"]["en_verde"] for x in manifiesto["muestras"])
+    # Una muestra omitida (p. ej. sin pista de música del release) no cuenta como verde.
+    todas = (all(x["puerta_estilo"]["en_verde"] for x in manifiesto["muestras"])
+             and not manifiesto["omitidas"])
     manifiesto["puerta_estilo_en_verde"] = todas
     informe.append(f"## Resultado: {'EN VERDE' if todas else 'EN ROJO'}\n")
     (salida / "manifiesto.json").write_text(json.dumps(manifiesto, ensure_ascii=False, indent=2), encoding="utf-8")
