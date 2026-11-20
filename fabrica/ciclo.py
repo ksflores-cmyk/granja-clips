@@ -42,7 +42,7 @@ from .registro import ZONA
 
 PLATAFORMAS = publicar.PLATAFORMAS
 SECRETOS = ("BUFFER_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY", "TWITCH_CLIENT_ID",
-            "TWITCH_CLIENT_SECRET", "GEMINI_API_KEY")
+            "TWITCH_CLIENT_SECRET", "GEMINI_API_KEY", "GH_TOKEN", "GITHUB_TOKEN")
 DIA_CADENCIA_LENTA = date(2026, 11, 21)      # desde este día (GT) sólo corre en horas múltiplo de 3
 TOPE_MINUTOS_DIA = 60                            # valor por defecto: el de verdad es actions.tope_minutos_dia
 MARGEN_MIN_S, MARGEN_MAX_S = 15 * 60, 75 * 60    # por defecto: el hueco cae de ahora+15 a ahora+75 min
