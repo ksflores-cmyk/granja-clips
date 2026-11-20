@@ -13,6 +13,26 @@ Lo escribe el jefe de Clips el 20 nov, 1:30 a. m. GT. Cada tarea programada de e
 - Lo que no se copia del tweet: subtítulos dorados palabra por palabra (los prohíbe la sección 5B), música con derechos (sólo CC0), clips de Speed fuera de su campaña.
 - Instagram: Meta lo rehabilitó el 20 nov (perfil público visible a la 1:25 a. m.) pero sigue **desconectado en Buffer** hasta que Kevin lo reconecte. Al volver, va con calentamiento (ver la decisión pendiente en el reporte).
 
+## Herramientas para usar (estudio del tweet de @e1genqq, 20 nov 2:30 a. m.)
+
+El tweet lista 20 repos libres para un «estudio de clips de GTA 6»; el video es una maqueta de interfaz y la cifra de US$10K no está comprobada. Lo que sirve, por tarea. Todo corre en GitHub Actions, sin pago, y con caché de pip para no gastar minutos. Preferir lo liviano: nada que arrastre `torch` si hay una opción sin él.
+
+| Herramienta | Para qué nos sirve | Tarea | Nota |
+|---|---|---|---|
+| MediaPipe (detección de rostro) + OpenCV | Encontrar la facecam y seguir la acción para el recorte | #16 `dividida` | `mediapipe` es CPU y liviano; OpenCV `-headless` |
+| faster-whisper (con `word_timestamps=True` y su filtro VAD Silero integrado) | Transcripción local y tiempos por palabra; detectar dónde hay voz | #19 `voces`, #17 | Sin `torch` (CTranslate2). Modelo `base` o `small`; medir tiempo dentro del plazo de 13 min |
+| WhisperX | Alineación por palabra más fina | #17 (sólo si faster-whisper no llega a ±150 ms) | Pesado (`torch`): último recurso |
+| Silero VAD | Segmentos de voz para cortar silencios y separar hablantes | #19 | Ya viene dentro de faster-whisper |
+| Auto-Editor | Quitar silencios y aire muerto | #19 | Usar su lógica o su CLI con margen; cuidar que no corte risas o reacciones |
+| PySceneDetect | Cambios de escena más fiables que el filtro de ffmpeg | #20 `historia`, corte sin IA de la #2 | `scenedetect[opencv-headless]` |
+| TwitchDownloader (CLI) | Bajar la repetición del chat: los picos de mensajes y emotes marcan los mejores momentos | Nueva, después de esta noche (radar de momentos) | Sólo para fuentes autorizadas; para clips de Twitch ya tenemos las vistas como señal |
+| Remotion | Plantillas animadas para informativas | Seguimiento | Licencia gratis para personas y equipos pequeños; pide Chrome en Actions (más minutos) |
+| ClipsAI / FunClip | Partir videos largos en clips por transcripción | Seguimiento (campañas con VOD largo, p. ej. Speed) | ClipsAI usa pyannote (pide token de Hugging Face); FunClip está pensado para chino |
+| yt-dlp, FFmpeg | Ya los usamos | — | — |
+| OBS, Streamlink, Subtitle Edit, LosslessCut, OpenCut, MoviePy | No sirven para la fábrica (son de escritorio, graban directos sin permiso o duplican ffmpeg) | — | Descartados |
+
+Dependencias nuevas aprobadas para esta noche dentro del «Sí: todo» de Kevin (gratis y sólo en la nube): `mediapipe`, `opencv-python-headless`, `faster-whisper`, `scenedetect`, `auto-editor`. Cada tarea las añade a `requirements.txt` con versión fija y anota cuánto suman al tiempo de instalación.
+
 ## Tareas (todas: PR lista para revisión contra `main`, nunca borrador; el jefe fusiona)
 
 | # | Hora GT (20 nov) | Rama `claude/clips-…` | Criterios de aceptación |
@@ -28,3 +48,4 @@ Lo escribe el jefe de Clips el 20 nov, 1:30 a. m. GT. Cada tarea programada de e
 ## Bitácora de la noche
 
 - 20 nov 1:30 a. m. — jefe: plan escrito y tareas #16 a #22 programadas.
+- 20 nov 2:30 a. m. — jefe: estudio de herramientas del tweet de @e1genqq añadido (tabla de arriba).
