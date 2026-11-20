@@ -1040,10 +1040,10 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
                 if toma.candidato is not None:
                     puertas.anotar_visto(raiz, toma.candidato.id_origen)
                     _borrar_reintento(raiz, toma.candidato.id_origen)
-                if toma.entrada is not None and estado == "programada":
+                if toma.entrada is not None:
                     informativa.marcar_usada(raiz, toma.entrada["id"])
                 registro.avanzar_toma(raiz)
-            elif estado == "programada" and toma.entrada is not None:
+            elif estado != "fallada" and toma.entrada is not None:
                 informativa.marcar_usada(raiz, toma.entrada["id"])
 
         with plazo.etapa("publicar"):

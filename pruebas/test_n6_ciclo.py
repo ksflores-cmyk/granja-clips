@@ -647,6 +647,14 @@ def test_en_vivo_con_la_informativa_la_marca_usada(r, monkeypatch):
     assert d["informativas"][0]["usada"] is True
 
 
+def test_una_informativa_con_resultado_incierto_tambien_queda_usada(r, monkeypatch):
+    monkeypatch.setattr(ciclo.informativa, "armar", armar_falso)
+    cod, sal = correr(r, buffer=BufferIncierto())
+    assert "INCIERTO" in sal
+    d = yaml.safe_load((r / "informativas.yml").read_text(encoding="utf-8"))
+    assert d["informativas"][0]["usada"] is True
+
+
 def test_en_ensayo_no_hay_createpost_ni_subida_y_queda_una_linea(r):
     cambiar_modo(r, "ensayo", ["shorts", "tiktok", "reels"])
     sim, supa = BufferSimulado(), SupabaseSimulado()
