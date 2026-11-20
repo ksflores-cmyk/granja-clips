@@ -696,7 +696,9 @@ def test_sin_hueco_pero_con_envios_abiertos_hace_el_mantenimiento(r, monkeypatch
 
 def test_sin_hueco_y_sin_pendientes_no_hay_llamadas(r):
     cod, sal, e = correr_con_espias(r, ahora=datetime(2026, 11, 18, 3, 7, tzinfo=ZONA))
-    assert "sin hueco" in sal and sin_llamadas(e)
+    # Sin hueco ni pendientes sólo queda la lectura de retiros (tarea #10): nada de almacén, detección ni mutaciones.
+    assert "sin hueco" in sal and e.almacen.llamadas == [] and e.detectar == [] and e.hacer == []
+    assert all(b"mutation" not in c["cuerpo"] for c in e.buffer.llamadas)
 
 
 # ---------------------------------------------------------------- 6. avisos de envíos
@@ -1023,7 +1025,7 @@ def test_una_clave_en_el_error_de_elegir_candidatos_corta_antes_del_respaldo_y_d
                          hacer_toma_fn=Hacer(r), transporte_buffer=sim, transporte_almacen=supa)
     assert cod == 0 and CLAVE not in "\n".join(sal)
     comprobar_alerta(r, "BUFFER_API_KEY")
-    assert sim.consultas == [] and supa.llamadas == [] and filas(r) == []
+    assert not sim.hubo("createPost") and supa.llamadas == [] and filas(r) == []    # sólo la lectura de retiros
 
 
 def test_un_hueco_cerrado_por_plataforma_no_se_reabre_aunque_fallara(r):

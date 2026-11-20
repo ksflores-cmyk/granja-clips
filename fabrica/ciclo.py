@@ -31,7 +31,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from . import detectar as mod_detectar
-from . import informativa, plazo, publicar, puertas, red, registro
+from . import informativa, plazo, publicar, puertas, red, registro, retiros
 from . import validar as mod_validar
 from .almacen import Almacen, ErrorAlmacen
 from .config import cargar_yaml, raiz_repo
@@ -51,6 +51,7 @@ TIEMPO_MIN_INTENTO_S = 240      # menos que esto del plazo: no se empieza otro i
 FALLOS_CUARENTENA = 3           # fallos seguidos (red, tiempo o máquina) de una fuente antes de la cuarentena
 HORAS_CUARENTENA = 24
 TIEMPO_MIN_ARRANQUE_S = 60      # menos que esto al empezar (por una instalación lenta): no se hace nada
+TIEMPO_MIN_RETIROS_S = 30       # menos que esto del plazo: no se lee Buffer en busca de reclamos
 TIEMPO_MIN_PUBLICAR_S = 120     # menos que esto: no se publica (la fuente no se gasta)
 RE_CUENTA = re.compile(r"suspend|restrict|bloquead|blocked|disabled|deshabilitad", re.IGNORECASE)
 RE_HTTP_CUENTA = re.compile(r"código (401|403)\b")
@@ -803,6 +804,32 @@ def mantenimiento(raiz, env, out, transporte_buffer, transporte_almacen, reloj) 
         out(f"mantenimiento: {e}")
 
 
+def revisar_retiros(raiz, env, out, transporte_buffer, ahora, reloj) -> None:
+    """Reclamos y retiros: veta ya, antes de detectar. Sin clave sólo se evalúa la regla de 2 reclamos en 7 días.
+
+    Un fallo de Buffer o de red se anota y el ciclo sigue (401/403 es alerta roja); `AlertaRoja` sube."""
+    cliente, ids, org = None, {}, None
+    if env.get("BUFFER_API_KEY"):
+        cfg = cargar_yaml("config/canales.yml", raiz)
+        ids = {p: cfg[p]["buffer_channel_id"] for p in PLATAFORMAS if (cfg.get(p) or {}).get("buffer_channel_id")}
+        org = next((cfg[p].get("buffer_org_id") for p in ids if cfg[p].get("buffer_org_id")), None)
+        cliente = publicar.ClienteBuffer(env["BUFFER_API_KEY"], transporte_buffer, raiz, ahora=reloj)
+    if cliente is not None and not plazo.queda(TIEMPO_MIN_RETIROS_S):
+        out("retiros: sin tiempo para leer Buffer, sólo se evalúa la regla de 2 reclamos en 7 días")
+        cliente = None
+    # Plazo propio de la lectura (con tope por llamada) dentro del plazo del ciclo: nunca se come lo de producir.
+    limite = max(1.0, min(retiros.PRESUPUESTO_S, plazo.restante() - plazo.MARGEN_S))
+    try:
+        with plazo.etapa("retiros"):
+            retiros.revisar(raiz, cliente, ids, org, ahora, out, secretos=getattr(out, "secretos", ()),
+                            limite_s=limite)
+    except (publicar.ErrorBuffer, red.ErrorRed, OSError) as e:
+        motivo = _motivo_cuenta(e)
+        if motivo:
+            raise AlertaRojaCiclo(motivo) from None
+        out(f"retiros: {e}")
+
+
 def ejecutar(raiz=None, *, decidir=False, ensayo_forzado=False, ahora=None, salida_dir=None, env=None,
              imprimir=None, detectar_fn=None, hacer_toma_fn=None, transporte_buffer=None,
              transporte_almacen=None, transporte_twitch=None, validar_fn=None, solo_ensayo=False,
@@ -900,6 +927,7 @@ def _ejecutar(raiz, out, *, decidir, ensayo_forzado, ahora, salida_dir, env, det
 
 
 def _solo_mantenimiento(raiz, env, out, pendiente, tb, ta, reloj) -> int:
+    revisar_retiros(raiz, env, out, tb, reloj(), reloj)
     if pendiente:
         with plazo.etapa("mantenimiento"):
             mantenimiento(raiz, env, out, tb, ta, reloj)
@@ -944,6 +972,7 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
     try:
         if not sim:
             sumar_intento(raiz, hueco)            # cuenta aunque no salga toma: el relleno tiene tope de intentos
+            revisar_retiros(raiz, env, out, tb, ahora, reloj)   # el veto de un reclamo vale ya: antes de detectar
         cliente = mod_detectar.cliente_desde_entorno(tt) if not sim or env.get("TWITCH_CLIENT_ID") else None
         with plazo.etapa("detectar"):
             cands = elegir_candidatos(raiz, ahora, hueco.plataformas, out, detectar_fn, cliente)

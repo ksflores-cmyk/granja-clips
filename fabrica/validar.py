@@ -684,6 +684,14 @@ def validar_pausa(raiz: Path, inf: Informe) -> None:
             inf.error("PAUSA: debe tener una línea 'motivo:' con texto")
 
 
+def validar_pausa_t(raiz: Path, inf: Informe) -> None:
+    ruta = raiz / "estado" / "pausa-t.yml"
+    if ruta.exists():
+        lineas = [l for l in ruta.read_text(encoding="utf-8").splitlines() if not l.lstrip().startswith("#")]
+        if not any(l.startswith("motivo:") and l.partition(":")[2].strip() for l in lineas):
+            inf.error("estado/pausa-t.yml: debe tener una línea 'motivo:' con texto")
+
+
 def validar_csv(raiz: Path, nombre: str, cabecera: list[str], inf: Informe) -> None:
     ruta = raiz / nombre
     if not ruta.exists():
@@ -839,6 +847,7 @@ def validar(raiz=None) -> Informe:
     if musica is not None:
         validar_musica(raiz, musica, inf)
     validar_pausa(raiz, inf)
+    validar_pausa_t(raiz, inf)
     validar_csv(raiz, "marcador.csv", CABECERA_MARCADOR, inf)
     validar_csv(raiz, "envios-pendientes.csv", CABECERA_ENVIOS, inf)
     validar_sin_media(raiz, inf)

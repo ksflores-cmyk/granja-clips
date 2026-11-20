@@ -24,13 +24,14 @@ def equipos_vetados(raiz=None) -> list[str]:
     return _lista(_config(raiz).get("equipos_twitch"))
 
 
-def _de_retiros(raiz) -> set[str]:
+def filas_retiros(raiz) -> list[list[str]]:
+    """Celdas de cada fila de datos de la tabla de retiros.md (sin encabezado ni separador)."""
     ruta = raiz_repo(raiz) / "retiros.md"
     try:
         lineas = ruta.read_text(encoding="utf-8").splitlines()
     except OSError:
-        return set()
-    out: set[str] = set()
+        return []
+    filas = []
     for linea in lineas:
         s = linea.strip()
         if not s.startswith("|"):
@@ -40,6 +41,18 @@ def _de_retiros(raiz) -> set[str]:
             continue                                   # separador
         if celdas and celdas[0].lower() == "fecha":
             continue                                   # encabezado
+        filas.append(celdas)
+    return filas
+
+
+def fuentes_retiradas(raiz=None) -> set[str]:
+    """Ids de la columna «Fuente» de retiros.md: la fuente pasa a vetada hasta tener permiso nuevo."""
+    return {f[1].strip().lower() for f in filas_retiros(raiz) if len(f) > 1 and f[1].strip()}
+
+
+def _de_retiros(raiz) -> set[str]:
+    out: set[str] = set()
+    for celdas in filas_retiros(raiz):
         for c in celdas:
             out.update(m.lower() for m in RE_CANAL.findall(c))
         if len(celdas) > 1:

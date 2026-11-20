@@ -24,6 +24,7 @@ import yaml
 from . import plazo
 from .config import cargar_yaml, raiz_repo
 from .fuentes import RUTA_FICHAS_T, cargar_fuentes, es_publicable
+from .pausa import pausa_t_activa
 from .vetados import equipos_vetados, logins_vetados
 
 ZONA = ZoneInfo("America/Guatemala")
@@ -278,6 +279,9 @@ def detectar_t_con_descartes(raiz, ahora: datetime, cliente: ClienteTwitch | Non
 
     if not cfg["activo"]:
         return [], saltos, [], descartes
+    en_pausa, motivo_pausa = pausa_t_activa(raiz)
+    if en_pausa:
+        return [], [f"ficha T en PAUSA: {motivo_pausa or 'sin motivo'}"], [], descartes
     if cliente is None:
         return [], ["ficha T: sin claves de Twitch, no corre"], [], descartes
     hoy = ahora.astimezone(ZONA).date()
