@@ -37,6 +37,12 @@ PLATAFORMAS = ("shorts", "tiktok", "reels")
 HASHTAGS_MAX = {"shorts": 3, "tiktok": 3, "reels": 5}
 HASHTAGS_MIN_REELS = 3
 SEP_CREDITOS = " · "
+MARGEN_DURACION_S = 0.1     # el relleno del AAC alarga el MP4 unos 37 ms: la suma deja margen en los dos bordes
+
+
+def hora_local(dt: datetime) -> datetime:
+    """A hora de Guatemala. Una fecha sin zona se toma como hora de Guatemala (no la del sistema)."""
+    return (dt.replace(tzinfo=ZONA) if dt.tzinfo is None else dt).astimezone(ZONA)
 
 
 # ---------------------------------------------------------------- configuración
@@ -187,7 +193,7 @@ def elegir_candidatos(candidatos: list, fichas: list[dict], formato: str, ahora:
     if formato not in cfg["formatos"]:
         raise ValueError(f"formato desconocido: {formato!r}")
     pilar = cfg["formatos"][formato]["pilar_segmento"]
-    local = ahora.astimezone(ZONA)
+    local = hora_local(ahora)
     hoy = local.date()
     por_id = {f.get("id"): f for f in fichas}
     aptos = []
@@ -195,7 +201,7 @@ def elegir_candidatos(candidatos: list, fichas: list[dict], formato: str, ahora:
         ficha = por_id.get(c.fuente_id)
         if not apto(ficha, hoy, pilar, muestra)[0]:
             continue
-        if c.creado_en is None or c.creado_en.astimezone(ZONA).date() != hoy:
+        if c.creado_en is None or hora_local(c.creado_en).date() != hoy:
             continue
         aptos.append(c)
     aptos.sort(key=lambda c: c.vistas_por_hora, reverse=True)
@@ -221,14 +227,26 @@ def combinar(segmentos: list[Segmento], cfg: dict) -> list[Segmento] | None:
     lo, hi = cfg["duracion_s"]
     for n in range(min(len(segmentos), hi_n), lo_n - 1, -1):
         total = sum(s.duracion for s in segmentos[:n])
-        if lo <= total <= hi:
+        if lo + MARGEN_DURACION_S <= total <= hi - MARGEN_DURACION_S:
             return list(segmentos[:n])
     return None
 
 
 # ---------------------------------------------------------------- tomas y créditos
 
-def _login(creador: str) -> str:
+def _login(creador: str, ficha: dict | None = None) -> str:
+    """El login real de Twitch: `twitch.tv/<login>` ya escrito en el creador, o `twitch_login` de la ficha (si el
+    creador es el de la ficha); como último recurso, el nombre visible normalizado."""
+    m = re.search(r"twitch\.tv/([A-Za-z0-9_]+)", str(creador or ""))
+    if m:
+        return m.group(1).lower()
+    ficha = ficha or {}
+    ficha_login = str(ficha.get("twitch_login") or "").strip().lower()
+    if ficha_login and _clave_creador(creador) in (_clave_creador(ficha.get("creador")), ficha_login, ""):
+        return ficha_login
+    m = re.search(r"twitch\.tv/([A-Za-z0-9_]+)", str(ficha.get("creador") or ""))
+    if m and _clave_creador(creador) == _clave_creador(ficha.get("creador")):
+        return m.group(1).lower()
     return re.sub(r"[^a-z0-9_]", "", str(creador or "").lower())
 
 
@@ -238,7 +256,7 @@ def etiqueta_credito(ficha: dict, creador: str, plataforma: str | None = None) -
     if not creador:
         return ""
     if ficha.get("tipo") == "T":
-        return f"twitch.tv/{_login(creador) or creador}"
+        return f"twitch.tv/{_login(creador, ficha) or creador}"
     if plataforma:
         e = fuentes.etiqueta_creador(ficha, creador, plataforma)
         if e:
@@ -354,7 +372,7 @@ def textos_compilado(compilado: Compilado, plataforma: str, temporada: dict, cfg
 
 def fila_marcador(compilado: Compilado, ahora: datetime, duracion: float | None = None, raiz=None) -> dict:
     """Fila futura del marcador (como `toma.fila_marcador`, con `pilar: compilados` y los datos unidos)."""
-    local = ahora.astimezone(ZONA)
+    local = hora_local(ahora)
     segs = compilado.segmentos
     campanas = []
     for s in segs:
@@ -406,7 +424,7 @@ def _recorte_de(cfg: dict, ficha: dict) -> tuple[float, float]:
 
 def preparar_segmento(candidato: Candidato, ficha: dict, ctx: Contexto) -> Segmento:
     """Descarga → ojos → validar_respuesta → armar. La fuente queda abierta en `ctx.pila`."""
-    hoy = ctx.ahora.astimezone(ZONA).date()
+    hoy = hora_local(ctx.ahora).date()
     try:
         d = ctx.pila.enter_context(mod_descargar.descargar(ctx.raiz, candidato, ficha, hoy, abrir=ctx.abrir,
                                                             ejecutor=ctx.ejecutor))
@@ -433,7 +451,7 @@ def preparar_segmento(candidato: Candidato, ficha: dict, ctx: Contexto) -> Segme
     creador = (entrada or {}).get("creador") or candidato.creador or ficha.get("creador") or ""
     toma, lineas, inicio, dur = armar(mirada.datos, ctx.marca, ficha, ctx.numero, creador)
     return Segmento(fuente=d.ruta, inicio=inicio, duracion=dur, toma=toma, lineas=lineas, ficha=ficha,
-                    creador=str(creador), fecha=candidato.creado_en.astimezone(ZONA).date(),
+                    creador=str(creador), fecha=hora_local(candidato.creado_en).date(),
                     id_origen=candidato.id_origen)
 
 
@@ -450,10 +468,11 @@ def hacer_compilado(raiz, formato_id: str, candidatos: list, fichas: list[dict],
     """
     propia = salida is None
     carpeta: Path | None = None
+    creados: list[Path] = []          # sólo los archivos de ESTE compilado: nunca se borra el de otro en la carpeta
     r = None
     try:
         carpeta = Path(salida) if salida is not None else Path(tempfile.mkdtemp(prefix="granja-compilado-"))
-        r = _hacer_compilado(raiz, formato_id, candidatos, fichas, ahora, carpeta,
+        r = _hacer_compilado(raiz, formato_id, candidatos, fichas, ahora, carpeta, creados,
                              hacer_segmento_fn or preparar_segmento,
                              dict(abrir=abrir, ejecutor=ejecutor, transporte=transporte, espera=espera,
                                   entorno=entorno))
@@ -462,15 +481,14 @@ def hacer_compilado(raiz, formato_id: str, candidatos: list, fichas: list[dict],
     finally:
         if r is None or not r.ok:
             if carpeta is not None:
-                for f in carpeta.glob("compilado-*.mp4"):
+                for f in creados:
                     f.unlink(missing_ok=True)
-                (carpeta / "plan_compilado.json").unlink(missing_ok=True)
                 if propia:
                     shutil.rmtree(carpeta, ignore_errors=True)
     return r
 
 
-def _hacer_compilado(raiz, formato_id, candidatos, fichas, ahora, carpeta: Path, fn, extras) -> Resultado:
+def _hacer_compilado(raiz, formato_id, candidatos, fichas, ahora, carpeta: Path, creados: list, fn, extras) -> Resultado:
     from .editar import compilado as mod_compilado
     raiz = raiz_repo(raiz)
     cfg = cargar_config(raiz)
@@ -510,6 +528,8 @@ def _hacer_compilado(raiz, formato_id, candidatos, fichas, ahora, carpeta: Path,
         segmentos = [replace(s, toma=toma_de_segmento(s.toma, formato, numero, i, s.creador, s.ficha))
                      for i, s in enumerate(total)]
         mp4 = carpeta / f"compilado-{numero:03d}-{formato_id}.mp4"
+        plan_json = mp4.with_suffix(".plan.json")
+        creados += [mp4, plan_json]
         try:
             with tempfile.TemporaryDirectory(prefix="trabajo-compilado-") as trabajo:
                 plan, puntos = mod_compilado.compilar(marca, formato, segmentos, mp4, trabajo=Path(trabajo))
@@ -522,10 +542,10 @@ def _hacer_compilado(raiz, formato_id, candidatos, fichas, ahora, carpeta: Path,
         rojos = [f"puerta del compilado: {n}" + (f" ({det})" if det else "") for n, ok_p, det in puntos if not ok_p]
         if rojos:
             mp4.unlink(missing_ok=True)
-            (carpeta / "plan_compilado.json").unlink(missing_ok=True)
+            plan_json.unlink(missing_ok=True)
             return Resultado(False, [*omitidos, *rojos], None, plan, None, None, puntos)
         comp = Compilado(formato_id, segmentos)
         plan["omitidos"] = omitidos
-        (carpeta / "plan_compilado.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+        plan_json.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
         return Resultado(True, [], mp4, plan, None, None, puntos,
                          fila_marcador(comp, ahora, plan["duracion"], raiz))

@@ -109,15 +109,20 @@ def _pistas_audio(ruta: Path) -> int:
 # ---------------------------------------------------------------- unir
 
 def orden_concat(entradas: list[Path], salida: Path, marca: Marca) -> list[str]:
-    """La orden de ffmpeg que une los segmentos con corte seco (función pura; no corre nada)."""
+    """La orden de ffmpeg que une los segmentos con corte seco (sólo lee los cuadros de cada MP4).
+
+    El audio de cada segmento se recorta exactamente a su duración en cuadros: el AAC lo deja unos ms más largo
+    y `concat` arrancaría el siguiente segmento al final de la pista más larga (todo correría 1 cuadro)."""
     n = len(entradas)
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
     for e in entradas:
         cmd += ["-i", str(e)]
     filtros = []
-    for i in range(n):
+    for i, e in enumerate(entradas):
+        fin = _cuadros(Path(e)) / FPS
         filtros.append(f"[{i}:v]scale={marca.ancho}:{marca.alto},fps={FPS},setsar=1,format=yuv420p[v{i}]")
-        filtros.append(f"[{i}:a]aformat=sample_rates=48000:channel_layouts=stereo[a{i}]")
+        filtros.append(f"[{i}:a]aformat=sample_rates=48000:channel_layouts=stereo,apad,"
+                       f"atrim=end={fin:.6f},asetpts=PTS-STARTPTS[a{i}]")
     pares = "".join(f"[v{i}][a{i}]" for i in range(n))
     filtros.append(f"{pares}concat=n={n}:v=1:a=1[v][a]")
     return cmd + ["-filter_complex", ";".join(filtros), "-map", "[v]", "-map", "[a]",
@@ -137,8 +142,9 @@ def compilar(marca: Marca, formato: dict, segmentos: list, salida: Path, *, trab
     `formato`: el formato con sus límites (`formatos.formato_con_limites`). Los MP4 de cada segmento quedan en
     `trabajo/seg-N.mp4` (el que llama decide cuándo borrarlos). Lanza `SegmentoRojo` si algún segmento sale en
     rojo en la puerta de estilo y `ValueError` si un texto no cabe. Devuelve (plan, puntos del compilado) y escribe
-    `plan_compilado.json` junto al MP4.
+    `<nombre del MP4>.plan.json` junto al MP4.
     """
+    from .. import formatos
     trabajo = Path(trabajo)
     salida = Path(salida)
     trabajo.mkdir(parents=True, exist_ok=True)
@@ -166,6 +172,7 @@ def compilar(marca: Marca, formato: dict, segmentos: list, salida: Path, *, trab
         credito = seg.toma.credito
         entradas.append({"n": i, "t0": round(t, 3), "t1": round(t + dur, 3), "duracion": round(dur, 3),
                          "fuente_id": seg.ficha.get("id"), "creador": seg.creador, "credito": credito,
+                         "etiqueta": formatos.etiqueta_credito(seg.ficha, seg.creador),
                          "id_origen": seg.id_origen, "fecha": seg.fecha.isoformat(),
                          "sha256_mp4": sha256_archivo(mp4), "plan": plan_seg,
                          "puerta_ok": all(ok for _, ok, _ in puntos),
@@ -177,7 +184,7 @@ def compilar(marca: Marca, formato: dict, segmentos: list, salida: Path, *, trab
             "plantilla": entradas[0]["plan"].get("plantilla", PLANTILLA_POR_DEFECTO),
             "creditos": [e["credito"] for e in entradas], "segmentos": entradas}
     puntos = revisar_compilado(salida, plan, mp4s, formato, marca)
-    (salida.parent / "plan_compilado.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2),
+    salida.with_suffix(".plan.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2),
                                                        encoding="utf-8")
     return plan, puntos
 
@@ -213,6 +220,10 @@ def revisar_compilado(mp4: Path, plan: dict, segmentos_mp4: list, cfg: dict, mar
     tol = TOL_DURACION_SEGMENTO_S * max(1, len(segs))
     punto("compilado", "Duración igual a la suma de los segmentos", abs(info["duracion"] - suma) <= tol,
           f"MP4 {info['duracion']:.2f} s, segmentos {suma:.2f} s (tolerancia {tol:.2f})")
+    cuadros_seg = sum(_cuadros(Path(x)) for x in segmentos_mp4)
+    cuadros_mp4 = _cuadros(mp4)
+    punto("compilado", "Cuadros = suma de los segmentos", cuadros_mp4 == cuadros_seg,
+          f"MP4 {cuadros_mp4} cuadros, segmentos {cuadros_seg}")
     punto("fotograma", f"Resolución {marca.ancho}x{marca.alto}",
           (v.get("width"), v.get("height")) == (marca.ancho, marca.alto), f"{v.get('width')}x{v.get('height')}")
     punto("fotograma", "Códec h264 + aac", v.get("codec_name") == "h264" and a.get("codec_name") == "aac",
@@ -224,8 +235,8 @@ def revisar_compilado(mp4: Path, plan: dict, segmentos_mp4: list, cfg: dict, mar
           ", ".join(sorted(fechas)))
     creditos = [str(c) for c in plan.get("creditos") or []]
     malos = [str(s.get("n")) for s in segs
-             if not (str(s.get("credito") or "").strip() and _norm(s.get("creador"))
-                     and _norm(s.get("creador")) in _norm(s.get("credito"))
+             if not (str(s.get("credito") or "").strip()
+                     and any(_norm(x) and _norm(x) in _norm(s.get("credito")) for x in (s.get("creador"), s.get("etiqueta")))
                      and str(s.get("credito")) in creditos)]
     punto("compilado", "Crédito de cada segmento", bool(segs) and not malos and len(creditos) == len(segs),
           ("segmentos sin crédito de su creador: " + ", ".join(malos)) if malos else
@@ -403,7 +414,7 @@ def generar_muestras(salida: Path, marca: Marca, datos: dict, descargas: Path, *
                 ok = False
             textos.append(f"### {plataforma}\n\n{cuerpo}\n")
         manifiesto["compilados"].append({
-            "id": cid, "formato": c["formato"], "archivo": f"{cid}/{mp4.name}", "plan": f"{cid}/plan_compilado.json",
+            "id": cid, "formato": c["formato"], "archivo": f"{cid}/{mp4.name}", "plan": f"{cid}/{mp4.stem}.plan.json",
             "duracion_s": plan["duracion"], "segmentos": [{"fuente_id": e["fuente_id"], "t0": e["t0"], "t1": e["t1"]}
                                                           for e in plan["segmentos"]],
             "fotogramas": cuadros, "sha256_mp4": sha256_archivo(mp4), "en_verde": ok})

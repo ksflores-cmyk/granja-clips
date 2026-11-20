@@ -187,6 +187,34 @@ def test_combinar_elige_el_primer_prefijo_que_cae_en_rango(cfg):
     assert formatos.combinar([], cfg) is None
 
 
+def test_combinar_deja_margen_en_los_bordes(cfg):
+    assert formatos.combinar([seg_falso(30.0), seg_falso(0.05, creador="b")], cfg) is None      # 30.05: pegado al mínimo
+    assert formatos.combinar([seg_falso(15.2), seg_falso(15.2, creador="b")], cfg) is not None  # 30.4
+    assert formatos.combinar([seg_falso(30.0), seg_falso(30.0, creador="b")], cfg) is None      # 60 exactos: el AAC lo pasa
+    assert formatos.combinar([seg_falso(29.96), seg_falso(29.96, creador="b")], cfg) is None    # 59.92
+    assert formatos.combinar([seg_falso(29.9), seg_falso(29.9, creador="b")], cfg) is not None  # 59.8
+
+
+def test_login_real_de_twitch_en_el_credito():
+    f = ficha_t(twitch_login="ibai", creador="Ibai Llanos")
+    assert formatos.etiqueta_credito(f, "Ibai Llanos") == "twitch.tv/ibai"
+    assert formatos.etiqueta_credito(ficha_t(), "twitch.tv/AuronPlay") == "twitch.tv/auronplay"
+    assert formatos.etiqueta_credito(ficha_t(creador="twitch.tv/elxokas"), "twitch.tv/elxokas") == "twitch.tv/elxokas"
+    assert formatos.etiqueta_credito(ficha_t(creador="otros"), "Auron Play") == "twitch.tv/auronplay"   # último recurso
+    assert formatos.etiqueta_credito(f, "Otro Streamer") == "twitch.tv/otrostreamer"
+
+
+def test_fechas_sin_zona_se_toman_como_hora_de_guatemala(cfg):
+    naive_ahora = datetime(2026, 11, 20, 12, 0)                    # 12:00 GT; en UTC del sistema sería otro día/hora
+    ayer_naive = datetime(2026, 11, 19, 23, 30)
+    hoy_naive = datetime(2026, 11, 20, 0, 5)
+    cs = [cand("ayer", "uno", 99, creado=ayer_naive), cand("h1", "dos", 5, creado=hoy_naive),
+          cand("h2", "tres", 4, creado=hoy_naive)]
+    assert ids(formatos.elegir_candidatos(cs, [ficha_t()], "mejores-momentos", naive_ahora, cfg)) == ["h1", "h2"]
+    assert formatos.fila_marcador(compilado_de_texto(), naive_ahora)["hora"] == "12:00"
+    assert formatos.hora_local(hoy_naive).utcoffset() == timedelta(hours=-6)
+
+
 # ---------------------------------------------------------------- tomas
 
 def test_toma_de_segmento_primero_lleva_el_gancho_del_formato(cfg):
@@ -356,10 +384,12 @@ CREADORES = ("ibai", "auronplay", "thegrefg")
 DUR_SEG = 11.0
 
 
-def segmentos_sinteticos(carpeta, n=3, dur=DUR_SEG, fecha=HOY, formato=None, cfg=None):
+def segmentos_sinteticos(carpeta, n=3, dur=DUR_SEG, fecha=HOY, formato=None, cfg=None, duraciones=None,
+                         patrones=("testsrc2", "mandelbrot", "smptebars")):
     segs = []
     for i, (creador, tono) in enumerate(zip(CREADORES[:n], (440, 660, 880))):
-        fuente = fuente_sintetica(carpeta / f"f{i}.mp4", dur + 2.0, tono, patron=("testsrc2", "mandelbrot", "smptebars")[i])
+        dur = duraciones[i] if duraciones else dur
+        fuente = fuente_sintetica(carpeta / f"f{i}.mp4", dur + 2.0, tono, patron=patrones[i])
         propia = Toma(7, f"Clip {'uno dos tres'.split()[i]} del día", "CLIP", escena=f"INT. STREAM {i + 1} — TARDE")
         ficha = ficha_t(f"twitch-{creador}", creador=creador)
         toma = formatos.toma_de_segmento(propia, formato, 7, i, creador, ficha) if formato else propia
@@ -397,7 +427,7 @@ def test_compilar_produce_un_mp4_valido_y_todo_en_verde(compilado_ok):
     assert info["video"]["profile"] == "High" and info["video"]["pix_fmt"] == "yuv420p"
     assert abs(info["fps"] - 30) < 0.01 and estilo.faststart(c["mp4"])
     assert abs(info["duracion"] - 3 * DUR_SEG) <= 0.15 * 3
-    plan = json.loads((c["mp4"].parent / "plan_compilado.json").read_text(encoding="utf-8"))
+    plan = json.loads(c["mp4"].with_suffix(".plan.json").read_text(encoding="utf-8"))
     assert plan["tipo"] == "compilado" and plan["formato"] == "mejores-momentos" and plan["pilar"] == "compilados"
     assert plan["plantilla"] == "v1-pagina" and plan["numero"] == 7 and plan["fecha"] == HOY.isoformat()
     assert plan["creditos"] == [f"Con: twitch.tv/{x}" for x in CREADORES]
@@ -597,7 +627,7 @@ def test_hacer_compilado_ok_con_tres_segmentos(repo, tmp_path):
     r = formatos.hacer_compilado(repo, "mejores-momentos", candidatos_falsos(), fichas_falsas(), AHORA, salida=salida,
                                  hacer_segmento_fn=segmento_falso_fn(tmp_path))
     assert r.ok, r.motivos
-    assert r.mp4.is_file() and r.mp4.parent == salida and (salida / "plan_compilado.json").is_file()
+    assert r.mp4.is_file() and r.mp4.parent == salida and r.mp4.with_suffix(".plan.json").is_file()
     assert r.fila["pilar"] == "compilados" and r.fila["fuente_id"] == "twitch-ibai+twitch-auronplay+twitch-thegrefg"
     assert r.fila["toma"] == 1 and r.fila["duracion_s"] == pytest.approx(33.0, abs=0.1)
     assert r.fila["gancho"] == "Mejores momentos del día" and r.fila["credito"].count("Con: twitch.tv/") == 3
@@ -638,15 +668,39 @@ def test_hacer_compilado_descarta_si_un_segmento_sale_rojo_en_la_puerta_de_estil
                                  salida=salida, hacer_segmento_fn=segmento_falso_fn(
                                      tmp_path, duraciones={"c0": 4.0, "c1": 15.0, "c2": 15.0}))
     assert not r.ok and any("segmento 1" in m and "Duración de 7 a 30 s" in m for m in r.motivos), r.motivos
-    assert sin_mp4(salida) == [] and not (salida / "plan_compilado.json").exists()
+    assert sin_mp4(salida) == [] and not list(salida.glob("*.plan.json"))
 
 
-def test_hacer_compilado_omite_un_segmento_fallido_y_sigue_si_quedan_dos(repo, tmp_path):
+def test_hacer_compilado_descarta_si_un_segmento_falla_y_queda_uno(repo, tmp_path):
     fn = segmento_falso_fn(tmp_path, falla=("c1",))
     r = formatos.hacer_compilado(repo, "mejores-momentos", candidatos_falsos(2), fichas_falsas(), AHORA,
                                  hacer_segmento_fn=fn)
     assert not r.ok and "segmento c1: ojos: sin respuesta de prueba" in r.motivos[0]
     assert "quedan 1 segmentos y el mínimo es 2" in r.motivos[-1]
+
+
+@necesita_ffmpeg
+def test_hacer_compilado_omite_el_segmento_fallido_y_sigue_con_los_otros_dos(repo, tmp_path):
+    fn = segmento_falso_fn(tmp_path, dur=16.0, falla=("c1",))
+    r = formatos.hacer_compilado(repo, "mejores-reacciones", candidatos_falsos(3), fichas_falsas(), AHORA,
+                                 salida=tmp_path / "s", hacer_segmento_fn=fn)
+    assert r.ok, r.motivos
+    assert [s["id_origen"] for s in r.plan["segmentos"]] == ["c0", "c2"]
+    assert r.plan["omitidos"] == ["segmento c1: ojos: sin respuesta de prueba"]
+    assert r.fila["fuente_id"] == "twitch-ibai+twitch-thegrefg"
+
+
+@necesita_ffmpeg
+def test_un_descarte_no_borra_el_mp4_de_otro_compilado_en_la_misma_carpeta(repo, tmp_path):
+    salida = tmp_path / "s"
+    salida.mkdir()
+    ajeno, ajeno_plan = salida / "compilado-009-mejores-momentos.mp4", salida / "compilado-009-mejores-momentos.plan.json"
+    ajeno.write_bytes(b"video de otro")
+    ajeno_plan.write_text("{}", encoding="utf-8")
+    r = formatos.hacer_compilado(repo, "mejores-reacciones", candidatos_falsos(2, (30, 20)), fichas_falsas(), AHORA,
+                                 salida=salida, hacer_segmento_fn=segmento_falso_fn(tmp_path, dur=8.0))
+    assert not r.ok
+    assert ajeno.read_bytes() == b"video de otro" and ajeno_plan.is_file()
 
 
 def test_hacer_compilado_con_excepcion_inesperada_es_descarte_y_borra_lo_temporal(repo, tmp_path):
@@ -658,3 +712,18 @@ def test_hacer_compilado_con_excepcion_inesperada_es_descarte_y_borra_lo_tempora
     r2 = formatos.hacer_compilado(repo, "mejores-momentos", candidatos_falsos(), fichas_falsas(), AHORA,
                                   hacer_segmento_fn=lambda *a: 1 / 0)
     assert not r2.ok and "error inesperado: ZeroDivisionError" in r2.motivos[0]
+
+
+@necesita_ffmpeg
+def test_duraciones_que_no_son_multiplo_de_un_cuadro_no_corren_las_uniones(tmp_path, marca, cfg):
+    """10.37, 12.41 y 11.55 s con metraje que se mueve mucho: los cuadros del compilado son la suma de los de los
+    segmentos (sin el cuadro extra del audio más largo) y el corte seco sale en verde."""
+    fm = formatos.formato_con_limites(cfg, "mejores-momentos")
+    segs = segmentos_sinteticos(tmp_path, formato=fm, duraciones=(10.37, 12.41, 11.55),
+                                patrones=("testsrc2", "mandelbrot", "testsrc2"))
+    plan, puntos = compilado.compilar(marca, fm, segs, tmp_path / "salida" / "c.mp4", trabajo=tmp_path / "trabajo")
+    assert rojos(puntos) == [], puntos
+    assert punto_de(puntos, "Cuadros = suma")[1]
+    segs_mp4 = compilado.rutas_segmentos(tmp_path / "trabajo", 3)
+    assert compilado._cuadros(tmp_path / "salida" / "c.mp4") == sum(compilado._cuadros(m) for m in segs_mp4)
+    assert plan["segmentos"][2]["t1"] == pytest.approx(compilado._cuadros(tmp_path / "salida" / "c.mp4") / 30, abs=1e-3)
