@@ -5,7 +5,15 @@ name: formatos
 on:
   workflow_dispatch:
   push:
-    branches: ["claude/clips-formatos", "main"]
+    branches: ["main"]   # ahorro de minutos (20 nov): las ramas corren en su PR
+    paths:
+      - "fabrica/**"
+      - "config/formatos.yml"
+      - "marca/**"
+      - "marca.yml"
+      - "temporada.yml"
+      - ".github/workflows/formatos.yml"
+  pull_request:
     paths:
       - "fabrica/**"
       - "config/formatos.yml"
