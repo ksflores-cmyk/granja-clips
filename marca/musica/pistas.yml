@@ -24,8 +24,8 @@ pistas:
     estilo: "ambiental calmado, evoluciona despacio"
     inicio_s: 0
     asset: "calm-track.ogg"
-    sha256: null
-    estado: candidata
+    sha256: "ab004477a4f37183beb5b6153fdccd6659181c2cca87b12bee68d29ffb7a4f33"
+    estado: verificada
   - id: lofi-hip-hop-loop
     titulo: "Lofi Hip Hop Loop"
     autor: "omfgdude"
@@ -35,8 +35,8 @@ pistas:
     estilo: "lofi hip hop en bucle"
     inicio_s: 0
     asset: "lofi-hip-hop-loop.ogg"
-    sha256: null
-    estado: candidata
+    sha256: "e57ba821d4db8d66783ca984a2778ec68d1439e862239ec36407344ef3bd1eab"
+    estado: verificada
   - id: chill-loopable
     titulo: "Chill (Loopable)"
     autor: "Pro Sensory (Alex McCulloch)"
@@ -46,8 +46,8 @@ pistas:
     estilo: "lofi tranquilo en bucle"
     inicio_s: 0
     asset: "chill-loopable.mp3"
-    sha256: null
-    estado: candidata
+    sha256: "4978e64d0cadd1446c9fa81e2ed7ebb369cf9ced37e4ce606006e0c7c414fde6"
+    estado: verificada
   - id: beat-1
     titulo: "Beat #1"
     autor: "Spring Spring"
@@ -57,8 +57,8 @@ pistas:
     estilo: "beat chill con sintetizador"
     inicio_s: 0
     asset: "beat-1.mp3"
-    sha256: null
-    estado: candidata
+    sha256: "70d2f53be85b340cad01fb1af5d026c7544be209caa021bbc7822398a3bcd5dc"
+    estado: verificada
   - id: synthwave-type
     titulo: "synthwave_type"
     autor: "G_P"
@@ -68,8 +68,8 @@ pistas:
     estilo: "synthwave"
     inicio_s: 0
     asset: "synthwave-type.mp3"
-    sha256: null
-    estado: candidata
+    sha256: "df87e826f113f3fc425b24fc85361e1f5866045eb44f06096ea64b792a362389"
+    estado: verificada
   - id: synth-wave-by-alex
     titulo: "Synth Wave by Alex"
     autor: "Pro Sensory (Alex McCulloch)"
@@ -79,8 +79,8 @@ pistas:
     estilo: "synthwave ochentero"
     inicio_s: 0
     asset: "synth-wave-by-alex.mp3"
-    sha256: null
-    estado: candidata
+    sha256: "a70eb068eebed3eaaed2ceea4f681e972de9de92465a770052327254d73ecd51"
+    estado: verificada
   - id: snow-theme
     titulo: "Snow Theme"
     autor: "CleytonKauffman"
@@ -91,8 +91,8 @@ pistas:
     estilo: "ambiental tranquilo, bucle de 24 s"
     inicio_s: 0
     asset: "snow-theme.ogg"
-    sha256: null
-    estado: candidata
+    sha256: "3fad0971a8d3c2aca03c6535a7bd89076c36cc006b2a0888c4ab309a98160c87"
+    estado: verificada
   - id: chill-lofi-inspired
     titulo: "Chill lofi inspired"
     autor: "omfgdude"
@@ -102,5 +102,5 @@ pistas:
     estilo: "lofi grabado en una toma"
     inicio_s: 0
     asset: "chill-lofi-inspired.ogg"
-    sha256: null
-    estado: candidata
+    sha256: "7ea7fd1b7c95ed1ca5f6ebb796626570137bcb75c7f2ea87b6c61212c7a86694"
+    estado: verificada
