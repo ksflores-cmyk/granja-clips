@@ -148,8 +148,12 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             juego = ojos.juego_de(ficha, temporada)          # el de la ficha si lo declara (FM27, no GTA 6)
             recorte = ojos.rango_recorte(ficha)              # reglas.duracion_s de la ficha
             with tempfile.TemporaryDirectory(prefix="ojos-toma-") as carpeta_ojos:
-                with plazo.etapa("copia ligera"):
-                    video_ojos = copia_para_ojos(d.ruta, raiz, Path(carpeta_ojos))
+                try:
+                    with plazo.etapa("copia ligera"):
+                        video_ojos = copia_para_ojos(d.ruta, raiz, Path(carpeta_ojos))
+                except subprocess.CalledProcessError as e:     # ffmpeg rechazó el archivo: es del material
+                    return Resultado(False, [f"copia ligera: ffmpeg no pudo leer el archivo ({type(e).__name__})"],
+                                     gastar=True)
                 with plazo.etapa("ojos (Gemini)"):
                     mirada = ojos.mirar(video_ojos, marca, temporada, raiz=raiz, duracion=d.duracion,
                                         transporte=transporte, espera=espera, entorno=entorno, juego=juego,
@@ -180,9 +184,11 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                     puntos = estilo.revisar(mp4, plan, marca, ficha=ficha)
             except (ValueError, subprocess.SubprocessError, OSError) as e:
                 mp4.unlink(missing_ok=True)
-                # Un ffmpeg que se pasó de tiempo es de la máquina, no del material.
+                # Sólo es del material si el editor corrió y falló (ffmpeg con código ≠ 0) o dio datos inválidos
+                # (ValueError). Falta de ffmpeg, disco lleno (OSError) o tiempo agotado son de la máquina.
                 return Resultado(False, [f"editor: {type(e).__name__}: {e}"], gemini=mirada.datos,
-                                 modelo=mirada.modelo, gastar=not isinstance(e, subprocess.TimeoutExpired))
+                                 modelo=mirada.modelo,
+                                 gastar=isinstance(e, (subprocess.CalledProcessError, ValueError)))
             rojos = [f"puerta de estilo: {n}" + (f" ({det})" if det else "") for n, ok_p, det in puntos if not ok_p]
             if rojos:
                 mp4.unlink(missing_ok=True)

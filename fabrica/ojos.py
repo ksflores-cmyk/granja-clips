@@ -52,6 +52,22 @@ class Mirada:
     del_material: bool = False         # el fallo es de ESTE video (400, sin candidatos, muy pesado): la fuente se gasta
 
 
+def _error_de_clave(texto) -> bool:
+    """Un 400 de Gemini cuyo `error.status` o `details[].reason` habla de clave o permiso (no del video)."""
+    try:
+        err = (json.loads(texto) or {}).get("error") or {}
+    except (ValueError, TypeError, AttributeError):
+        return False
+    if not isinstance(err, dict):
+        return False
+    marcas = [str(err.get("status") or "")]
+    for d in err.get("details") or []:
+        if isinstance(d, dict):
+            marcas.append(str(d.get("reason") or ""))
+    junto = " ".join(marcas).upper()
+    return any(m in junto for m in ("API_KEY", "PERMISSION_DENIED", "FAILED_PRECONDITION", "UNAUTHENTICATED"))
+
+
 def esquema_respuesta() -> dict:
     """`responseSchema` de Gemini (subconjunto de OpenAPI) con los campos que pide la especificación."""
     texto, booleano, numero = {"type": "STRING"}, {"type": "BOOLEAN"}, {"type": "NUMBER"}
@@ -244,7 +260,8 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
         if estado != 200:
             mirada.motivo = f"Gemini respondió HTTP {estado} con {modelo}"
             mirada.pasajero = False
-            mirada.del_material = True       # p. ej. 400: Gemini rechaza este video o esta petición
+            # 401/403 y los 400 de clave o permiso son de la máquina; sólo 400 INVALID_ARGUMENT y 413 son del video.
+            mirada.del_material = estado not in (401, 403) and not (estado == 400 and _error_de_clave(texto))
             return mirada
         mirada.modelo = modelo
         mirada.pasajero = False

@@ -13,6 +13,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+from . import plazo
 from .candado import candado
 from .config import raiz_repo
 from .registro import ZONA
@@ -80,6 +81,8 @@ def completar(raiz, publicador) -> int:
             continue
         try:
             estado, url = publicador.estado_y_url(e["post_id"])
+        except plazo.SinTiempo:       # sólo consulta: no hay nada creado a medias; el plazo manda
+            raise
         except Exception as x:  # noqa: BLE001 (un envío con error no frena a los demás)
             fallos[e["post_id"]] = f"error al consultar Buffer: {type(x).__name__}: {x}"
             continue

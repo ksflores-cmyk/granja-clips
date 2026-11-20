@@ -27,6 +27,7 @@ class SinTiempo(Exception):
 
 
 _estado = {"inicio": None, "limite": None}
+_critica = {"nivel": 0, "pendiente": False, "alarma": False}
 _salida = [lambda texto: print(texto, flush=True)]
 
 
@@ -94,15 +95,39 @@ def alarma(segundos):
         return
 
     def _al_sonar(_signum, _frame):
+        if _critica["nivel"] > 0:          # sección crítica: se difiere hasta que termine
+            _critica["pendiente"] = True
+            return
         raise SinTiempo(f"alarma dura: pasaron {segundos:g} s")
 
     anterior = signal.signal(signal.SIGALRM, _al_sonar)
+    _critica.update(pendiente=False, alarma=True)
     signal.setitimer(signal.ITIMER_REAL, max(float(segundos), 0.001))
     try:
         yield
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, anterior)
+        _critica.update(pendiente=False, alarma=False)
+
+
+@contextmanager
+def critico():
+    """Sección crítica: difiere la alarma dura. Si suena dentro, sólo se marca; al salir del bloque más externo
+    se lanza `SinTiempo`. Anidable. Sin alarma activa no hace nada."""
+    _critica["nivel"] += 1
+    try:
+        yield
+    except BaseException:
+        _critica["nivel"] -= 1
+        if _critica["nivel"] == 0:
+            _critica["pendiente"] = False      # ya sube otra excepción: no se pisa
+        raise
+    else:
+        _critica["nivel"] -= 1
+        if _critica["nivel"] == 0 and _critica["pendiente"]:
+            _critica["pendiente"] = False
+            raise SinTiempo("alarma dura (diferida tras una sección crítica)")
 
 
 def registrar(out=None) -> None:

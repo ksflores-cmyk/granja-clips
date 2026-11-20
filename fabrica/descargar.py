@@ -122,14 +122,15 @@ def _titulo(html: str) -> str:
     return m.group(1).strip() if m else "sin título"
 
 
-def bajar_https(url: str, destino: Path, *, abrir=None, tope: int = TOPE_BYTES, _reintento: bool = True) -> Path:
+def bajar_https(url: str, destino: Path, *, abrir=None, tope: int = TOPE_BYTES, _reintento: bool = True,
+               _t0: float | None = None) -> Path:
     """Streaming a disco. Exige https y `Content-Type` de video; corta al pasar el tope.
     Con Google Drive, si llega su página de aviso, sigue una vez su formulario de confirmación
     (mismo host y mismo id; nunca otro destino)."""
     if not _es_https(url):
         raise ErrorDescarga(f"URL no https: {url!r}")
     abrir = abrir or _abrir_urllib
-    t0 = time.monotonic()
+    t0 = time.monotonic() if _t0 is None else _t0      # el aviso de Drive NO reinicia el tope total
     try:
         with abrir(url) as r:
             tipo = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
@@ -137,7 +138,7 @@ def bajar_https(url: str, destino: Path, *, abrir=None, tope: int = TOPE_BYTES, 
                 pagina = r.read(200_000).decode("utf-8", errors="replace")
                 siguiente = _aviso_drive(url, pagina) if _reintento else None
                 if siguiente:
-                    return bajar_https(siguiente, destino, abrir=abrir, tope=tope, _reintento=False)
+                    return bajar_https(siguiente, destino, abrir=abrir, tope=tope, _reintento=False, _t0=t0)
                 raise ErrorDescarga(f"Google Drive devolvió una página y no el video ({_titulo(pagina)!r})")  # cuota: no es del material
             if not tipo.startswith("video/"):
                 raise ErrorDescarga(f"Content-Type {tipo or 'ausente'!r}: no es video", del_material=True)
@@ -148,8 +149,7 @@ def bajar_https(url: str, destino: Path, *, abrir=None, tope: int = TOPE_BYTES, 
             with open(destino, "wb") as f:
                 while True:
                     # Tope total de tiempo, acotado también por el plazo del ciclo (se mira antes de cada lectura).
-                    limite = min(TOPE_DESCARGA_S, plazo.restante() - plazo.MARGEN_S)
-                    if time.monotonic() - t0 > limite:
+                    if time.monotonic() - t0 > TOPE_DESCARGA_S or (plazo.activo() and plazo.restante() < plazo.MARGEN_S):
                         raise ErrorDescarga(f"la descarga pasó el tiempo límite de {TOPE_DESCARGA_S} s "
                                             f"(o del plazo del ciclo)", del_material=False)
                     bloque = r.read(BLOQUE)
@@ -234,8 +234,11 @@ def descargar(raiz, candidato, ficha: dict | None, hoy: date, *, abrir=None, eje
         try:
             duracion = float(sondear_video(ruta)["duracion"])
         except (subprocess.SubprocessError, ValueError, KeyError, StopIteration, OSError) as e:
+            # Del material sólo si ffprobe corrió y rechazó el archivo (código ≠ 0 o salida ilegible);
+            # ausente, sin permiso, disco lleno o tiempo agotado son de la máquina.
             raise ErrorDescarga(f"ffprobe no pudo medir el archivo ({type(e).__name__})",
-                                del_material=not isinstance(e, subprocess.TimeoutExpired)) from None
+                                del_material=isinstance(e, (subprocess.CalledProcessError, ValueError, KeyError,
+                                                            StopIteration))) from None
         # `reglas.duracion_s` es la duración del clip PUBLICADO: Gemini elige un recorte dentro de ese rango.
         # A la fuente sólo se le exige que alcance el mínimo y que no pase de TOPE_FUENTE_S.
         minimo = ((ficha.get("reglas") or {}).get("duracion_s") or [0])[0]
