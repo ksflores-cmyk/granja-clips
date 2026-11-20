@@ -255,7 +255,7 @@ def test_un_sin_tiempo_residual_no_crea_pausa(rb, monkeypatch):
     monkeypatch.setattr(ciclo, "mantenimiento", mantenimiento_colgado)
     # sin candidatos y con un envío abierto en el libro: sólo corre el mantenimiento
     monkeypatch.setattr(ciclo, "hay_mantenimiento", lambda raiz: True)
-    monkeypatch.setattr(ciclo, "buscar_hueco", lambda raiz, ahora, activas: None)
+    monkeypatch.setattr(ciclo, "buscar_hueco", lambda raiz, ahora, activas, **k: None)
     cod, sal = correr(rb, cands=[])
     assert cod == 0 and "SIN TIEMPO" in sal and not (rb / "PAUSA").exists()
 

@@ -87,27 +87,31 @@ def test_dos_corridas_en_la_misma_hora_la_segunda_no_repite(r):
 # ---------------------------------------------------------------- 2. relleno
 
 def test_corrida_perdida_se_rellena_a_ahora_mas_15_redondeado_y_el_normal_gana(r):
-    h = ciclo.buscar_hueco(r, gt(25, 9, 23), ["shorts"])          # la de las 8:23 se perdió
-    assert (h.hora, h.relleno, h.publicar_en) == ("09:00", True, gt(25, 9, 40))
-    assert h.programar_en == gt(25, 9, 40) and h.fecha == "2026-11-25"
+    h = ciclo.buscar_hueco(r, gt(25, 9, 23), ["shorts"])          # la de las 8:23 se perdió: 9:23 + 35 = 9:58 -> 10:00
+    assert (h.hora, h.relleno, h.publicar_en) == ("09:00", True, gt(25, 10, 0))
+    assert h.programar_en == gt(25, 10, 0) and h.fecha == "2026-11-25"
     h = ciclo.buscar_hueco(r, gt(25, 10, 23), ["shorts"])         # el normal de las 11:00 gana al relleno
     assert (h.hora, h.relleno) == ("11:00", False)
 
 
 def test_el_relleno_no_se_amontona_con_los_huecos_del_dia(r):
     ciclo.cerrar_hueco(r, ciclo.Hueco(gt(25, 11, 0), ["shorts"]), "shorts")   # el 11:00 ya salió
-    assert ciclo.buscar_hueco(r, gt(25, 11, 23), ["shorts"]) is None          # 11:40 queda a 40 min del 11:00
+    assert ciclo.buscar_hueco(r, gt(25, 11, 8), ["shorts"]) is None           # 11:45 queda a 45 min del 11:00
+    assert ciclo.buscar_hueco(r, gt(25, 10, 23), ["shorts"]) is None          # 11:00 exacto: encima del hueco
+    h = ciclo.buscar_hueco(r, gt(25, 11, 23), ["shorts"])                    # 12:00 queda a 60 min de ambos: cabe
+    assert (h.hora, h.relleno, h.publicar_en) == ("09:00", True, gt(25, 12, 0))
     h = ciclo.buscar_hueco(r, gt(25, 12, 23), ["shorts"])                    # gana el normal de las 13:00
     assert (h.hora, h.relleno) == ("13:00", False)
     ciclo.cerrar_hueco(r, ciclo.Hueco(gt(25, 13, 0), ["shorts"]), "shorts")   # el 13:00 ya salió
-    assert ciclo.buscar_hueco(r, gt(25, 13, 23), ["shorts"]) is None          # 13:40 queda a 40 min del 13:00
+    assert ciclo.buscar_hueco(r, gt(25, 12, 23), ["shorts"]) is None          # 13:00 exacto: encima del hueco
+    assert ciclo.buscar_hueco(r, gt(25, 13, 8), ["shorts"]) is None           # 13:45 queda a 45 min del 13:00
     h = ciclo.buscar_hueco(r, gt(25, 14, 23), ["shorts"])
-    assert (h.hora, h.relleno, h.publicar_en) == ("09:00", True, gt(25, 14, 40))
+    assert (h.hora, h.relleno, h.publicar_en) == ("09:00", True, gt(25, 15, 0))
 
 
 def test_el_relleno_tampoco_se_amontona_con_lo_ya_programado_de_esa_red(r):
     ciclo.cerrar_hueco(r, ciclo.Hueco(gt(25, 11, 0), ["shorts"]), "shorts")
-    libro(r, [envio("shorts", gt(25, 14, 0))])                    # algo ya programado a las 14:00
+    libro(r, [envio("shorts", gt(25, 14, 30))])                   # algo ya programado a las 14:30
     assert ciclo.buscar_hueco(r, gt(25, 14, 23), ["shorts"]) is None
     h = ciclo.buscar_hueco(r, gt(25, 14, 23), ["shorts", "tiktok"])          # tiktok no tiene nada: sí se rellena
     assert h.plataformas == ["tiktok"] and h.relleno
@@ -115,7 +119,8 @@ def test_el_relleno_tampoco_se_amontona_con_lo_ya_programado_de_esa_red(r):
 
 def test_el_relleno_nunca_pasa_de_las_23_ni_cae_al_dia_siguiente(r):
     h = ciclo.buscar_hueco(r, gt(25, 22, 23), ["shorts"])
-    assert h.hora == "22:00" and h.publicar_en == gt(25, 22, 40)               # 22:40 < 23:00
+    assert h.hora == "22:00" and h.publicar_en == gt(25, 23, 0)                # 22:23 + 35 -> 23:00, aún cabe
+    assert ciclo.buscar_hueco(r, gt(25, 22, 26), ["shorts"]) is None           # 23:05 ya no
     assert ciclo.buscar_hueco(r, gt(25, 22, 50), ["shorts"]) is None           # 23:05 pasa de las 23:00
     assert ciclo.buscar_hueco(r, gt(25, 23, 50), ["shorts"]) is None           # 00:05 ya es otro día
     assert ciclo.buscar_hueco(r, gt(25, 23, 23), ["shorts"]) is None
@@ -151,9 +156,91 @@ def test_un_relleno_cerrado_no_vuelve(r):
 def test_un_relleno_en_vivo_programa_a_la_hora_del_relleno_y_cierra_el_hueco_original(r):
     cambiar_modo(r, "vivo", ["shorts"])
     cod, sal = correr(r, ahora=gt(25, 9, 23), hacer=Hacer(r), cands=[cand("a")])
-    assert "hueco 2026-11-25 09:00 (relleno a las 09:40)" in sal and "shorts: programada" in sal
-    assert [(f["fecha"], f["hora"]) for f in filas(r)] == [("2026-11-25", "09:40")]
+    assert "hueco 2026-11-25 09:00 (relleno a las 10:00)" in sal and "shorts: programada" in sal
+    assert [(f["fecha"], f["hora"]) for f in filas(r)] == [("2026-11-25", "10:00")]
     assert ciclo.buscar_hueco(r, gt(25, 9, 23), ["shorts"]) is None
+
+
+# ---------------------------------------------------------------- 2b. relleno: plazo, reloj y modo
+
+def _toma_y_ficha(r, tmp_path, ahora):
+    from fabrica.fuentes import cargar_fuentes
+    c = cand("clip-relleno")
+    ficha = next(f for f in cargar_fuentes(r) if f.get("id") == c.fuente_id)
+    res = Hacer(r)(r, c, ficha, ahora, salida=tmp_path / "s")
+    return ciclo.Toma(res, ciclo._toma_dict(res, c, ficha), ficha, c)
+
+
+def _publicar(r, tmp_path, hueco, reloj_a):
+    from fabrica.simulacion import SupabaseSimulado
+    sal = []
+    toma = _toma_y_ficha(r, tmp_path, reloj_a)
+    buf = BufferSimulado()
+    res = ciclo.publicar_en_vivo(r, ENV, toma, hueco, sal.append, buf, SupabaseSimulado(), lambda: reloj_a)
+    return res, "\n".join(sal), buf
+
+
+def _hueco_de_las_14(r):
+    for hh in (11, 13):
+        ciclo.cerrar_hueco(r, ciclo.Hueco(gt(25, hh, 0), ["shorts"]), "shorts")
+    h = ciclo.buscar_hueco(r, gt(25, 13, 23), ["shorts"])
+    assert h.relleno and h.publicar_en == gt(25, 14, 0)
+    return h
+
+
+def test_si_producir_tarda_el_relleno_se_mueve_y_queda_10_min_en_el_futuro(r, tmp_path):
+    cambiar_modo(r, "vivo", ["shorts"])
+    h = _hueco_de_las_14(r)
+    reloj_a = gt(25, 13, 50)                         # producir tardó 27 min: 14:00 ya está a 10 min
+    (prog, fall, inc), sal = _publicar(r, tmp_path, h, reloj_a)[:2]
+    assert prog == ["shorts"] and fall == [] and "relleno movido de las 14:00 a las 14:05" in sal
+    assert h.publicar_en == gt(25, 14, 5) and h.fecha == "2026-11-25" and h.hora == "09:00"
+    fila = filas(r)[0]
+    assert fila["hora"] == "14:05" and gt(25, 14, 5) - reloj_a >= timedelta(minutes=10)
+
+
+def test_un_relleno_con_tiempo_de_sobra_no_se_mueve(r, tmp_path):
+    cambiar_modo(r, "vivo", ["shorts"])
+    h = _hueco_de_las_14(r)
+    (prog, fall, inc), sal = _publicar(r, tmp_path, h, gt(25, 13, 35))[:2]
+    assert prog == ["shorts"] and "relleno movido" not in sal and h.publicar_en == gt(25, 14, 0)
+
+
+def test_un_hueco_normal_no_se_mueve(r, tmp_path):
+    cambiar_modo(r, "vivo", ["shorts"])
+    h = ciclo.buscar_hueco(r, gt(25, 10, 23), ["shorts"])
+    (prog, fall, inc), sal = _publicar(r, tmp_path, h, gt(25, 10, 49))[:2]
+    assert prog == ["shorts"] and h.publicar_en is None and "relleno" not in sal
+
+
+def test_si_el_relleno_movido_ya_no_cabe_por_separacion_falla_con_motivo(r, tmp_path):
+    cambiar_modo(r, "vivo", ["shorts"])
+    h = _hueco_de_las_14(r)
+    (prog, fall, inc), sal, buf = _publicar(r, tmp_path, h, gt(25, 14, 50))   # 15:05 queda a 55 min del 16:00
+    assert prog == [] and fall == ["shorts"] and "shorts: relleno sin tiempo" in sal
+    assert not buf.hubo("createPost") and filas(r) == []
+
+
+def test_si_el_relleno_movido_pasaria_de_las_23_falla_con_motivo(r, tmp_path):
+    cambiar_modo(r, "vivo", ["shorts"])
+    h = ciclo.buscar_hueco(r, gt(25, 22, 23), ["shorts"])
+    assert h.publicar_en == gt(25, 23, 0)
+    (prog, fall, inc), sal, buf = _publicar(r, tmp_path, h, gt(25, 22, 50))   # 23:05
+    assert fall == ["shorts"] and "relleno sin tiempo" in sal and not buf.hubo("createPost")
+
+
+def test_en_ensayo_no_se_propone_ningun_relleno(r):
+    assert ciclo.buscar_hueco(r, gt(25, 9, 23), ["shorts"]).relleno
+    assert ciclo.buscar_hueco(r, gt(25, 9, 23), ["shorts"], relleno=False) is None
+    assert ciclo.buscar_hueco(r, gt(25, 10, 23), ["shorts"], relleno=False).hora == "11:00"      # el normal sí
+    cambiar_modo(r, "ensayo", ["shorts"])
+    cod, sal = correr(r, ahora=gt(25, 9, 23), decidir=True)
+    assert "sin hueco" in sal and "hueco 2026-11-25" not in sal
+    cambiar_modo(r, "vivo", ["shorts"])
+    cod, sal = correr(r, ahora=gt(25, 9, 23), decidir=True, solo_ensayo=True)
+    assert "sin hueco" in sal
+    cod, sal = correr(r, ahora=gt(25, 9, 23), decidir=True)
+    assert "(relleno a las 10:00)" in sal
 
 
 # ---------------------------------------------------------------- 3. cola de Buffer
@@ -340,6 +427,12 @@ def editar(repo, editar_yaml, **cambios):
     ({"huecos": [f"{h:02d}:00" for h in range(9)]}, "8 como máximo"),
     ({"no_repetir_horas": 23}, "no_repetir_horas"),
     ({"relleno": {"separacion_min_minutos": "x"}}, "separacion_min_minutos"),
+    ({"relleno": {"separacion_min_minutos": 29}}, "separacion_min_minutos"),
+    ({"relleno": {"anticipacion_minutos": 24}}, "anticipacion_minutos"),
+    ({"relleno": {"anticipacion_minutos": 76}}, "anticipacion_minutos"),
+    ({"margen_max_minutos": 30, "relleno": {"anticipacion_minutos": 35}}, "anticipacion_minutos"),
+    ({"margen_min_minutos": 11}, "margen_min_minutos"),
+    ({"zona": "America/Mexico_City"}, "exactamente America/Guatemala"),
     ({"relleno": {"max_intentos_por_hueco": 0}}, "max_intentos_por_hueco"),
     ({"relleno": {"ultima_hora": "25:99"}}, "ultima_hora"),
     ({"actions": {"tope_minutos_dia": 29}}, "tope_minutos_dia"),
@@ -371,6 +464,7 @@ def test_los_valores_opcionales_de_horarios_tienen_defecto(r):
     hz = ciclo._cfg_horarios(r)
     assert (hz["margen_min_s"], hz["margen_max_s"], hz["separacion_s"], hz["ultima_hora"], hz["max_intentos"],
             hz["cola_max"], hz["no_repetir_horas"], hz["tope_minutos_dia"]) == (900, 4500, 3600, "23:00", 2, 10, 24, 60)
+    assert hz["anticipacion_s"] == 35 * 60
 
 
 def test_no_quedan_las_listas_viejas_de_huecos_en_el_codigo():

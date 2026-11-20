@@ -325,6 +325,7 @@ def _cfg_horarios(raiz) -> dict:
         "margen_min_s": int(h.get("margen_min_minutos", MARGEN_MIN_S // 60)) * 60,
         "margen_max_s": int(h.get("margen_max_minutos", MARGEN_MAX_S // 60)) * 60,
         "separacion_s": int(rel.get("separacion_min_minutos", 60)) * 60,
+        "anticipacion_s": int(rel.get("anticipacion_minutos", 35)) * 60,
         "ultima_hora": str(rel.get("ultima_hora", "23:00")),
         "max_intentos": int(rel.get("max_intentos_por_hueco", 2)),
         "cola_max": int(h.get("cola_buffer_max", 10)),
@@ -399,10 +400,22 @@ def _horas_de_la_red(raiz, filas: list[dict], plataforma: str, dia: date) -> lis
     return horas
 
 
-def buscar_hueco(raiz, ahora: datetime, activas: list[str]) -> Hueco | None:
+def _relleno_valido(hz: dict, t: datetime, hoy: date) -> bool:
+    """La hora de un relleno cae el mismo día local y no después de relleno.ultima_hora."""
+    return t.date() == hoy and t <= _a_las(hoy, hz["ultima_hora"])
+
+
+def _separado(hz: dict, t: datetime, cuando: datetime, huecos_del_dia: list[datetime],
+              horas_red: list[datetime]) -> bool:
+    """`t` queda a la separación mínima o más de los demás huecos del día (menos el propio) y de lo ya programado."""
+    otros = [x for x in huecos_del_dia if x != cuando] + horas_red
+    return all(abs((t - x).total_seconds()) >= hz["separacion_s"] for x in otros)
+
+
+def buscar_hueco(raiz, ahora: datetime, activas: list[str], relleno: bool = True) -> Hueco | None:
     """El hueco de esta corrida. Primero el normal de horarios.yml entre ahora+margen_min y ahora+margen_max con
     alguna red libre. Si no hay, el relleno: un hueco de hoy ya perdido, a ahora+margen_min (redondeado a 5 min),
-    sólo si no se amontona con lo demás del día. Sin nada, None."""
+    sólo si no se amontona con lo demás del día. Sin nada, None. `relleno=False` (ensayo) no propone rellenos."""
     if not activas:
         return None
     hz = _cfg_horarios(raiz)
@@ -416,11 +429,13 @@ def buscar_hueco(raiz, ahora: datetime, activas: list[str]) -> Hueco | None:
         libres = [p for p in activas if (cuando.date().isoformat(), cuando.strftime("%H:%M"), p) not in ocupados]
         if libres:
             return Hueco(cuando, libres)
-    # relleno
-    hoy = local.date()
-    t = _redondear_5(local + timedelta(seconds=hz["margen_min_s"]))
-    if t.date() != hoy or t > _a_las(hoy, hz["ultima_hora"]):
+    if not relleno:
         return None
+    hoy = local.date()
+    t = _redondear_5(local + timedelta(seconds=hz["anticipacion_s"]))     # da tiempo a producir antes de la hora
+    if not _relleno_valido(hz, t, hoy):
+        return None
+    del_dia = [_a_las(hoy, hhmm) for hhmm in hz["huecos"]]
     intentos = intentos_de_huecos(raiz)
     horas_red = {p: _horas_de_la_red(raiz, filas, p, hoy) for p in activas}
     perdidos = sorted((c for c in (_a_las(hoy, hhmm) for hhmm in hz["huecos"])
@@ -428,10 +443,9 @@ def buscar_hueco(raiz, ahora: datetime, activas: list[str]) -> Hueco | None:
     for cuando in perdidos:
         if intentos.get((cuando.date().isoformat(), cuando.strftime("%H:%M")), 0) >= hz["max_intentos"]:
             continue
-        otros = [_a_las(hoy, hhmm) for hhmm in hz["huecos"] if _a_las(hoy, hhmm) != cuando]
         aptas = [p for p in activas
                  if (cuando.date().isoformat(), cuando.strftime("%H:%M"), p) not in ocupados
-                 and all(abs((t - x).total_seconds()) >= hz["separacion_s"] for x in otros + horas_red[p])]
+                 and _separado(hz, t, cuando, del_dia, horas_red[p])]
         if aptas:
             return Hueco(cuando, aptas, publicar_en=t)
     return None
@@ -711,8 +725,11 @@ def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer
                           cargar_yaml("config/almacen.yml", raiz), transporte_almacen)
         pub = publicar.Publicador(cliente, almacen, raiz, "vivo", reloj, ids,
                                   orgs=publicar.organizaciones_de(canales_api, ids))
-        cuando = hueco.programar_en.astimezone(timezone.utc)
         hz = _cfg_horarios(raiz)
+        destinos = _reajustar_relleno(raiz, hz, hueco, destinos, reloj, out, fallo)
+        if not destinos:
+            return programadas, falladas, inciertas
+        cuando = hueco.programar_en.astimezone(timezone.utc)
         listos = {}
         for plat in destinos:            # todo se valida ANTES de subir
             try:
@@ -777,6 +794,32 @@ def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer
             except (ErrorAlmacen, publicar.ErrorBuffer, red.ErrorRed, OSError, plazo.SinTiempo) as e:
                 out(f"AVISO: no se pudo borrar el video huérfano {ruta} ({e})")
     return programadas, falladas, inciertas
+
+
+def _reajustar_relleno(raiz, hz, hueco: Hueco, destinos: list[str], reloj, out, fallo) -> list[str]:
+    """Producir tarda: si a un relleno ya no le sobran MINUTOS_MINIMOS_FUTURO + 2 min, se recalcula su hora con el
+    reloj de ahora (ahora + margen_min, a 5 min) y se vuelve a exigir mismo día, última hora y separación.
+    Las redes que ya no cumplen fallan con «relleno sin tiempo». Un hueco normal no se mueve."""
+    ahora = reloj().astimezone(ZONA)
+    if not hueco.relleno or hueco.programar_en >= ahora + timedelta(minutes=publicar.MINUTOS_MINIMOS_FUTURO + 2):
+        return destinos
+    t = _redondear_5(ahora + timedelta(seconds=hz["margen_min_s"]))
+    hoy = ahora.date()
+    filas = puertas._filas_marcador(raiz)
+    del_dia = [_a_las(hoy, hhmm) for hhmm in hz["huecos"]]
+    quedan = []
+    for plat in destinos:
+        if hueco.cuando.date() == hoy and _relleno_valido(hz, t, hoy) \
+                and _separado(hz, t, hueco.cuando, del_dia, _horas_de_la_red(raiz, filas, plat, hoy)):
+            quedan.append(plat)
+        else:
+            out(f"{plat}: relleno sin tiempo (ya no cabe a las {t.strftime('%H:%M')})")
+            fallo(plat)
+    if quedan:
+        out(f"relleno movido de las {hueco.programar_en.strftime('%H:%M')} a las {t.strftime('%H:%M')} "
+            "(producir tardó)")
+        hueco.publicar_en = t
+    return quedan
 
 
 def mantenimiento(raiz, env, out, transporte_buffer, transporte_almacen, reloj) -> None:
@@ -878,7 +921,7 @@ def _ejecutar(raiz, out, *, decidir, ensayo_forzado, ahora, salida_dir, env, det
     if sim:
         hueco = Hueco(ahora.astimezone(ZONA) + timedelta(minutes=30), list(activas or PLATAFORMAS))
     else:
-        hueco = buscar_hueco(raiz, ahora, activas)
+        hueco = buscar_hueco(raiz, ahora, activas, relleno=(modo == "vivo"))      # el relleno sólo en vivo
     pendiente = modo == "vivo" and hay_mantenimiento(raiz)
     if hueco is None:
         if not sim and not en_cadencia(ahora):
@@ -957,19 +1000,20 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
                 else:
                     libres.append(c)
             cands = libres
+        # El mismo clip no se repite en 24 h: los repetidos se saltan sin contar como intento.
         horas = _cfg_horarios(raiz)["no_repetir_horas"]
-        recientes = {p: claves_recientes(raiz, p, hueco.programar_en, horas) for p in hueco.plataformas}
-        i = 0
+        recientes = set().union(*(claves_recientes(raiz, p, hueco.programar_en, horas) for p in hueco.plataformas))
+        sin_repetir = []
         for c in cands:
-            if i >= MAX_INTENTOS:
-                break
-            if set(_claves_de(c)) & set().union(*recientes.values()):
+            if set(_claves_de(c)) & recientes:
                 out(f"{c.id_origen}: repetido en {horas} h: se salta")
-                continue
+            else:
+                sin_repetir.append(c)
+        cands = sin_repetir
+        for i, c in enumerate(cands[:MAX_INTENTOS], 1):
             if not plazo.queda(TIEMPO_MIN_INTENTO_S):
                 out("sin tiempo para otro intento")
                 break
-            i += 1
             ficha = fichas.get(c.fuente_id) or {}
             try:
                 with plazo.etapa(f"toma, intento {i}"):

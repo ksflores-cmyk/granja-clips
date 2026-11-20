@@ -537,6 +537,9 @@ def validar_horarios(h, inf: Informe) -> None:
         ZoneInfo(str(h["zona"]))
     except (ZoneInfoNotFoundError, ValueError, OSError):
         inf.error(f"{rel}: zona inválida '{h['zona']}'")
+    else:
+        if h["zona"] != "America/Guatemala":
+            inf.error(f"{rel}: zona debe ser exactamente America/Guatemala (el código usa esa zona fija)")
     huecos = h["huecos"]
     if not isinstance(huecos, list) or not huecos:
         inf.error(f"{rel}: huecos debe ser una lista no vacía")
@@ -550,9 +553,10 @@ def validar_horarios(h, inf: Informe) -> None:
             inf.error(f"{rel}: huecos debe estar ordenada y sin repetidos")
         if len(huecos) > 8:
             inf.error(f"{rel}: huecos admite 8 como máximo")
-    for clave in ("margen_min_minutos", "margen_max_minutos"):
-        if clave in h and not _entero(h[clave], 1):
-            inf.error(f"{rel}: {clave} debe ser un entero positivo")
+    if "margen_min_minutos" in h and not _entero(h["margen_min_minutos"], 12):
+        inf.error(f"{rel}: margen_min_minutos debe ser un entero de 12 o más (10 min de futuro + 2)")
+    if "margen_max_minutos" in h and not _entero(h["margen_max_minutos"], 1):
+        inf.error(f"{rel}: margen_max_minutos debe ser un entero positivo")
     if _entero(h.get("margen_min_minutos", 15), 1) and _entero(h.get("margen_max_minutos", 75), 1) \
             and h.get("margen_min_minutos", 15) >= h.get("margen_max_minutos", 75):
         inf.error(f"{rel}: margen_min_minutos debe ser menor que margen_max_minutos")
@@ -565,8 +569,12 @@ def validar_horarios(h, inf: Informe) -> None:
         if not isinstance(r, dict):
             inf.error(f"{rel}: relleno debe ser un mapa")
         else:
-            if "separacion_min_minutos" in r and not _entero(r["separacion_min_minutos"], 1):
-                inf.error(f"{rel}: relleno.separacion_min_minutos debe ser un entero positivo")
+            if "separacion_min_minutos" in r and not _entero(r["separacion_min_minutos"], 30):
+                inf.error(f"{rel}: relleno.separacion_min_minutos debe ser un entero de 30 o más")
+            if "anticipacion_minutos" in r:
+                tope = h["margen_max_minutos"] if _entero(h.get("margen_max_minutos"), 1) else 75
+                if not _entero(r["anticipacion_minutos"], 25, tope):
+                    inf.error(f"{rel}: relleno.anticipacion_minutos debe ser un entero de 25 hasta margen_max_minutos")
             if "max_intentos_por_hueco" in r and not _entero(r["max_intentos_por_hueco"], 1):
                 inf.error(f"{rel}: relleno.max_intentos_por_hueco debe ser un entero positivo")
             if "ultima_hora" in r and not (isinstance(r["ultima_hora"], str) and RE_HORA.match(r["ultima_hora"])):
