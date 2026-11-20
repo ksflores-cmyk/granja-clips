@@ -3,7 +3,8 @@ nombre: "Guion Vivo"
 usuario: "guionvivo"
 confirmado: true             # Kevin lo confirmó el 17 nov 2026 23:17 GT
 direccion: guion
-lienzo: pagina               # pagina de guion 1080x1920 con el video dentro
+lienzo: pagina               # página de guion 1080x1920 (sólo tomas sin video; con video manda plantilla_video)
+plantilla_video: pantalla_completa   # con video: el clip cubre todo el cuadro y la marca va en placas encima (decisión de Kevin, 19 nov 2026)
 resolucion: [1080, 1920]
 colores:
   papel: "#F2EDE3"
@@ -62,12 +63,46 @@ maqueta:                        # todas las medidas de la página de guion, en p
             giro_max_grados: 3, holguras_extra: [4, 8, 14], holgura_letra: 1.0}
   subrayado: {grosor: [6, 9], sobresale: [12, 24], bajo_palabra: 6, alto_extra: 14,
               inclinacion_max: 0.012, amplitud: [1.6, 3.2]}
-marca_agua:                     # logo de una campaña (ficha.marca_agua): lugar fijo, nunca sobre la cabecera, el diálogo ni la mosca
+marca_agua:                     # logo de una campaña (ficha.marca_agua): lugar fijo, nunca sobre la cabecera, el diálogo ni la mosca (en v2, ver pantalla_completa.agua)
   posicion: cuerpo_inferior_derecha   # esquina del cuerpo de video (cuerpo_inferior|superior_derecha|izquierda)
   ancho: 220                    # píxeles del logo sobre 1080 de ancho
   margen: 24                    # separación al borde del video
   opacidad: 0.95
   placa: 10                     # relleno de la placa de papel que da contraste al logo oscuro
+pantalla_completa:              # plantilla v2 de las tomas con video: todas las medidas, en píxeles sobre 1080x1920
+  zona_segura: {x0: 60, y0: 150, x1: 1020, y1: 1600}    # nada de marca fuera de aquí (arriba y abajo tapan las apps)
+  zona_accion: {x0: 60, y0: 460, x1: 1020, y1: 1280}    # el centro del cuadro: ninguna placa lo toca
+  tope_capas: 0.22              # área sumada máxima de las placas activas, como fracción del cuadro
+  gancho_s: 3.0                 # segundos que se ven el gancho y la escena; luego sólo la fila mínima
+  relleno_placa: 14             # aire entre el texto y el borde de la placa de papel
+  ancho_max_encabezado: 700     # ancho máximo de las placas del encabezado (la mosca y el logo quedan al otro lado)
+  recorte:                      # encuadre fijo por toma (sin zoom ni paneo)
+    fotogramas: 12              # cuántos fotogramas se miran para seguir la acción
+    ancho_analisis: 192         # ancho en píxeles de esos fotogramas en gris
+    margen_accion: 0.15         # la ventana de acción debe superar a la centrada en esta fracción
+    peso_bordes: 0.2            # peso de los bordes frente al movimiento
+  fila: {tam_toma: 28, tam_credito: 24, separacion: 16}            # TOMA nnn y crédito, siempre en pantalla
+  cabecera: {tam_gancho: 44, alto_linea_gancho: 54, tam_escena: 24, alto_escena: 32, espacio_escena: 8}
+  mosca: {tam: 24, relleno: 12}
+  dialogo:
+    columna_dialogo: [120, 960]
+    tam_nombre: 34
+    alto_nombre: 44
+    tam_acotacion: 30
+    alto_acotacion: 40
+    tam_frase: 38
+    alto_linea_frase: 50
+    relleno_x: 24
+    relleno_y: 18
+    borde_inferior: 1560        # el borde de abajo de la placa queda sobre la franja de las apps (1600 a 1920)
+  cierre: {tam_corte: 56, alto_corte: 68, tam_credito: 26, alto_credito: 36, relleno_x: 28, relleno_y: 18, borde_inferior: 1560}
+  agua: {y: 216}                # el logo de campaña va bajo la mosca, pegado al borde de la zona segura
+  lapiz:                        # trazos del lápiz rojo a la escala del gancho compacto
+    reserva: 24                 # aire a cada lado del gancho para que el trazo no se salga de la placa
+    circulo: {margen_x: 14, margen_y: 9, irregularidad: 0.06, sobrepaso_grados: [15, 35], grosor: [3, 5],
+              giro_max_grados: 3, holguras_extra: [3, 6, 10], holgura_letra: 1.0}
+    subrayado: {grosor: [4, 6], sobresale: [8, 14], bajo_palabra: 4, alto_extra: 10,
+                inclinacion_max: 0.012, amplitud: [1.0, 2.0]}
 prohibido:
   - subtítulos palabra por palabra con una palabra en amarillo
   - emojis dentro del video

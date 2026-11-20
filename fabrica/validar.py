@@ -300,6 +300,7 @@ def validar_marca(m, inf: Informe) -> None:
         inf.error(f"{rel}: subtitulo_max_lineas debe ser entero de 1 a 2")
     validar_maqueta(m, inf)
     validar_marca_agua(m, inf)
+    validar_pantalla_completa(m, inf)
 
 
 def validar_marca_agua(m, inf: Informe) -> None:
@@ -320,6 +321,40 @@ def validar_marca_agua(m, inf: Informe) -> None:
         inf.error(f"{rel}.opacidad debe estar entre 0 y 1")
     if isinstance(ma.get("ancho"), (int, float)) and not isinstance(ma.get("ancho"), bool) and ma["ancho"] > 540:
         inf.error(f"{rel}.ancho {ma['ancho']}: el logo no puede pasar de la mitad del ancho (540)")
+
+
+CLAVES_PANTALLA = ["zona_segura", "zona_accion", "tope_capas", "gancho_s", "relleno_placa", "ancho_max_encabezado",
+                   "recorte", "fila", "cabecera", "mosca", "dialogo", "cierre", "agua", "lapiz"]
+
+
+def validar_pantalla_completa(m, inf: Informe) -> None:
+    """`pantalla_completa` de marca.yml: todas las medidas de la plantilla v2 (clip a cuadro completo con placas)."""
+    rel = "marca.yml: pantalla_completa"
+    if m.get("plantilla_video") != "pantalla_completa":
+        inf.error("marca.yml: plantilla_video debe ser pantalla_completa")
+    pc = m.get("pantalla_completa")
+    if not isinstance(pc, dict):
+        inf.error("marca.yml: falta la sección pantalla_completa")
+        return
+    for c in CLAVES_PANTALLA:
+        if c not in pc:
+            inf.error(f"{rel}: falta la clave '{c}'")
+    _positivos(pc, "pantalla_completa", inf)
+    zonas = {}
+    for z in ("zona_segura", "zona_accion"):
+        d = pc.get(z)
+        if isinstance(d, dict) and all(isinstance(d.get(k), (int, float)) and not isinstance(d.get(k), bool)
+                                       for k in ("x0", "y0", "x1", "y1")):
+            zonas[z] = d
+            if not (d["x0"] < d["x1"] and d["y0"] < d["y1"]):
+                inf.error(f"{rel}.{z}: x0 e y0 deben ser menores que x1 e y1")
+    if len(zonas) == 2:
+        s, a = zonas["zona_segura"], zonas["zona_accion"]
+        if not (s["x0"] <= a["x0"] and s["y0"] <= a["y0"] and a["x1"] <= s["x1"] and a["y1"] <= s["y1"]):
+            inf.error(f"{rel}: zona_accion debe quedar dentro de zona_segura")
+    tope = pc.get("tope_capas")
+    if isinstance(tope, (int, float)) and not isinstance(tope, bool) and tope > 1:
+        inf.error(f"{rel}.tope_capas debe estar entre 0 y 1")
 
 
 CLAVES_MAQUETA = [

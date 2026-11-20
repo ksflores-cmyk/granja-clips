@@ -70,6 +70,18 @@ class Marca:
         return self.datos["marca_agua"]
 
     @property
+    def pc(self) -> dict:
+        """Medidas de la plantilla de pantalla completa (clave `pantalla_completa` de marca.yml)."""
+        return self.datos["pantalla_completa"]
+
+    def pc_marca(self) -> "Marca":
+        """Copia cuyo trazo de lápiz usa las medidas compactas de la plantilla de pantalla completa."""
+        datos = copy.deepcopy(self.datos)
+        datos["maqueta"]["circulo"] = copy.deepcopy(self.pc["lapiz"]["circulo"])
+        datos["maqueta"]["subrayado"] = copy.deepcopy(self.pc["lapiz"]["subrayado"])
+        return Marca(datos, self.raiz)
+
+    @property
     def max_palabras_gancho(self) -> int:
         return int(self.datos["encabezado_max_palabras"])
 
