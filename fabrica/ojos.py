@@ -7,6 +7,8 @@ motivo "sin GEMINI_API_KEY" y el ciclo descarta el clip. La instrucción vive en
 from __future__ import annotations
 
 import base64
+import hashlib
+import inspect
 import json
 import math
 import os
@@ -14,6 +16,7 @@ import re
 import time
 import unicodedata
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -25,6 +28,9 @@ from .editar.lienzo import PUNTUACION, partir
 from .editar.marca import Marca
 
 URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+URL_LISTA = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000"
+TIEMPO_LISTA_S = 15                      # ListModels: una consulta corta, nunca bloquea
+RESPALDOS_POR_FALLA = 1                  # por defecto, si la config no dice `respaldos_por_falla`
 RUTA_PROMPT = Path(__file__).resolve().parent / "ojos_prompt.md"
 ESPERA_REINTENTO_S = 8.0
 TIEMPO_ESPERA_S = 120                    # por petición
@@ -50,6 +56,12 @@ class Mirada:
     intentos: list[str] = field(default_factory=list)   # un renglón por intento (sin claves)
     pasajero: bool = False             # falló Gemini (429, 5xx, red), no el clip: la fuente no se gasta
     del_material: bool = False         # el fallo es de ESTE video (400, sin candidatos, muy pesado): la fuente se gasta
+
+    @property
+    def sin_gemini(self) -> bool:
+        """Gemini no estuvo disponible (caída, sin tiempo, sin clave, todos los modelos 404): no hubo veredicto.
+        Es lo único que habilita el corte sin IA; si Gemini respondió y vetó, o el fallo es del video, no."""
+        return self.datos is None and not self.del_material
 
 
 def esquema_respuesta() -> dict:
@@ -166,11 +178,113 @@ def _texto_de_respuesta(texto_http: str) -> str:
     return texto
 
 
+def transporte_get_urllib(url: str, encabezados: dict, tiempo: float | None = None) -> tuple[int, str]:
+    """Transporte real de ListModels: GET. Devuelve (estado_http, texto). Nunca deja la clave en un error."""
+    req = urllib.request.Request(url, headers=encabezados, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=tiempo or TIEMPO_LISTA_S) as r:  # noqa: S310 (URL fija https)
+            return r.status, r.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode("utf-8", errors="replace")
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise ErrorOjos(f"fallo de conexión con ListModels: {type(e).__name__}") from None
+
+
+def modelos_disponibles(clave: str, transporte_get=None, tiempo: float = TIEMPO_LISTA_S) -> set[str]:
+    """Nombres (sin el prefijo `models/`) de los modelos que soportan `generateContent`, según ListModels.
+
+    Sigue `nextPageToken`. `transporte_get(url, encabezados, tiempo)` es inyectable. ErrorOjos si la consulta falla
+    (red, HTTP distinto de 200, JSON raro); quien llama decide qué hacer (`mirar` nunca se bloquea por esto)."""
+    get = transporte_get or transporte_get_urllib
+    encabezados = {"x-goog-api-key": clave}
+    nombres: set[str] = set()
+    pagina, vistas = None, set()
+    while True:
+        url = URL_LISTA + (f"&pageToken={urllib.parse.quote(pagina)}" if pagina else "")
+        estado, texto = get(url, encabezados, tiempo)
+        if estado != 200:
+            raise ErrorOjos(f"ListModels respondió HTTP {estado}")
+        try:
+            d = json.loads(texto)
+        except json.JSONDecodeError:
+            raise ErrorOjos("ListModels no devolvió JSON") from None
+        if not isinstance(d, dict) or not isinstance(d.get("models", []), list):
+            raise ErrorOjos("ListModels devolvió un JSON inesperado")
+        for m in d.get("models", []):
+            if not isinstance(m, dict) or not isinstance(m.get("name"), str):
+                continue
+            metodos = m.get("supportedGenerationMethods")
+            if isinstance(metodos, list) and "generateContent" in metodos:
+                nombres.add(m["name"].removeprefix("models/"))
+        pagina = d.get("nextPageToken")
+        if not pagina:
+            return nombres
+        if pagina in vistas:
+            raise ErrorOjos("ListModels repitió la página siguiente")
+        vistas.add(pagina)
+
+
+_CACHE_MODELOS: dict[str, set[str]] = {}
+
+
+def vaciar_cache_modelos() -> None:
+    _CACHE_MODELOS.clear()
+
+
+def modelos_disponibles_en_cache(clave: str, transporte_get=None, tiempo: float = TIEMPO_LISTA_S) -> set[str]:
+    """Como `modelos_disponibles`, pero una sola consulta por proceso y clave (el ciclo mira varias tomas).
+    Sólo se guardan los éxitos; la clave se guarda hasheada."""
+    k = hashlib.sha256(clave.encode("utf-8")).hexdigest()
+    if k not in _CACHE_MODELOS:
+        _CACHE_MODELOS[k] = modelos_disponibles(clave, transporte_get, tiempo)
+    return _CACHE_MODELOS[k]
+
+
+def _acepta_tiempo(transporte) -> bool:
+    """Los transportes inyectados antiguos reciben 3 argumentos; uno con `tiempo` (o 4 parámetros) recibe además el tope."""
+    try:
+        ps = inspect.signature(transporte).parameters
+    except (TypeError, ValueError):
+        return False
+    return "tiempo" in ps or sum(1 for p in ps.values() if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)) >= 4
+
+
+def _numero_cfg(cfg: dict, clave: str, por_defecto: float, entero: bool = False) -> float:
+    v = cfg.get(clave, por_defecto)
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0:
+        return por_defecto
+    return int(v) if entero else float(v)
+
+
+def _modelos_a_probar(cfg: dict, clave: str, mirada: Mirada, transporte, transporte_lista) -> list[str]:
+    """La lista de la config, sin los modelos que ListModels no muestra. Nunca bloquea: si la consulta falla o
+    el filtro la vacía, se usa la lista completa."""
+    todos = [cfg["modelo"], *cfg.get("modelos_respaldo", [])]
+    if not cfg.get("listar_modelos") or (transporte is not None and transporte_lista is None):
+        return todos
+    try:
+        disponibles = modelos_disponibles_en_cache(clave, transporte_lista)
+    except ErrorOjos as e:
+        mirada.intentos.append(f"ListModels: {e}; se usa la lista completa")
+        return todos
+    buenos = [m for m in todos if m in disponibles]
+    if not buenos:
+        mirada.intentos.append("ListModels: ningún modelo de la lista aparece; se usa la lista completa")
+        return todos
+    for m in todos:
+        if m not in disponibles:
+            mirada.intentos.append(f"{m}: no aparece en ListModels, se salta")
+    return buenos
+
+
 def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracion: float | None = None,
           transporte=None, espera=time.sleep, entorno=None, config: dict | None = None,
           juego: str | None = None, nota: str | None = None,
-          recorte: tuple[float, float] | None = None) -> Mirada:
-    """Le pide a Gemini el análisis del clip. Reintenta una vez ante 429 o 5xx; ante 404 prueba el modelo siguiente."""
+          recorte: tuple[float, float] | None = None, transporte_lista=None) -> Mirada:
+    """Le pide a Gemini el análisis del clip. Reintenta una vez ante 429 o 5xx; ante 404 prueba el modelo siguiente.
+
+    Antes consulta ListModels (si `listar_modelos`) y salta los modelos que no existen. Con un `transporte`
+    inyectado sólo se consulta si también se da `transporte_lista`."""
     env = os.environ if entorno is None else entorno
     clave = env.get("GEMINI_API_KEY", "")
     if not clave:
@@ -188,19 +302,24 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
         return Mirada(None, motivo=f"la petición serializada pesa {len(cuerpo) / 1048576:.1f} MB y el tope es "
                                    f"{TOPE_PETICION_BYTES // 1048576} MB", del_material=True)
     inicio_ojos = time.monotonic()
+    tope_ojos = _numero_cfg(cfg, "tope_ojos_s", TOPE_OJOS_S)
+    por_intento = _numero_cfg(cfg, "tiempo_por_intento_s", TIEMPO_ESPERA_S)
 
     def presupuesto() -> float:
         """Segundos que quedan: lo que resta del tope de ojos y lo que resta del plazo del ciclo."""
-        return min(TOPE_OJOS_S - (time.monotonic() - inicio_ojos), plazo.restante() - plazo.MARGEN_S)
+        return min(tope_ojos - (time.monotonic() - inicio_ojos), plazo.restante() - plazo.MARGEN_S)
 
     def llamar(url, encabezados, cuerpo, tiempo):
         if transporte is None:
             return transporte_urllib(url, encabezados, cuerpo, tiempo=tiempo)
-        return transporte(url, encabezados, cuerpo)      # los transportes inyectados reciben 3 argumentos
+        if _acepta_tiempo(transporte):
+            return transporte(url, encabezados, cuerpo, tiempo)
+        return transporte(url, encabezados, cuerpo)      # los transportes inyectados antiguos reciben 3 argumentos
     encabezados = {"Content-Type": "application/json", "x-goog-api-key": clave}
     mirada = Mirada(None)
-    respaldos_por_falla = 1      # ante 429/5xx/red persistentes se prueba UN modelo más (18 nov: 503 y timeouts)
-    for modelo in [cfg["modelo"], *cfg.get("modelos_respaldo", [])]:
+    # ante 429/5xx/red persistentes se prueban hasta N modelos más (18 nov: 503 y timeouts)
+    respaldos_por_falla = int(_numero_cfg(cfg, "respaldos_por_falla", RESPALDOS_POR_FALLA, entero=True))
+    for modelo in _modelos_a_probar(cfg, clave, mirada, transporte, transporte_lista):
         url = URL_BASE.format(modelo=modelo)
         estado, texto = None, ""
         caida = None
@@ -208,13 +327,13 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
             quedan = presupuesto()
             if quedan < MINIMO_INTENTO_S:
                 mirada.motivo = (f"sin tiempo para Gemini (quedan {max(quedan, 0):.0f} s del presupuesto de "
-                                 f"{TOPE_OJOS_S} s o del plazo del ciclo)")
+                                 f"{tope_ojos:g} s o del plazo del ciclo)")
                 mirada.pasajero = True
                 mirada.datos = None
                 mirada.intentos.append(f"{modelo}: {mirada.motivo}")
                 return mirada
             try:
-                estado, texto = llamar(url, encabezados, cuerpo, min(TIEMPO_ESPERA_S, quedan))
+                estado, texto = llamar(url, encabezados, cuerpo, min(por_intento, quedan))
             except ErrorOjos as e:
                 mirada.intentos.append(f"{modelo}: {e} (intento {intento})")
                 caida = str(e)

@@ -35,7 +35,18 @@ NOTA_MUESTRA = (
 )
 
 
-def correr(salida: Path, *, entorno=None, transporte=None) -> int:
+def _informe_modelos(clave: str, transporte, transporte_lista) -> list[str]:
+    """Qué modelos aparecen en ListModels (transporte real, salvo que se inyecte uno). Nunca rompe la prueba."""
+    if transporte is not None and transporte_lista is None:
+        return []
+    try:
+        nombres = sorted(m for m in ojos.modelos_disponibles_en_cache(clave, transporte_lista) if m.startswith("gemini-"))
+    except ojos.ErrorOjos as e:
+        return [f"- ListModels: {e}", ""]
+    return [f"- ListModels: {len(nombres)} modelos gemini con generateContent", *[f"  - {n}" for n in nombres], ""]
+
+
+def correr(salida: Path, *, entorno=None, transporte=None, transporte_lista=None) -> int:
     env = os.environ if entorno is None else entorno
     if not env.get("GEMINI_API_KEY"):
         print("sin GEMINI_API_KEY: la prueba de los ojos no hace nada (no se llamó a Gemini).")
@@ -58,8 +69,12 @@ def correr(salida: Path, *, entorno=None, transporte=None) -> int:
         vid = m["video"]
         ruta = muestras.descargar(vid["url"], vid["sha256"], tmp / Path(vid["url"]).name)
         dur_src = sondear_video(ruta)["duracion"]
-        mirada = ojos.mirar(ruta, marca, temporada, duracion=dur_src, entorno=env, transporte=transporte,
-                       juego=JUEGO_MUESTRA, nota=NOTA_MUESTRA)
+        informe += _informe_modelos(env["GEMINI_API_KEY"], transporte, transporte_lista)
+        copia = toma.copia_para_ojos(ruta, RAIZ, tmp)       # a Gemini va la copia ligera; se compone con el original
+        mb = copia.stat().st_size / 1048576
+        informe += [f"- Enviado a Gemini: copia ligera: {mb:.1f} MB" + (" (el original ya cabía)" if copia == ruta else ""), ""]
+        mirada = ojos.mirar(copia, marca, temporada, duracion=dur_src, entorno=env, transporte=transporte,
+                            juego=JUEGO_MUESTRA, nota=NOTA_MUESTRA, transporte_lista=transporte_lista)
         informe += [f"- Modelo que respondió: {mirada.modelo}", *[f"- Intento: {i}" for i in mirada.intentos]]
         if mirada.datos is None:
             informe += ["", f"RESULTADO: sin datos de Gemini ({mirada.motivo})."]

@@ -50,11 +50,22 @@ jobs:
             echo "Twitch: error HTTP $codigo en games"; exit 1
           fi
           printf '%s' "${salida%$'\n'*}" | python3 -c 'import sys,json; d=json.load(sys.stdin).get("data",[]); print("id de Grand Theft Auto VI:", d[0]["id"] if d else "no encontrado")'
+      - name: Gemini, ListModels (sólo nombres gemini-* con generateContent; no imprime la clave)
+        shell: bash
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then echo "ListModels: falta la clave"; exit 0; fi
+          cod=$(curl -sS -o /tmp/modelos.json -w '%{http_code}' --max-time 20 \
+            -H "x-goog-api-key: $GEMINI_API_KEY" \
+            "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000" || echo "000")
+          if [ "$cod" != "200" ]; then echo "ListModels: HTTP $cod (se sigue sin esta lista)"; exit 0; fi
+          python3 -c 'import json; d=json.load(open("/tmp/modelos.json")); n=sorted(m["name"].removeprefix("models/") for m in d.get("models",[]) if m.get("name","").startswith("models/gemini-") and "generateContent" in m.get("supportedGenerationMethods",[])); print("ListModels: %d modelos gemini con generateContent" % len(n)); print("\n".join(n))' || echo "ListModels: la respuesta no se pudo leer"
+          exit 0
       - name: Gemini, ping de texto por modelo (no imprime la clave)
         shell: bash
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then echo "Gemini: falta la clave"; exit 0; fi
-          for m in gemini-3.8-flash gemini-3.8-flash-lite gemini-3.7-flash gemini-3.7-flash-lite gemini-3-flash-preview gemini-2.5-flash gemini-2.5-flash-lite; do
+          # los de config/ojos.yml, en el mismo orden (primero el modelo principal)
+          for m in gemini-3-flash-preview gemini-3.8-flash gemini-3.7-flash; do
             ini=$(date +%s)
             cod=$(printf '{"contents":[{"parts":[{"text":"Responde solo: ok"}]}]}' | curl -sS -o /tmp/g.json -w '%{http_code}' --max-time 40 \
               -H "x-goog-api-key: $GEMINI_API_KEY" -H 'Content-Type: application/json' --data @- \

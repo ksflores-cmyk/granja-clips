@@ -110,6 +110,11 @@ def registrar(out=None) -> None:
     _salida[0] = out if out is not None else (lambda texto: print(texto, flush=True))
 
 
+def log(texto) -> None:
+    """Una línea al log del ciclo (misma salida que las etapas)."""
+    _salida[0](str(texto))
+
+
 def _decimal(x) -> str:
     return f"{x:.1f}"
 

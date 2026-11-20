@@ -19,7 +19,8 @@ from fabrica import ciclo, descargar as mod_descargar, ojos, plazo, publicar, re
 from fabrica.editar import toma
 from fabrica.editar.marca import Marca
 from fabrica.simulacion import BufferSimulado, SupabaseSimulado
-from test_n4 import AHORA as AHORA_N4, Resp, Transporte, candidato, ficha_propia, sobre
+from test_n4 import (AHORA as AHORA_N4, Resp, Transporte, candidato, cfg_antigua_de_ojos, config_antigua,
+                     ficha_propia, sobre)
 from test_n6_ciclo import (AHORA, ENV, FICHA, VERDE, Hacer, armar_falso, cambiar_modo, cand, correr, filas,
                            vistos)
 
@@ -279,7 +280,7 @@ def _mirar(tmp_path, transporte, espera=lambda s: None):
     v.write_bytes(b"\x00" * 2048)
     temporada = yaml.safe_load((RAIZ_REAL / "temporada.yml").read_text(encoding="utf-8"))
     return ojos.mirar(v, Marca.cargar(RAIZ_REAL), temporada, raiz=RAIZ_REAL, duracion=20.0, transporte=transporte,
-                      espera=espera, entorno={"GEMINI_API_KEY": "clave-de-prueba"})
+                      espera=espera, entorno={"GEMINI_API_KEY": "clave-de-prueba"}, config=cfg_antigua_de_ojos())
 
 
 def test_mirar_sin_tiempo_termina_pasajero_sin_llamar_a_gemini(tmp_path):
@@ -386,6 +387,7 @@ def test_la_descarga_que_no_es_video_gasta_y_la_pagina_de_cuota_de_drive_no(repo
 
 
 def test_gemini_pasajero_no_gasta_y_sin_clave_tampoco(repo, tmp_path, video8):
+    config_antigua(repo)
     err = ojos.ErrorOjos("fallo de conexión con Gemini: TimeoutError")
     r = _toma(repo, tmp_path, abrir=lambda url: Resp(video8.read_bytes()), transporte=Transporte(err, err, err, err))
     assert not r.ok and r.gastar is False and "pasajero" in r.motivos[0]

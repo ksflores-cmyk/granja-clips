@@ -452,6 +452,22 @@ def validar_ojos(o, inf: Informe) -> None:
     t = o["temperatura"]
     if isinstance(t, bool) or not isinstance(t, (int, float)) or not 0 <= t <= 2:
         inf.error(f"{rel}: temperatura debe ser un número de 0 a 2")
+    for clave, minimo in (("tiempo_por_intento_s", 1), ("tope_ojos_s", 1)):     # opcionales
+        if clave in o and (isinstance(o[clave], bool) or not isinstance(o[clave], (int, float)) or o[clave] < minimo):
+            inf.error(f"{rel}: {clave} debe ser un número de {minimo} o más")
+    if "respaldos_por_falla" in o and (isinstance(o["respaldos_por_falla"], bool)
+                                       or not isinstance(o["respaldos_por_falla"], int) or o["respaldos_por_falla"] < 0):
+        inf.error(f"{rel}: respaldos_por_falla debe ser un entero de 0 o más")
+    if "listar_modelos" in o and not isinstance(o["listar_modelos"], bool):
+        inf.error(f"{rel}: listar_modelos debe ser true o false")
+    if "sin_ia" in o:
+        s = o["sin_ia"]
+        if not isinstance(s, dict) or not isinstance(s.get("activo"), bool):
+            inf.error(f"{rel}: sin_ia debe ser un bloque con activo: true o false")
+        else:
+            d = s.get("duracion_objetivo_s", 20)
+            if isinstance(d, bool) or not isinstance(d, (int, float)) or not 7 <= d <= 30:
+                inf.error(f"{rel}: sin_ia.duracion_objetivo_s debe ser un número de 7 a 30")
 
 
 def validar_canales(c, inf: Informe) -> None:
