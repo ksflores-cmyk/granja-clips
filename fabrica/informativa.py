@@ -1,6 +1,7 @@
 """Informativa tipográfica: una toma sin video armada con una entrada de `informativas.yml`.
 
 Camino de N2 (`componer` sin `fuente_video`), ficha `propio-tipografico` y puerta de estilo completa.
+Lleva una pista de música CC0 (`editar.musica`) y movimiento de entrada de texto; sin pista disponible no se compone.
 La entrada sólo se marca `usada: true` cuando se publicó de verdad (modo vivo): `marcar_usada`.
 """
 from __future__ import annotations
@@ -15,7 +16,7 @@ from pathlib import Path
 import yaml
 
 from .config import raiz_repo
-from .editar import estilo
+from .editar import estilo, musica as mod_musica
 from .editar.componer import Linea, componer
 from .editar.lienzo import Toma
 from .editar.marca import Marca
@@ -126,13 +127,18 @@ def armar(raiz, entrada: dict, ahora: datetime, salida: Path) -> Resultado:
     try:
         marca = Marca.cargar(raiz)
         numero = contador_toma(raiz)
+        pista = mod_musica.elegir(raiz, numero)
+        if pista is None:
+            return Resultado(False, ["informativa: sin pista de música CC0 disponible "
+                                     f"(GRANJA_MUSICA_DIR={mod_musica.carpeta() or ''})"])
         toma = Toma(numero=numero, gancho=entrada["gancho"].strip(), palabra_lapiz=entrada["palabra_lapiz"].strip(),
                     lapiz=lapiz_de(numero), escena=str(entrada.get("escena") or ESCENA).upper(), credito=CREDITO)
         mp4 = salida / f"toma-{numero:03d}-{entrada['id']}.mp4"
         plan_ruta = mp4.with_suffix(".plan.json")
         with tempfile.TemporaryDirectory(prefix="trabajo-informativa-") as trabajo:
             plan = componer(marca, toma, _lineas(entrada), mp4, duracion=DURACION_S, trabajo=Path(trabajo),
-                            fuente_video=None, inicio=0.0, plan_salida=plan_ruta)
+                            fuente_video=None, inicio=0.0, plan_salida=plan_ruta,
+                            musica=pista, movimiento=True)
         puntos = estilo.revisar(mp4, plan, marca)
     except (ValueError, KeyError, subprocess.SubprocessError, OSError) as e:
         return Resultado(False, [f"informativa: {type(e).__name__}: {e}"])

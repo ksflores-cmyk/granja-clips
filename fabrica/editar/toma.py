@@ -21,8 +21,8 @@ from .. import descargar as mod_descargar
 from .. import fuentes, ojos, puertas
 from ..config import cargar_yaml, raiz_repo
 from ..registro import ZONA, contador_toma
-from . import estilo
-from .componer import Linea, componer
+from . import estilo, musica as mod_musica
+from .componer import Linea, componer, sondear_video
 from .lienzo import Toma
 from .marca import Marca
 
@@ -157,10 +157,20 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                                               entrada["creador"] if entrada else None)
             mp4 = salida / f"toma-{numero:03d}-{_nombre_seguro(candidato.id_origen)}.mp4"
             plan_ruta = mp4.with_suffix(".plan.json")
+            pista, aviso_musica = None, None
             try:
+                # Música CC0 sólo si la fuente no trae audio y la ficha no dice sin_musica. Sin pista disponible
+                # sigue en silencio (la puerta de estilo lo marca en rojo y la toma se descarta con ese motivo).
+                if mod_musica.lleva_musica(ficha, sondear_video(d.ruta)["audio"]):
+                    pista = mod_musica.elegir(raiz, numero)
+                    if pista is None:
+                        aviso_musica = ("la fuente no trae audio y no hay pista de música CC0 disponible "
+                                        f"(GRANJA_MUSICA_DIR={mod_musica.carpeta() or ''}): sigue en silencio")
+                        print(f"AVISO: {aviso_musica}")
                 with tempfile.TemporaryDirectory(prefix="trabajo-toma-") as trabajo:
                     plan = componer(marca, toma, lineas, mp4, duracion=dur, trabajo=Path(trabajo),
-                                    fuente_video=d.ruta, inicio=inicio, plan_salida=plan_ruta, ficha=ficha)
+                                    fuente_video=d.ruta, inicio=inicio, plan_salida=plan_ruta, ficha=ficha,
+                                    musica=pista)
                 puntos = estilo.revisar(mp4, plan, marca, ficha=ficha)
             except (ValueError, subprocess.SubprocessError, OSError) as e:
                 mp4.unlink(missing_ok=True)
@@ -169,6 +179,8 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             rojos = [f"puerta de estilo: {n}" + (f" ({det})" if det else "") for n, ok_p, det in puntos if not ok_p]
             if rojos:
                 mp4.unlink(missing_ok=True)
+                if aviso_musica:
+                    rojos.append(f"música: {aviso_musica}")
                 return Resultado(False, rojos, None, plan, mirada.datos, mirada.modelo, puntos)
             plan["gemini"] = {"modelo": mirada.modelo, "idioma_original": mirada.datos["idioma_original"]}
             plan_ruta.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
