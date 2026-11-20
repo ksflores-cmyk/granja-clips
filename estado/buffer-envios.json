@@ -184,7 +184,8 @@
     "largo": 117
    },
    "ficha_id": "sega-fm27"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|2|2026-11-20T15:00:00.000Z",
@@ -233,7 +234,8 @@
     "largo": 117
    },
    "ficha_id": "sega-fm27"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|2|2026-11-20T15:00:00.000Z",
@@ -282,6 +284,145 @@
     "largo": 122
    },
    "ficha_id": "sega-fm27"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "shorts|3|2026-11-20T19:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 3,
+  "dueAt": "2026-11-20T19:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-20/toma-003-b1861572.mp4",
+  "estado": "creado",
+  "post_id": "6b008c00e3772ee0cf566924",
+  "intento": "b242aab21db340b8b13afd19c8560843",
+  "registrado": true,
+  "texto": "Toma 003. Accidente fatal en motocicleta\n\n🎥 twitch.tv/taisontv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 3,
+    "gancho": "Accidente fatal en motocicleta",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-taisontv",
+    "campana": "",
+    "duracion_s": 17.0,
+    "creador": "twitch.tv/taisontv",
+    "id_origen": "ScrumptiousColdbloodedGrassTTours-b50y5x1JYoI2CULn",
+    "claves": [
+     "ScrumptiousColdbloodedGrassTTours-b50y5x1JYoI2CULn"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 003. Accidente fatal en motocicleta\n\n🎥 twitch.tv/taisontv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 003. Accidente fatal en motocicleta",
+    "credito": "🎥 twitch.tv/taisontv",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 003. Accidente fatal en motocicleta\n\n🎥 twitch.tv/taisontv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 94
+   },
+   "ficha_id": "t-taisontv"
+  }
+ },
+ {
+  "id": "tiktok|3|2026-11-20T19:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 3,
+  "dueAt": "2026-11-20T19:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-20/toma-003-b1861572.mp4",
+  "estado": "creado",
+  "post_id": "6b008c00e3772ee0cf56696a",
+  "intento": "0ef8ab397293461abb827bc54f5cf8c5",
+  "registrado": true,
+  "texto": "Toma 003. Accidente fatal en motocicleta\n\n🎥 twitch.tv/taisontv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 3,
+    "gancho": "Accidente fatal en motocicleta",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-taisontv",
+    "campana": "",
+    "duracion_s": 17.0,
+    "creador": "twitch.tv/taisontv",
+    "id_origen": "ScrumptiousColdbloodedGrassTTours-b50y5x1JYoI2CULn",
+    "claves": [
+     "ScrumptiousColdbloodedGrassTTours-b50y5x1JYoI2CULn"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 003. Accidente fatal en motocicleta\n\n🎥 twitch.tv/taisontv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/taisontv",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 003. Accidente fatal en motocicleta\n\n🎥 twitch.tv/taisontv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 94
+   },
+   "ficha_id": "t-taisontv"
+  }
+ },
+ {
+  "id": "reels|3|2026-11-20T19:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 3,
+  "dueAt": "2026-11-20T19:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-20/toma-003-b1861572.mp4",
+  "estado": "creado",
+  "post_id": "6b008c0144c36191134e6ac7",
+  "intento": "9de986fd1fb246448cf8e76fe50cb2c1",
+  "registrado": true,
+  "texto": "Toma 003. Accidente fatal en motocicleta\n\n🎥 twitch.tv/taisontv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 3,
+    "gancho": "Accidente fatal en motocicleta",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-taisontv",
+    "campana": "",
+    "duracion_s": 17.0,
+    "creador": "twitch.tv/taisontv",
+    "id_origen": "ScrumptiousColdbloodedGrassTTours-b50y5x1JYoI2CULn",
+    "claves": [
+     "ScrumptiousColdbloodedGrassTTours-b50y5x1JYoI2CULn"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 003. Accidente fatal en motocicleta\n\n🎥 twitch.tv/taisontv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/taisontv",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 003. Accidente fatal en motocicleta\n\n🎥 twitch.tv/taisontv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 97
+   },
+   "ficha_id": "t-taisontv"
   }
  }
 ]
