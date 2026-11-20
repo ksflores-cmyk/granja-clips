@@ -146,7 +146,7 @@ def test_elegir_recorte_sin_lectura_o_ya_en_9_16_queda_centrada(tmp_path):
 
 @necesita_ffmpeg
 def test_el_audio_del_mp4_es_el_de_la_fuente(ancha, marca):
-    assert ancha["plan"]["audio"] == "original"
+    assert ancha["plan"]["audio"] == {"tipo": "original"}
     ok, det = estilo.audio_original(ancha["mp4"], ancha["plan"])
     assert ok, det
     assert "correlación" in det and float(re.search(r"correlación con el audio de la fuente ([0-9.]+)", det).group(1)) > 0.9
@@ -158,12 +158,38 @@ def test_sin_audio_de_origen_el_mp4_va_en_silencio(tmp_path, marca):
     mp4 = tmp_path / "m.mp4"
     plan = componer.componer(marca, lienzo.Toma(**TOMA), LINEAS, mp4, duracion=4.0, trabajo=tmp_path / "w",
                              fuente_video=src, inicio=0.0)
-    assert plan["audio"] == "silencio"
+    assert plan["audio"] == {"tipo": "silencio"}
     ok, det = estilo.audio_original(mp4, plan)
     assert ok, det
-    assert malos(estilo.revisar(mp4, plan, marca)) == []
+    # Fusión con #6 musica: una pieza sin audio propio debe llevar música CC0; sin pista, sólo ese punto sale en rojo
+    assert malos(estilo.revisar(mp4, plan, marca)) == ["[plan] Música CC0 en pieza sin audio propio"]
     # un plan que diga "original" con una fuente muda no pasa
     assert not estilo.audio_original(mp4, {**plan, "audio": "original"})[0]
+
+
+@necesita_ffmpeg
+def test_fuente_muda_con_musica_cc0_pasa_toda_la_puerta(raiz_musica, tmp_path):
+    """Fusión #5 + #6: video mudo a pantalla completa con pista CC0; un video con audio nunca la recibe."""
+    raiz, audio = raiz_musica
+    m = Marca.cargar(raiz)
+    pistas = yaml.safe_load((raiz / "marca/musica/pistas.yml").read_text(encoding="utf-8"))["pistas"]
+    pista = {**pistas[1], "ruta": str(audio / pistas[1]["asset"])}
+    src = fuente(tmp_path / "mudo.mp4", 640, 360, 4, audio=False)
+    mp4 = tmp_path / "m.mp4"
+    plan = componer.componer(m, lienzo.Toma(**TOMA), LINEAS, mp4, duracion=4.0, trabajo=tmp_path / "w",
+                             fuente_video=src, inicio=0.0, musica=pista)
+    assert plan["audio"]["tipo"] == "musica" and plan["audio"]["pista"] == pista["id"]
+    assert plan["origen"]["audio"] == "silencio" and plan["plantilla"] == componer.PLANTILLA_V2
+    puntos = estilo.revisar(mp4, plan, m)
+    assert malos(puntos) == [], malos(puntos)
+    nombres = [n for n, _, _ in puntos]
+    assert "[plan] Música CC0 en pieza sin audio propio" in nombres and "[fotograma] Volumen normalizado" in nombres
+    # declarar música sobre una fuente con audio no pasa
+    con_audio = fuente(tmp_path / "con.mp4", 640, 360, 4)
+    with pytest.raises(ValueError, match="audio propio"):
+        componer.componer(m, lienzo.Toma(**TOMA), LINEAS, tmp_path / "x.mp4", duracion=4.0, trabajo=tmp_path / "w2",
+                          fuente_video=con_audio, inicio=0.0, musica=pista)
+    assert not estilo.audio_original(mp4, {**plan, "origen": {**plan["origen"], "archivo": str(con_audio)}})[0]
 
 
 def test_la_orden_de_ffmpeg_no_añade_audio_ni_efectos_prohibidos():
@@ -350,12 +376,17 @@ def test_un_logo_pegado_sin_declarar_sigue_en_rojo(ancha, marca, tmp_path):
 # ---------------------------------------------------------------- tomas sin video, marca.yml, validador
 
 @necesita_ffmpeg
-def test_una_toma_sin_video_no_cambia(marca, tmp_path):
+def test_una_toma_sin_video_no_cambia(raiz_musica, tmp_path):
+    # Fusión con #6 musica: la pieza sin video lleva pista CC0 (falsa, de `raiz_musica`) y entrada de texto
+    raiz, audio = raiz_musica
+    marca = Marca.cargar(raiz)
+    pistas = yaml.safe_load((raiz / "marca/musica/pistas.yml").read_text(encoding="utf-8"))["pistas"]
+    pista = {**pistas[0], "ruta": str(audio / pistas[0]["asset"])}
     t = lienzo.Toma(numero=1, gancho="GTA 6 llega esta medianoche", palabra_lapiz="MEDIANOCHE", lapiz="círculo",
                     escena="INT. TU CONSOLA", credito="Fuente: Rockstar Games Support")
     ln = [componer.Linea(0.0, 4.0, "EL DATO", "Medianoche local del 19 de noviembre.")]
     mp4 = tmp_path / "t.mp4"
-    plan = componer.componer(marca, t, ln, mp4, duracion=8.0, trabajo=tmp_path / "w")
+    plan = componer.componer(marca, t, ln, mp4, duracion=8.0, trabajo=tmp_path / "w", musica=pista, movimiento=True)
     assert "plantilla" not in plan and plan["origen"] is None and plan["geometria"]["cuerpo"] is None
     assert "y_dialogo" in plan["geometria"] and "capas" not in plan["geometria"]
     assert all(ok for _, ok, _ in estilo.revisar(mp4, plan, marca))

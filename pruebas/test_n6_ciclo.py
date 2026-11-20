@@ -213,8 +213,8 @@ def test_ensayo_forzado_corre_con_pausa_sin_publicar_ni_tocar_el_repo(r, tmp_pat
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="sin ffmpeg")
 @pytest.mark.slow
-def test_ensayo_forzado_de_punta_a_punta_produce_la_informativa_real(repo, tmp_path):
-    r = repo                                        # copia del repo real: con PAUSA y en ensayo
+def test_ensayo_forzado_de_punta_a_punta_produce_la_informativa_real(repo_con_musica, tmp_path):
+    r = repo_con_musica                             # copia del repo real (con pistas falsas): con PAUSA y en ensayo
     assert (r / "PAUSA").exists()
     sal = []
     cod = ciclo.ejecutar(r, ahora=AHORA, ensayo_forzado=True, salida_dir=tmp_path / "s", env={},

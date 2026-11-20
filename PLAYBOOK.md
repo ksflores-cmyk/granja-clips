@@ -208,7 +208,8 @@ sonido:
 Movimiento y sonido:
 
 - Sólo corte seco. Sin zoom automático, temblores, destellos ni transiciones de plantilla.
-- El audio es el del clip. Sin música de biblioteca ni voz sintética.
+- El audio es el del clip. Sin voz sintética.
+- Decisión de Kevin del 19 nov 2026 (manda sobre el `musica_de_biblioteca: false` de arriba): la pieza sin audio propio (informativa tipográfica o video mudo) lleva una pista CC0 de `marca/musica/` (licencia en `marca/musica/<id>/LICENCIA.md`, audio en el release privado `musica`), normalizada a -16 LUFS, y entrada de texto sobria; con `sin_musica: true` no lleva música. Ver `marca.yml` (`sonido`, `musica`, `movimiento.entrada_texto`).
 - Los trazos del lápiz rojo salen de una biblioteca de 8 a 10 trazos distintos, para que no se repita el mismo.
 
 Lo que no puede aparecer nunca, porque es la firma de los canales hechos en serie:

@@ -1,0 +1,106 @@
+# Música de biblioteca de Guion Vivo (decisión de Kevin del 19 nov 2026, 8:00 p. m.).
+# Sólo para piezas SIN audio propio (informativa tipográfica, o video mudo) y nunca en fichas con
+# `reglas.sin_musica: true`. Los clips con video llevan su audio original.
+#
+# El audio NO vive en el repo (regla: ni video ni audio en git). Cada pista está en el release privado
+# `musica` de este repo, con el nombre de `asset`. La sube el workflow `musica.yml`, que dentro de
+# GitHub Actions lee la página de origen, comprueba que el campo de licencia diga CC0, baja el archivo
+# y anota su sha256. La fábrica sólo usa una pista con `estado: verificada`, su LICENCIA.md al lado
+# y el sha256 del archivo bajado igual al de aquí.
+#
+# Campos: id (carpeta marca/musica/<id>/), titulo, autor, pagina (enlace leído), archivo (nombre guardado en
+# "File(s):" de la página), zip_miembro (si el archivo es un .zip, el audio que se usa de dentro),
+# licencia (sólo CC0), estilo, inicio_s (dónde empieza el recorte), asset (nombre en el release),
+# sha256 (del asset; null hasta la primera corrida verde de musica.yml), estado (candidata | verificada | descartada).
+licencias_permitidas: [CC0]
+release: musica
+pistas:
+  - id: calm-track
+    titulo: "Calm Track"
+    autor: "pmiller"
+    pagina: "https://opengameart.org/content/calm-track"
+    archivo: "calm_track.ogg"
+    licencia: CC0
+    estilo: "ambiental calmado, evoluciona despacio"
+    inicio_s: 0
+    asset: "calm-track.ogg"
+    sha256: "ab004477a4f37183beb5b6153fdccd6659181c2cca87b12bee68d29ffb7a4f33"
+    estado: verificada
+  - id: lofi-hip-hop-loop
+    titulo: "Lofi Hip Hop Loop"
+    autor: "omfgdude"
+    pagina: "https://opengameart.org/node/94031"
+    archivo: "LofiLoop_2.ogg"
+    licencia: CC0
+    estilo: "lofi hip hop en bucle"
+    inicio_s: 0
+    asset: "lofi-hip-hop-loop.ogg"
+    sha256: "e57ba821d4db8d66783ca984a2778ec68d1439e862239ec36407344ef3bd1eab"
+    estado: verificada
+  - id: chill-loopable
+    titulo: "Chill (Loopable)"
+    autor: "Pro Sensory (Alex McCulloch)"
+    pagina: "https://opengameart.org/content/chill-loopable"
+    archivo: "chillloopable_0.mp3"
+    licencia: CC0
+    estilo: "lofi tranquilo en bucle"
+    inicio_s: 0
+    asset: "chill-loopable.mp3"
+    sha256: "4978e64d0cadd1446c9fa81e2ed7ebb369cf9ced37e4ce606006e0c7c414fde6"
+    estado: verificada
+  - id: beat-1
+    titulo: "Beat #1"
+    autor: "Spring Spring"
+    pagina: "https://opengameart.org/content/beat-1"
+    archivo: "n os_0.mp3"
+    licencia: CC0
+    estilo: "beat chill con sintetizador"
+    inicio_s: 0
+    asset: "beat-1.mp3"
+    sha256: "70d2f53be85b340cad01fb1af5d026c7544be209caa021bbc7822398a3bcd5dc"
+    estado: verificada
+  - id: synthwave-type
+    titulo: "synthwave_type"
+    autor: "G_P"
+    pagina: "https://opengameart.org/content/synthwavetype"
+    archivo: "synth_type_1.mp3"
+    licencia: CC0
+    estilo: "synthwave"
+    inicio_s: 0
+    asset: "synthwave-type.mp3"
+    sha256: "df87e826f113f3fc425b24fc85361e1f5866045eb44f06096ea64b792a362389"
+    estado: verificada
+  - id: synth-wave-by-alex
+    titulo: "Synth Wave by Alex"
+    autor: "Pro Sensory (Alex McCulloch)"
+    pagina: "https://opengameart.org/content/synth-wave-by-alex"
+    archivo: "80s_song_mastered_0.mp3"
+    licencia: CC0
+    estilo: "synthwave ochentero"
+    inicio_s: 0
+    asset: "synth-wave-by-alex.mp3"
+    sha256: "a70eb068eebed3eaaed2ceea4f681e972de9de92465a770052327254d73ecd51"
+    estado: verificada
+  - id: snow-theme
+    titulo: "Snow Theme"
+    autor: "CleytonKauffman"
+    pagina: "https://opengameart.org/content/snow-theme"
+    archivo: "snow_theme_1.zip"
+    zip_miembro: ".ogg"
+    licencia: CC0
+    estilo: "ambiental tranquilo, bucle de 24 s"
+    inicio_s: 0
+    asset: "snow-theme.ogg"
+    sha256: "3fad0971a8d3c2aca03c6535a7bd89076c36cc006b2a0888c4ab309a98160c87"
+    estado: verificada
+  - id: chill-lofi-inspired
+    titulo: "Chill lofi inspired"
+    autor: "omfgdude"
+    pagina: "https://opengameart.org/content/chill-lofi-inspired"
+    archivo: "ChillLofi.ogg"
+    licencia: CC0
+    estilo: "lofi grabado en una toma"
+    inicio_s: 0
+    asset: "chill-lofi-inspired.ogg"
+    sha256: "7ea7fd1b7c95ed1ca5f6ebb796626570137bcb75c7f2ea87b6c61212c7a86694"
+    estado: verificada

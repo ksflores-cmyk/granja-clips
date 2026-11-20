@@ -42,8 +42,15 @@ jobs:
         uses: ./.github/actions/ffmpeg
       - if: steps.clave.outputs.tiene == 'si'
         run: pip install -r requirements.txt
+      - name: Bajar música del release
+        if: steps.clave.outputs.tiene == 'si'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download musica -D "$RUNNER_TEMP/musica" --clobber || echo "::warning::sin música del release"
       - name: Pedirle a Gemini el JSON y renderizar la toma
         if: steps.clave.outputs.tiene == 'si'
+        env:
+          GRANJA_MUSICA_DIR: ${{ runner.temp }}/musica
         run: python -m fabrica.editar.prueba_ojos --salida "$RUNNER_TEMP/ojos"
       - name: Resumen
         if: always() && steps.clave.outputs.tiene == 'si'

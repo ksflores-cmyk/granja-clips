@@ -22,7 +22,8 @@ import yaml
 from .. import fuentes as mod_fuentes
 from ..registro import ZONA
 from . import estilo
-from .componer import Linea, componer
+from . import musica as mod_musica
+from .componer import Linea, componer, sondear_video
 from .config_ruta import RAIZ
 from .lienzo import Toma
 from .marca import Marca
@@ -96,6 +97,49 @@ def autorizar(m: dict, fichas: list[dict], hoy) -> None:
             raise RuntimeError(f"descarga no autorizada para {m['id']} ({m['fuente_id']}): {motivo}")
 
 
+ID_CON_MUSICA = "informativa-con-musica"
+TEXTOS_NEUTROS = {"gancho": "Prueba de música y movimiento", "palabra_lapiz": "MOVIMIENTO",
+                  "datos": ["Pieza de prueba sin datos reales.", "La música es CC0 y viene del release privado."],
+                  "credito": "Fuente: prueba de estilo"}
+
+
+def _entrada_de_prueba(raiz, hoy) -> tuple[dict, str]:
+    """Entrada de `informativas.yml` (la vigente, o cualquiera) o textos fijos neutros, sin datos inventados."""
+    from .. import informativa
+    ahora = datetime.now(ZONA)
+    validas = [e for e in informativa.cargar(raiz) if all(e.get(k) for k in ("id", "gancho", "palabra_lapiz", "datos"))]
+    entrada = next((e for e in validas if informativa.vigente(e, ahora)), None) or (validas[0] if validas else None)
+    if entrada is not None:
+        return entrada, f"informativas.yml:{entrada['id']}"
+    return {"id": "neutra", **{k: v for k, v in TEXTOS_NEUTROS.items() if k != "credito"}}, "textos fijos neutros"
+
+
+def _muestra_con_musica(salida: Path, marca: Marca, registrar, omitir, hoy) -> None:
+    """4.ª muestra: informativa con música CC0 y movimiento de entrada de texto (se omite sin pista disponible)."""
+    from .. import informativa
+    numero = 4
+    pista = mod_musica.elegir(marca.raiz, numero)
+    if pista is None:
+        omitir(ID_CON_MUSICA, "sin pista de música CC0 disponible "
+                              f"(GRANJA_MUSICA_DIR={mod_musica.carpeta() or ''})")
+        return
+    entrada, origen = _entrada_de_prueba(marca.raiz, hoy)
+    credito = informativa.CREDITO if origen.startswith("informativas.yml") else TEXTOS_NEUTROS["credito"]
+    t = Toma(numero=numero, gancho=entrada["gancho"].strip(), palabra_lapiz=entrada["palabra_lapiz"].strip(),
+             lapiz="subrayado", escena=str(entrada.get("escena") or informativa.ESCENA).upper(), credito=credito)
+    lineas = informativa._lineas(entrada)
+    mp4 = salida / f"{ID_CON_MUSICA}.mp4"
+    plan_ruta = salida / f"{ID_CON_MUSICA}.plan.json"
+    with tempfile.TemporaryDirectory(prefix=f"trabajo-{ID_CON_MUSICA}-") as tmp:
+        plan = componer(marca, t, lineas, mp4, duracion=informativa.DURACION_S, trabajo=Path(tmp),
+                        fuente_video=None, plan_salida=plan_ruta, musica=pista, movimiento=True)
+    puntos = estilo.revisar(mp4, plan, marca)
+    registrar(ID_CON_MUSICA, mp4, plan_ruta, informativa.DURACION_S, puntos, lineas, {
+        "pilar": "informativa", "fuente_id": informativa.FICHA_ID, "fuente": {"propio": f"tipográfico: {origen}"},
+        "recorte": None, "licencia": f"propio (tipográfico); música CC0: {pista['id']} ({pista['autor']})",
+        "enlace": pista["pagina"]}, plan)
+
+
 def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *,
             fichas: list[dict] | None = None, hoy=None, descargador=descargar) -> dict:
     if fichas is None:
@@ -104,9 +148,33 @@ def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *
         hoy = datetime.now(ZONA).date()
     for m in muestras:          # todo se autoriza antes de la primera conexión
         autorizar(m, fichas, hoy)
-    manifiesto = {"muestras": []}
+    manifiesto = {"muestras": [], "omitidas": []}
     informe = ["# Puerta de estilo automática", "",
                "Revisión sin LLM (`python -m fabrica.editar.estilo`) sobre cada MP4 y su plan.", ""]
+
+    def registrar(mid, mp4, plan_ruta, duracion, puntos, lineas, datos, plan):
+        cuadros = fotogramas(mp4, duracion, salida, mid)
+        ok = all(p[1] for p in puntos)
+        informe.append(estilo.informe_md(f"{mid} ({'EN VERDE' if ok else 'EN ROJO'})", puntos))
+        manifiesto["muestras"].append({
+            "id": mid,
+            "archivo": mp4.name,
+            "plan": plan_ruta.name,
+            "duracion_s": round(estilo.sondear(mp4)["duracion"], 3),
+            "sha256_mp4": sha256(mp4),
+            "fotogramas": cuadros,
+            **datos,
+            "lineas": [{"t0": ln.t0, "t1": ln.t1, "nombre": ln.nombre, "frase": ln.frase,
+                        "acotacion": ln.acotacion, "original": ln.original} for ln in lineas],
+            "audio": plan.get("audio"),
+            "puerta_estilo": {"en_verde": ok,
+                              "puntos": [{"punto": n, "ok": o, "detalle": d} for n, o, d in puntos]},
+        })
+
+    def omitir(mid, motivo):
+        manifiesto["omitidas"].append({"id": mid, "motivo": motivo})
+        informe.append(f"### {mid} (OMITIDA)\n\n- {motivo}\n")
+
     for m in muestras:
         mid = m["id"]
         t = Toma(**m["toma"])
@@ -124,34 +192,29 @@ def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *
             inicio, duracion = float(m["recorte"]["inicio"]), float(m["recorte"]["duracion"])
         else:
             inicio, duracion = 0.0, float(m["duracion"])
+        # Música CC0 sólo si la pieza no trae audio propio (video mudo o sin video); el movimiento, sin video.
+        pista = None
+        if mod_musica.lleva_musica(None, bool(ruta_video) and sondear_video(ruta_video)["audio"]):
+            pista = mod_musica.elegir(marca.raiz, t.numero)
+            if pista is None:
+                omitir(mid, "pieza sin audio propio y sin pista de música CC0 disponible "
+                            f"(GRANJA_MUSICA_DIR={mod_musica.carpeta() or ''})")
+                continue
         mp4 = salida / f"{mid}.mp4"
         plan_ruta = salida / f"{mid}.plan.json"
         with tempfile.TemporaryDirectory(prefix=f"trabajo-{mid}-") as tmp:
             plan = componer(marca, t, lineas, mp4, duracion=duracion, trabajo=Path(tmp),
-                            fuente_video=ruta_video, inicio=inicio, plan_salida=plan_ruta)
+                            fuente_video=ruta_video, inicio=inicio, plan_salida=plan_ruta,
+                            musica=pista, movimiento=ruta_video is None)
         puntos = estilo.revisar(mp4, plan, marca)
-        cuadros = fotogramas(mp4, duracion, salida, mid)
-        ok = all(p[1] for p in puntos)
-        informe.append(estilo.informe_md(f"{mid} ({'EN VERDE' if ok else 'EN ROJO'})", puntos))
-        manifiesto["muestras"].append({
-            "id": mid,
-            "archivo": mp4.name,
-            "plan": plan_ruta.name,
-            "duracion_s": round(estilo.sondear(mp4)["duracion"], 3),
-            "sha256_mp4": sha256(mp4),
-            "fotogramas": cuadros,
-            "pilar": m["pilar"],
-            "fuente_id": m["fuente_id"],
+        registrar(mid, mp4, plan_ruta, duracion, puntos, lineas, {
+            "pilar": m["pilar"], "fuente_id": m["fuente_id"],
             "fuente": extra_src or {"propio": "tipográfico, sin metraje"},
-            "recorte": m.get("recorte"),
-            "licencia": m["licencia"],
-            "enlace": m.get("enlace_licencia"),
-            "lineas": [{"t0": ln.t0, "t1": ln.t1, "nombre": ln.nombre, "frase": ln.frase,
-                        "acotacion": ln.acotacion, "original": ln.original} for ln in lineas],
-            "puerta_estilo": {"en_verde": ok,
-                              "puntos": [{"punto": n, "ok": o, "detalle": d} for n, o, d in puntos]},
-        })
-    todas = all(x["puerta_estilo"]["en_verde"] for x in manifiesto["muestras"])
+            "recorte": m.get("recorte"), "licencia": m["licencia"], "enlace": m.get("enlace_licencia")}, plan)
+    _muestra_con_musica(salida, marca, registrar, omitir, hoy)
+    # Una muestra omitida (p. ej. sin pista de música del release) no cuenta como verde.
+    todas = (all(x["puerta_estilo"]["en_verde"] for x in manifiesto["muestras"])
+             and not manifiesto["omitidas"])
     manifiesto["puerta_estilo_en_verde"] = todas
     informe.append(f"## Resultado: {'EN VERDE' if todas else 'EN ROJO'}\n")
     (salida / "manifiesto.json").write_text(json.dumps(manifiesto, ensure_ascii=False, indent=2), encoding="utf-8")

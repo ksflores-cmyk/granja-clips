@@ -27,7 +27,7 @@ PLATAFORMAS = {"shorts", "tiktok", "reels"}
 SERVICIOS = {"shorts": "youtube", "tiktok": "tiktok", "reels": "instagram"}
 MODOS = {"ensayo", "vivo"}
 EXT_BINARIAS = {".ttf", ".otf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".ico"}
-EXT_MEDIA = {".mp4", ".mov", ".mkv", ".webm", ".m4a", ".wav", ".mp3"}
+EXT_MEDIA = {".mp4", ".mov", ".mkv", ".webm", ".m4a", ".wav", ".mp3", ".ogg", ".flac", ".opus", ".aac"}
 IGNORAR_DIRS = {".git", "__pycache__", ".pytest_cache", ".venv"}
 RE_ID = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 RE_HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -306,7 +306,21 @@ def validar_marca(m, inf: Informe) -> None:
         inf.error(f"{rel}: movimiento.zoom_automatico debe ser false")
     son = m["sonido"] if isinstance(m["sonido"], dict) else {}
     if son.get("musica_de_biblioteca") is not False:
-        inf.error(f"{rel}: sonido.musica_de_biblioteca debe ser false")
+        mus = m.get("musica") if isinstance(m.get("musica"), dict) else {}
+        if son.get("musica_de_biblioteca") is not True:
+            inf.error(f"{rel}: sonido.musica_de_biblioteca debe ser true o false")
+        elif not mus.get("manifiesto"):
+            inf.error(f"{rel}: sonido.musica_de_biblioteca true exige musica.manifiesto")
+        else:
+            lufs, pico = mus.get("lufs"), mus.get("pico_db")
+            if not (isinstance(lufs, (int, float)) and not isinstance(lufs, bool) and -20 <= lufs <= -12):
+                inf.error(f"{rel}: musica.lufs debe estar entre -20 y -12")
+            if not (isinstance(pico, (int, float)) and not isinstance(pico, bool) and pico <= -1):
+                inf.error(f"{rel}: musica.pico_db debe ser -1 o menos")
+            for k in ("entrada_s", "salida_s"):
+                v = mus.get(k)
+                if not (isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 3):
+                    inf.error(f"{rel}: musica.{k} debe ser un número de 0 a 3")
     e = m["encabezado_max_palabras"]
     if not (_es_int(e) and 1 <= e <= 6):
         inf.error(f"{rel}: encabezado_max_palabras debe ser entero de 1 a 6")
@@ -316,6 +330,63 @@ def validar_marca(m, inf: Informe) -> None:
     validar_maqueta(m, inf)
     validar_marca_agua(m, inf)
     validar_pantalla_completa(m, inf)
+
+
+RE_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+CAMPOS_LICENCIA = ("Fuente:", "Autor:", "Licencia:", "Enlace:")
+
+
+def validar_musica(raiz: Path, datos, inf: Informe) -> None:
+    """`marca/musica/pistas.yml`: sólo CC0, páginas https, assets sin rutas, y LICENCIA.md completa si está verificada."""
+    rel = "marca/musica/pistas.yml"
+    if not isinstance(datos, dict):
+        inf.error(f"{rel}: debe ser un diccionario")
+        return
+    permitidas = datos.get("licencias_permitidas")
+    if not (isinstance(permitidas, list) and permitidas and set(permitidas) <= {"CC0"}):
+        inf.error(f"{rel}: licencias_permitidas debe ser una lista que sólo contenga CC0")
+        permitidas = []
+    pistas = datos.get("pistas")
+    if not isinstance(pistas, list):
+        inf.error(f"{rel}: pistas debe ser una lista")
+        return
+    vistos: set[str] = set()
+    for i, p in enumerate(pistas):
+        if not isinstance(p, dict):
+            inf.error(f"{rel}: pistas[{i}] debe ser un diccionario")
+            continue
+        pid = p.get("id")
+        et = f"{rel}: pista {pid if isinstance(pid, str) else i}"
+        if not (isinstance(pid, str) and RE_ID.match(pid)):
+            inf.error(f"{et}: id inválido (minúsculas, números y guiones)")
+        elif pid in vistos:
+            inf.error(f"{et}: id repetido")
+        else:
+            vistos.add(pid)
+        if p.get("licencia") not in permitidas:
+            inf.error(f"{et}: licencia {p.get('licencia')!r} fuera de licencias_permitidas (sólo CC0)")
+        if not _es_https(p.get("pagina")):
+            inf.error(f"{et}: pagina debe ser un enlace https")
+        asset = p.get("asset")
+        if not (isinstance(asset, str) and asset and "/" not in asset and "\\" not in asset
+                and not asset.startswith(".")):
+            inf.error(f"{et}: asset debe ser un nombre de archivo sin barras")
+        if p.get("estado") not in ("candidata", "verificada", "descartada"):
+            inf.error(f"{et}: estado debe ser candidata, verificada o descartada")
+        if p.get("estado") == "verificada":
+            if not (isinstance(p.get("sha256"), str) and RE_SHA256.match(p["sha256"])):
+                inf.error(f"{et}: verificada exige sha256 hexadecimal de 64 caracteres")
+            lic = raiz / "marca" / "musica" / str(pid) / "LICENCIA.md"
+            if not lic.is_file():
+                inf.error(f"{et}: verificada exige marca/musica/{pid}/LICENCIA.md")
+            else:
+                texto = lic.read_text(encoding="utf-8", errors="ignore")
+                faltan = [c for c in CAMPOS_LICENCIA
+                          if not re.search(rf"(?m)^\s*[-*]?\s*\**{re.escape(c[:-1])}(?::\**|\**:)[ \t]*\S", texto)]
+                if faltan:
+                    inf.error(f"{et}: LICENCIA.md sin las líneas {', '.join(faltan)}")
+                elif not re.search(r"(?m)^\s*[-*]?\s*\**Licencia(?::\**|\**:)[^\n]*\bCC0\b", texto):
+                    inf.error(f"{et}: la línea Licencia: de LICENCIA.md debe decir CC0")
 
 
 def validar_marca_agua(m, inf: Informe) -> None:
@@ -711,6 +782,9 @@ def validar(raiz=None) -> Informe:
     informativas = _cargar(raiz, "informativas.yml", inf)
     if informativas is not None:
         validar_informativas(informativas, datos["marca"], inf)
+    musica = _cargar(raiz, "marca/musica/pistas.yml", inf)
+    if musica is not None:
+        validar_musica(raiz, musica, inf)
     validar_pausa(raiz, inf)
     validar_csv(raiz, "marcador.csv", CABECERA_MARCADOR, inf)
     validar_csv(raiz, "envios-pendientes.csv", CABECERA_ENVIOS, inf)
