@@ -136,5 +136,152 @@
    "ficha_id": "propio-tipografico"
   },
   "ruta_borrada": true
+ },
+ {
+  "id": "shorts|2|2026-11-20T15:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 2,
+  "dueAt": "2026-11-20T15:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-20/toma-002-4587ae1e.mp4",
+  "estado": "creado",
+  "post_id": "6b0053787efc64d5e424f3a0",
+  "intento": "de52fa345acf4dcc9f92fc90c3f3f701",
+  "registrado": true,
+  "texto": "Toma 002. Gol en contra de Lucumí\n\n@footballmanager\n@sebasberon\n#Publicidad\n#FootballManager #FM27 #FootballManager27",
+  "datos": {
+   "toma": {
+    "numero": 2,
+    "gancho": "Gol en contra de Lucumí",
+    "pilar": "momentos",
+    "fuente_id": "sega-fm27",
+    "campana": "SEGA FM27 (Clipping Culture)",
+    "duracion_s": 20.0,
+    "creador": "SEBASBERON",
+    "id_origen": "https://github.com/ksflores-cmyk/granja-clips/releases/download/fuentes-fm27/fm27-sebasberon.mp4",
+    "claves": [
+     "https://github.com/ksflores-cmyk/granja-clips/releases/download/fuentes-fm27/fm27-sebasberon.mp4"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 002. Gol en contra de Lucumí\n\n@footballmanager\n@sebasberon\n#Publicidad\n#FootballManager #FM27 #FootballManager27",
+    "titulo": "Toma 002. Gol en contra de Lucumí",
+    "credito": "@sebasberon",
+    "etiquetas": [
+     "@footballmanager",
+     "#Publicidad",
+     "#FootballManager",
+     "#FM27",
+     "#FootballManager27"
+    ],
+    "descripcion": "Toma 002. Gol en contra de Lucumí\n\n@footballmanager\n@sebasberon\n#Publicidad\n#FootballManager #FM27 #FootballManager27",
+    "hashtags": [
+     "#Publicidad",
+     "#FootballManager",
+     "#FM27",
+     "#FootballManager27"
+    ],
+    "largo": 117
+   },
+   "ficha_id": "sega-fm27"
+  }
+ },
+ {
+  "id": "tiktok|2|2026-11-20T15:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 2,
+  "dueAt": "2026-11-20T15:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-20/toma-002-4587ae1e.mp4",
+  "estado": "creado",
+  "post_id": "6b00537977e195b72208f1da",
+  "intento": "134047f491c2405b9165c90593bfa558",
+  "registrado": true,
+  "texto": "Toma 002. Gol en contra de Lucumí\n\n@footballmanager\n@sebasclips\n#Publicidad\n#FootballManager #FM27 #FootballManager27",
+  "datos": {
+   "toma": {
+    "numero": 2,
+    "gancho": "Gol en contra de Lucumí",
+    "pilar": "momentos",
+    "fuente_id": "sega-fm27",
+    "campana": "SEGA FM27 (Clipping Culture)",
+    "duracion_s": 20.0,
+    "creador": "SEBASBERON",
+    "id_origen": "https://github.com/ksflores-cmyk/granja-clips/releases/download/fuentes-fm27/fm27-sebasberon.mp4",
+    "claves": [
+     "https://github.com/ksflores-cmyk/granja-clips/releases/download/fuentes-fm27/fm27-sebasberon.mp4"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 002. Gol en contra de Lucumí\n\n@footballmanager\n@sebasclips\n#Publicidad\n#FootballManager #FM27 #FootballManager27",
+    "titulo": null,
+    "credito": "@sebasclips",
+    "etiquetas": [
+     "@footballmanager",
+     "#Publicidad",
+     "#FootballManager",
+     "#FM27",
+     "#FootballManager27"
+    ],
+    "descripcion": "Toma 002. Gol en contra de Lucumí\n\n@footballmanager\n@sebasclips\n#Publicidad\n#FootballManager #FM27 #FootballManager27",
+    "hashtags": [
+     "#Publicidad",
+     "#FootballManager",
+     "#FM27",
+     "#FootballManager27"
+    ],
+    "largo": 117
+   },
+   "ficha_id": "sega-fm27"
+  }
+ },
+ {
+  "id": "reels|2|2026-11-20T15:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 2,
+  "dueAt": "2026-11-20T15:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-20/toma-002-4587ae1e.mp4",
+  "estado": "creado",
+  "post_id": "6b005379fc5b97f0f80f47e3",
+  "intento": "0d71df2306aa4956ad588f15d062fbf9",
+  "registrado": true,
+  "texto": "Toma 002. Gol en contra de Lucumí\n\n@footballmanager\n@sebasberon\n#Publicidad\n#FootballManager #FM27 #FootballManager27",
+  "datos": {
+   "toma": {
+    "numero": 2,
+    "gancho": "Gol en contra de Lucumí",
+    "pilar": "momentos",
+    "fuente_id": "sega-fm27",
+    "campana": "SEGA FM27 (Clipping Culture)",
+    "duracion_s": 20.0,
+    "creador": "SEBASBERON",
+    "id_origen": "https://github.com/ksflores-cmyk/granja-clips/releases/download/fuentes-fm27/fm27-sebasberon.mp4",
+    "claves": [
+     "https://github.com/ksflores-cmyk/granja-clips/releases/download/fuentes-fm27/fm27-sebasberon.mp4"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 002. Gol en contra de Lucumí\n\n@footballmanager\n@sebasberon\n#Publicidad\n#FootballManager #FM27 #FootballManager27",
+    "titulo": null,
+    "credito": "@sebasberon",
+    "etiquetas": [
+     "@footballmanager",
+     "#Publicidad",
+     "#FootballManager",
+     "#FM27",
+     "#FootballManager27"
+    ],
+    "descripcion": "Toma 002. Gol en contra de Lucumí\n\n@footballmanager\n@sebasberon\n#Publicidad\n#FootballManager #FM27 #FootballManager27",
+    "hashtags": [
+     "#Publicidad",
+     "#FootballManager",
+     "#FM27",
+     "#FootballManager27"
+    ],
+    "largo": 122
+   },
+   "ficha_id": "sega-fm27"
+  }
  }
 ]

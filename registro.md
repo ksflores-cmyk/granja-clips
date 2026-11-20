@@ -5,3 +5,4 @@
 - 2026-11-18 14:00 GT · ciclo: sin toma
 - 2026-11-18 14:28 GT · ciclo: sin toma
 - 2026-11-18 16:16 GT · ciclo: sin toma
+- 2026-11-20 08:04 GT · ciclo: toma 2 (momentos) programada en shorts, tiktok, reels

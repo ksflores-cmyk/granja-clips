@@ -1,0 +1,32 @@
+[
+  {
+    "plataforma": "shorts",
+    "post_id": "6b0053787efc64d5e424f3a0",
+    "hora": "2026-11-20T09:00:00-06:00",
+    "campana": "SEGA FM27 (Clipping Culture)",
+    "toma": 2,
+    "estado": "programado",
+    "url": null,
+    "nota": "programado: el enlace se completa cuando Buffer lo marque sent"
+  },
+  {
+    "plataforma": "tiktok",
+    "post_id": "6b00537977e195b72208f1da",
+    "hora": "2026-11-20T09:00:00-06:00",
+    "campana": "SEGA FM27 (Clipping Culture)",
+    "toma": 2,
+    "estado": "programado",
+    "url": null,
+    "nota": "programado: el enlace se completa cuando Buffer lo marque sent"
+  },
+  {
+    "plataforma": "reels",
+    "post_id": "6b005379fc5b97f0f80f47e3",
+    "hora": "2026-11-20T09:00:00-06:00",
+    "campana": "SEGA FM27 (Clipping Culture)",
+    "toma": 2,
+    "estado": "programado",
+    "url": null,
+    "nota": "programado: el enlace se completa cuando Buffer lo marque sent"
+  }
+]
