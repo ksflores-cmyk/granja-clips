@@ -22,9 +22,17 @@ toma:
 movimiento:
   transiciones: ninguna         # sólo corte seco
   zoom_automatico: false
+  entrada_texto: {duracion_s: 0.35, subida_px: 14}   # piezas sin video: cada capa de diálogo entra con fundido y una subida corta
 sonido:
-  musica_de_biblioteca: false
+  musica_de_biblioteca: true    # decisión de Kevin del 19 nov 2026: sólo en piezas sin audio propio; manda sobre el false anterior
   sello_sonoro: opcional        # propio, de menos de 0.4 s
+musica:                         # pistas CC0 del release privado `musica`; nunca en fichas con reglas.sin_musica
+  manifiesto: marca/musica/pistas.yml
+  solo_sin_audio_propio: true
+  lufs: -16                     # sonoridad integrada objetivo
+  pico_db: -1.5                 # pico verdadero máximo
+  entrada_s: 0.4                # fundido de entrada
+  salida_s: 0.8                 # fundido de salida
 encabezado_max_palabras: 6
 subtitulo_max_lineas: 2
 mosca: {esquina: superior_derecha, texto: "GUION VIVO"}   # abajo la tapan los botones y el texto de las apps

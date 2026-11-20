@@ -6,6 +6,10 @@
 *.m4a
 *.wav
 *.mp3
+*.ogg
+*.flac
+*.opus
+*.aac
 media/
 salida/
 __pycache__/
