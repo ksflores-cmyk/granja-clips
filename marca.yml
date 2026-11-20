@@ -118,6 +118,7 @@ dividida:                       # tarea #16: pantalla dividida (facecam arriba, 
   cara_centro_y: 0.48           # fracción del alto del panel donde va el centro de la cara
   holgura_cara: 0.10            # aire alrededor de la caja de Haar (frente y barbilla) para decir que la cara va entera
   max_cara_panel: 0.85          # la cara con holgura ocupa a lo sumo esta fracción del alto del panel
+  max_escala_facecam: 4.0       # el recorte de la facecam no se amplía más que esto (más: facecam muy chica, pantalla completa)
   margen_cara: 24               # separación mínima entre la cara y cualquier placa, en píxeles del cuadro
   zona_accion: {x0: 60, y0: 960, x1: 1020, y1: 1300}   # dentro del panel del juego: ninguna placa lo toca
   placas_alterna: {y_fila: 690}  # posición de la fila (y de la cabecera tras ella) si la de siempre toca la cara
@@ -149,6 +150,12 @@ dividida:                       # tarea #16: pantalla dividida (facecam arriba, 
     min_alto_juego: 0.55        # alto mínimo del recorte del juego, como fracción de la fuente
     margen_facecam: 0.01        # separación entre el recorte del juego y la facecam, como fracción del ancho
     peso_estorbo: 3.0           # castigo por área tapada cuando no hay recorte que evite todos los estorbos
+    plazo_min_s: 5              # segundos de plazo que deben quedar para empezar a detectar
+    plazo_min_cara_s: 2         # y para buscar la cara en cada fotograma
+    min_lado_px: 12             # lado mínimo (px de análisis) de una cara para Haar
+    tamanos_juego: 8            # alturas de recorte probadas para la zona del juego
+    paso_juego: 2               # paso (px de análisis) de la búsqueda de la zona del juego
+    peso_centro: 0.05           # preferencia por un recorte centrado cuando hay empate
     peso_tamano: 0.1            # preferencia por el recorte más grande
 prohibido:
   - subtítulos palabra por palabra con una palabra en amarillo

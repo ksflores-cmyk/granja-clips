@@ -445,12 +445,12 @@ def validar_pantalla_completa(m, inf: Informe) -> None:
 
 
 CLAVES_DIVIDIDA = ["activa", "alto_facecam", "tolerancia_alto", "cara_centro_y", "holgura_cara", "max_cara_panel",
-                   "margen_cara", "zona_accion", "placas_alterna", "deteccion"]
+                   "margen_cara", "max_escala_facecam", "zona_accion", "placas_alterna", "deteccion"]
 CLAVES_DETECCION = ["fotogramas", "fotogramas_cara", "ancho_analisis", "haar", "min_fraccion_cara", "max_dispersion",
                     "max_area_cara", "centro_excluido", "expansion", "borde_persistente", "umbral_borde", "rejilla",
                     "banda", "banda_chat", "densidad_logo", "variacion_estatica", "densidad_chat", "min_celdas_chat",
                     "densidad_base_alerta", "salto_alerta", "min_celdas_alerta", "max_fraccion_alerta", "min_movimiento", "peso_bordes",
-                    "min_alto_juego", "margen_facecam", "peso_estorbo", "peso_tamano"]
+                    "min_alto_juego", "plazo_min_s", "plazo_min_cara_s", "min_lado_px", "tamanos_juego", "paso_juego", "peso_centro", "margen_facecam", "peso_estorbo", "peso_tamano"]
 
 
 def validar_dividida(m, inf: Informe) -> None:

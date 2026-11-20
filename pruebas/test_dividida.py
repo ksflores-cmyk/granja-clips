@@ -662,3 +662,49 @@ def test_dibujar_la_deteccion_guarda_un_png_con_las_cajas(stream, aj, tmp_path):
     assert img.size == (1280, 720)
     px = img.convert("RGB").getpixel((det["cara"]["x"], det["cara"]["y"] + det["cara"]["alto"] // 2))
     assert px == (255, 0, 0)                                                      # el borde rojo de la cara
+
+
+# ---------------------------------------------------------------- ronda 1: tope de escala, plazo y borde
+
+@necesita_ffmpeg
+def test_facecam_muy_chica_es_completa_con_motivo(tmp_path, marca):
+    src = generar_stream(tmp_path / "c.mp4", tmp_path / "w", facecam=True, estorbos=False, seg=6, audio=False)
+    cfg = copy.deepcopy(marca.datos)
+    cfg["dividida"]["max_escala_facecam"] = 2.0               # la facecam de 360 px sube a ~3x: pasa de 2
+    det = dividida.detectar(src, 0.0, 6.0, 1280, 720, ajustes=dividida.ajustes_de(marca), detector=cara_en(*CARA_STREAM))
+    with pytest.raises(ValueError, match="facecam muy chica: escala"):
+        dividida.paneles(Marca(cfg, marca.raiz), det, 1280, 720)
+    chica = det_de_mano()
+    chica["facecam"] = dividida.caja(1000, 60, 100, 56)
+    chica["cara"] = dividida.caja(1030, 70, 30, 30)
+    with pytest.raises(ValueError, match="facecam muy chica: escala"):
+        dividida.paneles(marca, chica, 1280, 720)
+
+
+def test_la_puerta_pone_rojo_si_la_escala_de_la_facecam_pasa_el_tope(marca):
+    g = dividida.paneles(marca, det_de_mano(), 1280, 720)
+    plan = {"geometria": {"paneles": g["paneles"], "deteccion": det_de_mano(), "cara": g["cara"], "capas": []}}
+    plan["geometria"]["paneles"][0]["recorte"]["escala"] = 6.0
+    assert any("escala 6.00" in m for m in dividida.problemas_division(plan, marca))
+
+
+def test_sin_tiempo_cooperativo_es_completa_y_la_alarma_dura_sube(aj, tmp_path, monkeypatch):
+    def alarma(gris):
+        raise plazo.SinTiempo("alarma dura")
+    monkeypatch.setattr(encuadre, "_fotogramas_grises", lambda *a, **k: np.zeros((24, 36, 64), dtype=np.float32))
+    with pytest.raises(plazo.SinTiempo):
+        dividida.detectar(tmp_path / "x.mp4", 0.0, 6.0, 1280, 720, ajustes=aj, detector=alarma)
+    monkeypatch.setattr(plazo, "queda", lambda s: False)
+    det = dividida.detectar(tmp_path / "x.mp4", 0.0, 6.0, 1280, 720, ajustes=aj, detector=cara_en(0.9, 0.1, 0.05))
+    assert det["modo"] == "completa" and "plazo" in det["motivo"]
+
+
+@necesita_ffmpeg
+def test_cara_pegada_al_borde_cae_a_completa_con_motivo(fondo, aj):
+    det = detectar(fondo, aj, cara_en(0.97, 0.05, 0.06))              # la caja de la cara toca el borde del cuadro
+    if det["modo"] == "completa":
+        assert det["motivo"]
+    else:                                                               # la holgura de la cara no cabe: no hay división
+        pegada = {**det, "cara": dividida.caja(1200, 0, 80, 80), "facecam": dividida.caja(1100, 0, 180, 100)}
+        with pytest.raises(ValueError, match="no queda entera"):
+            dividida.paneles(Marca.cargar(RAIZ_REAL), pegada, 1280, 720)

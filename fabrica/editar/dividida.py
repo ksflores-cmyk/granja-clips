@@ -67,6 +67,10 @@ def _par(n: float) -> int:
 
 # ---------------------------------------------------------------- cara (Haar o detector inyectado)
 
+class _SinPlazo(Exception):
+    """El chequeo cooperativo del plazo (`plazo.queda`) dice que no hay tiempo: la toma sigue a pantalla completa."""
+
+
 class SinCv2(Exception):
     """No se puede usar OpenCV: el motivo va en el mensaje."""
 
@@ -87,7 +91,7 @@ def detector_haar(aj: dict):
     h = aj["haar"]
 
     def detectar_caras(gris: np.ndarray) -> list[tuple[int, int, int, int]]:
-        lado = max(12, int(round(float(h["min_lado"]) * gris.shape[1])))
+        lado = max(int(aj["min_lado_px"]), int(round(float(h["min_lado"]) * gris.shape[1])))
         cajas = clasificador.detectMultiScale(gris, scaleFactor=float(h["escala"]), minNeighbors=int(h["vecinos"]),
                                               minSize=(lado, lado))
         return [tuple(int(v) for v in c) for c in cajas]
@@ -101,8 +105,8 @@ def _cara_estable(pila: np.ndarray, detector, aj: dict) -> tuple[tuple | None, s
     indices = sorted({int(round(i)) for i in np.linspace(0, n - 1, k)})
     cuadros = []
     for i in indices:
-        if not plazo.queda(2):
-            raise plazo.SinTiempo("se acabó el plazo buscando la cara")
+        if not plazo.queda(float(aj["plazo_min_cara_s"])):
+            raise _SinPlazo("se acabó el plazo buscando la cara")
         gris = np.clip(pila[i], 0, 255).astype(np.uint8)
         cuadros.append([(x + w / 2, y + h / 2, float(w), float(h)) for x, y, w, h in detector(gris)])
     con_cara = sum(1 for c in cuadros if c)
@@ -305,10 +309,10 @@ def _zona_juego(pila: np.ndarray, facecam: tuple, estorbos: list[tuple], aj: dic
     if h_max < h_min:
         return None
     mejores: dict[bool, tuple | None] = {False: None, True: None}      # {con_castigo: (puntaje, x, y, w, h)}
-    for hh in np.unique(np.linspace(h_max, h_min, 8).astype(int)):
+    for hh in np.unique(np.linspace(h_max, h_min, int(aj["tamanos_juego"])).astype(int)):
         hh = int(hh)
         ww = min(ancho, int(round(hh * razon)))
-        paso = 2
+        paso = int(aj["paso_juego"])
         ys, xs = np.arange(0, alto - hh + 1, paso), np.arange(0, ancho - ww + 1, paso)
         if len(ys) == 0 or len(xs) == 0:
             continue
@@ -316,7 +320,7 @@ def _zona_juego(pila: np.ndarray, facecam: tuple, estorbos: list[tuple], aj: dic
         capt = _suma(i_en, ys, xs, hh, ww) / total if total > 0 else np.zeros((len(ys), len(xs)))
         sobre_e = _suma(i_e, ys, xs, hh, ww) / float(hh * ww)
         centro = (np.hypot((xs[None, :] + ww / 2) / ancho - 0.5, (ys[:, None] + hh / 2) / alto - 0.5))
-        base = capt + float(aj["peso_tamano"]) * hh / h_max - 0.05 * centro
+        base = capt + float(aj["peso_tamano"]) * hh / h_max - float(aj["peso_centro"]) * centro
         for castigo, valido, puntaje in ((False, ~toca_f & (sobre_e <= 0), base),
                                          (True, ~toca_f, base - float(aj["peso_estorbo"]) * sobre_e)):
             if not valido.any():
@@ -356,8 +360,10 @@ def detectar(ruta, inicio: float, duracion: float, ancho_v: int, alto_v: int, *,
         return _detectar(Path(ruta), float(inicio), float(duracion), int(ancho_v), int(alto_v), ajustes, detector)
     except SinCv2 as e:
         return _completa(f"sin OpenCV: {e}")
-    except plazo.SinTiempo as e:
+    except _SinPlazo as e:           # `plazo.SinTiempo` (la alarma dura) NO se traga: sube, como en el resto de la fábrica
         return _completa(f"se acabó el plazo del ciclo ({e})")
+    except plazo.SinTiempo:
+        raise
     except Exception as e:       # la detección es un extra: jamás debe romper la toma
         return _completa(f"falló la detección ({type(e).__name__}: {e})")
 
@@ -365,7 +371,7 @@ def detectar(ruta, inicio: float, duracion: float, ancho_v: int, alto_v: int, *,
 def _detectar(ruta: Path, inicio: float, duracion: float, ancho_v: int, alto_v: int, aj: dict, detector) -> dict:
     if ancho_v <= 0 or alto_v <= 0:
         return _completa(f"fuente con tamaño inválido {ancho_v}x{alto_v}")
-    if not plazo.queda(5):
+    if not plazo.queda(float(aj["plazo_min_s"])):
         return _completa("sin tiempo en el plazo del ciclo para detectar")
     if detector is None:
         detector = detector_haar(aj)
@@ -470,6 +476,8 @@ def paneles(marca, det: dict, ancho_v: int, alto_v: int) -> dict:
     esc = rf["escala"]
     cara_cuadro = caja((cara["x"] - rf["x"]) * esc, (cara["y"] - rf["y"]) * esc,
                        cara["ancho"] * esc, cara["alto"] * esc)
+    if rf["escala"] > float(cfg["max_escala_facecam"]):
+        raise ValueError(f"facecam muy chica: escala {rf['escala']:.2f} > {float(cfg['max_escala_facecam']):g}")
     rj = _recorte(juego["x"], juego["y"], juego["ancho"], juego["alto"], dest_j)
     if rj["x"] + rj["ancho"] > ancho_v or rj["y"] + rj["alto"] > alto_v:
         raise ValueError("el recorte del juego se sale de la fuente")
@@ -543,6 +551,8 @@ def problemas_division(plan: dict, marca) -> list[str]:
         det = geo["deteccion"]
         fc, cara = det["facecam"], det["cara"]
         rf, rj = pf["recorte"], pj["recorte"]
+        if float(rf["escala"]) > float(cfg["max_escala_facecam"]):
+            malas.append(f"la facecam se amplía a escala {float(rf['escala']):.2f} y el tope es {float(cfg['max_escala_facecam']):g}")
         rfc = {k: rf[k] for k in ("x", "y", "ancho", "alto")}
         rjc = {k: rj[k] for k in ("x", "y", "ancho", "alto")}
         if _interseca(rjc, fc):
