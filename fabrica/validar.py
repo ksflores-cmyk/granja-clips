@@ -10,6 +10,7 @@ import re
 import sys
 from datetime import date, datetime
 from pathlib import Path
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
@@ -250,6 +251,13 @@ def _validar_entrada_material(m: dict, et: str, ficha: dict, inf: Informe) -> No
     """Entrada con creador y etiquetas por red: {url, creador, etiquetas: {shorts, tiktok, reels}, archivo?}."""
     if not _es_https(m.get("url")):
         inf.error(f"{et}: url debe ser https")
+    elif urlparse(m["url"]).hostname == "github.com":
+        from .release import es_url_release
+        if not es_url_release(m["url"]):
+            inf.error(f"{et}: url de github.com debe ser un release (https://github.com/<dueño>/<repo>/releases/download/<tag>/<nombre>)")
+    if "drive_url" in m and not (isinstance(m["drive_url"], str)
+                                 and m["drive_url"].startswith("https://drive.usercontent.google.com/download?id=")):
+        inf.error(f"{et}: drive_url debe empezar por https://drive.usercontent.google.com/download?id=")
     if not (isinstance(m.get("creador"), str) and m["creador"].strip()):
         inf.error(f"{et}: creador es obligatorio")
     etq = m.get("etiquetas")

@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 from .config import cargar_yaml, raiz_repo
 from .detectar import Candidato, ClienteTwitch, ErrorTwitch
-from .fuentes import cargar_fuentes, es_publicable
+from .fuentes import cargar_fuentes, entrada_material, es_publicable
 from .registro import ZONA
 
 
@@ -131,9 +131,17 @@ def ids_en_marcador(raiz) -> set[str]:
 
 
 def puerta_no_repetido(raiz, cand: Candidato) -> tuple[bool, str]:
-    if cand.id_origen in _vistos(raiz):
+    ids = [cand.id_origen]
+    if cand.origen == "brief":     # el material pasó de Drive al release: su URL de Drive sigue siendo la misma fuente
+        ficha = _ficha(raiz, cand.fuente_id)
+        entrada = entrada_material(ficha, url=cand.url) if ficha else None
+        if entrada and entrada.get("drive_url"):
+            ids.append(entrada["drive_url"])
+    vistos = _vistos(raiz)
+    if any(i in vistos for i in ids):
         return False, "ya está en estado/vistos.txt"
-    if cand.id_origen and cand.id_origen in ids_en_marcador(raiz):
+    en_marcador = ids_en_marcador(raiz)
+    if any(i and i in en_marcador for i in ids):
         return False, "ya está en el marcador"
     return True, "ok"
 

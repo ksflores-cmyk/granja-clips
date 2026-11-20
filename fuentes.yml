@@ -100,23 +100,28 @@
   pilares: [momentos]
   marca_agua: marca/campanas/fm27/logo.png
   material:
-    - url: "https://drive.usercontent.google.com/download?id=1Z8QGSsOLahIn15ludN-ItQ56aSJ_Q-hV&export=download&confirm=t"
+    - url: "https://github.com/ksflores-cmyk/granja-clips/releases/download/fuentes-fm27/fm27-sebasberon.mp4"
+      drive_url: "https://drive.usercontent.google.com/download?id=1Z8QGSsOLahIn15ludN-ItQ56aSJ_Q-hV&export=download&confirm=t"
       archivo: "Football Manager 27 Spanish Content_SEBASBERON.mp4"
       creador: SEBASBERON
       etiquetas: {reels: "@sebasberon", tiktok: "@sebasclips", shorts: "@sebasberon"}
-    - url: "https://drive.usercontent.google.com/download?id=1ZzpMQ5LzOem94pys0KAgmLYSf92YkmEP&export=download&confirm=t"
+    - url: "https://github.com/ksflores-cmyk/granja-clips/releases/download/fuentes-fm27/fm27-daro.mp4"
+      drive_url: "https://drive.usercontent.google.com/download?id=1ZzpMQ5LzOem94pys0KAgmLYSf92YkmEP&export=download&confirm=t"
       archivo: "DARO.mp4"
       creador: DARO
       etiquetas: {reels: "@darizenz", tiktok: "Credit to Dario Zenz", shorts: "Credit to Dario Zenz"}
-    - url: "https://drive.usercontent.google.com/download?id=1pvvTm9uKcrd_BjN1SMF7048FGn1Ni2vH&export=download&confirm=t"
+    - url: "https://github.com/ksflores-cmyk/granja-clips/releases/download/fuentes-fm27/fm27-eric-zzeta.mp4"
+      drive_url: "https://drive.usercontent.google.com/download?id=1pvvTm9uKcrd_BjN1SMF7048FGn1Ni2vH&export=download&confirm=t"
       archivo: "ERIC ZZETA.mp4"
       creador: ERIC ZZETA
       etiquetas: {reels: "@ericzzeta", tiktok: "@ericzzeta", shorts: "@ericzzeta"}
-    - url: "https://drive.usercontent.google.com/download?id=1xo_SFCmZabeXR3afEl3SZkH43R-boMkf&export=download&confirm=t"
+    - url: "https://github.com/ksflores-cmyk/granja-clips/releases/download/fuentes-fm27/fm27-habemus-gamer.mov"
+      drive_url: "https://drive.usercontent.google.com/download?id=1xo_SFCmZabeXR3afEl3SZkH43R-boMkf&export=download&confirm=t"
       archivo: "HABEMUS GAMER.mov"
       creador: HABEMUS GAMER
       etiquetas: {reels: "@habemusfutbol", tiktok: "@habemusfutbol", shorts: "@habemusfutbol"}
-    - url: "https://drive.usercontent.google.com/download?id=1ZU5eMBd_yl0HuPH_YEyGQ8XqTmbtEHOS&export=download&confirm=t"
+    - url: "https://github.com/ksflores-cmyk/granja-clips/releases/download/fuentes-fm27/fm27-tio-pedro.mp4"
+      drive_url: "https://drive.usercontent.google.com/download?id=1ZU5eMBd_yl0HuPH_YEyGQ8XqTmbtEHOS&export=download&confirm=t"
       archivo: "TIO PEDRO.MP4"
       creador: TIO PEDRO
       etiquetas: {reels: "@eltiopedro_fut", tiktok: "@eltiopedro_fut", shorts: "@ElTioPedro"}
@@ -130,7 +135,7 @@
   uso: produccion
   publicable: true
   envio: manual
-  notas: "Brief leído el 18 nov 2026. Paga hasta US$2 por mil vistas de México y Argentina. Sólo metraje de la carpeta oficial; sin música de fondo, sin voces IA, sin datos inventados, sin llamar gameplay a un tráiler. Marca de agua: logo FM. Post publicado 30 días, likes visibles. Texto: español, @footballmanager, etiqueta del creador, #Publicidad en su línea y primer hashtag."
+  notas: "Brief leído el 18 nov 2026. Paga hasta US$2 por mil vistas de México y Argentina. Sólo metraje de la carpeta oficial; sin música de fondo, sin voces IA, sin datos inventados, sin llamar gameplay a un tráiler. Marca de agua: logo FM. Post publicado 30 días, likes visibles. Texto: español, @footballmanager, etiqueta del creador, #Publicidad en su línea y primer hashtag. Material copiado una vez de la carpeta oficial (Drive) al release privado fuentes-fm27 por el workflow release-fm27 (20 nov 2026); la fábrica no toca Drive."
 
 # Ejemplo de ficha tipo A (no es una fuente real; no descomentar sin brief leído):
 # - id: ejemplo-campana-001
