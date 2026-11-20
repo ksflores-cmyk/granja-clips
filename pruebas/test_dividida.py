@@ -708,3 +708,14 @@ def test_cara_pegada_al_borde_cae_a_completa_con_motivo(fondo, aj):
         pegada = {**det, "cara": dividida.caja(1200, 0, 80, 80), "facecam": dividida.caja(1100, 0, 180, 100)}
         with pytest.raises(ValueError, match="no queda entera"):
             dividida.paneles(Marca.cargar(RAIZ_REAL), pegada, 1280, 720)
+
+
+def test_humo_detector_haar_real_lee_sus_ajustes(aj):
+    """El detector de verdad (Haar) se arma con los ajustes de marca.yml y corre sobre una imagen sin cara.
+
+    Las demás pruebas usan un detector falso: ésta atrapa una clave de ajustes mal leída en la puerta rápida.
+    """
+    pytest.importorskip("cv2")
+    detectar_caras = dividida.detector_haar(aj)
+    gris = np.full((360, 640), 128, dtype=np.uint8)
+    assert detectar_caras(gris) == []
