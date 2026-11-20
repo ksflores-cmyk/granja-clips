@@ -211,7 +211,11 @@ def descargar(raiz, candidato, ficha: dict | None, hoy: date, *, abrir=None, eje
         if candidato.origen == "twitch":
             ruta = bajar_twitch(candidato.url, carpeta, ejecutor=ejecutor)
         else:
-            ruta = bajar_https(candidato.url, carpeta / "origen.mp4", abrir=abrir)
+            from . import release   # import perezoso: release importa este módulo
+            if abrir is None and release.es_url_release(candidato.url):   # material privado en el release
+                ruta = release.bajar(candidato.url, carpeta / "origen.mp4")
+            else:
+                ruta = bajar_https(candidato.url, carpeta / "origen.mp4", abrir=abrir)
         puertas.anotar_visto(raiz, candidato.id_origen)
         try:
             duracion = float(sondear_video(ruta)["duracion"])

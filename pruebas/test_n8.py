@@ -23,6 +23,9 @@ IDS = {
     "ERIC ZZETA": "1pvvTm9uKcrd_BjN1SMF7048FGn1Ni2vH", "HABEMUS GAMER": "1xo_SFCmZabeXR3afEl3SZkH43R-boMkf",
     "TIO PEDRO": "1ZU5eMBd_yl0HuPH_YEyGQ8XqTmbtEHOS",
 }
+PREFIJO_RELEASE = "https://github.com/ksflores-cmyk/granja-clips/releases/download/fuentes-fm27/"
+ASSETS = {"SEBASBERON": "fm27-sebasberon.mp4", "DARO": "fm27-daro.mp4", "ERIC ZZETA": "fm27-eric-zzeta.mp4",
+          "HABEMUS GAMER": "fm27-habemus-gamer.mov", "TIO PEDRO": "fm27-tio-pedro.mp4"}
 RED = {"reels": 0, "tiktok": 1, "shorts": 2}
 
 
@@ -53,11 +56,12 @@ def test_ficha_sega_fm27_cinco_urls_directas_con_creador_y_etiquetas():
     urls = fuentes.urls_material(f)
     assert len(urls) == 5
     for u in urls:
-        assert u.startswith("https://drive.usercontent.google.com/download?id=") \
-            and u.endswith("&export=download&confirm=t")
+        assert u.startswith(PREFIJO_RELEASE)
     for creador, tags in CREADORES.items():
         m = fuentes.entrada_material(f, creador=creador)
-        assert m is not None and m["url"].split("id=")[1].split("&")[0] == IDS[creador]
+        assert m is not None and m["url"] == PREFIJO_RELEASE + ASSETS[creador]
+        assert m["drive_url"].startswith("https://drive.usercontent.google.com/download?id=")
+        assert m["drive_url"].split("id=")[1].split("&")[0] == IDS[creador]
         for red, i in RED.items():
             assert fuentes.etiqueta_creador(f, creador, red) == tags[i]
     assert fuentes.puede_descargar(f)[0]
@@ -590,7 +594,7 @@ def candidatos_de_fm27(repo):
 def test_el_detector_trae_los_cinco_videos_con_su_creador(repo):
     cands = candidatos_de_fm27(repo)
     assert sorted(cands) == sorted(CREADORES)
-    assert all(c.origen == "brief" and c.pilar is None and c.url.startswith("https://drive.usercontent") for c in cands.values())
+    assert all(c.origen == "brief" and c.pilar is None and c.url == PREFIJO_RELEASE + ASSETS[c.creador] for c in cands.values())
     assert cands["HABEMUS GAMER"].titulo == "HABEMUS GAMER.mov"
 
 
