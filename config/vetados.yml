@@ -1,0 +1,4 @@
+# Lista negra de la ficha T (decisión de Kevin, 19 nov 2026). Logins de Twitch en minúsculas.
+logins: [rubius, auronplay, ibai, spreen, westcol, juanguarnizo]
+# Equipos de Twitch vetados: todos sus miembros (Helix /teams). Si no se puede leer un equipo, la ficha T no corre (falla cerrada).
+equipos_twitch: [youplanet]
