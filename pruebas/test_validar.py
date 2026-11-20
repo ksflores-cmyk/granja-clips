@@ -134,7 +134,7 @@ def test_contador_invalido_falla(repo, editar_yaml):
 @pytest.mark.parametrize("seccion,clave,valor,msg", [
     ("movimiento", "transiciones", "fundido", "transiciones"),
     ("movimiento", "zoom_automatico", True, "zoom_automatico"),
-    ("sonido", "musica_de_biblioteca", True, "musica_de_biblioteca"),
+    ("sonido", "musica_de_biblioteca", "quizá", "musica_de_biblioteca"),
 ])
 def test_reglas_de_movimiento_y_sonido(repo, editar_yaml, seccion, clave, valor, msg):
     marca(repo, editar_yaml, lambda d: d[seccion].update({clave: valor}))
