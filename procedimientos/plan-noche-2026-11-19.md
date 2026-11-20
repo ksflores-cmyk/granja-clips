@@ -37,6 +37,7 @@ Lo escribe el jefe de Clips el 19 nov, 8:30 p. m. GT. Cada tarea programada de e
 
 > **Aviso (20 nov, 1:15 a. m.):** las sesiones programadas no pueden empujar a `main` (sólo los commits de bitácora pasan). Deja tu rama con una PR **lista para revisión (no borrador)** contra `main`, puerta en verde, y escribe en la bitácora «lista para fusionar». El jefe la fusiona en sus pasadas de las 2:40, 4:20 y 6:20. Construye siempre sobre `main` actualizado; si dependes de una PR sin fusionar, apila tu rama sobre ella y dilo.
 > **Instagram suspendido** (20 nov, 1:00 a. m.): Meta inhabilitó @guionvivo y Kevin ya apeló. Nadie toca Instagram (ni Buffer ni navegador) hasta nuevo aviso; la fábrica publica sólo en Shorts y TikTok.
+> **Instagram rehabilitado** (20 nov, 1:25 a. m.) y **decisión de Kevin (1:30 a. m.): "IG normal"**, 6 al día como las otras redes, en cuanto el canal esté conectado en Buffer (`isDisconnected: false`). Mientras siga desconectado, la fábrica lo salta sin error y el reporte lo dice.
 > **Toma 1 borrada también en TikTok** (Kevin, 20 nov).
 
 1. Preparación: `add_repo` de `ksflores-cmyk/granja-clips` (push) y `ksflores-cmyk/cuartel-general` (push); clonar con `--depth 50`. `gh` funciona por el proxy aunque `gh auth status` diga que el token no vale.
