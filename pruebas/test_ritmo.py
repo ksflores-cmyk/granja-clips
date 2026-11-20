@@ -393,3 +393,14 @@ def test_no_quedan_las_listas_viejas_de_huecos_en_el_codigo():
         texto = (raiz / rel).read_text(encoding="utf-8")
         for viejo in ("huecos_" + "normales", "huecos_" + "estreno"):
             assert viejo not in texto, rel
+
+
+def test_salida_tapa_el_token_de_github_y_el_paso_de_musica_no_corta_el_job():
+    import yaml as _y
+    for nombre in ("GITHUB_TOKEN", "GH_TOKEN"):
+        sal = []
+        ciclo.Salida(sal.append, {nombre: "ghs_abcdefgh1234"})("token ghs_abcdefgh1234 en el log")
+        assert "ghs_abcdefgh1234" not in sal[0]
+    pasos = _y.safe_load(WORKFLOW.read_text(encoding="utf-8"))["jobs"]
+    paso = next(p for j in pasos.values() for p in j["steps"] if p.get("name") == "Bajar música del release")
+    assert paso["continue-on-error"] is True
