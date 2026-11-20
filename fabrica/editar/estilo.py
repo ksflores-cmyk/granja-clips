@@ -23,6 +23,7 @@ from .. import plazo
 from . import agua as mod_agua
 from . import cierre as mod_cierre
 from . import dialogo as mod_dialogo
+from . import dividida as mod_dividida
 from . import lienzo, placas
 from .lienzo import Toma, _limpia, partir
 from .marca import Marca
@@ -201,13 +202,20 @@ def es_v2(plan: dict) -> bool:
     return plan.get("plantilla") == PLANTILLA_V2
 
 
+def es_dividida(plan: dict) -> bool:
+    """True si el plan v2 usa la disposición dividida (facecam arriba, juego abajo)."""
+    return es_v2(plan) and (plan.get("geometria") or {}).get("disposicion") == mod_dividida.DIVIDIDA
+
+
 def _placas_del_plan(plan: dict, marca: Marca) -> list[placas.Placa]:
     """Las placas que el plan debe llevar, dibujadas desde el texto del plan y marca.yml. ValueError si no se pueden."""
     en_plan = (plan.get("campana") or {}).get("marca_agua")
     logo = None
     if en_plan and (marca.raiz / en_plan["archivo"]).is_file():
         logo = marca.raiz / en_plan["archivo"]
-    return placas.construir(marca, _toma(plan), plan.get("lineas", []), float(plan.get("duracion") or 0), logo)
+    posicion = (plan.get("geometria") or {}).get("posicion_placas", "estandar") if es_dividida(plan) else "estandar"
+    return placas.construir(marca, _toma(plan), plan.get("lineas", []), float(plan.get("duracion") or 0), logo,
+                            posicion)
 
 
 def _comparar_placa(real: Image.Image, placa: placas.Placa, papel: Image.Image) -> dict[str, int]:
@@ -261,10 +269,31 @@ def _fuente_encuadrada(ruta: Path, t_fuente: float, recorte: dict, marca: Marca)
     return f.crop((x, y, x + w, y + h)).resize((marca.ancho, marca.alto), Image.LANCZOS).convert("RGBA")
 
 
+def _fuente_dividida(ruta: Path, t_fuente: float, paneles: list[dict], marca: Marca) -> Image.Image | None:
+    """Fotograma de la fuente compuesto con los paneles del plan: cada recorte, escalado a su destino, en el cuadro."""
+    f = _fotograma(ruta, t_fuente)
+    if f is None:
+        return None
+    lienzo_ = Image.new("RGBA", (marca.ancho, marca.alto), (0, 0, 0, 255))
+    try:
+        for p in paneles:
+            r, d = p["recorte"], p["destino"]
+            x, y, w, h = (int(r[k]) for k in ("x", "y", "ancho", "alto"))
+            dx, dy, dw, dh = (int(d[k]) for k in ("x", "y", "ancho", "alto"))
+            if w <= 0 or h <= 0 or x < 0 or y < 0 or x + w > f.width or y + h > f.height or dw <= 0 or dh <= 0:
+                return None
+            lienzo_.paste(f.crop((x, y, x + w, y + h)).resize((dw, dh), Image.LANCZOS).convert("RGBA"), (dx, dy))
+    except (KeyError, TypeError, ValueError):
+        return None
+    return lienzo_
+
+
 def _fuente_esperada(plan: dict, marca: Marca, t: float) -> Image.Image | None:
     """Fotograma de la fuente en el instante `t` de la toma, tal como el plan dice que se ve (sin placas)."""
     origen, geo = plan.get("origen") or {}, plan.get("geometria") or {}
     ruta, t_fuente = Path(origen["archivo"]), float(origen["inicio"]) + t
+    if es_dividida(plan):
+        return _fuente_dividida(ruta, t_fuente, geo.get("paneles") or [], marca)
     if es_v2(plan):
         return _fuente_encuadrada(ruta, t_fuente, geo.get("recorte") or {}, marca)
     return _fuente_en_cuerpo(ruta, t_fuente, geo["cuerpo"])
@@ -305,6 +334,17 @@ def pantalla_completa(plan: dict, marca: Marca) -> tuple[bool, str]:
     esperado = {"x": 0, "y": 0, "ancho": marca.ancho, "alto": marca.alto}
     if geo.get("cuerpo") != esperado:
         return False, f"el cuerpo es {geo.get('cuerpo')} y debe ser {esperado}"
+    if es_dividida(plan):
+        ruta = Path(str(origen.get("archivo", "")))
+        if not ruta.is_file():
+            return False, f"el archivo de origen no está: {ruta}"
+        from .componer import sondear_video
+        info = sondear_video(ruta)
+        malas = mod_dividida.problemas_paneles(geo, marca, info["ancho"], info["alto"])
+        if malas:
+            return False, "; ".join(malas)
+        return True, (f"cuerpo {marca.ancho}x{marca.alto}, {len(geo['paneles'])} paneles sin huecos ni solapes: "
+                      + ", ".join(f"{p['nombre']} {p['destino']['alto']} px" for p in geo["paneles"]))
     r = geo.get("recorte") or {}
     try:
         x, y, w, h, esc = (float(r[k]) for k in ("x", "y", "ancho", "alto", "escala"))
@@ -330,7 +370,8 @@ def capas_fuera_de_la_accion(plan: dict, marca: Marca) -> tuple[bool, str]:
     capas = (plan.get("geometria") or {}).get("capas")
     if not isinstance(capas, list) or not capas:
         return False, "el plan no trae geometria.capas"
-    malas = placas.problemas_capas(capas, marca)
+    accion = marca.datos["dividida"]["zona_accion"] if es_dividida(plan) else None
+    malas = placas.problemas_capas(capas, marca, accion)
     return not malas, "; ".join(malas) if malas else f"{len(capas)} placas dentro de la zona segura y fuera de la zona de acción"
 
 
@@ -355,7 +396,7 @@ def bordes_coinciden(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     Un video con franjas negras o de papel falla; una escena oscura de verdad no, porque se compara contra la fuente.
     """
     origen, geo = plan.get("origen") or {}, plan.get("geometria") or {}
-    if not origen or not geo.get("recorte"):
+    if not origen or not (geo.get("recorte") or (es_dividida(plan) and geo.get("paneles"))):
         return False, "el plan no trae origen y recorte"
     dur = float(plan.get("duracion") or 0)
     ruta = Path(str(origen.get("archivo", "")))
@@ -1129,6 +1170,10 @@ def revisar(video: Path, plan: dict, marca: Marca, ficha: dict | None = None) ->
     if con_video:
         ok_pc, det_pc = pantalla_completa(plan, marca)
         punto("plan", "Pantalla completa (cuerpo 1080x1920, sin franjas)", ok_pc, det_pc)
+    if es_dividida(plan):
+        malas_div = mod_dividida.problemas_division(plan, marca)
+        punto("plan", "Pantalla dividida (facecam arriba, juego abajo)", not malas_div,
+              "; ".join(malas_div) or "facecam arriba, juego abajo, ninguna placa toca la cara")
     if v2:
         ok_ca, det_ca = capas_fuera_de_la_accion(plan, marca)
         punto("plan", "Capas fuera de la zona de acción", ok_ca, det_ca)

@@ -22,6 +22,7 @@ from .. import plazo
 from . import agua as mod_agua
 from . import cierre as mod_cierre
 from . import dialogo as mod_dialogo
+from . import dividida as mod_dividida
 from . import encuadre, lienzo, placas
 from .lienzo import Toma
 from .marca import Marca
@@ -192,17 +193,22 @@ def orden_ffmpeg_pantalla_completa(*, salida: str, duracion: float, ancho: int, 
     """Orden de ffmpeg de una toma CON video en la plantilla v2 (función pura).
 
     `video`: {ruta, inicio, recorte {x, y, ancho, alto}, audio (bool)}. El clip se recorta (fijo) y se escala para
-    cubrir `ancho`x`alto`; encima van las placas `[(ruta PNG, x, y, t0, t1)]`. Si el video trae audio, es el de
+    cubrir `ancho`x`alto`. Pantalla dividida: en vez de `recorte`, `paneles` [{recorte, destino {x, y, ancho, alto}}]:
+    el video se parte en una copia por panel, cada una con su `crop` y su `scale`, y se juntan (`vstack` si los paneles
+    se apilan sin huecos; si no, `overlay` sobre un fondo negro); encima van las placas `[(ruta PNG, x, y, t0, t1)]`. Si el video trae audio, es el de
     origen, tal cual (nunca música ni voz añadidas: ValueError si llega `musica`). Video mudo: la pista `musica`
     (mismo formato que en `orden_ffmpeg`) o, sin ella, silencio.
     """
     if musica is not None and video.get("audio", True):
         raise ValueError("el video trae audio propio: no se le añade música")
     d = f"{duracion:g}"
-    r = video["recorte"]
     entradas = ["-ss", f"{video['inicio']:g}", "-t", d, "-i", video["ruta"]]
-    filtros = [f"[0:v]fps=30,crop={r['ancho']}:{r['alto']}:{r['x']}:{r['y']},scale={ancho}:{alto}:flags=lanczos,"
-               f"setsar=1[c0]"]
+    if video.get("paneles"):
+        filtros = _filtros_paneles(video["paneles"], ancho, alto)
+    else:
+        r = video["recorte"]
+        filtros = [f"[0:v]fps=30,crop={r['ancho']}:{r['alto']}:{r['x']}:{r['y']},scale={ancho}:{alto}:flags=lanczos,"
+                   f"setsar=1[c0]"]
     actual = "c0"
     for i, (ruta, x, y, t0, t1) in enumerate(placas):
         entradas += ["-loop", "1", "-framerate", "30", "-t", d, "-i", ruta]
@@ -220,6 +226,33 @@ def orden_ffmpeg_pantalla_completa(*, salida: str, duracion: float, ancho: int, 
         entradas += ["-f", "lavfi", "-t", d, "-i", "anullsrc=r=48000:cl=stereo"]
         mapa_audio = f"{1 + len(placas)}:a"
     return _orden(entradas, filtros, mapa_audio, d, salida)
+
+
+def _filtros_paneles(paneles: list[dict], ancho: int, alto: int) -> list[str]:
+    """Cadena de filtros de los paneles (función pura): `split`, un `crop`+`scale` por panel y `vstack` u `overlay`."""
+    n = len(paneles)
+    if n < 2:
+        raise ValueError("la pantalla dividida necesita al menos 2 paneles")
+    ps = sorted(paneles, key=lambda p: p["destino"]["y"])
+    filtros = ["[0:v]fps=30,split=%d%s" % (n, "".join(f"[s{i}]" for i in range(n)))]
+    for i, p in enumerate(ps):
+        r, d = p["recorte"], p["destino"]
+        filtros.append(f"[s{i}]crop={r['ancho']}:{r['alto']}:{r['x']}:{r['y']},"
+                       f"scale={d['ancho']}:{d['alto']}:flags=lanczos,setsar=1[p{i}]")
+    apilados, y = True, 0
+    for p in ps:
+        d = p["destino"]
+        apilados = apilados and d["x"] == 0 and d["ancho"] == ancho and d["y"] == y
+        y += d["alto"]
+    if apilados and y == alto:
+        filtros.append("".join(f"[p{i}]" for i in range(n)) + f"vstack=inputs={n}[c0]")
+        return filtros
+    filtros.append(f"color=c=black:s={ancho}x{alto}:r=30,format=yuv420p[f0]")
+    for i, p in enumerate(ps):
+        d = p["destino"]
+        filtros.append(f"[f{i}][p{i}]overlay={d['x']}:{d['y']}[f{i + 1}]")
+    filtros.append(f"[f{n}]null[c0]")
+    return filtros
 
 
 def _orden(entradas: list[str], filtros: list[str], mapa_audio: str, d: str, salida: str) -> list[str]:
@@ -364,6 +397,35 @@ def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duraci
     return plan
 
 
+def _disposicion_dividida(marca: Marca, t: Toma, lineas: list[Linea], duracion: float, logo, ficha, fuente_video: Path,
+                          inicio: float, info: dict) -> dict | None:
+    """None si la pantalla dividida está apagada (marca.yml o ficha). Si no, la decisión de la toma: o bien
+    {modo: "dividida", placas, capas, paneles, cara, deteccion, posicion} o {modo: "completa", deteccion} con el motivo
+    en `deteccion["motivo"]` (sin facecam, sin sitio para el juego o sin posición libre para las placas)."""
+    if not mod_dividida.activa(marca, ficha):
+        return None
+    det = mod_dividida.detectar(fuente_video, inicio, duracion, info["ancho"], info["alto"],
+                                ajustes=mod_dividida.ajustes_de(marca))
+    if det["modo"] != mod_dividida.DIVIDIDA:
+        return {"modo": mod_dividida.COMPLETA, "deteccion": det}
+    try:
+        geo = mod_dividida.paneles(marca, det, info["ancho"], info["alto"])
+    except ValueError as e:
+        return {"modo": mod_dividida.COMPLETA, "deteccion": {**det, "modo": mod_dividida.COMPLETA, "motivo": str(e)}}
+    accion = marca.datos["dividida"]["zona_accion"]
+    motivos = []
+    for posicion in ("estandar", "alterna"):
+        todas = placas.construir(marca, t, lineas, duracion, logo, posicion)
+        capas = [p.capa() for p in todas]
+        malas = placas.problemas_capas(capas, marca, accion) + mod_dividida.problemas_placas(capas, geo["cara"], marca)
+        if not malas:
+            return {"modo": mod_dividida.DIVIDIDA, "placas": todas, "capas": capas, "paneles": geo["paneles"],
+                    "cara": geo["cara"], "deteccion": det, "posicion": posicion}
+        motivos.append(f"{posicion}: " + "; ".join(malas))
+    motivo = "ninguna posición de las placas evita la cara y la zona de acción de la división (" + " | ".join(motivos) + ")"
+    return {"modo": mod_dividida.COMPLETA, "deteccion": {**det, "modo": mod_dividida.COMPLETA, "motivo": motivo}}
+
+
 def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duracion: float,
                                 trabajo: Path, fuente_video: Path, inicio: float, plan_salida: Path | None,
                                 ficha: dict | None, musica: dict | None = None) -> dict:
@@ -383,13 +445,19 @@ def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], sali
         logo = marca.raiz / ficha["marca_agua"]
         if not logo.is_file():
             raise ValueError(f"marca de agua ausente: {ficha['marca_agua']}")
-    todas = placas.construir(marca, t, lineas, duracion, logo)
-    capas = [p.capa() for p in todas]
-    problemas = placas.problemas_capas(capas, marca)
-    if problemas:
-        raise ValueError("las placas no cumplen la pantalla completa: " + "; ".join(problemas))
-    recorte = encuadre.elegir_recorte(fuente_video, inicio, duracion, info["ancho"], info["alto"],
-                                      marca.ancho, marca.alto, ajustes=marca.pc["recorte"])
+    div = _disposicion_dividida(marca, t, lineas, duracion, logo, ficha, fuente_video, inicio, info)
+    if div is not None and div["modo"] == mod_dividida.DIVIDIDA:
+        todas, capas, paneles = div["placas"], div["capas"], div["paneles"]
+        recorte = None
+    else:
+        todas = placas.construir(marca, t, lineas, duracion, logo)
+        capas = [p.capa() for p in todas]
+        problemas = placas.problemas_capas(capas, marca)
+        if problemas:
+            raise ValueError("las placas no cumplen la pantalla completa: " + "; ".join(problemas))
+        recorte = encuadre.elegir_recorte(fuente_video, inicio, duracion, info["ancho"], info["alto"],
+                                          marca.ancho, marca.alto, ajustes=marca.pc["recorte"])
+        paneles = None
     cuerpo = {"x": 0, "y": 0, "ancho": marca.ancho, "alto": marca.alto}
     campana = _campana(ficha, "original" if info["audio"] else "silencio")     # el audio de la fuente
     if campana is not None and logo is not None:
@@ -402,13 +470,22 @@ def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], sali
         p.imagen.save(ruta)
         rutas.append((str(ruta), p.x, p.y, p.t0, p.t1))
     video = {"ruta": str(fuente_video), "inicio": inicio, "recorte": recorte, "audio": info["audio"]}
+    if paneles is not None:
+        video["paneles"] = [{"recorte": p["recorte"], "destino": p["destino"]} for p in paneles]
     cmd = orden_ffmpeg_pantalla_completa(salida=str(salida), duracion=duracion, ancho=marca.ancho,
                                          alto=marca.alto, video=video, placas=rutas, musica=musica_ff)
     salida.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(cmd, check=True, timeout=plazo.tiempo_para(300))
     origen = {"archivo": str(fuente_video), "sha256": sha256_archivo(fuente_video),
               "inicio": inicio, "duracion": duracion, "audio": "original" if info["audio"] else "silencio"}
-    geo = {"cuerpo": cuerpo, "recorte": recorte, "capas": capas}
+    if paneles is not None:
+        geo = {"cuerpo": cuerpo, "disposicion": mod_dividida.DIVIDIDA, "paneles": paneles, "cara": div["cara"],
+               "deteccion": div["deteccion"], "posicion_placas": div["posicion"], "capas": capas}
+    else:
+        geo = {"cuerpo": cuerpo, "recorte": recorte, "capas": capas}
+        if div is not None:                      # dividida activa pero sin facecam (o sin sitio): pantalla completa
+            geo = {"cuerpo": cuerpo, "disposicion": mod_dividida.COMPLETA, "recorte": recorte,
+                   "deteccion": div["deteccion"], "capas": capas}
     plan = plan_json(marca, t, lineas, duracion, geometria=geo, origen=origen, campana=campana,
                      plantilla=PLANTILLA_V2, audio=_audio_plan(marca, musica, info["audio"]))
     if plan_salida is not None:
