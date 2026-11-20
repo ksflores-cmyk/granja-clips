@@ -331,7 +331,8 @@
     "largo": 94
    },
    "ficha_id": "t-taisontv"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|3|2026-11-20T19:00:00.000Z",
@@ -377,7 +378,8 @@
     "largo": 94
    },
    "ficha_id": "t-taisontv"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|3|2026-11-20T19:00:00.000Z",
@@ -423,6 +425,7 @@
     "largo": 97
    },
    "ficha_id": "t-taisontv"
-  }
+  },
+  "ruta_borrada": true
  }
 ]
