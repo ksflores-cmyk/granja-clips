@@ -182,6 +182,23 @@ def test_createpost_correcto_con_la_forma_documentada(tmp_path):
     assert not any("addToQueue" in q for q in sim.consultas)
 
 
+def test_con_30_s_de_plazo_createpost_no_se_intenta_ni_se_reserva(tmp_path):
+    from fabrica import plazo
+    sim = BufferSimulado()
+    pub, _ = vivo(tmp_path, sim)
+    tx = textos(TOMA, FICHA_LIMPIA, "shorts")
+    antes = len(pub._libro())
+    plazo.iniciar(30)                    # quedan 25 s libres: no caben los 60 s de createPost
+    try:
+        with pytest.raises(plazo.SinTiempo):
+            pub.programar("shorts", {**TOMA, "fuente_id": "propio"}, "https://x.invalid/v.mp4", tx,
+                          hueco_a_utc(HOY, "11:00"))
+    finally:
+        plazo.detener()
+    assert len(pub._libro()) == antes
+    assert not any("createPost" in q for q in sim.consultas)
+
+
 def test_instagram_manda_reel_y_feed(tmp_path):
     carga, _ = armar_carga("reels", "canal-ig-001", "texto", None, "https://x.invalid/v.mp4",
                            hueco_a_utc(HOY, "15:00"), esquema(tmp_path))
