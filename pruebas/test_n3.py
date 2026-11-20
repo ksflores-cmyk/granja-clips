@@ -364,18 +364,18 @@ def llenar(repo, n, plataforma="tiktok", fecha="2026-11-19"):
         anotar_fila(repo, {"id_clip": f"r{i}", "fecha": fecha, "plataforma": plataforma})
 
 
-def test_cupo_de_estreno_es_8(repo_n3):
-    assert puertas.cupo_del_dia(repo_n3, AHORA, "tiktok") == 8
-    llenar(repo_n3, 7)
+def test_cupo_de_estreno_es_6(repo_n3):
+    assert puertas.cupo_del_dia(repo_n3, AHORA, "tiktok") == 6
+    llenar(repo_n3, 5)
     assert puertas.puerta_cupo(repo_n3, AHORA, "tiktok")[0]
     llenar(repo_n3, 1)
     assert not puertas.puerta_cupo(repo_n3, AHORA, "tiktok")[0]
 
 
-def test_cupo_normal_es_3_fuera_de_ventana(repo_n3):
+def test_cupo_normal_es_6_fuera_de_ventana(repo_n3):
     despues = dt.datetime(2026, 12, 15, 18, 0, tzinfo=UTC)
-    assert puertas.cupo_del_dia(repo_n3, despues, "tiktok") == 3
-    llenar(repo_n3, 3, fecha="2026-12-15")
+    assert puertas.cupo_del_dia(repo_n3, despues, "tiktok") == 6
+    llenar(repo_n3, 6, fecha="2026-12-15")
     assert not puertas.puerta_cupo(repo_n3, despues, "tiktok")[0]
 
 
@@ -402,10 +402,13 @@ def test_filtrar_aprueba_y_descarta_con_motivo(repo_n3):
     assert "juego" in motivos["Otro"] and "mínimo" in motivos["Corto"] and "vistos" in motivos["ClipVisto"]
 
 
-def test_filtrar_respeta_cupo_dentro_de_la_corrida(repo_n3):
-    llenar(repo_n3, 7)
+def test_filtrar_cuenta_el_cupo_con_las_filas_del_dia_y_los_demas_aprobados_son_suplentes(repo_n3):
+    llenar(repo_n3, 5)                      # cupo 6: falta una publicación; cada corrida publica una sola toma
     ok, no = puertas.filtrar(repo_n3, [cand(id_origen="a"), cand(id_origen="b")], AHORA, "tiktok")
-    assert [c.id_origen for c in ok] == ["a"] and "cupo" in no[0][1]
+    assert [c.id_origen for c in ok] == ["a", "b"] and no == []
+    llenar(repo_n3, 1)                      # con el cupo lleno no pasa ninguno
+    ok, no = puertas.filtrar(repo_n3, [cand(id_origen="a"), cand(id_origen="b")], AHORA, "tiktok")
+    assert ok == [] and all("cupo" in m for _, m in no) and len(no) == 2
 
 
 # ---- validador ----

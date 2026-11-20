@@ -21,8 +21,9 @@ palabras_evitar:        # spoilers y trama: si aparecen, el clip se descarta
   - jefe final
   - última misión
 cupos:
-  por_dia_por_plataforma: 3
-  estreno_max_por_dia_por_plataforma: 8
+  # Decisión de Kevin (19 nov 2026, 8:00 p. m.): 6 clips al día por red, también en estreno.
+  por_dia_por_plataforma: 6
+  estreno_max_por_dia_por_plataforma: 6
 pilares:                # sección 6 del playbook
   primeras_veces: 0.6
   momentos: 0.2

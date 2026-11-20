@@ -525,24 +525,71 @@ def validar_archivos_fuente(raiz: Path, m, inf: Informe) -> None:
             inf.error(f"marca.yml: fuente.archivos.{estilo} apunta a {ruta}, que no existe")
 
 
+def _entero(v, minimo: int, maximo: int | None = None) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool) and v >= minimo and (maximo is None or v <= maximo)
+
+
 def validar_horarios(h, inf: Informe) -> None:
     rel = "config/horarios.yml"
-    if not _claves(h, rel, ["zona", "huecos_normales", "huecos_estreno"], inf):
+    if not _claves(h, rel, ["zona", "huecos"], inf):
         return
     try:
         ZoneInfo(str(h["zona"]))
     except (ZoneInfoNotFoundError, ValueError, OSError):
         inf.error(f"{rel}: zona inválida '{h['zona']}'")
-    for clave in ("huecos_normales", "huecos_estreno"):
-        lista = h[clave]
-        if not isinstance(lista, list):
-            inf.error(f"{rel}: {clave} debe ser una lista")
-            continue
-        for x in lista:
+    huecos = h["huecos"]
+    if not isinstance(huecos, list) or not huecos:
+        inf.error(f"{rel}: huecos debe ser una lista no vacía")
+    else:
+        validos = True
+        for x in huecos:
             if not (isinstance(x, str) and RE_HORA.match(x)):
-                inf.error(f"{rel}: {clave} con hora inválida {x!r} (formato HH:MM)")
-    if isinstance(h["huecos_estreno"], list) and len(h["huecos_estreno"]) > 8:
-        inf.error(f"{rel}: huecos_estreno admite 8 como máximo")
+                inf.error(f"{rel}: huecos con hora inválida {x!r} (formato HH:MM)")
+                validos = False
+        if validos and huecos != sorted(set(huecos)):
+            inf.error(f"{rel}: huecos debe estar ordenada y sin repetidos")
+        if len(huecos) > 8:
+            inf.error(f"{rel}: huecos admite 8 como máximo")
+    for clave in ("margen_min_minutos", "margen_max_minutos"):
+        if clave in h and not _entero(h[clave], 1):
+            inf.error(f"{rel}: {clave} debe ser un entero positivo")
+    if _entero(h.get("margen_min_minutos", 15), 1) and _entero(h.get("margen_max_minutos", 75), 1) \
+            and h.get("margen_min_minutos", 15) >= h.get("margen_max_minutos", 75):
+        inf.error(f"{rel}: margen_min_minutos debe ser menor que margen_max_minutos")
+    if "cola_buffer_max" in h and not _entero(h["cola_buffer_max"], 1, 10):
+        inf.error(f"{rel}: cola_buffer_max debe ser un entero de 1 a 10")
+    if "no_repetir_horas" in h and not _entero(h["no_repetir_horas"], 24):
+        inf.error(f"{rel}: no_repetir_horas debe ser un entero de 24 o más")
+    if "relleno" in h:
+        r = h["relleno"]
+        if not isinstance(r, dict):
+            inf.error(f"{rel}: relleno debe ser un mapa")
+        else:
+            if "separacion_min_minutos" in r and not _entero(r["separacion_min_minutos"], 1):
+                inf.error(f"{rel}: relleno.separacion_min_minutos debe ser un entero positivo")
+            if "max_intentos_por_hueco" in r and not _entero(r["max_intentos_por_hueco"], 1):
+                inf.error(f"{rel}: relleno.max_intentos_por_hueco debe ser un entero positivo")
+            if "ultima_hora" in r and not (isinstance(r["ultima_hora"], str) and RE_HORA.match(r["ultima_hora"])):
+                inf.error(f"{rel}: relleno.ultima_hora debe ser HH:MM")
+    if "actions" in h:
+        a = h["actions"]
+        if not isinstance(a, dict):
+            inf.error(f"{rel}: actions debe ser un mapa")
+        elif "tope_minutos_dia" in a and not _entero(a["tope_minutos_dia"], 30, 100):
+            inf.error(f"{rel}: actions.tope_minutos_dia debe ser un entero de 30 a 100")
+
+
+def validar_cupos_contra_huecos(t, h, inf: Informe) -> None:
+    """Los cupos de temporada.yml no pueden pasar del número de huecos de horarios.yml."""
+    huecos = h.get("huecos") if isinstance(h, dict) else None
+    cupos = t.get("cupos") if isinstance(t, dict) else None
+    if not (isinstance(huecos, list) and huecos and isinstance(cupos, dict)):
+        return
+    for clave in ("por_dia_por_plataforma", "estreno_max_por_dia_por_plataforma"):
+        v = cupos.get(clave)
+        if isinstance(v, int) and not isinstance(v, bool) and v > len(huecos):
+            inf.error(f"temporada.yml: cupos.{clave} ({v}) pasa del número de huecos de config/horarios.yml "
+                      f"({len(huecos)})")
 
 
 def validar_modo(m, inf: Informe) -> None:
@@ -769,6 +816,8 @@ def validar(raiz=None) -> Informe:
             validar_archivos_fuente(raiz, datos["marca"], inf)
     if datos["horarios"] is not None:
         validar_horarios(datos["horarios"], inf)
+        if datos["temporada"] is not None:
+            validar_cupos_contra_huecos(datos["temporada"], datos["horarios"], inf)
     if datos["modo"] is not None:
         validar_modo(datos["modo"], inf)
     if datos["canales"] is not None:

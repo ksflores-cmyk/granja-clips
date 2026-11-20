@@ -1,10 +1,11 @@
 name: fabrica
 
-# El ciclo de la fábrica: cada hora, minuto 7. La cadencia real la decide el código (fabrica.ciclo), no el cron.
+# El ciclo de la fábrica: cada hora, minuto 23 (impar, respaldo del disparador de cron-job.org). La cadencia y el
+# hueco los decide el código (fabrica.ciclo), no el cron: cada corrida programa a lo sumo un hueco de horarios.yml.
 # Con PAUSA, `decidir` dice trabajo=no en menos de un minuto y `producir` se salta.
 on:
   schedule:
-    - cron: "7 */1 * * *"
+    - cron: "23 * * * *"
   workflow_dispatch:
     inputs:
       ensayo_forzado:
