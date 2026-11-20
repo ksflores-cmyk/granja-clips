@@ -1,0 +1,23 @@
+# Formatos con valor añadido (tarea #7): el compilado junta 2 o 3 clips del mismo día, de 30 a 60 s,
+# con corte seco y el crédito de cada streamer. `fabrica.formatos.cargar_config` valida este archivo.
+pilar: compilados             # pilar propio en temporada.yml (con su peso)
+duracion_s: [30, 60]          # del compilado entero
+segmentos: [2, 3]
+segmento_s: [10, 25]          # recorte que se pide a Gemini por segmento (dentro de 7-30 de la puerta)
+max_por_creador: 2            # segmentos del mismo creador en un compilado
+max_por_dia_por_plataforma: 1
+formatos:
+  mejores-momentos:
+    nombre: "Mejores momentos"
+    pilar_segmento: momentos
+    gancho: "Mejores momentos del día"
+    palabra_lapiz: "MOMENTOS"
+    unidad: "momentos"        # para la línea de valor de Instagram: "3 momentos de hoy, de 3 streamers."
+    hashtags: ["#MejoresMomentos", "#Streamers"]
+  mejores-reacciones:
+    nombre: "Mejores reacciones"
+    pilar_segmento: primeras_veces
+    gancho: "Mejores reacciones del día"
+    palabra_lapiz: "REACCIONES"
+    unidad: "reacciones"
+    hashtags: ["#Reacciones", "#Streamers"]

@@ -1,0 +1,78 @@
+# Muestras de los formatos «Mejores momentos» y «Mejores reacciones» (tarea #7). Sólo material CC BY ya autorizado
+# para muestras (fichas bbb-cc-by y sintel-cc-by de fuentes.yml; mismas URL y sha256 que muestras.yml): nunca se publica.
+# Los tiempos de `lineas` son segundos relativos al recorte. El primer segmento de cada compilado no declara gancho
+# ni palabra del lápiz: lleva el del formato (config/formatos.yml). `fecha: corrida` = el día de la corrida (hora de
+# Guatemala) para todos los segmentos (mismo día). `creador` es el nombre que sale en pantalla y en el texto: con
+# "Blender Foundation (Big Buck Bunny)" el crédito del cierre mide 1008 px y la puerta de estilo da 900 como máximo.
+compilados:
+  - id: mejores-momentos
+    formato: mejores-momentos
+    numero: 4
+    fecha: corrida
+    muestra: true
+    segmentos:
+      - fuente_id: bbb-cc-by
+        video:
+          url: https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4
+          sha256: 543a4ad9fef4c9e0004ec9482cb7225c2574b0f889291e8270b1c4d61dbc1ab8
+        creador: "Blender (Big Buck Bunny)"
+        recorte: {inicio: 40.0, duracion: 14.0}
+        escena: "EXT. PRADERA — MAÑANA"
+        lineas:
+          - {t0: 7.5, t1: 13.4, acotacion: "(sale sin prisa)"}
+      - fuente_id: sintel-cc-by
+        video:
+          url: https://raw.githubusercontent.com/mdn/shared-assets/main/videos/sintel-short.mp4
+          sha256: 358447f332663e6f3794816e32b8072526fcba8bf8744dc7fb3387afb5b2fceb
+        creador: "Blender (Sintel)"
+        recorte: {inicio: 18.2, duracion: 15.0}
+        gancho: "El chamán la regaña"
+        palabra_lapiz: "CHAMÁN"
+        escena: "INT. CABAÑA DEL CHAMÁN — NOCHE"
+        lineas:
+          - {t0: 0.5, t1: 3.3, nombre: "CHAMÁN", frase: "Esta espada tiene un pasado oscuro."}
+          - {t0: 10.8, t1: 14.2, nombre: "CHAMÁN", frase: "Eres un necio por viajar sola y sin nada preparado."}
+      - fuente_id: sintel-cc-by
+        video:
+          url: https://raw.githubusercontent.com/mdn/shared-assets/main/videos/sintel-short.mp4
+          sha256: 358447f332663e6f3794816e32b8072526fcba8bf8744dc7fb3387afb5b2fceb
+        creador: "Blender (Sintel)"
+        recorte: {inicio: 39.6, duracion: 17.0}
+        gancho: "Ella busca a un dragón"
+        palabra_lapiz: "DRAGÓN"
+        escena: "INT. CABAÑA DEL CHAMÁN — NOCHE"
+        lineas:
+          - {t0: 0.8, t1: 5.2, nombre: "CHAMÁN", frase: "¿Qué te trae a la tierra de los guardianes?"}
+          - {t0: 6.4, t1: 8.9, nombre: "SINTEL", frase: "Busco a alguien."}
+          - {t0: 9.4, t1: 13.6, nombre: "CHAMÁN", frase: "¿Alguien muy querido? ¿Un alma gemela?"}
+          - {t0: 14.8, t1: 16.4, nombre: "SINTEL", frase: "Un dragón."}
+
+  - id: mejores-reacciones
+    formato: mejores-reacciones
+    numero: 5
+    fecha: corrida
+    muestra: true
+    segmentos:
+      - fuente_id: sintel-cc-by
+        video:
+          url: https://raw.githubusercontent.com/mdn/shared-assets/main/videos/sintel-short.mp4
+          sha256: 358447f332663e6f3794816e32b8072526fcba8bf8744dc7fb3387afb5b2fceb
+        creador: "Blender (Sintel)"
+        recorte: {inicio: 39.6, duracion: 17.0}
+        escena: "INT. CABAÑA DEL CHAMÁN — NOCHE"
+        lineas:
+          - {t0: 0.8, t1: 5.2, nombre: "CHAMÁN", frase: "¿Qué te trae a la tierra de los guardianes?"}
+          - {t0: 6.4, t1: 8.9, nombre: "SINTEL", frase: "Busco a alguien."}
+          - {t0: 9.4, t1: 13.6, nombre: "CHAMÁN", frase: "¿Alguien muy querido? ¿Un alma gemela?"}
+          - {t0: 14.8, t1: 16.4, nombre: "SINTEL", frase: "Un dragón."}
+      - fuente_id: bbb-cc-by
+        video:
+          url: https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4
+          sha256: 543a4ad9fef4c9e0004ec9482cb7225c2574b0f889291e8270b1c4d61dbc1ab8
+        creador: "Blender (Big Buck Bunny)"
+        recorte: {inicio: 40.0, duracion: 14.0}
+        gancho: "El conejo sale a la luz"
+        palabra_lapiz: "LUZ"
+        escena: "EXT. PRADERA — MAÑANA"
+        lineas:
+          - {t0: 7.5, t1: 13.4, acotacion: "(sale sin prisa)"}
