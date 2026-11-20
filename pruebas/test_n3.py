@@ -577,8 +577,8 @@ def test_diagnostico_ningun_paso_imprime_un_secreto():
     ruta = Path(__file__).parent.parent / ".github" / "workflows" / "diagnostico.yml"
     wf = yaml.safe_load(ruta.read_text(encoding="utf-8"))
     assert wf[True] == {"workflow_dispatch": None} and wf["permissions"] == {"contents": "read"}
-    pasos = wf["jobs"]["diagnostico"]["steps"]
-    assert all(p.get("shell") == "bash" for p in pasos)
+    pasos = [p for p in wf["jobs"]["diagnostico"]["steps"] if "run" in p]   # los `uses:` no llevan shell
+    assert pasos and all(p.get("shell") == "bash" for p in pasos)
     for p in pasos:
         logicas = p["run"].replace("\\\n", " ").splitlines()
         for linea in logicas:
