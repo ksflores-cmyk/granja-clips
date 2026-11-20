@@ -270,13 +270,27 @@ def _sin_repetir(etiquetas: list[str], vistos: set[str]) -> list[str]:
     return out
 
 
+def _raiz_evitar(p: str) -> str:
+    """Raíz de una palabra a evitar: sin la vocal final si tiene más de 4 letras (pirata → pirat)."""
+    return p[:-1] if len(p) > 4 and p[-1] in "aeiou" else p
+
+
+def _evita(palabras: list[str], frase: list[str]) -> bool:
+    """Una palabra suelta del brief atrapa sus variantes por el inicio (leak → leaks, filtración →
+    filtraciones, pirata → piratería, crack → crackeado); una frase de varias palabras va completa."""
+    if len(frase) == 1:
+        r = _raiz_evitar(frase[0])
+        return any(w.startswith(r) for w in palabras)
+    return _contiene(palabras, frase)
+
+
 def _comprobar_final(texto: str, ficha: dict, plataforma: str, cfg: dict) -> int:
     lim = cfg["limites"][plataforma]
     if contar_emojis(texto) > 1:
         raise Descartada("el texto lleva más de un emoji")
     plano = _palabras(texto)
     for p in (ficha.get("reglas") or {}).get("palabras_evitar") or []:
-        if _contiene(plano, _palabras(p)):
+        if _evita(plano, _palabras(p)):
             raise Descartada(f"el texto contiene la palabra a evitar «{p}»")
     n = largo(texto, plataforma, cfg)
     if n > lim["max_texto"]:

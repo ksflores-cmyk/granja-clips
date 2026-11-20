@@ -38,6 +38,8 @@ genericos:
   - increíble
   - locura total
   - parte 2
+  - lo mejor de
+  - esto es lo que
 
 # Palabras que no cuentan como contenido del gancho (quedan menos de 2 con contenido: se descarta).
 vacias: [el, la, los, las, un, una, unos, unas, lo, al, del, de, en, a, y, o, u, e, que, con, por, para, se,

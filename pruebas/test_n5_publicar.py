@@ -336,7 +336,7 @@ def test_informativa_usa_la_plantilla_y_el_credito_de_rockstar():
 
 
 def test_el_juego_se_escribe_gta_6():
-    # Gancho cambiado en la tarea #8: «Lo mejor de GTA VI y gta6» quedaba con una sola palabra de contenido y ahora se descarta.
+    # Gancho cambiado en la tarea #8: «Lo mejor de GTA VI y gta6» ahora se descarta por genérico («lo mejor de», config/textos.yml).
     t = textos({**TOMA, "gancho": "El mejor tiroteo de GTA VI y gta6"}, FICHA_LIMPIA, "shorts")["texto"]
     assert "tiroteo de GTA 6 y GTA 6" in t and "VI" not in t
 

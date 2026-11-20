@@ -296,12 +296,26 @@ def test_r2_generico_sigue_descartando_la_frase_completa(gancho):
         textos({**TOMA_P, "gancho": gancho}, FICHA_PROPIA, "shorts")
 
 
-def test_r2_palabras_evitar_por_palabra_completa_y_sin_acentos():
+def test_r2_palabras_evitar_sin_acentos():
     f = ficha_fm27()
     with pytest.raises(Descartada, match="filtración"):
         textos({**TOMA_A, "gancho": "Sebas confirma una FILTRACION nueva"}, f, "shorts")
-    textos({**TOMA_A, "gancho": "Sebas habla de filtraciones nuevas"}, f, "shorts")     # otra palabra: pasa
     textos({**TOMA_A, "gancho": "Sebas lo ve gratuito en casa"}, f, "shorts")
+
+
+# Revisión ronda 2: el brief de SEGA prohíbe filtraciones y piratería; plurales y variantes también caen.
+@pytest.mark.parametrize("gancho", ["Los leaks del FM27 nuevo", "Las filtraciones del FM27",
+                                    "Sebas y los piratas del juego", "FM27 crackeado en la PC",
+                                    "Sebas habla de piratería"])
+def test_palabras_evitar_atrapan_plurales_y_variantes(gancho):
+    with pytest.raises(Descartada, match="palabra a evitar"):
+        textos({**TOMA_A, "gancho": gancho}, ficha_fm27(), "shorts")
+
+
+@pytest.mark.parametrize("gancho", ["Lo mejor de GTA 6", "Lo mejor de GTA VI y gta6", "Esto es lo que hay"])
+def test_lo_mejor_de_y_esto_es_lo_que_son_genericos(gancho):
+    with pytest.raises(Descartada, match="genérico"):
+        textos({**TOMA_P, "gancho": gancho}, FICHA_PROPIA, "shorts")
 
 
 # 2. Gancho concreto: 0 palabras con contenido, o 1 sola con menos de 3 palabras en total.
