@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import estilo, muestras
+from . import estilo, muestras, tecnica
 from .componer import Linea, componer, sha256_archivo
 from .config_ruta import RAIZ
 from .lienzo import Toma
@@ -183,7 +183,7 @@ def compilar(marca: Marca, formato: dict, segmentos: list, salida: Path, *, trab
             "duracion": round(estilo.sondear(salida)["duracion"], 3),
             "plantilla": entradas[0]["plan"].get("plantilla", PLANTILLA_POR_DEFECTO),
             "creditos": [e["credito"] for e in entradas], "segmentos": entradas}
-    puntos = revisar_compilado(salida, plan, mp4s, formato, marca)
+    puntos = revisar_compilado(salida, plan, mp4s, formato, marca) + tecnica.revisar(salida, plan, tecnica.cargar(marca.raiz))
     salida.with_suffix(".plan.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2),
                                                        encoding="utf-8")
     return plan, puntos

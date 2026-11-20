@@ -19,7 +19,7 @@ from .. import fuentes as mod_fuentes
 from .. import ojos
 from ..config import cargar_yaml
 from ..registro import ZONA, contador_toma
-from . import estilo, muestras, toma
+from . import estilo, muestras, tecnica, toma
 from .componer import componer, sondear_video
 from .config_ruta import RAIZ
 from .marca import Marca
@@ -95,7 +95,8 @@ def correr(salida: Path, *, entorno=None, transporte=None, transporte_lista=None
         with tempfile.TemporaryDirectory(prefix="trabajo-ojos-") as trabajo:
             plan = componer(marca, t, lineas, mp4, duracion=dur, trabajo=Path(trabajo), fuente_video=ruta,
                             inicio=inicio, plan_salida=plan_ruta)
-        puntos = estilo.revisar(mp4, plan, marca)
+        puntos = (tecnica.revisar(mp4, tecnica.con_originales(plan, lineas), tecnica.cargar(marca.raiz))
+                  + estilo.revisar(mp4, plan, marca))
         muestras.fotogramas(mp4, dur, salida, "ojos-sintel")
         verde = all(p[1] for p in puntos)
         informe += ["", estilo.informe_md(f"Puerta de estilo ({'EN VERDE' if verde else 'EN ROJO'})", puntos),

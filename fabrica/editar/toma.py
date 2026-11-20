@@ -1,4 +1,4 @@
-"""Editor de punta a punta: `hacer_toma` descarga, mira, valida, compone y pasa la puerta de estilo.
+"""Editor de punta a punta: `hacer_toma` descarga, mira, valida, compone y pasa la puerta técnica y la de estilo.
 
 Nunca publica ni sube el contador de `marca.yml`: usa el número actual. Cualquier NO es un descarte con
 todos sus motivos. La puerta de estilo corre mientras el video de origen sigue en la carpeta temporal
@@ -22,7 +22,7 @@ from .. import descargar as mod_descargar
 from .. import fuentes, ojos, plazo, puertas
 from ..config import cargar_yaml, raiz_repo
 from ..registro import ZONA, contador_toma
-from . import estilo, musica as mod_musica, sin_ia
+from . import estilo, musica as mod_musica, sin_ia, tecnica
 from .componer import Linea, componer, sondear_video
 from .lienzo import Toma
 from .marca import Marca
@@ -227,8 +227,15 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                         plan = componer(marca, toma, lineas, mp4, duracion=dur, trabajo=Path(trabajo),
                                         fuente_video=d.ruta, inicio=inicio, plan_salida=plan_ruta, ficha=ficha,
                                         musica=pista)
+                # La puerta técnica (sin LLM) corre antes que la de estilo: si sale roja se ahorra la de estilo (~70 s).
+                with plazo.etapa("puerta técnica"):
+                    puntos_t = tecnica.revisar(mp4, tecnica.con_originales(plan, lineas), tecnica.cargar(raiz))
+                if any(not ok_t for _, ok_t, _ in puntos_t):
+                    mp4.unlink(missing_ok=True)
+                    return Resultado(False, tecnica.rojos(puntos_t), None, plan, mirada.datos, mirada.modelo, puntos_t,
+                                     gastar=True)
                 with plazo.etapa("puerta de estilo"):
-                    puntos = estilo.revisar(mp4, plan, marca, ficha=ficha)
+                    puntos = puntos_t + estilo.revisar(mp4, plan, marca, ficha=ficha)
             except (ValueError, subprocess.SubprocessError, OSError) as e:
                 mp4.unlink(missing_ok=True)
                 # Sólo es del material si el editor corrió y falló (ffmpeg con código ≠ 0) o dio datos inválidos
@@ -236,7 +243,7 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                 return Resultado(False, [f"editor: {type(e).__name__}: {e}"], gemini=mirada.datos,
                                  modelo=mirada.modelo,
                                  gastar=isinstance(e, (subprocess.CalledProcessError, ValueError)))
-            rojos = [f"puerta de estilo: {n}" + (f" ({det})" if det else "") for n, ok_p, det in puntos if not ok_p]
+            rojos = tecnica.rojos(puntos)
             if rojos:
                 mp4.unlink(missing_ok=True)
                 if aviso_musica:

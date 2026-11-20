@@ -1,0 +1,49 @@
+# Puerta técnica por código (tarea #17): lo que un editor humano nunca dejaría pasar, medido sobre el MP4 sin LLM.
+# La lee `fabrica/editar/tecnica.py` (`cargar`); si falta una clave se usa el valor por omisión del código.
+# Los umbrales se calibraron midiendo (ver procedimientos/tareas/17-revisiones-codigo.md y el resumen de la tarea).
+
+# 1. Subtítulo a tiempo con su palabra (necesita transcripción por palabra: plan["transcripcion"]["palabras"]).
+subtitulos:
+  tolerancia_s: 0.15            # la línea empieza a esto o menos del inicio de su primera palabra
+  ventana_s: 1.5                # se buscan palabras con inicio a ±esto del inicio de la línea
+  parecido_min: 0.75            # parecido mínimo (0 a 1, difflib) entre la palabra del original y la transcrita
+  exigir_transcripcion: false   # true: una pieza con voz y sin transcripción sale en rojo (activar con la #19)
+
+# 2. Destellos de 1 cuadro (negro o blanco) entre cortes.
+destellos:
+  negro_max: 32                 # un píxel (gris 0-255) es negro si vale esto o menos
+  blanco_min: 224               # un píxel es blanco si vale esto o más
+  fraccion_min: 0.6             # fracción de píxeles negros (o blancos) para que el cuadro cuente como destello
+  salto_min: 0.4                # los cuadros vecinos deben tener al menos esta fracción menos
+  cuadros_max: 2                # un tramo de 1 a este número de cuadros es destello; más largo es fundido o escena oscura
+
+# 3. Congelados (sólo en piezas con video).
+congelados:
+  max_s: 0.5                    # un tramo de cuadros iguales más largo que esto es congelado
+  dif_percentil: 99.5           # percentil de |diferencia| entre cuadros seguidos (miniatura en gris)
+  dif_max: 3.0                  # el par de cuadros es "igual" si ese percentil vale esto o menos (gris 0-255)
+
+# 4. Música bajo las voces, con ducking por sidechaincompress (sólo piezas que mezclan música con voz).
+ducking:
+  margen_db: 12                 # la música debe quedar al menos esto bajo la voz
+  ventana_s: 0.1                # tamaño de la ventana de medición (RMS)
+  voz_activa_db: -40            # una ventana tiene voz si su RMS vale esto o más (dBFS)
+  tolerancia_fraccion: 0.02     # fracción de ventanas con voz que pueden incumplir el margen
+  max_seguidas: 3               # este número de ventanas malas seguidas ya es rojo
+  musica_base_db: -8            # ganancia fija de la música antes de comprimirla
+  sidechain:                    # parámetros de `sidechaincompress` de ffmpeg (la voz es la cadena lateral)
+    threshold: 0.01             # umbral lineal (0.01 = -40 dBFS)
+    ratio: 16                   # razón de compresión
+    attack: 10                  # ms
+    release: 250                # ms
+    makeup: 1                   # ganancia de salida lineal (1 = ninguna)
+
+# 5. Recortes de audio (clipping).
+clipping:
+  umbral: 0.99                  # una muestra recorta si su valor absoluto llega a esto (escala 0 a 1)
+  muestras_seguidas: 3          # y recortan al menos este número de muestras seguidas del mismo canal
+
+# Resolución del análisis de cuadros (miniatura en gris; vale para cualquier resolución del MP4).
+analisis:
+  ancho: 135
+  alto: 240

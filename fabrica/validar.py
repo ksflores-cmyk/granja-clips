@@ -645,6 +645,90 @@ def validar_ojos(o, inf: Informe) -> None:
                 inf.error(f"{rel}: sin_ia.duracion_objetivo_s debe ser un número de 7 a 30")
 
 
+def validar_tecnica(t, inf: Informe) -> None:
+    """`config/tecnica.yml`: umbrales de la puerta técnica (todos numéricos, con su rango)."""
+    rel = "config/tecnica.yml"
+    if not isinstance(t, dict):
+        inf.error(f"{rel}: debe ser un diccionario")
+        return
+
+    def num(bloque, clave, minimo, maximo=None, entero=False, estricto=False):
+        v = bloque.get(clave)
+        tipo = int if entero else (int, float)
+        bien = (isinstance(v, tipo) and not isinstance(v, bool)
+                and (v > minimo if estricto else v >= minimo) and (maximo is None or v <= maximo))
+        if not bien:
+            rango = f"{'mayor que' if estricto else 'de'} {minimo:g}{' o más' if not estricto else ''}"
+            if maximo is not None:
+                rango = (f"mayor que {minimo:g} y de {maximo:g} como máximo" if estricto
+                         else f"entre {minimo:g} y {maximo:g}")
+            inf.error(f"{rel}: {bloque['_nombre']}.{clave} debe ser {'un entero' if entero else 'un número'} {rango}")
+
+    def bloque(nombre, claves):
+        b = t.get(nombre)
+        if not isinstance(b, dict):
+            inf.error(f"{rel}: falta el bloque {nombre}")
+            return None
+        for c in claves:
+            if c not in b:
+                inf.error(f"{rel}: {nombre} sin la clave {c}")
+        return dict(b, _nombre=nombre) if all(c in b for c in claves) else None
+
+    b = bloque("subtitulos", ["tolerancia_s", "ventana_s", "parecido_min", "exigir_transcripcion"])
+    if b:
+        num(b, "tolerancia_s", 0, 5, estricto=True)
+        num(b, "ventana_s", 0, 10, estricto=True)
+        num(b, "parecido_min", 0, 1)
+        if not isinstance(b["exigir_transcripcion"], bool):
+            inf.error(f"{rel}: subtitulos.exigir_transcripcion debe ser true o false")
+    b = bloque("destellos", ["negro_max", "blanco_min", "fraccion_min", "salto_min", "cuadros_max"])
+    if b:
+        num(b, "negro_max", 0, 255, entero=True)
+        num(b, "blanco_min", 0, 255, entero=True)
+        num(b, "fraccion_min", 0, 1, estricto=True)
+        num(b, "salto_min", 0, 1, estricto=True)
+        num(b, "cuadros_max", 1, 10, entero=True)
+        if isinstance(b["negro_max"], int) and isinstance(b["blanco_min"], int) and b["negro_max"] >= b["blanco_min"]:
+            inf.error(f"{rel}: destellos.negro_max debe ser menor que blanco_min")
+    b = bloque("congelados", ["max_s", "dif_percentil", "dif_max"])
+    if b:
+        num(b, "max_s", 0, 60, estricto=True)
+        num(b, "dif_percentil", 50, 100)
+        num(b, "dif_max", 0, 255)
+    b = bloque("ducking", ["margen_db", "ventana_s", "voz_activa_db", "tolerancia_fraccion", "max_seguidas",
+                           "musica_base_db", "sidechain"])
+    if b:
+        num(b, "margen_db", 0, 60)
+        num(b, "ventana_s", 0.01, 2)
+        num(b, "voz_activa_db", -100, 0)
+        num(b, "tolerancia_fraccion", 0, 1)
+        num(b, "max_seguidas", 1, 1000, entero=True)
+        num(b, "musica_base_db", -60, 0)
+        s = b["sidechain"]
+        if not isinstance(s, dict):
+            inf.error(f"{rel}: ducking.sidechain debe ser un bloque")
+        else:
+            for c in ("threshold", "ratio", "attack", "release", "makeup"):
+                if c not in s:
+                    inf.error(f"{rel}: ducking.sidechain sin la clave {c}")
+            s = dict(s, _nombre="ducking.sidechain")
+            if all(c in s for c in ("threshold", "ratio", "attack", "release", "makeup")):
+                # los límites son los de `sidechaincompress` de ffmpeg
+                num(s, "threshold", 0.000976563, 1)
+                num(s, "ratio", 1, 20)
+                num(s, "attack", 0.01, 2000)
+                num(s, "release", 0.01, 9000)
+                num(s, "makeup", 1, 64)
+    b = bloque("clipping", ["umbral", "muestras_seguidas"])
+    if b:
+        num(b, "umbral", 0, 1, estricto=True)
+        num(b, "muestras_seguidas", 1, 1000, entero=True)
+    b = bloque("analisis", ["ancho", "alto"])
+    if b:
+        num(b, "ancho", 16, 1920, entero=True)
+        num(b, "alto", 16, 1920, entero=True)
+
+
 def validar_canales(c, inf: Informe) -> None:
     rel = "config/canales.yml"
     if not isinstance(c, dict):
@@ -837,6 +921,9 @@ def validar(raiz=None) -> Informe:
     ojos = _cargar(raiz, "config/ojos.yml", inf)
     if ojos is not None:
         validar_ojos(ojos, inf)
+    tecnica = _cargar(raiz, "config/tecnica.yml", inf)
+    if tecnica is not None:
+        validar_tecnica(tecnica, inf)
     almacen = _cargar(raiz, "config/almacen.yml", inf)
     if almacen is not None:
         validar_almacen(almacen, inf)
