@@ -1,0 +1,52 @@
+# Textos de cada publicación (playbook, sección 10). Los lee fabrica/textos.py.
+# Límites comprobados el 20 nov 2026: developers.buffer.com/guides/character-limits.md,
+# support.buffer.com (YouTube Shorts con Buffer) y el tope de 5 hashtags de Instagram (dic 2025).
+# Conteo en UTF-16 (un emoji cuenta 2). `salto_cuenta`: cuánto cuenta cada salto de línea.
+limites:
+  shorts:
+    max_texto: 5000
+    max_titulo: 100          # título de YouTube, sin < ni >
+    max_hashtags: 3
+    min_hashtags: 0
+    salto_cuenta: 1
+  tiktok:
+    max_texto: 2200
+    max_titulo: null
+    max_hashtags: 3
+    min_hashtags: 0
+    salto_cuenta: 1
+  reels:
+    max_texto: 2196          # el límite es 2200 y cada salto de línea cuenta 2
+    max_titulo: null
+    max_hashtags: 5          # Instagram corta en 5
+    min_hashtags: 3
+    salto_cuenta: 2
+
+# En campaña, #Publicidad va aparte y se suman hasta 3 hashtags relacionados
+# (en Reels, #Publicidad cuenta dentro del tope de 5).
+max_relacionados_campana: 3
+
+# Ganchos genéricos, además de los de marca.yml (`prohibido`). Se comparan sin acentos ni mayúsculas.
+genericos:
+  - no vas a creer
+  - esto cambia todo
+  - el final te sorprenderá
+  - mira esto
+  - no te lo pierdas
+  - lo que pasó
+  - momento épico
+  - increíble
+  - locura total
+  - parte 2
+
+# Palabras que no cuentan como contenido del gancho (quedan menos de 2 con contenido: se descarta).
+vacias: [el, la, los, las, un, una, unos, unas, lo, al, del, de, en, a, y, o, u, e, que, con, por, para, se,
+         su, sus, es, son, no, ni, mi, tu, te, me, le, les, nos, ya, muy, mas, más, como, sin, sobre, entre,
+         desde, hasta, este, esta, esto, ese, esa, eso, clip, clips, stream, directo, momento, momentos,
+         video, vídeo, short, shorts, gta, 6, vi, gaming]
+
+# Palabras de relleno en inglés: con 2 o más en el gancho, se descarta.
+ingles: [the, and, when, this, with, is, you, my, what, of]
+
+# Siglas que se conservan en mayúsculas cuando el gancho llega todo en mayúsculas.
+siglas: [GTA, NPC, FM27, PS5, FIFA, DLC, IA]
