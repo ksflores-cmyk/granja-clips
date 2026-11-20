@@ -82,15 +82,30 @@ def _duracion_pista_video(ruta: Path, v: dict, formato: dict) -> float:
     raise ValueError(f"no se pudo leer la duración de la pista de video de {ruta}")
 
 
+def rotacion(v: dict) -> int:
+    """Rotación del video en grados (0, 90, 180 o 270), del tag `rotate` o del side_data `rotation`."""
+    graus = (v.get("tags") or {}).get("rotate")
+    for sd in v.get("side_data_list") or []:
+        if "rotation" in sd:
+            graus = sd["rotation"]
+    try:
+        return int(round(float(graus))) % 360
+    except (TypeError, ValueError):
+        return 0
+
+
 def sondear_video(ruta: Path) -> dict:
     """Ancho, alto, presencia de audio y duración de la pista de video de un archivo."""
     out = json.loads(subprocess.check_output([
         "ffprobe", "-v", "error", "-show_entries",
-        "stream=codec_type,width,height,duration,nb_frames,r_frame_rate:format=duration",
-        "-of", "json", str(ruta)]))
+        "stream=codec_type,width,height,duration,nb_frames,r_frame_rate:stream_tags=rotate:stream_side_data=rotation"
+        ":format=duration", "-of", "json", str(ruta)]))
     v = next(s for s in out["streams"] if s["codec_type"] == "video")
     audio = any(s["codec_type"] == "audio" for s in out["streams"])
-    return {"ancho": int(v["width"]), "alto": int(v["height"]), "audio": audio,
+    ancho, alto = int(v["width"]), int(v["height"])
+    if rotacion(v) in (90, 270):            # ffmpeg autorrota al decodificar: la imagen real es la girada
+        ancho, alto = alto, ancho
+    return {"ancho": ancho, "alto": alto, "audio": audio,
             "duracion": _duracion_pista_video(ruta, v, out.get("format", {}))}
 
 
@@ -147,8 +162,8 @@ def orden_ffmpeg_pantalla_completa(*, salida: str, duracion: float, ancho: int, 
     d = f"{duracion:g}"
     r = video["recorte"]
     entradas = ["-ss", f"{video['inicio']:g}", "-t", d, "-i", video["ruta"]]
-    filtros = [f"[0:v]crop={r['ancho']}:{r['alto']}:{r['x']}:{r['y']},scale={ancho}:{alto}:flags=lanczos,"
-               f"fps=30,setsar=1[c0]"]
+    filtros = [f"[0:v]fps=30,crop={r['ancho']}:{r['alto']}:{r['x']}:{r['y']},scale={ancho}:{alto}:flags=lanczos,"
+               f"setsar=1[c0]"]
     actual = "c0"
     for i, (ruta, x, y, t0, t1) in enumerate(placas):
         entradas += ["-loop", "1", "-framerate", "30", "-t", d, "-i", ruta]
@@ -157,7 +172,7 @@ def orden_ffmpeg_pantalla_completa(*, salida: str, duracion: float, ancho: int, 
         actual = sig
     filtros.append(f"[{actual}]format=yuv420p[out]")
     if video.get("audio", True):
-        mapa_audio = "0:a"
+        mapa_audio = "0:a:0"
     else:
         entradas += ["-f", "lavfi", "-t", d, "-i", "anullsrc=r=48000:cl=stereo"]
         mapa_audio = f"{1 + len(placas)}:a"

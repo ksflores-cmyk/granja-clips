@@ -79,7 +79,7 @@ pantalla_completa:              # plantilla v2 de las tomas con video: todas las
   recorte:                      # encuadre fijo por toma (sin zoom ni paneo)
     fotogramas: 12              # cuántos fotogramas se miran para seguir la acción
     ancho_analisis: 192         # ancho en píxeles de esos fotogramas en gris
-    margen_accion: 0.15         # la ventana de acción debe superar a la centrada en esta fracción
+    margen_accion: 0.05         # la ventana de acción debe superar a la centrada en esta fracción
     peso_bordes: 0.2            # peso de los bordes frente al movimiento
   fila: {tam_toma: 28, tam_credito: 24, separacion: 16}            # TOMA nnn y crédito, siempre en pantalla
   cabecera: {tam_gancho: 44, alto_linea_gancho: 54, tam_escena: 24, alto_escena: 32, espacio_escena: 8}

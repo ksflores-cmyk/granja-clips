@@ -420,13 +420,32 @@ def _cierre_v2(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     return not fallan, texto
 
 
+def _gancho_se_va(video: Path, plan: dict, marca: Marca, cabecera: list[placas.Placa]) -> tuple[bool, str]:
+    """Pasado `gancho_s`, el fotograma trae la fuente en la caja del gancho (la placa ya no está)."""
+    dur = float(plan.get("duracion") or 0)
+    t = float(marca.pc["gancho_s"]) + 0.5
+    if not cabecera or t > dur - float(marca.m("cierre_s")) - 0.1:
+        return True, ""
+    p = cabecera[0]
+    real = _fotograma(Path(video), t)
+    if real is None:
+        return False, f"no se pudo leer el fotograma en {t:.2f} s"
+    caja = {"x": p.x, "y": p.y, "ancho": p.ancho, "alto": p.alto}
+    cuerpo = {"x": 0, "y": 0, "ancho": marca.ancho, "alto": marca.alto}
+    d = _mejor_contra_fuente(plan, marca, t, lambda f: _diff_region(real, f, cuerpo, caja), UMBRAL_LOGO_EXTRA)
+    if d is None:
+        return False, f"no se pudo leer la fuente en {t:.2f} s"
+    return d < UMBRAL_LOGO_EXTRA, f"gancho fuera a los {t:.1f} s: diferencia con la fuente {d:.1f} (máximo {UMBRAL_LOGO_EXTRA:g})"
+
+
 def mosca_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     """[fotograma] La mosca GUION VIVO está en su esquina, dentro de su placa, a mitad de la toma."""
     try:
         esperadas = _del_tipo(_placas_del_plan(plan, marca), "mosca")
     except ValueError as e:
         return False, f"el plan no se puede dibujar: {e}"
-    return _placas_visibles(Path(video), plan, marca, [(p, _instante_medio(plan, marca)) for p in esperadas])
+    return _placas_visibles(Path(video), plan, marca,
+                            [(p, _instante_medio(plan, marca, f)) for p in esperadas for f in (0.3, 0.5, 0.7)])
 
 
 def cierre_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
@@ -484,7 +503,13 @@ def cabecera_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
         except ValueError as e:
             return False, f"el plan no se puede dibujar: {e}"
         t = min(T_CABECERA_S, dur / 2) if dur > 0 else T_CABECERA_S
-        return _placas_visibles(Path(video), plan, marca, [(p, t) for p in esperadas])
+        ok, det = _placas_visibles(Path(video), plan, marca, [(p, t) for p in esperadas])
+        # la fila (TOMA y crédito) se queda en pantalla toda la toma: también a 30 % y 70 %
+        fila = _del_tipo(esperadas, "fila")
+        ok2, det2 = _placas_visibles(Path(video), plan, marca,
+                                     [(p, _instante_medio(plan, marca, f)) for p in fila for f in (0.3, 0.7)])
+        ok3, det3 = _gancho_se_va(Path(video), plan, marca, _del_tipo(esperadas, "cabecera"))
+        return ok and ok2 and ok3, "; ".join(x for x in (det, det2, det3) if x)
     try:
         esperado, y_cont = lienzo.cabecera(marca, _toma(plan))
     except ValueError as e:
@@ -653,7 +678,7 @@ def marca_agua_visible(video: Path, plan: dict, marca: Marca, ficha: dict | None
     return True, "; ".join(detalle) + f" (tolerancia {TOL_AGUA:g})"
 
 
-def logo_extra_en_esquina(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
+def logo_extra_en_esquina(video: Path, plan: dict, marca: Marca, cuerpo_ok: bool | None = None) -> tuple[bool, str]:
     """Sin capa declarada, la esquina de marca.yml donde iría el logo debe seguir siendo la de la fuente.
 
     En la plantilla v2 la mosca declarada (arriba) no cuenta como logo extra: el logo va debajo de ella.
@@ -662,7 +687,9 @@ def logo_extra_en_esquina(video: Path, plan: dict, marca: Marca) -> tuple[bool, 
     cuerpo = geo.get("cuerpo")
     if not origen or not cuerpo:
         return True, "no aplica"
-    if not cuerpo_coincide(video, plan, marca)[0]:      # si el cuerpo ya está en rojo, ese punto lo dice; no se duplica
+    if cuerpo_ok is None:
+        cuerpo_ok = cuerpo_coincide(video, plan, marca)[0]
+    if not cuerpo_ok:      # si el cuerpo ya está en rojo, ese punto lo dice; no se duplica
         return True, "no aplica (el cuerpo ya sale en rojo en su propio punto)"
     cfg = marca.marca_agua
     w = int(cfg["ancho"]) + 2 * int(cfg["placa"])
@@ -721,6 +748,8 @@ def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
         tiene = _pistas_de_audio(ruta) > 0
         if tiene and declarado != "original":
             return False, f"la fuente trae audio y el plan declara {declarado!r}: debe ser el original"
+        if tiene and _pistas_de_audio(Path(video)) != 1:
+            return False, f"el MP4 trae {_pistas_de_audio(Path(video))} pistas de audio y debe traer exactamente una"
         if not tiene and declarado != "silencio":
             return False, f"la fuente no trae audio y el plan declara {declarado!r}: debe ser silencio"
     if declarado == "silencio":
@@ -996,7 +1025,7 @@ def revisar(video: Path, plan: dict, marca: Marca, ficha: dict | None = None) ->
         ok_ma, det_ma = marca_agua_visible(Path(video), plan, marca, ficha)
         punto("fotograma", "Marca de agua de la campaña", ok_ma, det_ma)
     elif plan.get("origen"):
-        ok_ex, det_ex = logo_extra_en_esquina(Path(video), plan, marca)
+        ok_ex, det_ex = logo_extra_en_esquina(Path(video), plan, marca, ok_cue)
         punto("fotograma", "Sin logos extra no declarados", ok_ex, det_ex)
     if v2:
         ok_au, det_au = audio_original(Path(video), plan)

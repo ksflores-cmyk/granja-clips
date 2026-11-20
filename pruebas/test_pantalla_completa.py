@@ -94,6 +94,9 @@ def test_la_puerta_nueva_sale_en_verde_con_el_video_correcto(ancha, marca):
 
 # ---------------------------------------------------------------- criterio 2: elegir_recorte
 
+AJ = Marca.cargar(RAIZ_REAL).pc["recorte"]      # los ajustes de marca.yml, como los pasa la fábrica
+
+
 def mover_en_el_tercio_derecho(ruta):
     """640x360 negro con un cuadrado blanco que se mueve (x de 470 a 560) dentro del tercio derecho."""
     subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
@@ -107,12 +110,12 @@ def mover_en_el_tercio_derecho(ruta):
 @necesita_ffmpeg
 def test_elegir_recorte_sigue_el_movimiento_del_tercio_derecho(tmp_path):
     src = mover_en_el_tercio_derecho(tmp_path / "mov.mp4")
-    r = encuadre.elegir_recorte(src, 0.0, 6.0, 640, 360, 1080, 1920)
+    r = encuadre.elegir_recorte(src, 0.0, 6.0, 640, 360, 1080, 1920, ajustes=AJ)
     assert r["modo"] == "accion"
     assert r["alto"] == 360 and 200 <= r["ancho"] <= 204
     assert r["x"] <= 470 and r["x"] + r["ancho"] >= 600                 # la ventana contiene el cuadrado en movimiento
     assert r["x"] > (640 - r["ancho"]) // 2                               # y no es la centrada
-    assert r == encuadre.elegir_recorte(src, 0.0, 6.0, 640, 360, 1080, 1920)      # determinista
+    assert r == encuadre.elegir_recorte(src, 0.0, 6.0, 640, 360, 1080, 1920, ajustes=AJ)      # determinista
 
 
 @necesita_ffmpeg
@@ -125,17 +128,17 @@ def test_elegir_recorte_estatica_o_uniforme_queda_centrada(tmp_path):
                     "-i", str(tmp_path / "ruido.png"), "-c:v", "libx264", "-qp", "0", "-pix_fmt", "yuv444p",
                     str(estatica)], check=True)
     for src in (uniforme, estatica):
-        r = encuadre.elegir_recorte(src, 0.0, 5.0, 640, 360, 1080, 1920)
+        r = encuadre.elegir_recorte(src, 0.0, 5.0, 640, 360, 1080, 1920, ajustes=AJ)
         assert r["modo"] == "centro"
         assert r["x"] == (640 - r["ancho"]) // 2 // 2 * 2 and r["y"] == 0
 
 
 def test_elegir_recorte_sin_lectura_o_ya_en_9_16_queda_centrada(tmp_path):
-    r = encuadre.elegir_recorte(tmp_path / "no-existe.mp4", 0.0, 5.0, 640, 360, 1080, 1920)
+    r = encuadre.elegir_recorte(tmp_path / "no-existe.mp4", 0.0, 5.0, 640, 360, 1080, 1920, ajustes=AJ)
     assert r["modo"] == "centro" and r["alto"] == 360 and r["x"] + r["ancho"] <= 640
-    r = encuadre.elegir_recorte(tmp_path / "no-existe.mp4", 0.0, 5.0, 1080, 1920, 1080, 1920)
+    r = encuadre.elegir_recorte(tmp_path / "no-existe.mp4", 0.0, 5.0, 1080, 1920, 1080, 1920, ajustes=AJ)
     assert (r["x"], r["y"], r["ancho"], r["alto"], r["escala"], r["modo"]) == (0, 0, 1080, 1920, 1.0, "centro")
-    r = encuadre.elegir_recorte(tmp_path / "no-existe.mp4", 0.0, 5.0, 1000, 1000, 1080, 1920)   # 1:1: sobra ancho
+    r = encuadre.elegir_recorte(tmp_path / "no-existe.mp4", 0.0, 5.0, 1000, 1000, 1080, 1920, ajustes=AJ)   # 1:1: sobra ancho
     assert r["alto"] == 1000 and r["ancho"] < 1000 and r["escala"] == 1.92
 
 
@@ -398,3 +401,79 @@ def test_las_3_muestras_son_de_video_y_caben_en_la_plantilla(marca):
         lineas = [componer.Linea(**ln) for ln in m["lineas"]]
         todas_p = placas.construir(marca, lienzo.Toma(**m["toma"]), lineas, float(m["recorte"]["duracion"]))
         assert placas.problemas_capas([p.capa() for p in todas_p], marca) == []
+
+
+# ---------------------------------------------------------------- ronda 1: rotación, solapes, fila y gancho
+
+@necesita_ffmpeg
+def test_una_fuente_con_rotacion_90_se_trata_con_ancho_y_alto_intercambiados(ancha, marca, tmp_path):
+    girada = tmp_path / "girada.mp4"
+    r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-display_rotation", "90",
+                        "-i", str(ancha["fuente"]), "-c", "copy", str(girada)], capture_output=True)
+    if r.returncode != 0:
+        pytest.skip("este ffmpeg no soporta -display_rotation")
+    info = componer.sondear_video(girada)
+    assert (info["ancho"], info["alto"]) == (360, 640)
+    sin = componer.sondear_video(ancha["fuente"])
+    assert (sin["ancho"], sin["alto"]) == (640, 360)
+    mp4 = tmp_path / "g.mp4"
+    plan = componer.componer(marca, lienzo.Toma(**TOMA), LINEAS, mp4, duracion=4.0, trabajo=tmp_path / "w",
+                             fuente_video=girada, inicio=0.0)
+    r = plan["geometria"]["recorte"]
+    assert r["x"] + r["ancho"] <= 360 and r["y"] + r["alto"] <= 640
+    assert malos(estilo.revisar(mp4, plan, marca)) == []
+
+
+def test_rotacion_lee_el_tag_y_el_side_data():
+    assert componer.rotacion({"tags": {"rotate": "90"}}) == 90
+    assert componer.rotacion({"side_data_list": [{"rotation": -90}]}) == 270
+    assert componer.rotacion({}) == 0
+
+
+def test_un_dialogo_se_recorta_antes_del_cierre_o_se_rechaza(marca):
+    t = lienzo.Toma(**TOMA)
+    todas = placas.construir(marca, t, [componer.Linea(0.5, 8.0, "ANA", "Hola.")], 8.0)
+    d = next(p for p in todas if p.tipo == "dialogo_1")
+    assert d.t1 == 8.0 - marca.m("cierre_s")
+    with pytest.raises(ValueError, match="dentro del cierre"):
+        placas.construir(marca, t, [componer.Linea(7.6, 8.0, "ANA", "Hola.")], 8.0)
+
+
+def test_placas_activas_a_la_vez_no_se_solapan(marca):
+    t, lineas = toma_cargada(marca)
+    capas = [p.capa() for p in placas.construir(marca, t, lineas, 8.0)]
+    assert placas.problemas_capas(capas, marca) == []
+    dos = [dict(c) for c in capas]
+    d1 = next(c for c in dos if c["tipo"] == "dialogo_1")
+    d2 = next(c for c in dos if c["tipo"] == "dialogo_2")
+    d2.update(t0=d1["t0"], t1=d1["t1"], x=d1["x"], y=d1["y"])        # dos diálogos al mismo tiempo y en el mismo sitio
+    assert any("se solapan" in x for x in placas.problemas_capas(dos, marca))
+    d2.update(t0=d1["t1"], t1=d1["t1"] + 1)                          # en tiempos distintos sí conviven
+    assert not any("dialogo_1 y dialogo_2" in x for x in placas.problemas_capas(dos, marca))
+
+
+@necesita_ffmpeg
+def test_la_fila_debe_seguir_en_pantalla_a_30_y_70_por_ciento(ancha, marca, tmp_path):
+    fila = next(c for c in ancha["plan"]["geometria"]["capas"] if c["tipo"] == "fila")
+    sin = tmp_path / "sin-fila.mp4"
+    caja = f"drawbox=x={fila['x']}:y={fila['y']}:w={fila['ancho']}:h={fila['alto']}:color=black:t=fill:enable='gte(t,2.5)'"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(ancha["mp4"]), "-vf", caja,
+                    "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "copy", str(sin)], check=True)
+    assert "[fotograma] Cabecera en el video" in malos(estilo.revisar(sin, ancha["plan"], marca))
+
+
+@necesita_ffmpeg
+def test_el_gancho_ya_no_esta_pasado_gancho_s(marca, tmp_path):
+    datos = copy.deepcopy(marca.datos)
+    datos["pantalla_completa"]["gancho_s"] = 6.0
+    largo = Marca(datos, marca.raiz)
+    src = fuente(tmp_path / "a.mp4", 640, 360, 8)
+    mp4 = tmp_path / "t.mp4"
+    componer.componer(largo, lienzo.Toma(**TOMA), [], mp4, duracion=8.0, trabajo=tmp_path / "w",
+                      fuente_video=src, inicio=0.0)
+    plan = componer.componer(marca, lienzo.Toma(**TOMA), [], tmp_path / "ok.mp4", duracion=8.0,
+                             trabajo=tmp_path / "w2", fuente_video=src, inicio=0.0)
+    ok, det = estilo.cabecera_visible(tmp_path / "ok.mp4", plan, marca)
+    assert ok, det
+    ok, det = estilo.cabecera_visible(mp4, plan, marca)              # este MP4 aún trae el gancho a los 3.5 s
+    assert not ok and "gancho fuera" in det

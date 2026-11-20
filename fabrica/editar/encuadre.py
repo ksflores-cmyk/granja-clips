@@ -14,12 +14,6 @@ from pathlib import Path
 
 import numpy as np
 
-# Valores por defecto si no se pasan los de marca.yml (`pantalla_completa.recorte`); la fábrica los pasa siempre.
-FOTOGRAMAS = 12
-ANCHO_ANALISIS = 192
-MARGEN_ACCION = 0.15
-PESO_BORDES = 0.2
-
 
 def escala_cubrir(ancho_v: int, alto_v: int, ancho_salida: int, alto_salida: int) -> float:
     if ancho_v <= 0 or alto_v <= 0:
@@ -63,10 +57,13 @@ def _mejor_posicion(energia: np.ndarray, ventana: int) -> tuple[int, int, float,
 
 
 def elegir_recorte(ruta, inicio: float, duracion: float, ancho_v: int, alto_v: int,
-                   ancho_salida: int, alto_salida: int, *, ajustes: dict | None = None) -> dict:
-    """Recorte fijo en píxeles de la fuente: {x, y, ancho, alto, escala, modo}. `modo` es "accion" o "centro"."""
-    aj = {"fotogramas": FOTOGRAMAS, "ancho_analisis": ANCHO_ANALISIS, "margen_accion": MARGEN_ACCION,
-          "peso_bordes": PESO_BORDES, **(ajustes or {})}
+                   ancho_salida: int, alto_salida: int, *, ajustes: dict) -> dict:
+    """Recorte fijo en píxeles de la fuente: {x, y, ancho, alto, escala, modo}. `modo` es "accion" o "centro".
+
+    `ajustes` es obligatorio: `pantalla_completa.recorte` de marca.yml (fotogramas, ancho_analisis, margen_accion,
+    peso_bordes).
+    """
+    aj = ajustes
     escala, vw, vh = _ventana(ancho_v, alto_v, ancho_salida, alto_salida)
     x, y = ((ancho_v - vw) // 2) // 2 * 2, ((alto_v - vh) // 2) // 2 * 2
     salida = {"x": x, "y": y, "ancho": vw, "alto": vh, "escala": round(escala, 6), "modo": "centro"}

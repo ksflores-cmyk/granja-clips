@@ -431,7 +431,7 @@ def test_la_orden_de_ffmpeg_no_mezcla_audio_nuevo(marca, video, tmp_path, monkey
                           fuente_video=video, inicio=2.0, ficha=ficha_real())
     orden = next(c for c in cmds if "-filter_complex" in c)
     maps = [orden[i + 1] for i, x in enumerate(orden) if x == "-map"]
-    assert maps == ["[out]", "0:a"]                                   # el audio es el de la fuente
+    assert maps == ["[out]", "0:a:0"]                                 # el audio es el de la fuente
     assert "amix" not in orden[orden.index("-filter_complex") + 1] and not any("anullsrc" in x for x in orden)
 
 

@@ -269,7 +269,13 @@ def construir(marca: Marca, t: Toma, lineas: list, duracion: float, logo: Path |
     placas = [fila, placa_cabecera(marca, t, fila.y + fila.alto, t1_cab), placa_mosca(marca, duracion)]
     if logo is not None:
         placas.append(placa_agua(marca, logo, duracion))
-    placas += [placa_dialogo(marca, i, ln) for i, ln in enumerate(lineas, 1)]
+    tope = float(duracion) - float(marca.m("cierre_s"))        # un diálogo no convive con la placa de cierre
+    for i, ln in enumerate(lineas, 1):
+        p = placa_dialogo(marca, i, ln)
+        p.t1 = min(p.t1, tope)
+        if p.t0 >= p.t1:
+            raise ValueError(f"el diálogo {i} empieza en {p.t0:g} s, dentro del cierre (desde {tope:g} s)")
+        placas.append(p)
     placas.append(placa_cierre(marca, t, duracion))
     return placas
 
@@ -292,6 +298,16 @@ def problemas_capas(capas: list[dict], marca: Marca) -> list[str]:
             malas.append(f"{nombre} toca la zona de acción")
         if nombre == "cierre" and y0 < acc["y1"]:
             malas.append("el cierre no va en el tercio inferior")
+    for i, a in enumerate(capas):
+        for b in capas[i + 1:]:
+            try:
+                en_tiempo = float(a["t0"]) < float(b["t1"]) and float(b["t0"]) < float(a["t1"])
+                en_espacio = (a["x"] < b["x"] + b["ancho"] and b["x"] < a["x"] + a["ancho"]
+                              and a["y"] < b["y"] + b["alto"] and b["y"] < a["y"] + a["alto"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if en_tiempo and en_espacio:
+                malas.append(f"{a.get('tipo')} y {b.get('tipo')} se solapan")
     tope = float(marca.pc["tope_capas"]) * marca.ancho * marca.alto
     for t in sorted({float(c.get("t0", 0)) for c in capas if isinstance(c, dict)}):
         area = sum(float(c["ancho"]) * float(c["alto"]) for c in capas
