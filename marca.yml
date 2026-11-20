@@ -111,6 +111,45 @@ pantalla_completa:              # plantilla v2 de las tomas con video: todas las
               giro_max_grados: 3, holguras_extra: [3, 6, 10], holgura_letra: 1.0}
     subrayado: {grosor: [4, 6], sobresale: [8, 14], bajo_palabra: 4, alto_extra: 10,
                 inclinacion_max: 0.012, amplitud: [1.0, 2.0]}
+dividida:                       # tarea #16: pantalla dividida (facecam arriba, juego abajo); sin facecam manda pantalla_completa
+  activa: true                  # interruptor global (por ficha: reglas.dividida: false)
+  alto_facecam: 672             # alto del panel de arriba (35 %); el del juego es el resto del cuadro (1248)
+  tolerancia_alto: 0.02         # la puerta acepta el alto del panel de la facecam con este margen relativo
+  cara_centro_y: 0.48           # fracción del alto del panel donde va el centro de la cara
+  holgura_cara: 0.10            # aire alrededor de la caja de Haar (frente y barbilla) para decir que la cara va entera
+  max_cara_panel: 0.85          # la cara con holgura ocupa a lo sumo esta fracción del alto del panel
+  margen_cara: 24               # separación mínima entre la cara y cualquier placa, en píxeles del cuadro
+  zona_accion: {x0: 60, y0: 960, x1: 1020, y1: 1300}   # dentro del panel del juego: ninguna placa lo toca
+  placas_alterna: {y_fila: 690}  # posición de la fila (y de la cabecera tras ella) si la de siempre toca la cara
+  deteccion:                    # sin red ni modelos descargados: Haar del paquete opencv-python-headless
+    fotogramas: 24              # fotogramas en gris que se leen del recorte de tiempo
+    fotogramas_cara: 12         # de esos, en cuántos se busca la cara
+    ancho_analisis: 640         # ancho en píxeles de esos fotogramas
+    haar: {escala: 1.1, vecinos: 5, min_lado: 0.035}   # min_lado: fracción del ancho de análisis
+    min_fraccion_cara: 0.5      # la cara debe verse en al menos esta fracción de los fotogramas mirados
+    max_dispersion: 0.04        # distancia máxima de los centros de la cara a su mediana, como fracción del ancho
+    max_area_cara: 0.06         # área máxima de la cara como fracción del cuadro
+    centro_excluido: {x: [0.3, 0.7], y: [0.3, 0.7]}   # una cara con el centro aquí no es facecam
+    expansion: {min: 0.05, max: 4.0, fija: 1.4, recorte_borde: 0.003}   # caja de la facecam, en anchos y altos de cara; el borde se deja fuera (fracción del ancho)
+    borde_persistente: {umbral: 30, fraccion: 0.6}    # gradiente (0-255) que se mantiene y parte de la línea que debe cubrir
+    umbral_borde: 40            # un píxel es borde si su gradiente pasa de esto
+    rejilla: [24, 14]           # celdas (columnas, filas) para buscar estorbos
+    banda: 0.25                 # los estorbos se buscan en esta fracción exterior del cuadro
+    banda_chat: 0.2             # y el chat en esta fracción lateral
+    densidad_logo: 0.08         # fracción de bordes de una celda fija para tomarla por logo o marco
+    variacion_estatica: 0.04    # variación máxima en el tiempo de esa densidad
+    densidad_chat: 0.10         # fracción de bordes de una celda lateral para tomarla por chat
+    min_celdas_chat: 3          # celdas juntas que hacen un chat
+    densidad_base_alerta: 0.03  # una alerta aparece sobre una celda tranquila (densidad de bordes mediana de esto o menos)
+    salto_alerta: 0.12          # subida de densidad que delata una alerta
+    min_celdas_alerta: 6        # celdas juntas que hacen una alerta
+    max_fraccion_alerta: 0.3    # fracción máxima de los fotogramas con la alerta a la vista
+    min_movimiento: 2.0         # movimiento medio del resto del cuadro; menos y no se marcan estorbos fijos
+    peso_bordes: 0.2            # peso de los bordes frente al movimiento en la energía del juego
+    min_alto_juego: 0.55        # alto mínimo del recorte del juego, como fracción de la fuente
+    margen_facecam: 0.01        # separación entre el recorte del juego y la facecam, como fracción del ancho
+    peso_estorbo: 3.0           # castigo por área tapada cuando no hay recorte que evite todos los estorbos
+    peso_tamano: 0.1            # preferencia por el recorte más grande
 prohibido:
   - subtítulos palabra por palabra con una palabra en amarillo
   - emojis dentro del video

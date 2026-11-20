@@ -330,6 +330,7 @@ def validar_marca(m, inf: Informe) -> None:
     validar_maqueta(m, inf)
     validar_marca_agua(m, inf)
     validar_pantalla_completa(m, inf)
+    validar_dividida(m, inf)
 
 
 RE_SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -441,6 +442,58 @@ def validar_pantalla_completa(m, inf: Informe) -> None:
     tope = pc.get("tope_capas")
     if isinstance(tope, (int, float)) and not isinstance(tope, bool) and tope > 1:
         inf.error(f"{rel}.tope_capas debe estar entre 0 y 1")
+
+
+CLAVES_DIVIDIDA = ["activa", "alto_facecam", "tolerancia_alto", "cara_centro_y", "holgura_cara", "max_cara_panel",
+                   "margen_cara", "zona_accion", "placas_alterna", "deteccion"]
+CLAVES_DETECCION = ["fotogramas", "fotogramas_cara", "ancho_analisis", "haar", "min_fraccion_cara", "max_dispersion",
+                    "max_area_cara", "centro_excluido", "expansion", "borde_persistente", "umbral_borde", "rejilla",
+                    "banda", "banda_chat", "densidad_logo", "variacion_estatica", "densidad_chat", "min_celdas_chat",
+                    "densidad_base_alerta", "salto_alerta", "min_celdas_alerta", "max_fraccion_alerta", "min_movimiento", "peso_bordes",
+                    "min_alto_juego", "margen_facecam", "peso_estorbo", "peso_tamano"]
+
+
+def validar_dividida(m, inf: Informe) -> None:
+    """`dividida` de marca.yml (tarea #16): medidas de la pantalla dividida y de la detección de la facecam."""
+    rel = "marca.yml: dividida"
+    d = m.get("dividida")
+    if not isinstance(d, dict):
+        inf.error("marca.yml: falta la sección dividida")
+        return
+    for c in CLAVES_DIVIDIDA:
+        if c not in d:
+            inf.error(f"{rel}: falta la clave '{c}'")
+    if not isinstance(d.get("activa"), bool):
+        inf.error(f"{rel}.activa debe ser true o false")
+    det = d.get("deteccion")
+    if isinstance(det, dict):
+        for c in CLAVES_DETECCION:
+            if c not in det:
+                inf.error(f"{rel}.deteccion: falta la clave '{c}'")
+    elif "deteccion" in d:
+        inf.error(f"{rel}.deteccion debe ser un diccionario")
+    _positivos({k: v for k, v in d.items() if k != "activa"}, "dividida", inf)
+    res = m.get("resolucion")
+    alto_f = d.get("alto_facecam")
+    if isinstance(res, list) and len(res) == 2 and isinstance(alto_f, (int, float)) and not isinstance(alto_f, bool):
+        if not 0 < alto_f < res[1]:
+            inf.error(f"{rel}.alto_facecam {alto_f}: debe ser menor que el alto del cuadro ({res[1]})")
+        za = d.get("zona_accion")
+        pc = m.get("pantalla_completa") or {}
+        seg = pc.get("zona_segura") if isinstance(pc, dict) else None
+        if isinstance(za, dict) and all(isinstance(za.get(k), (int, float)) for k in ("x0", "y0", "x1", "y1")):
+            if not (za["x0"] < za["x1"] and za["y0"] < za["y1"]):
+                inf.error(f"{rel}.zona_accion: x0 e y0 deben ser menores que x1 e y1")
+            if za["y0"] < alto_f:
+                inf.error(f"{rel}.zona_accion debe quedar dentro del panel del juego (y0 >= {alto_f})")
+            if isinstance(seg, dict) and all(isinstance(seg.get(k), (int, float)) for k in ("x0", "y0", "x1", "y1")) \
+                    and not (seg["x0"] <= za["x0"] and za["x1"] <= seg["x1"] and seg["y0"] <= za["y0"]
+                             and za["y1"] <= seg["y1"]):
+                inf.error(f"{rel}.zona_accion debe quedar dentro de la zona segura")
+    for k in ("cara_centro_y", "max_cara_panel", "tolerancia_alto"):
+        v = d.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 1:
+            inf.error(f"{rel}.{k} debe estar entre 0 y 1")
 
 
 CLAVES_MAQUETA = [
