@@ -261,13 +261,23 @@ def _fuente_encuadrada(ruta: Path, t_fuente: float, recorte: dict, marca: Marca)
     return f.crop((x, y, x + w, y + h)).resize((marca.ancho, marca.alto), Image.LANCZOS).convert("RGBA")
 
 
+def t_fuente(origen: dict, t: float) -> float:
+    """Instante de la fuente que corresponde al instante `t` de la toma. Con `origen.tramos` (silencios cortados) se
+    pasa por el mapa de tramos; sin ellos, `inicio + t`."""
+    tramos = origen.get("tramos")
+    if tramos:
+        from ..voces import a_fuente
+        return float(origen["inicio"]) + a_fuente(t, [(float(a), float(b)) for a, b in tramos])
+    return float(origen["inicio"]) + t
+
+
 def _fuente_esperada(plan: dict, marca: Marca, t: float) -> Image.Image | None:
     """Fotograma de la fuente en el instante `t` de la toma, tal como el plan dice que se ve (sin placas)."""
     origen, geo = plan.get("origen") or {}, plan.get("geometria") or {}
-    ruta, t_fuente = Path(origen["archivo"]), float(origen["inicio"]) + t
+    ruta, t_f = Path(origen["archivo"]), t_fuente(origen, t)
     if es_v2(plan):
-        return _fuente_encuadrada(ruta, t_fuente, geo.get("recorte") or {}, marca)
-    return _fuente_en_cuerpo(ruta, t_fuente, geo["cuerpo"])
+        return _fuente_encuadrada(ruta, t_f, geo.get("recorte") or {}, marca)
+    return _fuente_en_cuerpo(ruta, t_f, geo["cuerpo"])
 
 
 def _mejor_contra_fuente(plan: dict, marca: Marca, t: float, medir, tope: float) -> float | None:
@@ -786,7 +796,13 @@ def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
                            timeout=plazo.tiempo_para(120))
         return np.frombuffer(r.stdout, dtype=np.int16).astype(np.float32)
     largo = max(1.0, dur - float(0.5))
-    a, b = pcm(Path(video), 0.0, largo), pcm(Path(origen["archivo"]), inicio, largo)
+    a = pcm(Path(video), 0.0, largo)
+    tramos = origen.get("tramos")
+    if tramos:      # con silencios cortados, el audio esperado es el de la fuente con esos tramos pegados
+        b = np.concatenate([pcm(Path(origen["archivo"]), inicio + float(t0), float(t1) - float(t0))
+                            for t0, t1 in tramos])
+    else:
+        b = pcm(Path(origen["archivo"]), inicio, largo)
     n = min(len(a), len(b))
     if n < 800:
         return False, "no se pudo leer el audio"
@@ -944,7 +960,6 @@ def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     if sha256_archivo(ruta) != origen["sha256"]:
         return False, "el archivo de origen no coincide con el sha256 del plan"
     dur = float(plan.get("duracion") or 0)
-    inicio = float(origen.get("inicio", 0))
     tope = dur - float(marca.m("cierre_s")) - 0.2
     if es_v2(plan):
         return _cuerpo_v2(video, plan, marca, tope)
@@ -959,7 +974,7 @@ def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     for frac in (0.3, 0.7):
         t = min(dur * frac, tope)
         real = _fotograma(Path(video), t)
-        fuente = _fotograma(ruta, inicio + t)
+        fuente = _fotograma(ruta, t_fuente(origen, t))
         if real is None or fuente is None:
             return False, f"no se pudo leer el fotograma en {t:.2f} s"
         a = _miniatura_gris(real.crop(caja), MINIATURA_ANCHO, alto_min)

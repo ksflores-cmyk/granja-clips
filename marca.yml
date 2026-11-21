@@ -10,6 +10,9 @@ colores:
   papel: "#F2EDE3"
   tinta: "#151515"
   lapiz_rojo: "#D4261C"
+voces:                          # color del texto del diálogo según quién habla (nombres de `colores`; sin colores nuevos)
+  streamer: tinta               # la voz con más tiempo hablado (la de la facecam)
+  otra: lapiz_rojo              # la otra voz
 fuente:
   familia: "Courier Prime"     # licencia abierta SIL OFL 1.1, uso comercial permitido
   estilos: [regular, bold, italic, bolditalic]

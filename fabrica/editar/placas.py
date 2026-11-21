@@ -55,8 +55,9 @@ def lado_izquierdo(marca: Marca) -> bool:
 
 def _lineas_dialogo(linea) -> tuple:
     if isinstance(linea, dict):
-        return linea.get("nombre"), linea.get("frase"), linea.get("acotacion"), float(linea["t0"]), float(linea["t1"])
-    return linea.nombre, linea.frase, linea.acotacion, float(linea.t0), float(linea.t1)
+        return (linea.get("nombre"), linea.get("frase"), linea.get("acotacion"), float(linea["t0"]), float(linea["t1"]),
+                linea.get("voz"))
+    return linea.nombre, linea.frase, linea.acotacion, float(linea.t0), float(linea.t1), getattr(linea, "voz", None)
 
 
 def _par(n: float) -> int:
@@ -201,7 +202,7 @@ def placa_mosca(marca: Marca, duracion: float) -> Placa:
 # ---------------------------------------------------------------- diálogo
 
 def placa_dialogo(marca: Marca, indice: int, linea) -> Placa:
-    nombre, frase, acotacion, t0, t1 = _lineas_dialogo(linea)
+    nombre, frase, acotacion, t0, t1, voz = _lineas_dialogo(linea)
     cfg = marca.pc["dialogo"]
     lineas = mod_dialogo.validar_bloque(marca, nombre, frase, acotacion, cfg)
     rx, ry = int(cfg["relleno_x"]), int(cfg["relleno_y"])
@@ -219,7 +220,7 @@ def placa_dialogo(marca: Marca, indice: int, linea) -> Placa:
     x, y = _par_abajo(centro - w / 2), _par_abajo(cfg["borde_inferior"]) - h
     img = lienzo.papel_region(marca, x, y, w, h)
     d = ImageDraw.Draw(img)
-    tinta, yy = marca.color("tinta"), ry
+    tinta, yy = marca.color_voz(voz), ry          # sin voz: tinta, como siempre
     for txt, f, alto in filas:
         d.text((w / 2 - f.getlength(txt) / 2, yy), txt, font=f, fill=tinta)
         yy += alto

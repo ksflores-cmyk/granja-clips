@@ -14,12 +14,14 @@ import subprocess
 import sys
 import tempfile
 import urllib.request
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
 import yaml
 
 from .. import fuentes as mod_fuentes
+from .. import voces as mod_voces
 from ..registro import ZONA
 from . import estilo
 from . import musica as mod_musica
@@ -140,8 +142,42 @@ def _muestra_con_musica(salida: Path, marca: Marca, registrar, omitir, hoy) -> N
         "enlace": pista["pagina"]}, plan)
 
 
+MINIMO_VOCES_S = 7.0        # el corte de silencios de la muestra tampoco baja de aquí (el mínimo del formato)
+
+
+def _voces_de_muestra(marca: Marca, m: dict, ruta_video: Path, inicio: float, duracion: float, lineas: list[Linea],
+                      transcriptor=None) -> tuple[list[Linea], float, list | None, dict, dict]:
+    """Voces de una muestra (`voces: true`): analiza el audio de la fuente y mide `modelos_medir`.
+
+    Devuelve (líneas en tiempo de la toma, duración de la toma, tramos o None, resumen para el plan, `voces.json`).
+    La fuente puede estar en otro idioma (Sintel, inglés): se conservan las frases en español del yml y se toma de
+    la transcripción la voz de cada línea (por solape) y los silencios. Sin faster-whisper o sin modelo (como en
+    local) la muestra se renderiza igual, sin transcripción, y `voces.json` dice por qué."""
+    from . import toma as mod_toma
+    cfg = mod_voces.Cfg.cargar(marca.raiz) or mod_voces.Cfg()
+    cfg = replace(cfg, idioma=None)             # la muestra no sabe el idioma de antemano: se autodetecta
+    res = mod_voces.analizar(ruta_video, inicio, duracion, marca, cfg, minimo_s=MINIMO_VOCES_S,
+                             nombre_streamer=m["toma"].get("credito"), transcriptor=transcriptor)
+    nuevas, fuente = mod_toma.lineas_con_voces(res, lineas, "respaldo")
+    dur = round(res.duracion_toma, 3)
+    nuevas = mod_toma.ajustar_a_toma(nuevas, dur, marca)
+    medicion = mod_voces.medir(ruta_video, inicio, duracion, cfg, list(cfg.modelos_medir), transcriptor=transcriptor)
+    resumen = {"motor": "faster-whisper", "modelo": res.modelo, "idioma": res.idioma, "segundos": res.segundos,
+               "fuente_lineas": fuente, "hablantes": res.hablantes,
+               "cortes": [[round(a, 3), round(b, 3)] for a, b in res.cortes], "golpes": res.golpes}
+    if res.motivo:
+        resumen["motivo"] = res.motivo
+    detalle = {"muestra": m["id"], "modo": "muestra", "modelo_ciclo": cfg.modelo, **resumen,
+               "duracion_recorte_s": duracion, "duracion_toma_s": dur, "tramos": [list(t) for t in res.tramos],
+               "turnos": res.turnos,
+               "lineas": [{"t0": ln.t0, "t1": ln.t1, "nombre": ln.nombre, "frase": ln.frase, "voz": ln.voz}
+                          for ln in nuevas],
+               "medicion": medicion}
+    return nuevas, dur, (res.tramos if res.hay_cortes else None), resumen, detalle
+
+
 def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *,
-            fichas: list[dict] | None = None, hoy=None, descargador=descargar) -> dict:
+            fichas: list[dict] | None = None, hoy=None, descargador=descargar, transcriptor_voces=None) -> dict:
     if fichas is None:
         fichas = mod_fuentes.cargar_fuentes()
     if hoy is None:
@@ -165,7 +201,8 @@ def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *
             "fotogramas": cuadros,
             **datos,
             "lineas": [{"t0": ln.t0, "t1": ln.t1, "nombre": ln.nombre, "frase": ln.frase,
-                        "acotacion": ln.acotacion, "original": ln.original} for ln in lineas],
+                        "acotacion": ln.acotacion, "original": ln.original, **({"voz": ln.voz} if ln.voz else {})}
+                       for ln in lineas],
             "audio": plan.get("audio"),
             "puerta_estilo": {"en_verde": ok,
                               "puntos": [{"punto": n, "ok": o, "detalle": d} for n, o, d in puntos]},
@@ -202,10 +239,18 @@ def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *
                 continue
         mp4 = salida / f"{mid}.mp4"
         plan_ruta = salida / f"{mid}.plan.json"
+        tramos, resumen_voces = None, None
+        if m.get("voces") and ruta_video is not None:
+            lineas, duracion, tramos, resumen_voces, detalle_voces = _voces_de_muestra(
+                marca, m, ruta_video, inicio, duracion, lineas, transcriptor_voces)
+            (salida / "voces.json").write_text(json.dumps(detalle_voces, ensure_ascii=False, indent=2), encoding="utf-8")
         with tempfile.TemporaryDirectory(prefix=f"trabajo-{mid}-") as tmp:
             plan = componer(marca, t, lineas, mp4, duracion=duracion, trabajo=Path(tmp),
                             fuente_video=ruta_video, inicio=inicio, plan_salida=plan_ruta,
-                            musica=pista, movimiento=ruta_video is None)
+                            musica=pista, movimiento=ruta_video is None, tramos=tramos)
+        if resumen_voces is not None:
+            plan["voces"] = resumen_voces
+            plan_ruta.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
         puntos = estilo.revisar(mp4, plan, marca)
         registrar(mid, mp4, plan_ruta, duracion, puntos, lineas, {
             "pilar": m["pilar"], "fuente_id": m["fuente_id"],

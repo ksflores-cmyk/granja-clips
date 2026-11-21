@@ -330,6 +330,7 @@ def validar_marca(m, inf: Informe) -> None:
     validar_maqueta(m, inf)
     validar_marca_agua(m, inf)
     validar_pantalla_completa(m, inf)
+    validar_voces_marca(m, inf)
 
 
 RE_SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -645,6 +646,71 @@ def validar_ojos(o, inf: Informe) -> None:
                 inf.error(f"{rel}: sin_ia.duracion_objetivo_s debe ser un número de 7 a 30")
 
 
+def validar_voces_marca(m, inf: Informe) -> None:
+    """`marca.yml` voces (opcional): cada valor es el nombre de un color de `colores`."""
+    if "voces" not in m:
+        return
+    rel = "marca.yml"
+    v, colores = m["voces"], m.get("colores")
+    if not isinstance(v, dict):
+        inf.error(f"{rel}: voces debe ser un diccionario (streamer, otra)")
+        return
+    for clave, valor in v.items():
+        if clave not in ("streamer", "otra"):
+            inf.error(f"{rel}: voces.{clave} no existe (sólo streamer y otra)")
+        elif not (isinstance(valor, str) and isinstance(colores, dict) and valor in colores):
+            inf.error(f"{rel}: voces.{clave} debe ser el nombre de un color de `colores`")
+
+
+def _numero(v, minimo=None, maximo=None) -> bool:
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return False
+    return (minimo is None or v >= minimo) and (maximo is None or v <= maximo)
+
+
+def validar_voces(v, inf: Informe) -> None:
+    rel = "config/voces.yml"
+    if not _claves(v, rel, ["activo", "modo", "modelo", "tope_s", "silencio_min_s", "margen_s", "umbral_db"], inf):
+        return
+    if not isinstance(v["activo"], bool):
+        inf.error(f"{rel}: activo debe ser true o false")
+    if v["modo"] not in ("principal", "respaldo"):
+        inf.error(f"{rel}: modo debe ser principal o respaldo")
+    if not (isinstance(v["modelo"], str) and v["modelo"].strip()):
+        inf.error(f"{rel}: modelo debe ser texto")
+    mm = v.get("modelos_medir", [])
+    if not (isinstance(mm, list) and all(isinstance(x, str) and x.strip() for x in mm)):
+        inf.error(f"{rel}: modelos_medir debe ser una lista de nombres de modelo")
+    if v.get("idioma") is not None and not (isinstance(v["idioma"], str) and re.fullmatch(r"[a-z]{2,3}", v["idioma"])):
+        inf.error(f"{rel}: idioma debe ser un código de 2 o 3 letras (es) o null")
+    if not _numero(v["tope_s"], 10, 600):
+        inf.error(f"{rel}: tope_s debe ser un número de 10 a 600")
+    if not _numero(v["silencio_min_s"], 0.1, 5):
+        inf.error(f"{rel}: silencio_min_s debe ser un número de 0.1 a 5")
+    if not _numero(v["margen_s"], 0, 1):
+        inf.error(f"{rel}: margen_s debe ser un número de 0 a 1")
+    elif _numero(v["silencio_min_s"]) and v["silencio_min_s"] <= 2 * v["margen_s"]:
+        inf.error(f"{rel}: silencio_min_s debe ser mayor que el doble de margen_s")
+    if not _numero(v["umbral_db"], -90, -10):
+        inf.error(f"{rel}: umbral_db debe ser un número de -90 a -10")
+    bloques = {"golpes": {"sobre_mediana_db": (1, 60), "separacion_s": (0.1, 10), "max": (0, 50)},
+               "hablantes": {"max": (1, 2), "separacion_min": (0, 1), "minimo_s": (0, 60)},
+               "lineas": {"pausa_s": (0.1, 5), "max_s": (1, 10)}}
+    for nombre, campos in bloques.items():
+        b = v.get(nombre)
+        if not isinstance(b, dict):
+            inf.error(f"{rel}: falta el bloque {nombre}")
+            continue
+        for campo, (lo, hi) in campos.items():
+            if not _numero(b.get(campo), lo, hi):
+                inf.error(f"{rel}: {nombre}.{campo} debe ser un número de {lo} a {hi}")
+    al = v.get("alucinaciones", [])
+    if not (isinstance(al, list) and all(isinstance(x, str) and x.strip() for x in al)):
+        inf.error(f"{rel}: alucinaciones debe ser una lista de frases")
+    if not (isinstance(v.get("nombre_otra"), str) and v["nombre_otra"].strip()):
+        inf.error(f"{rel}: nombre_otra debe ser texto")
+
+
 def validar_canales(c, inf: Informe) -> None:
     rel = "config/canales.yml"
     if not isinstance(c, dict):
@@ -837,6 +903,12 @@ def validar(raiz=None) -> Informe:
     ojos = _cargar(raiz, "config/ojos.yml", inf)
     if ojos is not None:
         validar_ojos(ojos, inf)
+    if (raiz / "config/voces.yml").exists():
+        voces = _cargar(raiz, "config/voces.yml", inf)
+        if voces is not None:
+            validar_voces(voces, inf)
+    else:
+        inf.aviso("config/voces.yml: no existe: la fábrica no transcribe ni corta silencios")
     almacen = _cargar(raiz, "config/almacen.yml", inf)
     if almacen is not None:
         validar_almacen(almacen, inf)
