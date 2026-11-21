@@ -127,7 +127,7 @@
   origen: twitch
   twitch_login: taisontv
   broadcaster_id: '115156753'
-  seguidores: 165496
+  seguidores: 165498
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -327,7 +327,7 @@
   origen: twitch
   twitch_login: srserpiente
   broadcaster_id: '30805171'
-  seguidores: 169012
+  seguidores: 169013
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -1167,7 +1167,7 @@
   origen: twitch
   twitch_login: agustinitita
   broadcaster_id: '547214346'
-  seguidores: 35824
+  seguidores: 35832
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -1208,6 +1208,46 @@
   twitch_login: suzyroxx
   broadcaster_id: '417684519'
   seguidores: 182936
+  seguidores_leidos: '2026-11-21'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-23'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+- id: t-vicesat
+  tipo: T
+  creador: twitch.tv/vicesat
+  credito: twitch.tv/vicesat
+  origen: twitch
+  twitch_login: vicesat
+  broadcaster_id: '110387651'
+  seguidores: 14228
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
