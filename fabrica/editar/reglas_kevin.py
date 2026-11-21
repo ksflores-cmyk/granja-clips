@@ -176,6 +176,8 @@ def _movimiento_con_video(video: Path, plan: dict, marca) -> tuple[bool, str]:
 
 def _movimiento_sin_video(video: Path, plan: dict, marca) -> tuple[bool, str]:
     from . import estilo
+    if not plan.get("lineas"):
+        return False, "movimiento: pieza sin video y sin líneas de diálogo, no hay nada que se mueva"
     ok, det = estilo.movimiento_visible(Path(video), plan, marca)
     if not ok:
         return False, f"movimiento de entrada: {det}"
@@ -233,7 +235,8 @@ def _caja(video: Path, hasta: float) -> tuple[int, int, int, int] | None:
     r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(video), "-t", f"{hasta:.3f}", "-an", "-vf",
                         "cropdetect=limit=24:round=2:reset=0", "-f", "null", "-"],
                        capture_output=True, text=True, timeout=plazo.tiempo_para(180))
-    cajas = re.findall(r"crop=(\d+):(\d+):(\d+):(\d+)", r.stderr)
+    # Con un video todo negro ffmpeg da ancho y alto negativos (crop=-1078:-1918:…): se devuelven tal cual.
+    cajas = re.findall(r"crop=(-?\d+):(-?\d+):(-?\d+):(-?\d+)", r.stderr)
     return tuple(int(v) for v in cajas[-1]) if cajas else None  # type: ignore[return-value]
 
 
@@ -257,6 +260,9 @@ def sin_franjas(video: Path, plan: dict, marca, ficha: dict | None) -> tuple[boo
     if caja is None:
         ok = False
         partes.append("FALLA cropdetect: no dio caja")
+    elif caja[0] <= 0 or caja[1] <= 0:
+        ok = False
+        partes.append(f"FALLA cropdetect: el video es todo negro (caja {caja[0]}x{caja[1]})")
     else:
         w, h, x, y = caja
         sobras = {"arriba": y, "abajo": marca.alto - (y + h), "izquierda": x, "derecha": marca.ancho - (x + w)}
@@ -290,6 +296,9 @@ def puntos(video: Path, plan: dict, marca, ficha: dict | None = None) -> list[tu
         nombre = f"[regla-kevin] {r['id']}: {r['regla']}"
         try:
             ok, det = REVISIONES[r["revision"]](Path(video), plan, marca, ficha)
+        except (plazo.SinTiempo, subprocess.TimeoutExpired, OSError):
+            # Fallo de tiempo o de la máquina, no del material: sube para que `toma.py` no gaste la fuente.
+            raise
         except Exception as e:  # la puerta falla cerrada: una medida que revienta es un rojo, no un salto
             ok, det = False, f"la revisión {r['revision']} falló: {type(e).__name__}: {e}"
         res.append((nombre, bool(ok), det))

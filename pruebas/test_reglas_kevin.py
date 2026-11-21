@@ -121,6 +121,46 @@ def test_la_puerta_falla_cerrada_con_archivo_roto_o_revision_desconocida(repo):
     assert len(p) == 1 and not p[0][1] and "falta el archivo" in p[0][2]
 
 
+@pytest.mark.parametrize("error", ["sin_tiempo", "timeout", "oserror"])
+def test_un_fallo_de_tiempo_o_de_maquina_sube_y_no_es_rojo_del_material(repo, monkeypatch, error):
+    """Revisión del 21 nov: `toma.py` no gasta la fuente ante SinTiempo, TimeoutExpired u OSError; la regla no los
+    puede convertir en un punto rojo (que sí gasta la fuente)."""
+    from fabrica import plazo
+    exc = {"sin_tiempo": plazo.SinTiempo("quedan 0 s"), "timeout": subprocess.TimeoutExpired(["ffmpeg"], 1),
+           "oserror": OSError("disco lleno")}[error]
+
+    def revienta(*a, **k):
+        raise exc
+    monkeypatch.setitem(reglas_kevin.REVISIONES, "sin_franjas", revienta)
+    escribir(repo, [regla(revision="sin_franjas")])
+    with pytest.raises(type(exc)):
+        reglas_kevin.puntos(Path("x.mp4"), {}, Marca.cargar(repo))
+
+
+def test_otra_excepcion_de_una_medida_es_rojo(repo, monkeypatch):
+    def revienta(*a, **k):
+        raise KeyError("geometria")
+    monkeypatch.setitem(reglas_kevin.REVISIONES, "sin_franjas", revienta)
+    escribir(repo, [regla(revision="sin_franjas")])
+    p = reglas_kevin.puntos(Path("x.mp4"), {}, Marca.cargar(repo))
+    assert len(p) == 1 and not p[0][1] and "KeyError" in p[0][2]
+
+
+def test_pieza_sin_video_y_sin_lineas_no_pasa_el_movimiento(marca):
+    ok, det = reglas_kevin._movimiento_sin_video(Path("x.mp4"), {"lineas": []}, marca)
+    assert not ok and "sin líneas" in det
+
+
+@necesita_ffmpeg
+def test_video_todo_negro_dice_que_es_negro(marca, tmp_path):
+    negro = tmp_path / "negro.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                    "color=c=black:s=1080x1920:r=30:d=2", "-c:v", "libx264", "-preset", "ultrafast",
+                    "-pix_fmt", "yuv420p", str(negro)], check=True)
+    ok, det = reglas_kevin.sin_franjas(negro, {"duracion": 2.0}, marca, None)
+    assert not ok and "todo negro" in det, det
+
+
 def test_validar_usa_cargar_y_avisa_de_las_notas(repo):
     assert validar.validar(repo).errores == []
     escribir(repo, [regla(id="texto-chico")])
