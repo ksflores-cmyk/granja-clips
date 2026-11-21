@@ -132,6 +132,7 @@ def validar_fuentes(f, inf: Informe) -> None:
         inf.aviso(f"{rel}: sin fuentes: la fábrica no tendrá qué publicar")
         return
     vistos: set = set()
+    vistos_cr: dict = {}
     for i, ficha in enumerate(f):
         if not isinstance(ficha, dict):
             inf.error(f"{rel}[{i}]: la ficha debe ser un diccionario")
@@ -198,6 +199,7 @@ def validar_fuentes(f, inf: Informe) -> None:
             inf.aviso(f"{et}: marcada publicable pero no lo es ({motivo}); "
                       "la puerta de N3 exigirá estado vigente para descargar o publicar")
         _validar_campos_n3(ficha, et, inf)
+        _validar_campana(ficha, et, inf, vistos_cr)
         vence = ficha.get("vence")
         if vence is not None:
             f_vence = _a_fecha(vence)
@@ -205,6 +207,48 @@ def validar_fuentes(f, inf: Informe) -> None:
                 inf.error(f"{et}: vence ilegible ({vence!r}); use una fecha AAAA-MM-DD")
             elif ficha.get("estado") == "vigente" and f_vence < _hoy():
                 inf.aviso(f"{et}: ficha vigente con vence {f_vence} ya pasado; debe pasar a vencida")
+
+
+RE_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+def _validar_campana(ficha: dict, et: str, inf: Informe, vistos_cr: dict) -> None:
+    """Campos de las fichas de Content Rewards (#23): cr_campaign_id, motivo_pausa, *_por_red, presupuesto_total."""
+    cr = ficha.get("cr_campaign_id")
+    if cr is not None:
+        if not (isinstance(cr, str) and RE_UUID.match(cr)):
+            inf.error(f"{et}: cr_campaign_id debe ser el uuid de la campaña en minúsculas")
+        else:
+            if cr in vistos_cr:
+                inf.error(f"{et}: cr_campaign_id repetido (ya está en {vistos_cr[cr]})")
+            vistos_cr.setdefault(cr, ficha.get("id"))
+            if not (isinstance(ficha.get("campana"), str) and ficha["campana"].strip()):
+                inf.error(f"{et}: cr_campaign_id exige campana (nombre exacto de la campaña)")
+            if isinstance(ficha.get("permiso_url"), str) and cr not in ficha["permiso_url"]:
+                inf.error(f"{et}: permiso_url no es la página de la campaña {cr}")
+    if ficha.get("estado") == "pausada" and ficha.get("tipo") == "A":
+        mp = ficha.get("motivo_pausa")
+        if not (isinstance(mp, str) and len(mp.strip()) >= 20):
+            inf.error(f"{et}: ficha A pausada exige motivo_pausa (por qué y cómo se reanuda)")
+    reglas = ficha.get("reglas") if isinstance(ficha.get("reglas"), dict) else {}
+    plats = set(reglas.get("plataformas") or []) if isinstance(reglas.get("plataformas"), list) else set()
+    epr = reglas.get("etiquetas_por_red")
+    if epr is not None:
+        if not (isinstance(epr, dict) and epr and all(
+                isinstance(v, list) and v and all(isinstance(x, str) and x.strip() for x in v) for v in epr.values())):
+            inf.error(f"{et}: reglas.etiquetas_por_red debe ser {{red: [etiquetas]}}")
+        elif not set(epr) <= PLATAFORMAS or (plats and not set(epr) <= plats):
+            inf.error(f"{et}: reglas.etiquetas_por_red con una red fuera de reglas.plataformas")
+    tpr = ficha.get("tarifa_por_red")
+    if tpr is not None:
+        if not (isinstance(tpr, dict) and tpr and all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                                                      and v > 0 for v in tpr.values())):
+            inf.error(f"{et}: tarifa_por_red debe ser {{red: US$ por mil > 0}}")
+        elif not set(tpr) <= PLATAFORMAS or (plats and set(tpr) != plats):
+            inf.error(f"{et}: tarifa_por_red debe cubrir exactamente reglas.plataformas")
+    pt, pr = ficha.get("presupuesto_total"), ficha.get("presupuesto_restante")
+    if pt is not None and isinstance(pr, (int, float)) and isinstance(pt, (int, float)) and pr > pt:
+        inf.error(f"{et}: presupuesto_restante mayor que presupuesto_total")
 
 
 def _validar_campos_n3(ficha: dict, et: str, inf: Informe) -> None:

@@ -51,6 +51,26 @@ def repo(tmp_path):
     return destino
 
 
+def como_vigente(ficha: dict) -> dict:
+    """Copia de una ficha pausada como si su campaña siguiera abierta (estado vigente, publicable true).
+    La ficha real de FM27 está pausada desde el 19 nov 2026; las pruebas del camino de campaña usan esta copia."""
+    import copy
+    f = copy.deepcopy(ficha)
+    f.update(estado="vigente", publicable=True)
+    f.pop("motivo_pausa", None)
+    return f
+
+
+@pytest.fixture
+def repo_fm27(repo):
+    """La copia temporal del repo con la ficha `sega-fm27` vigente (en el repo real está pausada)."""
+    ruta = repo / "fuentes.yml"
+    datos = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    datos = [como_vigente(f) if isinstance(f, dict) and f.get("id") == "sega-fm27" else f for f in datos]
+    ruta.write_text(yaml.safe_dump(datos, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    return repo
+
+
 @pytest.fixture
 def editar_yaml():
     """Carga un YAML, aplica una función y lo vuelve a escribir."""
