@@ -863,8 +863,9 @@ def repo_con_efecto(repo, tmp_path, monkeypatch):
     sha = componer.sha256_archivo(wav)
     (repo / "marca" / "sfx" / "golpe-prueba").mkdir(parents=True, exist_ok=True)
     (repo / "marca" / "sfx" / "golpe-prueba" / "LICENCIA.md").write_text(LICENCIA_FALSA, encoding="utf-8")
-    (repo / "marca" / "sfx" / "efectos.yml").write_text(yaml.safe_dump({"efectos": [
-        {"id": "golpe-prueba", "tipo": "golpe", "estado": "verificada", "asset": "golpe.wav", "sha256": sha}]}),
+    (repo / "marca" / "sfx" / "efectos.yml").write_text(yaml.safe_dump({"licencias_permitidas": ["CC0"], "efectos": [
+        {"id": "golpe-prueba", "tipo": "golpe", "licencia": "CC0", "estado": "verificada", "asset": "golpe.wav",
+         "sha256": sha}]}),
         encoding="utf-8")
     monkeypatch.setenv("GRANJA_SFX_DIR", str(carpeta))
     return repo
