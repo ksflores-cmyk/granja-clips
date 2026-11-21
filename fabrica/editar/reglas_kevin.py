@@ -21,21 +21,26 @@ ARCHIVO = "reglas-kevin.yml"
 CAMPOS = ("id", "fecha", "queja", "regla", "revision", "estado")
 ESTADOS = ("vigente", "retirada")
 RE_ID = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+PREVIO_PANTALLA = "[plan] Pantalla completa (cuerpo 1080x1920, sin franjas)"   # nombres de los puntos que estilo.revisar ya calculó
+PREVIO_BORDES = "[fotograma] Bordes coinciden con la fuente (sin franjas)"
 PUNTO_ARCHIVO = "[regla-kevin] reglas-kevin.yml válido"
 
 MEDIA_SILENCIO_DB = -55.0     # volumen medio: por debajo, la toma no se oye aunque tenga algún pico
 INSTANTES = 6                 # instantes repartidos para medir el movimiento de una toma con video
 MINIATURA_ANCHO = 64          # px de ancho de las miniaturas en gris con que se compara
-# Calibrado el 20 nov 2026 con ffmpeg 6.1 y el método de abajo (6 instantes entre 0,3 y 4,3 s, miniaturas de 64 px,
-# diferencia media absoluta en gris 0-255, mayor de los 5 pares), todo en H.264 ultrafast 1080x1920:
-#   imagen fija (testsrc2, un solo cuadro)                      0,00
-#   imagen fija con ruido temporal fuerte (noise 8) a 800 kb/s   0,62
-#   color liso con ruido fuerte (noise 20) a 600 kb/s            0,17
-#   testsrc2 a la mitad de velocidad / un cambio por segundo     1,38
-#   testsrc2 normal                                              9,60
-#   mandelbrot en zoom                                          17,49
-# El umbral 1,0 queda sobre el peor ruido de compresión medido (0,62) y bajo el movimiento más lento (1,38).
-UMBRAL_MOVIMIENTO_TOMA = 1.0
+# Calibrado el 21 nov 2026 (ronda 3, método de una pasada) con ffmpeg 6.1: cuadros de 64x114 en gris con
+# scale=flags=area, 6 instantes entre 0,3 y 4,3 s (cuadro round(t*30)), diferencia media absoluta 0-255, mayor de los
+# 5 pares, todo en H.264 ultrafast 1080x1920:
+#   imagen fija (testsrc2, un solo cuadro)                        0,00
+#   imagen fija con ruido temporal fuerte (noise 8 y 12), 800 kb/s  0,81 (el peor; sólo el primer par, luego baja)
+#   color liso con ruido fuerte (noise 20) a 600 kb/s              0,02
+#   testsrc2 a la mitad de velocidad / un cambio por segundo        1,12
+#   testsrc2 normal                                                9,35
+#   mandelbrot en zoom                                            17,00
+# (Con el método anterior, 6 `_fotograma` a 1080x1920 y reducción con PIL, daba 0,62 / 1,38.)
+# El umbral 0,95 queda entre el peor ruido (0,81) y el movimiento más lento medido (1,12).
+UMBRAL_MOVIMIENTO_TOMA = 0.95
+FPS = 30                      # la puerta exige 30 fps: el instante t es el cuadro round(t * 30)
 FRANJA_MAX_PX = 16            # una franja de más de 16 px en cualquier borde es una franja
 
 
@@ -97,17 +102,77 @@ def cargar(raiz=None) -> list[dict]:
 
 # --------------------------------------------------------------------------------------------- medidas
 
-def _volumenes(video: Path) -> tuple[float | None, float | None, str | None]:
+class Medidas:
+    """Lo que las revisiones miden sobre un MP4, en una sola pasada de ffmpeg y guardado por (ruta, mtime, tamaño).
+
+    La pasada decodifica el video una vez y lo reparte a tres salidas: `volumedetect` (audio), `cropdetect` (video
+    hasta `hasta` s) y los fotogramas a 64 px en gris (rawvideo por stdout) de donde salen los instantes de movimiento.
+    `previos` son los resultados que `estilo.revisar` ya calculó ({nombre del punto: (ok, detalle)}).
+    """
+
+    def __init__(self, previos: dict | None = None) -> None:
+        self.previos = previos or {}
+        self._cache: dict = {}
+
+    def pasada(self, video: Path, hasta: float, ancho: int, alto: int, con_cuadros: bool) -> dict:
+        v = Path(video)
+        st = v.stat()
+        clave = (str(v), st.st_mtime_ns, st.st_size, round(hasta, 3), ancho, alto)
+        hallado = self._cache.get(clave)
+        if hallado is not None and (hallado["cuadros"] is not None or not con_cuadros):
+            return hallado
+        from . import estilo
+        cmd = ["ffmpeg", "-hide_banner", "-nostats", "-i", str(v)]
+        tope = ["-t", f"{hasta:.3f}"] if hasta < 1e5 else []
+        crop = "cropdetect=limit=24:round=2:reset=0"
+        if con_cuadros:   # un solo decodificador: el video se reparte con split a cropdetect y a la miniatura
+            cmd += ["-filter_complex", f"[0:v:0]split=2[a][b];[a]{crop}[c];[b]scale={ancho}:{alto}:flags=area,format=gray[g]",
+                    "-map", "[c]", *tope, "-f", "null", "-", "-map", "[g]", *tope, "-f", "rawvideo", "pipe:1"]
+        else:
+            cmd += ["-map", "0:v:0", *tope, "-an", "-vf", crop, "-f", "null", "-"]
+        if estilo._pistas_de_audio(v) > 0:
+            cmd += ["-map", "0:a:0", "-vn", "-af", "volumedetect", "-f", "null", "-"]
+        r = subprocess.run(cmd, capture_output=True, timeout=plazo.tiempo_para(180))
+        err = r.stderr.decode("utf-8", "replace")
+        res = {"error": None, "pico": None, "medio": None, "caja": None, "cuadros": None}
+        if r.returncode != 0:
+            res["error"] = f"ffmpeg falló (código {r.returncode})"
+        mx = re.search(r"max_volume:\s*(-?[0-9.]+|-inf)\s*dB", err)
+        me = re.search(r"mean_volume:\s*(-?[0-9.]+|-inf)\s*dB", err)
+        if mx and me:
+            res["pico"], res["medio"] = float(mx.group(1)), float(me.group(1))
+        # Con un video todo negro ffmpeg da ancho y alto negativos (crop=-1078:-1918:…): se devuelven tal cual.
+        cajas = re.findall(r"crop=(-?\d+):(-?\d+):(-?\d+):(-?\d+)", err)
+        if cajas:
+            res["caja"] = tuple(int(x) for x in cajas[-1])
+        if con_cuadros and r.returncode == 0:
+            n = len(r.stdout) // (ancho * alto)
+            res["cuadros"] = np.frombuffer(r.stdout[:n * ancho * alto], dtype=np.uint8).reshape(n, alto, ancho)
+        self._cache[clave] = res
+        return res
+
+
+def _medidas(medidas: "Medidas | None") -> "Medidas":
+    return medidas if medidas is not None else Medidas()
+
+
+def _pasada(video: Path, plan: dict, marca, medidas: "Medidas | None", con_cuadros: bool = False) -> dict:
+    """La pasada única del MP4 (cropdetect hasta antes del cierre; el cierre trae su propio fondo)."""
+    dur = float(plan.get("duracion") or 0)
+    hasta = dur - float(marca.m("cierre_s")) if dur > 0 else 1e6
+    alto = max(1, round(MINIATURA_ANCHO * marca.alto / marca.ancho))
+    return _medidas(medidas).pasada(Path(video), hasta, MINIATURA_ANCHO, alto, con_cuadros)
+
+
+def _volumenes(video: Path, plan: dict, marca, medidas: "Medidas | None" = None
+               ) -> tuple[float | None, float | None, str | None]:
     """(pico dB, volumen medio dB, motivo del error) con volumedetect."""
-    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(video), "-vn", "-af", "volumedetect",
-                        "-f", "null", "-"], capture_output=True, text=True, timeout=plazo.tiempo_para(120))
-    if r.returncode != 0:
-        return None, None, f"ffmpeg falló (código {r.returncode})"
-    mx = re.search(r"max_volume:\s*(-?[0-9.]+|-inf)\s*dB", r.stderr)
-    me = re.search(r"mean_volume:\s*(-?[0-9.]+|-inf)\s*dB", r.stderr)
-    if not (mx and me):
+    m = _pasada(video, plan, marca, medidas)
+    if m["error"]:
+        return None, None, m["error"]
+    if m["pico"] is None:
         return None, None, "el MP4 no tiene audio medible"
-    return float(mx.group(1)), float(me.group(1)), None
+    return m["pico"], m["medio"], None
 
 
 def _sin_musica(plan: dict, ficha: dict | None) -> bool:
@@ -126,11 +191,11 @@ def _fuente_muda(plan: dict) -> bool:
     return ruta.is_file() and estilo._pistas_de_audio(ruta) == 0
 
 
-def _audio(video: Path, plan: dict, ficha: dict | None) -> tuple[bool, str]:
+def _audio(video: Path, plan: dict, ficha: dict | None, marca, med: "Medidas | None" = None) -> tuple[bool, str]:
     from . import estilo
     if _sin_musica(plan, ficha) and _fuente_muda(plan):
         return True, "audio no aplica (sin_musica y fuente sin audio: manda el brief)"
-    pico, medio, error = _volumenes(Path(video))
+    pico, medio, error = _volumenes(Path(video), plan, marca, med)
     if pico is None:
         return False, f"audio: {error}"
     ok = pico > estilo.UMBRAL_SILENCIO_DB and medio > MEDIA_SILENCIO_DB
@@ -138,36 +203,34 @@ def _audio(video: Path, plan: dict, ficha: dict | None) -> tuple[bool, str]:
                 f"(mínimo {MEDIA_SILENCIO_DB:g})")
 
 
-def _miniatura(img, ancho: int, alto: int, libre: np.ndarray | None):
-    from . import estilo
-    g = estilo._miniatura_gris(img, ancho, alto)
-    if libre is None:
-        return g, np.ones(g.shape, dtype=bool)
+def _mascara_miniatura(libre: np.ndarray, ancho: int, alto: int) -> np.ndarray:
     from PIL import Image
     m = Image.fromarray((libre * 255).astype(np.uint8)).resize((ancho, alto), Image.NEAREST)
-    return g, np.asarray(m) > 127
+    return np.asarray(m) > 127
 
 
-def _movimiento_con_video(video: Path, plan: dict, marca) -> tuple[bool, str]:
+def _movimiento_con_video(video: Path, plan: dict, marca, med: "Medidas | None" = None) -> tuple[bool, str]:
     from . import estilo
     dur = float(plan.get("duracion") or 0)
     fin = dur - float(marca.m("cierre_s")) - 0.2
     if fin <= 0.3:
         return False, f"movimiento: la toma dura {dur:g} s, no alcanza para medirlo"
     ts = list(np.linspace(0.3, fin, INSTANTES))
-    ancho = MINIATURA_ANCHO
-    alto = max(1, round(ancho * marca.alto / marca.ancho))
+    m = _pasada(video, plan, marca, med, con_cuadros=True)
+    cuadros = m["cuadros"]
+    if cuadros is None or len(cuadros) == 0:
+        return False, f"movimiento: no se pudieron leer los fotogramas ({m['error'] or 'sin cuadros'})"
+    n, alto, ancho = cuadros.shape
     miniaturas = []
     for t in ts:
-        img = estilo._fotograma(Path(video), float(t))
-        if img is None:
-            return False, f"movimiento: no se pudo leer el fotograma en {t:.2f} s"
-        libre = estilo._mascara_placas(plan, float(t), marca) if estilo.es_v2(plan) else None
-        miniaturas.append(_miniatura(img, ancho, alto, libre))
+        i = min(n - 1, int(round(t * FPS)))
+        libre = (_mascara_miniatura(estilo._mascara_placas(plan, float(t), marca), ancho, alto)
+                 if estilo.es_v2(plan) else np.ones((alto, ancho), dtype=bool))
+        miniaturas.append((cuadros[i].astype(np.float32), libre))
     difs = []
     for (ga, ma), (gb, mb) in zip(miniaturas, miniaturas[1:]):
-        m = ma & mb
-        difs.append(float(np.abs(ga - gb)[m].mean()) if m.any() else 0.0)
+        mk = ma & mb
+        difs.append(float(np.abs(ga - gb)[mk].mean()) if mk.any() else 0.0)
     i = int(np.argmax(difs))
     detalle = (f"movimiento: mayor cambio {difs[i]:.2f} entre {ts[i]:.2f} s y {ts[i + 1]:.2f} s "
                f"(mínimo {UMBRAL_MOVIMIENTO_TOMA:g}; pares {', '.join(f'{d:.2f}' for d in difs)})")
@@ -207,56 +270,51 @@ def _movimiento_sin_video(video: Path, plan: dict, marca) -> tuple[bool, str]:
 
 # ------------------------------------------------------------------------------------------ revisiones
 
-def con_movimiento_y_audio(video: Path, plan: dict, marca, ficha: dict | None) -> tuple[bool, str]:
+def con_movimiento_y_audio(video: Path, plan: dict, marca, ficha: dict | None,
+                           med: "Medidas | None" = None) -> tuple[bool, str]:
     """Toda toma se mueve y se oye (el audio no aplica con sin_musica y fuente muda; el movimiento se mide igual)."""
-    ok_a, det_a = _audio(video, plan, ficha)
+    med = _medidas(med)
     if plan.get("origen"):
-        ok_m, det_m = _movimiento_con_video(video, plan, marca)
+        _pasada(video, plan, marca, med, con_cuadros=True)   # una sola pasada para audio, caja y movimiento
+    ok_a, det_a = _audio(video, plan, ficha, marca, med)
+    if plan.get("origen"):
+        ok_m, det_m = _movimiento_con_video(video, plan, marca, med)
     else:
         ok_m, det_m = _movimiento_sin_video(video, plan, marca)
     return ok_a and ok_m, f"{'bien' if ok_a else 'FALLA'} {det_a}; {'bien' if ok_m else 'FALLA'} {det_m}"
 
 
-def musica_cc0_sin_audio_propio(video: Path, plan: dict, marca, ficha: dict | None) -> tuple[bool, str]:
+def musica_cc0_sin_audio_propio(video: Path, plan: dict, marca, ficha: dict | None,
+                                med: "Medidas | None" = None) -> tuple[bool, str]:
     """Pieza sin audio propio lleva pista CC0 verificada y el MP4 se oye con ella."""
     from . import estilo
     ok, det = estilo.musica_en_plan(plan, marca, ficha)
     if not ok or estilo.tipo_audio(plan) != "musica":
         return ok, det
-    pico, _, error = _volumenes(Path(video))
+    pico, _, error = _volumenes(Path(video), plan, marca, med)
     if pico is None:
         return False, f"{det}; no se pudo oír el MP4: {error}"
     ok_p = pico > estilo.UMBRAL_SILENCIO_DB
     return ok_p, f"{det}; el MP4 suena con pico {pico:g} dB (mínimo {estilo.UMBRAL_SILENCIO_DB:g})"
 
 
-def _caja(video: Path, hasta: float) -> tuple[int, int, int, int] | None:
-    """(ancho, alto, x, y) de la caja que cropdetect ve en todo el video (reset=0: la unión de todos los cuadros)."""
-    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(video), "-t", f"{hasta:.3f}", "-an", "-vf",
-                        "cropdetect=limit=24:round=2:reset=0", "-f", "null", "-"],
-                       capture_output=True, text=True, timeout=plazo.tiempo_para(180))
-    # Con un video todo negro ffmpeg da ancho y alto negativos (crop=-1078:-1918:…): se devuelven tal cual.
-    cajas = re.findall(r"crop=(-?\d+):(-?\d+):(-?\d+):(-?\d+)", r.stderr)
-    return tuple(int(v) for v in cajas[-1]) if cajas else None  # type: ignore[return-value]
-
-
-def sin_franjas(video: Path, plan: dict, marca, ficha: dict | None) -> tuple[bool, str]:
+def sin_franjas(video: Path, plan: dict, marca, ficha: dict | None,
+                med: "Medidas | None" = None) -> tuple[bool, str]:
     """El clip llena el 9:16: plan y bordes con video, y cropdetect sobre el MP4 (sin franjas de más de 16 px)."""
     from . import estilo
     partes: list[str] = []
     ok = True
     if plan.get("origen"):
-        ok_pc, det_pc = estilo.pantalla_completa(plan, marca)
+        med = _medidas(med)
+        ok_pc, det_pc = med.previos.get(PREVIO_PANTALLA) or estilo.pantalla_completa(plan, marca)
         ok &= ok_pc
         partes.append(f"{'bien' if ok_pc else 'FALLA'} plan: {det_pc}")
         if estilo.es_v2(plan):
-            ok_bo, det_bo = estilo.bordes_coinciden(Path(video), plan, marca)
+            ok_bo, det_bo = med.previos.get(PREVIO_BORDES) or estilo.bordes_coinciden(Path(video), plan, marca)
             ok &= ok_bo
             partes.append(f"{'bien' if ok_bo else 'FALLA'} bordes: {det_bo}")
-    dur = float(plan.get("duracion") or 0)
-    # el cierre ocupa el último tramo con su propio fondo: se mide la toma antes de él
-    hasta = dur - float(marca.m("cierre_s")) if dur > 0 else 1e6
-    caja = _caja(Path(video), hasta)
+    # el cierre ocupa el último tramo con su propio fondo: la pasada mide la toma antes de él
+    caja = _pasada(Path(video), plan, marca, med)["caja"]
     if caja is None:
         ok = False
         partes.append("FALLA cropdetect: no dio caja")
@@ -283,19 +341,29 @@ REVISIONES = {
 
 # ----------------------------------------------------------------------------------------------- puerta
 
-def puntos(video: Path, plan: dict, marca, ficha: dict | None = None) -> list[tuple[str, bool, str]]:
+def puntos(video: Path, plan: dict, marca, ficha: dict | None = None,
+           previos: dict | None = None) -> list[tuple[str, bool, str]]:
     """[(nombre, ok, detalle)] de las reglas vigentes con revisión; un solo punto rojo si el archivo no carga."""
     try:
         reglas = cargar(marca.raiz)
     except ValueError as e:
         return [(PUNTO_ARCHIVO, False, str(e))]
     res = []
+    med = Medidas(previos)    # una pasada de ffmpeg por MP4, compartida por las revisiones de esta llamada
+    if plan.get("origen") and any(r["estado"] == "vigente" and r["revision"] == "con_movimiento_y_audio"
+                                  for r in reglas):
+        try:
+            _pasada(Path(video), plan, marca, med, con_cuadros=True)   # con los cuadros desde el principio
+        except (plazo.SinTiempo, subprocess.TimeoutExpired, OSError):
+            raise
+        except Exception:
+            pass   # el error sale, con su motivo, en la revisión que lo necesita
     for r in reglas:
         if r["estado"] != "vigente" or not r["revision"]:
             continue
         nombre = f"[regla-kevin] {r['id']}: {r['regla']}"
         try:
-            ok, det = REVISIONES[r["revision"]](Path(video), plan, marca, ficha)
+            ok, det = REVISIONES[r["revision"]](Path(video), plan, marca, ficha, med)
         except (plazo.SinTiempo, subprocess.TimeoutExpired, OSError):
             # Fallo de tiempo o de la máquina, no del material: sube para que `toma.py` no gaste la fuente.
             raise

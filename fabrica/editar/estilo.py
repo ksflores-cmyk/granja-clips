@@ -1191,7 +1191,7 @@ def revisar(video: Path, plan: dict, marca: Marca, ficha: dict | None = None) ->
     emojis = [x for x in textos if RE_EMOJI.search(x)]
     punto("plan", "Sin emojis", not emojis, "; ".join(emojis))
     from . import reglas_kevin   # import perezoso: reglas_kevin usa funciones de este módulo
-    res.extend(reglas_kevin.puntos(Path(video), plan, marca, ficha))
+    res.extend(reglas_kevin.puntos(Path(video), plan, marca, ficha, previos={n: (ok, d) for n, ok, d in res}))
     return res
 
 
