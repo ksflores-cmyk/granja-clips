@@ -127,7 +127,7 @@
   origen: twitch
   twitch_login: taisontv
   broadcaster_id: '115156753'
-  seguidores: 165509
+  seguidores: 165515
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -527,7 +527,7 @@
   origen: twitch
   twitch_login: itsmoura
   broadcaster_id: '110286144'
-  seguidores: 58886
+  seguidores: 58897
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -727,8 +727,8 @@
   origen: twitch
   twitch_login: miriam_petricor
   broadcaster_id: '577594813'
-  seguidores: 86885
-  seguidores_leidos: '2026-11-20'
+  seguidores: 87045
+  seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -754,7 +754,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-22'
+  vence: '2026-11-23'
   estado: vigente
   uso: produccion
   publicable: true
@@ -1247,7 +1247,7 @@
   origen: twitch
   twitch_login: vicesat
   broadcaster_id: '110387651'
-  seguidores: 14683
+  seguidores: 14796
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -1287,7 +1287,7 @@
   origen: twitch
   twitch_login: elmeap
   broadcaster_id: '648164647'
-  seguidores: 94773
+  seguidores: 94855
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -1327,7 +1327,7 @@
   origen: twitch
   twitch_login: jucaviapri
   broadcaster_id: '186736829'
-  seguidores: 250665
+  seguidores: 250667
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -1367,7 +1367,7 @@
   origen: twitch
   twitch_login: amir19k
   broadcaster_id: '189694540'
-  seguidores: 113936
+  seguidores: 113942
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -1407,7 +1407,7 @@
   origen: twitch
   twitch_login: cahos_gaming
   broadcaster_id: '73456543'
-  seguidores: 81628
+  seguidores: 81627
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -1448,6 +1448,46 @@
   twitch_login: victoriarodrgzz
   broadcaster_id: '73577459'
   seguidores: 45404
+  seguidores_leidos: '2026-11-21'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-23'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+- id: t-superblazing-
+  tipo: T
+  creador: twitch.tv/superblazing_
+  credito: twitch.tv/superblazing_
+  origen: twitch
+  twitch_login: superblazing_
+  broadcaster_id: '573251394'
+  seguidores: 27661
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
