@@ -1190,6 +1190,8 @@ def revisar(video: Path, plan: dict, marca: Marca, ficha: dict | None = None) ->
           ", ".join(hallados) if hallados else ("lista vacía en marca.yml" if not prohibidas else ""))
     emojis = [x for x in textos if RE_EMOJI.search(x)]
     punto("plan", "Sin emojis", not emojis, "; ".join(emojis))
+    from . import reglas_kevin   # import perezoso: reglas_kevin usa funciones de este módulo
+    res.extend(reglas_kevin.puntos(Path(video), plan, marca, ficha))
     return res
 
 
@@ -1222,6 +1224,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{'SÍ' if ok else 'NO'}  {nombre}" + (f"  [{det}]" if det else ""))
     todo = all(ok for _, ok, _ in puntos)
     print("Puerta de estilo: " + ("EN VERDE" if todo else "EN ROJO"))
+    from . import reglas_kevin
+    notas = reglas_kevin.notas_para_criticos(marca.raiz)
+    if notas:
+        print("Notas para los críticos (reglas de Kevin sin medida):")
+        print(notas)
     return 0 if todo else 1
 
 
