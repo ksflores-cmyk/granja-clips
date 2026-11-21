@@ -115,6 +115,17 @@ def sondear_video(ruta: Path) -> dict:
             "duracion": _duracion_pista_video(ruta, v, out.get("format", {}))}
 
 
+def canales_audio(ruta: Path) -> int:
+    """Canales de la primera pista de audio (0 si no hay o no se pudo leer)."""
+    try:
+        out = json.loads(subprocess.check_output([
+            "ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=channels", "-of", "json",
+            str(ruta)], timeout=plazo.tiempo_para(60)))
+        return int(out["streams"][0]["channels"])
+    except (subprocess.SubprocessError, OSError, ValueError, KeyError, IndexError, TypeError):
+        return 0
+
+
 def sha256_archivo(ruta: Path) -> str:
     h = hashlib.sha256()
     with open(ruta, "rb") as f:
@@ -440,7 +451,8 @@ def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], sali
     if tramos:
         usados = {tr.sfx for tr in tramos if tr.sfx}
         cmd = mod_historia.orden_ffmpeg(
-            salida=str(salida), ancho=marca.ancho, alto=marca.alto, video=video, tramos=tramos, placas=rutas,
+            salida=str(salida), ancho=marca.ancho, alto=marca.alto, video={**video, "canales": canales_audio(fuente_video)},
+            tramos=tramos, placas=rutas,
             sfx={i: sfx_d[i]["ruta"] for i in usados}, ganancia_sfx_db=float(cfg_h["ganancia_sfx_db"]),
             pausa_s=float(cfg_h["pausa_s"]))
         efectos = [{"id": tr.sfx, "sha256": sfx_d[tr.sfx]["sha256"], "t": tr.s0,

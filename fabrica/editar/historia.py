@@ -892,7 +892,7 @@ def orden_ffmpeg(*, salida: str, ancho: int, alto: int, video: dict, tramos: lis
                  ganancia_sfx_db: float = -6.0, pausa_s: float = PAUSA_S) -> list[str]:
     """Una sola orden de ffmpeg para una toma con historia (función pura; no corre nada).
 
-    `video`: {ruta, inicio, recorte {x, y, ancho, alto}}. `tramos`: el `mapa`. `placas`: [(PNG, x, y, t0, t1)] en
+    `video`: {ruta, inicio, recorte {x, y, ancho, alto}, canales (1 = mono)}. `tramos`: el `mapa`. `placas`: [(PNG, x, y, t0, t1)] en
     tiempo de salida. `sfx`: {id: ruta} de los efectos que usan los tramos. Entradas: 0 = la apertura (`-ss`/`-t`
     sobre la fuente, para no acumular cuadros), 1 = el recorte, luego las placas y los efectos. Cada tramo se
     corta con `trim`/`atrim`; la cámara lenta es `setpts=2*PTS` + `atempo=0.5` antes de `fps=30`; la pausa clona el
@@ -903,7 +903,9 @@ def orden_ffmpeg(*, salida: str, ancho: int, alto: int, video: dict, tramos: lis
     duracion = duracion_salida(tramos)
     r = video["recorte"]
     encuadre = (f"crop={r['ancho']}:{r['alto']}:{r['x']}:{r['y']},scale={ancho}:{alto}:flags=lanczos,setsar=1")
-    audio_fmt = "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo"
+    fmt_base = "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo"
+    # una fuente mono se duplica a los dos canales sin bajarle volumen (el upmix por defecto resta 3 dB a cada canal)
+    audio_fmt = ("pan=stereo|c0=c0|c1=c0," if int(video.get("canales") or 2) == 1 else "") + fmt_base
     dur_rec = max(tr.f1 for tr in principales if tr.velocidad != 0.0) - inicio
     entradas = ["-ss", _g(ap.f0), "-t", _g(ap.f1 - ap.f0), "-i", video["ruta"],
                 "-ss", _g(inicio), "-t", _g(dur_rec), "-i", video["ruta"]]
@@ -922,7 +924,7 @@ def orden_ffmpeg(*, salida: str, ancho: int, alto: int, video: dict, tramos: lis
             ult = max(0.0, tr.f0 - inicio - 0.034)
             cabeza = (f"[1:v]trim=start={_g(ult)}:end={_g(tr.f0 - inicio)},setpts=PTS-STARTPTS,fps={FPS},"
                       f"trim=end_frame=1,tpad=stop_mode=clone:stop={n - 1}")
-            audio = f"anullsrc=r=48000:cl=stereo,atrim=duration={_g(tr.dur)},asetpts=PTS-STARTPTS,{audio_fmt}"
+            audio = f"anullsrc=r=48000:cl=stereo,atrim=duration={_g(tr.dur)},asetpts=PTS-STARTPTS,{fmt_base}"
         else:
             f0, f1 = tr.f0 - inicio, tr.f1 - inicio
             lenta = tr.velocidad == 0.5
@@ -956,7 +958,7 @@ def orden_ffmpeg(*, salida: str, ancho: int, alto: int, video: dict, tramos: lis
                 raise ValueError(f"el efecto {tr.sfx!r} no tiene archivo")
             entradas += ["-i", str(ruta)]
             ms = int(round(tr.s0 * 1000))
-            filtros.append(f"[{base + k}:a]{audio_fmt},atrim=duration={_g(tr.dur)},volume={_g(ganancia_sfx_db)}dB,"
+            filtros.append(f"[{base + k}:a]{fmt_base},atrim=duration={_g(tr.dur)},volume={_g(ganancia_sfx_db)}dB,"
                            f"adelay={ms}|{ms}[e{k}]")
             mezcla.append(f"[e{k}]")
         filtros.append("".join(mezcla) + f"amix=inputs={len(mezcla)}:normalize=0:duration=first[aud]")
