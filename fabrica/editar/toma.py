@@ -338,7 +338,7 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                     plan, puntos = compuesta(lineas, dur, tramos)
                     malos = [n for n, ok_p, _ in puntos if not ok_p]
                     falla = ("la puerta de estilo salió en rojo: " + "; ".join(malos)) if malos else None
-                except ValueError as e0:
+                except (ValueError, subprocess.CalledProcessError) as e0:   # ffmpeg también: los cortes son de voces
                     error0, falla = e0, f"{type(e0).__name__}: {e0}"
                 if falla and ev.alterno is not None:
                     mp4.unlink(missing_ok=True)
