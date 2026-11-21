@@ -627,8 +627,10 @@ def test_la_orden_es_una_sola_llamada_de_ffmpeg_con_la_apertura_aparte():
     cmd = orden()
     assert cmd[0] == "ffmpeg" and cmd.count("ffmpeg") == 1 and cmd.count("-filter_complex") == 1
     txt = " ".join(cmd)
-    assert txt.startswith("ffmpeg -y -hide_banner -loglevel error -ss 12 -t 2 -i v.mp4 -ss 0 -t 2 -i v.mp4")
+    assert txt.startswith("ffmpeg -y -hide_banner -loglevel error -threads 2 -ss 12 -t 2 -i v.mp4 "
+                          "-threads 2 -ss 0 -t 2 -i v.mp4")
     assert txt.count("-i v.mp4") == len(h.mapa(plan_base(), 0.0, 18.0))      # una entrada por tramo: nada se retiene de más
+    assert txt.count("-threads 2 -ss") == txt.count("-i v.mp4")            # la memoria no crece con los núcleos del runner
     assert cmd[-1] == "s.mp4" and "-t 21.6" in txt and "-r 30" in txt and "libx264" in txt and "-movflags +faststart" in txt
     assert "-map [out] -map [ac]" in txt
 
@@ -653,15 +655,15 @@ def test_camara_lenta_es_setpts_x2_y_atempo_antes_de_fps_30():
     assert filtros.count("atempo=0.5") == 1 and filtros.count("2*(PTS-STARTPTS)") == 1
 
 
-def test_la_pausa_clona_el_ultimo_cuadro_en_silencio_y_el_zoom_es_scale_y_overlay_centrado():
+def test_la_pausa_clona_el_ultimo_cuadro_en_silencio_y_el_zoom_es_perspective_centrado():
     filtros = next(c for c in orden() if c.startswith("[0:v]")).split(";")
     pausa = next(f for f in filtros if "tpad=stop_mode=clone:stop=11" in f and "end_frame=1" in f)      # 12 cuadros = 0.4 s
     assert re.match(r"\[\d+:v\]setpts=PTS-STARTPTS,fps=30,trim=end_frame=1,", pausa)
     assert any(f.startswith("anullsrc=r=48000:cl=stereo,atrim=duration=0.4") for f in filtros)
     junto = " ".join(filtros)
-    assert "zoompan" not in junto and junto.count("eval=frame:flags=bicubic") == 1
-    assert "scale=w='2*trunc(1080*(1+" in junto and "overlay=x='(W-w)/2':y='(H-h)/2':eval=frame:shortest=1" in junto
-    assert "split[z2b][z2s]" in junto                          # etiquetas propias por tramo
+    assert "zoompan" not in junto and "overlay=x='(W-w)/2'" not in junto
+    assert junto.count("perspective=") == 1 and ":interpolation=cubic:sense=source:eval=frame" in junto
+    assert "*(in-1)" in junto                                  # `in` de perspective empieza en 1
 
 
 def test_cada_tramo_tiene_un_numero_exacto_de_cuadros_y_de_muestras():
@@ -1129,11 +1131,12 @@ def test_un_audio_que_empieza_tarde_no_se_adelanta_en_la_ruta_de_historia(marca,
 
 # --- 5. el zoom crece sin temblar
 
-def test_el_zoom_es_monotono_y_no_tiembla(tmp_path):
+@pytest.mark.parametrize("borde", [100, 200, 340])
+def test_el_zoom_es_monotono_y_no_tiembla(tmp_path, borde):
     cuadros = 60
     cadena = h._cadena_zoom(1.0, 1.12, cuadros, 1080, 1920)
     r = subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i",
-                        f"color=c=black:size=1080x1920:rate=30,drawbox=x=100:y=700:w=300:h=300:color=white:t=fill",
+                        f"color=c=black:size=1080x1920:rate=30,drawbox=x={borde}:y=700:w=300:h=300:color=white:t=fill",
                         "-vf", cadena + ",format=gray", "-frames:v", str(cuadros), "-f", "rawvideo", "-"],
                        capture_output=True, check=True)
     x = np.frombuffer(r.stdout, dtype=np.uint8).reshape(cuadros, 1920, 1080).astype(float)
@@ -1142,10 +1145,10 @@ def test_el_zoom_es_monotono_y_no_tiembla(tmp_path):
         i = int(np.argmax(f > 127.5))
         izq.append(i - (f[i] - 127.5) / max(f[i] - f[i - 1], 1e-9))
     saltos = np.diff(izq)
-    assert izq[0] == pytest.approx(100, abs=0.7)
-    assert saltos.max() <= 0.5, np.round(izq, 2)                  # sólo se aleja del centro: nunca vuelve (zoompan daba ±2 px)
-    assert (-saltos).max() <= 2.6                                 # y avanza sin saltos grandes
-    assert izq[-1] == pytest.approx(540 - (540 - 100) * 1.12, abs=1.5)
+    assert izq[0] == pytest.approx(borde, abs=0.7)               # el primer cuadro del tramo va sin zoom
+    assert saltos.max() <= 0.3, np.round(izq, 2)                  # sólo se aleja del centro: nunca vuelve (zoompan daba ±2 px)
+    assert (-saltos).max() <= 1.5                                 # y avanza sin saltos grandes
+    assert izq[-1] == pytest.approx(540 - (540 - borde) * 1.12, abs=1.0)
     assert not any(a < b - 0.5 for a, b in zip(izq, izq[1:]))
 
 

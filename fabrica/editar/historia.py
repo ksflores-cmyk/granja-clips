@@ -954,15 +954,17 @@ def _g(x: float) -> str:
 
 
 def _cadena_zoom(z0: float, z1: float, cuadros: int, ancho: int, alto: int, e: str = "z") -> str:
-    """Zoom suave centrado de `z0` a `z1` en `cuadros` cuadros sobre el cuadro ya escalado, como una cadena con
-    etiquetas propias (`e`): el cuadro se copia, una copia se agranda con `scale` (`eval=frame`, tamaño par que sólo
-    crece) y se centra sobre la original con `overlay` (`eval=frame`), que recorta lo que sobra. Todo cae en píxeles
-    enteros y el tamaño no oscila: sin la cuadrícula de `zoompan`, que temblaba ±2 px."""
+    """Zoom suave centrado de `z0` a `z1` en `cuadros` cuadros sobre el cuadro ya escalado: un solo filtro
+    `perspective` (`eval=frame`, interpolación cúbica) que lleva a las 4 esquinas de la salida el rectángulo central
+    de lado 1/z. Una sola entrada y posiciones con subpíxel: sin la cuadrícula entera de `zoompan` (±2 px) ni la
+    sincronía de dos ramas de `scale`+`overlay`, que en ffmpeg 8 arrancaba el zoom unos cuadros adelantado.
+    `in` es el número de cuadro que entra al filtro (1 en el primero del tramo). `ancho`, `alto` y `e` se conservan
+    por compatibilidad: el filtro usa W y H del propio cuadro."""
     paso = (z1 - z0) / max(cuadros - 1, 1)
-    z = f"({_g(z0)}+{_g(paso)}*n)"
-    return (f"split[{e}b][{e}s];"
-            f"[{e}s]scale=w='2*trunc({ancho}*{z}/2)':h='2*trunc({alto}*{z}/2)':eval=frame:flags=bicubic[{e}z];"
-            f"[{e}b][{e}z]overlay=x='(W-w)/2':y='(H-h)/2':eval=frame:shortest=1")
+    z = f"({_g(z0)}+{_g(paso)}*(in-1))"         # `perspective` cuenta `in` desde 1 (frame_count_out + 1)
+    a, b = f"W*(1-1/{z})/2", f"H*(1-1/{z})/2"
+    return (f"perspective=x0='{a}':y0='{b}':x1='W-{a}':y1='{b}':x2='{a}':y2='H-{b}':x3='W-{a}':y3='H-{b}'"
+            f":interpolation=cubic:sense=source:eval=frame")
 
 
 def orden_ffmpeg(*, salida: str, ancho: int, alto: int, video: dict, tramos: list[Tramo],
@@ -991,7 +993,9 @@ def orden_ffmpeg(*, salida: str, ancho: int, alto: int, video: dict, tramos: lis
             ss, t_in = max(inicio, tr.f0 - 0.034), 0.2          # sólo el cuadro de justo antes del congelado
         else:
             ss, t_in = tr.f0, tr.f1 - tr.f0
-        entradas += ["-ss", _g(ss), "-t", _g(t_in), "-i", video["ruta"]]
+        # `-threads 2` por entrada: cada decodificador retiene cuadros por hilo; sin tope, la memoria crece con los
+        # núcleos del runner (1,25 GB en el de 4 núcleos con ffmpeg 8, 0,6 GB con 2)
+        entradas += ["-threads", "2", "-ss", _g(ss), "-t", _g(t_in), "-i", video["ruta"]]
     filtros: list[str] = []
     etiquetas: list[str] = []
     for i, tr in enumerate(tramos):
