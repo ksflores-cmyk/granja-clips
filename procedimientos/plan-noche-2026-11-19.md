@@ -144,6 +144,7 @@ Lo escribe el jefe de Clips el 19 nov, 8:30 p. m. GT. Cada tarea programada de e
 - #7 formatos: re-medir el umbral de corte seco (4.0) con la plantilla v2 y paneo rápido (`/tmp`/`drift.py` del revisor: las diferencias crecen ~4x sin la franja de papel); el punto «Cuadros = suma» ya cubre el desfase sin depender de la imagen.
 - #7 formatos: «Crédito de cada segmento» acepta la `etiqueta` que sale de la misma función del crédito (casi tautológico en T); las etiquetas obligatorias de las fichas no tienen tope en Shorts (tal cual, como `publicar`).
 - #7 formatos: la puerta de estilo domina el tiempo (≈70 s por 33 s de video): extraer varios fotogramas por llamada de ffmpeg en `estilo.revisar`.
+- Vigilante 20 nov 8:40 p. m.: 8 h sin toma (última programada 12:05, para las 13:00; cola de Buffer vacía, sin errores). Desde las 17:00 `decidir` corta por «tope diario de Actions (73 min usados; hacen falta 20 libres de 90)»: el tope cuenta 52 min de `producir` + 1 por hora de `decidir`, así que pasadas las 18:00 ya no cabe otro `producir` y se pierden los huecos de 19:00 y 22:00. No se relanzó (el tope lo rechazaría igual). El de 16:00 (44816372740) gastó 3 fichas T por Gemini (2 desnudez, 1 mod de GTA V) y no había informativa de respaldo sin usar. Falla de diseño/presupuesto, no de material suelto: decide Kevin «tope 90» (ya anotado en #9).
 
 ## Bitácora de la noche
 
