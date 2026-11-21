@@ -301,11 +301,16 @@ def _fuente_esperada(plan: dict, marca: Marca, t: float) -> Image.Image | None:
     origen, geo = plan.get("origen") or {}, plan.get("geometria") or {}
     ruta, t_fuente = Path(origen["archivo"]), float(origen["inicio"]) + t
     tramos = _tramos(plan, marca)
+    zoom = 1.0
     if tramos is not None:
-        t_fuente = mod_historia.fuente_en(tramos, t)[0]
-    if es_v2(plan):
-        return _fuente_encuadrada(ruta, t_fuente, geo.get("recorte") or {}, marca)
-    return _fuente_en_cuerpo(ruta, t_fuente, geo["cuerpo"])
+        t_fuente, zoom = mod_historia.fuente_en(tramos, t)
+    f = (_fuente_encuadrada(ruta, t_fuente, geo.get("recorte") or {}, marca) if es_v2(plan)
+         else _fuente_en_cuerpo(ruta, t_fuente, geo["cuerpo"]))
+    if f is not None and zoom > 1.0001:       # en un tramo con zoom la imagen esperada es el centro ampliado
+        w, h = f.size
+        cw, ch = w / zoom, h / zoom
+        f = f.crop((round((w - cw) / 2), round((h - ch) / 2), round((w + cw) / 2), round((h + ch) / 2))).resize((w, h), Image.LANCZOS)
+    return f
 
 
 def _mejor_contra_fuente(plan: dict, marca: Marca, t: float, medir, tope: float) -> float | None:
@@ -470,7 +475,7 @@ def _gancho_se_va(video: Path, plan: dict, marca: Marca, cabecera: list[placas.P
     if _historia(plan) is not None:           # con historia se mide en un tramo plano, ya pasado el gancho
         plano = _t_plano(plan, marca, t, desde=t)
         tramos = _tramos(plan, marca) or []
-        if not any(tr.s0 <= plano < tr.s1 and tr.plano for tr in tramos) or plano < t:
+        if not any(tr.s0 <= plano < tr.s1 and tr.plano for tr in tramos) or plano < t - 1 / mod_historia.FPS:
             return True, "no aplica con historia (sin tramo plano tras el gancho)"
         t = plano
     real = _fotograma(Path(video), t)

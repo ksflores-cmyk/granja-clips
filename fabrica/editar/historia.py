@@ -19,6 +19,7 @@ import math
 import os
 import re
 import subprocess
+import time
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass, field
@@ -47,7 +48,10 @@ VENTANA_SIN_IA_S = 2.0              # sin IA: ancho de un momento (zoom y efecto
 VENTANA_LENTA_S = 1.4               # sin IA: ancho del momento en cámara lenta (1.5 s o menos)
 VENTANA_PAUSA_S = 1.0               # sin IA: ancho del momento que termina en la pausa
 PLANO_MIN_S = 2.0                   # debe quedar un tramo plano (velocidad 1, sin zoom ni efecto) de 2 s o más
-MARGEN_PLANO_S = 0.15               # la puerta mide a esta distancia del borde de un tramo plano
+MARGEN_PLANO_S = 0.2                # la puerta mide a esta distancia del borde de un tramo plano (y al centro de un cuadro)
+TOPE_TEXTO = 120                    # lo máximo que se copia de un texto del modelo a motivos, intentos, plan y log
+ESCENAS_MAX_S = 90                  # PySceneDetect sólo analiza recortes de hasta esta duración
+ESCENAS_PLAZO_MIN_S = 240           # y sólo si al ciclo le quedan al menos tantos segundos
 TOPE_SEGUNDO_FOTOGRAMAS = 6
 LADO_MAX_FOTOGRAMA = 512
 
@@ -55,7 +59,7 @@ DEFAULTS = {
     "activo": True, "apertura_min_s": 1.0, "apertura_max_s": 3.0, "apertura_final_pct": 40,
     "momentos_min": 2, "momentos_max": 4, "momento_min_s": 0.8,
     "camara_lenta_max": 1, "camara_lenta_momento_max_s": 1.5, "pausa_max": 1, "pausa_s": 0.4,
-    "zoom_max_n": 2, "zoom_max": 1.12, "sfx_max": 2, "sfx_en_campanas": False, "ganancia_sfx_db": -6,
+    "zoom_max_n": 2, "zoom_max": 1.12, "zoom_momento_max_s": 4.0, "sfx_max": 2, "sfx_en_campanas": False, "ganancia_sfx_db": -6,
     "segundo": {"activo": False, "nombre": "segundo-proveedor", "motivo": "GitHub Models retirado el 30 jul 2026",
                 "url": "", "modelo": "", "secreto": "", "tiempo_s": 60, "max_por_ciclo": 1},
 }
@@ -181,11 +185,22 @@ def tramos_planos(tramos: list[Tramo], minimo: float = 0.0) -> list[Tramo]:
     return [tr for tr in tramos if tr.plano and tr.dur >= minimo - TOL]
 
 
+def _cuerpo(tramos: list[Tramo]) -> list[Tramo]:
+    """Los tramos del cuerpo principal: todos menos la apertura en frío (`tramos[0]`)."""
+    return tramos[1:]
+
+
+def _centro_de_cuadro(t: float) -> float:
+    """El centro del cuadro de salida que contiene a `t` (ahí no hay ambigüedad entre dos cuadros)."""
+    return (math.floor(t * FPS + 1e-9) + 0.5) / FPS
+
+
 def instante_plano(tramos: list[Tramo], t: float, tope: float | None = None,
                    margen: float = MARGEN_PLANO_S, desde: float | None = None) -> float | None:
-    """El instante de un tramo plano más cercano a `t` (a `margen` de sus bordes, entre `desde` y `tope`), o None."""
+    """El instante, en el cuerpo principal (no en la apertura), de un tramo plano más cercano a `t`: a `margen` de
+    sus bordes, entre `desde` y `tope`, y en el centro de un cuadro de salida. None si no hay."""
     mejor = None
-    for tr in tramos_planos(tramos, 2 * margen + 0.1):
+    for tr in tramos_planos(_cuerpo(tramos), 2 * margen + 0.1):
         lo, hi = tr.s0 + margen, tr.s1 - margen
         if desde is not None:
             lo = max(lo, desde)
@@ -193,15 +208,15 @@ def instante_plano(tramos: list[Tramo], t: float, tope: float | None = None,
             hi = min(hi, tope)
         if hi < lo:
             continue
-        c = min(max(t, lo), hi)
+        c = _centro_de_cuadro(min(max(t, lo), hi))     # el ajuste mueve a lo sumo medio cuadro: sigue dentro del margen
         if mejor is None or abs(c - t) < abs(mejor - t) - TOL:
             mejor = c
     return mejor
 
 
 def tramo_plano_largo(tramos: list[Tramo], minimo: float = PLANO_MIN_S) -> Tramo | None:
-    """El tramo plano más largo (de `minimo` s o más); el primero si hay empate."""
-    cands = tramos_planos(tramos, minimo)
+    """El tramo plano más largo del cuerpo principal (de `minimo` s o más; la apertura no cuenta); el primero si hay empate."""
+    cands = tramos_planos(_cuerpo(tramos), minimo)
     return max(cands, key=lambda tr: (round(tr.dur, 6), -tr.s0), default=None)
 
 
@@ -262,7 +277,19 @@ def remapear_lineas(lineas: list, tramos: list[Tramo], tope: float | None = None
 # ------------------------------------------------------------------ validación (código nuestro, no del modelo)
 
 def _num(x) -> bool:
-    return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x)
+    """Número finito y razonable. Un entero de 400 dígitos (OverflowError al volverlo float) es inválido, no un fallo."""
+    if not isinstance(x, (int, float)) or isinstance(x, bool):
+        return False
+    try:
+        return math.isfinite(x) and abs(float(x)) < 1e9
+    except (OverflowError, ValueError):
+        return False
+
+
+def _c(x, n: int = TOPE_TEXTO) -> str:
+    """Un valor que viene del modelo, como texto corto (`repr` truncado) para motivos, intentos, plan y log."""
+    t = repr(x)
+    return t if len(t) <= n else t[:n - 1] + "…"
 
 
 def es_campana(ficha: dict | None) -> bool:
@@ -303,7 +330,7 @@ def _esquema(plan) -> list[str]:
     extra = sorted(str(k) for k in plan if k not in CLAVES_PLAN)
     falta = [k for k in CLAVES_PLAN if k not in plan]
     if extra:
-        m.append("claves fuera del esquema: " + ", ".join(extra))
+        m.append(_c("claves fuera del esquema: " + ", ".join(extra)))
     if falta:
         m.append("faltan claves: " + ", ".join(falta))
     ap = plan.get("apertura")
@@ -313,7 +340,7 @@ def _esquema(plan) -> list[str]:
         else:
             extra_a = sorted(str(k) for k in ap if k not in CLAVES_APERTURA)
             if extra_a:
-                m.append("apertura: claves fuera del esquema: " + ", ".join(extra_a))
+                m.append(_c("apertura: claves fuera del esquema: " + ", ".join(extra_a)))
             for k in CLAVES_APERTURA:
                 if not _num(ap.get(k)):
                     m.append(f"apertura.{k} falta o no es un número")
@@ -328,19 +355,19 @@ def _esquema(plan) -> list[str]:
                     continue
                 extra_m = sorted(str(k) for k in mo if k not in CLAVES_MOMENTO)
                 if extra_m:
-                    m.append(f"momento {i}: claves fuera del esquema: " + ", ".join(extra_m))
+                    m.append(_c(f"momento {i}: claves fuera del esquema: " + ", ".join(extra_m)))
                 for k in ("t0", "t1"):
                     if not _num(mo.get(k)):
                         m.append(f"momento {i}: {k} falta o no es un número")
                 if mo.get("sentimiento") not in SENTIMIENTOS:
-                    m.append(f"momento {i}: sentimiento {mo.get('sentimiento')!r} no está en la lista cerrada")
+                    m.append(f"momento {i}: sentimiento {_c(mo.get('sentimiento'), 40)} no está en la lista cerrada")
                 if mo.get("tratamiento") not in TRATAMIENTOS:
-                    m.append(f"momento {i}: tratamiento {mo.get('tratamiento')!r} no está en la lista cerrada")
+                    m.append(f"momento {i}: tratamiento {_c(mo.get('tratamiento'), 40)} no está en la lista cerrada")
                 s = mo.get("sfx")
                 if "sfx" not in mo:
                     m.append(f"momento {i}: falta sfx (null si no hay efecto)")
                 elif s is not None and not (isinstance(s, str) and RE_ID_SFX.match(s)):
-                    m.append(f"momento {i}: sfx {s!r} no es un id de efecto")
+                    m.append(f"momento {i}: sfx {_c(s, 40)} no es un id de efecto")
     return m
 
 
@@ -405,18 +432,22 @@ def validar_plan(plan, recorte: tuple[float, float], rango_duracion: tuple[float
         m.append(f"{len(por['pausa'])} pausas: máximo {cfg['pausa_max']}")
     if len(por["zoom_suave"]) > cfg["zoom_max_n"]:
         m.append(f"{len(por['zoom_suave'])} zooms suaves: máximo {cfg['zoom_max_n']}")
+    for mo in por["zoom_suave"]:
+        if float(mo["t1"]) - float(mo["t0"]) > cfg["zoom_momento_max_s"] + TOL:
+            m.append(f"zoom suave de {float(mo['t1']) - float(mo['t0']):.2f} s: máximo {cfg['zoom_momento_max_s']:g} s "
+                     "(debe quedar cuerpo plano para comprobarlo)")
     if len(por["sfx"]) > cfg["sfx_max"]:
         m.append(f"{len(por['sfx'])} efectos de sonido: máximo {cfg['sfx_max']}")
     prohibe = sfx_prohibido(ficha, cfg)
     for i, mo in enumerate(momentos, 1):
         s = mo["sfx"]
         if s is not None and mo["tratamiento"] != "sfx":
-            m.append(f"momento {i}: sfx {s!r} sólo va con tratamiento sfx")
+            m.append(f"momento {i}: sfx {_c(s, 40)} sólo va con tratamiento sfx")
         if mo["tratamiento"] == "sfx":
             if s is None:
                 m.append(f"momento {i}: el tratamiento sfx pide el id de un efecto")
             elif s not in ids:
-                m.append(f"momento {i}: el efecto {s!r} no está verificado y disponible")
+                m.append(f"momento {i}: el efecto {_c(s, 40)} no está verificado y disponible")
             if prohibe:
                 m.append(f"momento {i}: efectos de sonido prohibidos ({prohibe})")
 
@@ -428,8 +459,8 @@ def validar_plan(plan, recorte: tuple[float, float], rango_duracion: tuple[float
     if not m:
         tr = mapa(plan, ini, fin, zoom_max=cfg["zoom_max"], pausa_s=cfg["pausa_s"])
         if tramo_plano_largo(tr) is None:
-            m.append(f"no queda un tramo plano (velocidad 1, sin zoom ni efecto) de {PLANO_MIN_S:g} s o más "
-                     "para comprobar el audio original")
+            m.append(f"no queda en el cuerpo un tramo plano (velocidad 1, sin zoom ni efecto) de {PLANO_MIN_S:g} s "
+                     "o más para comprobar la imagen y el audio originales")
     return not m, m
 
 
@@ -459,7 +490,7 @@ def instruccion(cfg: dict | None, ids_sfx, prohibe_sfx: str | None = None) -> st
         "{{MOMENTOS_MIN}}": str(cfg["momentos_min"]), "{{MOMENTOS_MAX}}": str(cfg["momentos_max"]),
         "{{MOMENTO_MIN}}": f"{cfg['momento_min_s']:g}", "{{LENTA_MAX_S}}": f"{cfg['camara_lenta_momento_max_s']:g}",
         "{{PAUSA_S}}": f"{cfg['pausa_s']:g}", "{{ZOOM_MAX}}": f"{cfg['zoom_max']:g}",
-        "{{ZOOM_N}}": str(cfg["zoom_max_n"]), "{{SFX_N}}": str(cfg["sfx_max"]), "{{EFECTOS}}": efectos,
+        "{{ZOOM_N}}": str(cfg["zoom_max_n"]), "{{ZOOM_MAX_S}}": f"{cfg['zoom_momento_max_s']:g}", "{{SFX_N}}": str(cfg["sfx_max"]), "{{EFECTOS}}": efectos,
         "{{SENTIMIENTOS}}": ", ".join(SENTIMIENTOS), "{{TRATAMIENTOS}}": ", ".join(TRATAMIENTOS),
     }
     texto = m.group(1)
@@ -491,6 +522,8 @@ def esquema_gemini() -> dict:
 
 def escenas_scenedetect(ruta: Path, inicio: float, fin: float) -> list[float] | None:
     """Cambios de escena con PySceneDetect (`ContentDetector`) si está instalado; None si no (o si falla)."""
+    if fin - inicio > ESCENAS_MAX_S or (plazo.activo() and not plazo.queda(ESCENAS_PLAZO_MIN_S)):
+        return None      # recorte largo o plazo justo: PySceneDetect no se puede interrumpir; va el respaldo con tope de tiempo
     try:
         from scenedetect import ContentDetector, detect
     except ImportError:
@@ -675,14 +708,44 @@ def plan_sin_ia(sen: dict, recorte: tuple[float, float], rango_duracion: tuple[f
 
 # ------------------------------------------------------------------ eslabón 2: cliente chat/completions genérico
 
+class _SinRedireccion(urllib.request.HTTPRedirectHandler):
+    """No sigue redirecciones: la clave (`Authorization`) sólo viaja a la URL que fijó la config."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
+        return None
+
+
+TOPE_RESPUESTA_BYTES = 2 * 1024 * 1024
+
+
 def transporte_urllib(url: str, encabezados: dict, cuerpo: bytes, tiempo: float) -> tuple[int, str]:
-    """POST real. Devuelve (estado_http, texto). Nunca deja encabezados (la clave) en un error."""
+    """POST real. Devuelve (estado_http, texto). Sin redirecciones; `tiempo` es el total de la llamada (no sólo por
+    socket: la lectura se corta al pasarse); nunca deja encabezados (la clave) en un error."""
+    limite = time.monotonic() + float(tiempo)
     req = urllib.request.Request(url, data=cuerpo, headers=encabezados, method="POST")
+    opener = urllib.request.build_opener(_SinRedireccion)
+
+    def leer(r) -> str:
+        trozos, total = [], 0
+        while True:
+            if time.monotonic() > limite:
+                raise TimeoutError("tiempo total agotado")
+            b = getattr(r, "read1", r.read)(65536)         # read1: vuelve tras cada recepción, para vigilar el tiempo total
+            if not b:
+                break
+            total += len(b)
+            if total > TOPE_RESPUESTA_BYTES:
+                raise OSError("respuesta demasiado grande")
+            trozos.append(b)
+        return b"".join(trozos).decode("utf-8", errors="replace")
     try:
-        with urllib.request.urlopen(req, timeout=tiempo) as r:  # noqa: S310 (la URL la fija la config, https)
-            return r.status, r.read().decode("utf-8")
+        with opener.open(req, timeout=max(0.1, float(tiempo))) as r:  # noqa: S310 (la URL la fija la config, https)
+            return r.status, leer(r)
     except urllib.error.HTTPError as e:
-        return e.code, e.read().decode("utf-8", errors="replace")
+        try:
+            return e.code, leer(e)
+        except (TimeoutError, OSError) as e2:
+            raise ErrorHistoria(f"fallo de conexión con el segundo proveedor: {type(e2).__name__}") from None
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         raise ErrorHistoria(f"fallo de conexión con el segundo proveedor: {type(e).__name__}") from None
 
@@ -739,6 +802,9 @@ def llamar_segundo(cfg: dict, *, recorte, ids_sfx, prohibe_sfx, ruta_video=None,
     clave = env.get(seg.get("secreto") or "", "")
     if not (seg.get("url") and seg.get("modelo") and seg.get("secreto")) or not clave:
         intentos.append(f"segundo: sin secreto o sin configurar ({seg.get('secreto') or 'sin nombre'})")
+        return None
+    if not str(seg["url"]).lower().startswith("https://"):
+        intentos.append("segundo: la URL debe ser https (la clave no viaja en claro)")
         return None
     if _usadas_segundo[0] >= int(seg.get("max_por_ciclo", 1)):
         intentos.append("segundo: tope de llamadas del ciclo")
@@ -887,10 +953,16 @@ def _g(x: float) -> str:
     return f"{x:.6f}".rstrip("0").rstrip(".") or "0"
 
 
-def _cadena_zoom(z0: float, z1: float, cuadros: int, ancho: int, alto: int) -> str:
-    """Zoom suave centrado de `z0` a `z1` en `cuadros` cuadros: zoompan sobre el cuadro ya escalado, sin franjas."""
+def _cadena_zoom(z0: float, z1: float, cuadros: int, ancho: int, alto: int, e: str = "z") -> str:
+    """Zoom suave centrado de `z0` a `z1` en `cuadros` cuadros sobre el cuadro ya escalado, como una cadena con
+    etiquetas propias (`e`): el cuadro se copia, una copia se agranda con `scale` (`eval=frame`, tamaño par que sólo
+    crece) y se centra sobre la original con `overlay` (`eval=frame`), que recorta lo que sobra. Todo cae en píxeles
+    enteros y el tamaño no oscila: sin la cuadrícula de `zoompan`, que temblaba ±2 px."""
     paso = (z1 - z0) / max(cuadros - 1, 1)
-    return (f"zoompan=z='{_g(z0)}+{_g(paso)}*on':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={ancho}x{alto}:fps={FPS}")
+    z = f"({_g(z0)}+{_g(paso)}*n)"
+    return (f"split[{e}b][{e}s];"
+            f"[{e}s]scale=w='2*trunc({ancho}*{z}/2)':h='2*trunc({alto}*{z}/2)':eval=frame:flags=bicubic[{e}z];"
+            f"[{e}b][{e}z]overlay=x='(W-w)/2':y='(H-h)/2':eval=frame:shortest=1")
 
 
 def orden_ffmpeg(*, salida: str, ancho: int, alto: int, video: dict, tramos: list[Tramo],
@@ -899,12 +971,10 @@ def orden_ffmpeg(*, salida: str, ancho: int, alto: int, video: dict, tramos: lis
     """Una sola orden de ffmpeg para una toma con historia (función pura; no corre nada).
 
     `video`: {ruta, inicio, recorte {x, y, ancho, alto}, canales (1 = mono)}. `tramos`: el `mapa`. `placas`: [(PNG, x, y, t0, t1)] en
-    tiempo de salida. `sfx`: {id: ruta} de los efectos que usan los tramos. Entradas: 0 = la apertura (`-ss`/`-t`
-    sobre la fuente, para no acumular cuadros), 1 = el recorte, luego las placas y los efectos. Cada tramo se
-    corta con `trim`/`atrim`; la cámara lenta es `setpts=2*PTS` + `atempo=0.5` antes de `fps=30`; la pausa clona el
+    tiempo de salida. `sfx`: {id: ruta} de los efectos que usan los tramos. Entradas: una por tramo (`-ss`/`-t`
+    sobre la fuente, para no acumular cuadros), luego las placas y los efectos. La cámara lenta es `setpts=2*PTS` + `atempo=0.5` antes de `fps=30`; la pausa clona el
     último cuadro con `tpad` y va en silencio; el zoom es suave y centrado; todo se une con `concat` sin fundidos; los
     efectos entran con `adelay` + `amix=normalize=0`."""
-    ap, principales = tramos[0], tramos[1:]
     inicio = float(video["inicio"])
     duracion = duracion_salida(tramos)
     r = video["recorte"]
@@ -912,9 +982,16 @@ def orden_ffmpeg(*, salida: str, ancho: int, alto: int, video: dict, tramos: lis
     fmt_base = "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo"
     # una fuente mono se duplica a los dos canales sin bajarle volumen (el upmix por defecto resta 3 dB a cada canal)
     audio_fmt = ("pan=stereo|c0=c0|c1=c0," if int(video.get("canales") or 2) == 1 else "") + fmt_base
-    dur_rec = max(tr.f1 for tr in principales if tr.velocidad != 0.0) - inicio
-    entradas = ["-ss", _g(ap.f0), "-t", _g(ap.f1 - ap.f0), "-i", video["ruta"],
-                "-ss", _g(inicio), "-t", _g(dur_rec), "-i", video["ruta"]]
+    # una entrada por tramo, cada una con su `-ss`/`-t`: ffmpeg sólo decodifica y retiene lo que ese tramo usa (con
+    # varios `trim` de una misma entrada retenía cuadros de más: 4 a 5 GB en 1080p60; con una entrada por tramo, unos
+    # 600 MB). Sin `-itsoffset`: con él el concat recibe marcas de tiempo inválidas.
+    entradas: list[str] = []
+    for i, tr in enumerate(tramos):
+        if i > 0 and tr.velocidad == 0.0:
+            ss, t_in = max(inicio, tr.f0 - 0.034), 0.2          # sólo el cuadro de justo antes del congelado
+        else:
+            ss, t_in = tr.f0, tr.f1 - tr.f0
+        entradas += ["-ss", _g(ss), "-t", _g(t_in), "-i", video["ruta"]]
     filtros: list[str] = []
     etiquetas: list[str] = []
     for i, tr in enumerate(tramos):
@@ -923,24 +1000,20 @@ def orden_ffmpeg(*, salida: str, ancho: int, alto: int, video: dict, tramos: lis
         # mismas muestras: así el concat no corre el audio respecto del video de un tramo a otro
         n = max(1, int(round(tr.s1 * FPS)) - int(round(tr.s0 * FPS)))
         muestras = n * (48000 // FPS)
-        if i == 0:
-            cabeza = f"[0:v]trim=duration={_g(tr.dur)},setpts=PTS-STARTPTS,fps={FPS}"
-            audio = f"[0:a]atrim=duration={_g(tr.dur)},asetpts=PTS-STARTPTS,{audio_fmt}"
-        elif tr.velocidad == 0.0:
-            ult = max(0.0, tr.f0 - inicio - 0.034)
-            cabeza = (f"[1:v]trim=start={_g(ult)}:end={_g(tr.f0 - inicio)},setpts=PTS-STARTPTS,fps={FPS},"
-                      f"trim=end_frame=1,tpad=stop_mode=clone:stop={n - 1}")
+        # `aresample=async=1:first_pts=0` rellena con silencio un audio que empieza tarde (si no, `asetpts` lo
+        # adelantaría y el sonido saldría antes que la imagen)
+        sincro = "aresample=async=1:first_pts=0,asetpts=PTS-STARTPTS"
+        if tr.velocidad == 0.0:
+            cabeza = f"[{i}:v]setpts=PTS-STARTPTS,fps={FPS},trim=end_frame=1,tpad=stop_mode=clone:stop={n - 1}"
             audio = f"anullsrc=r=48000:cl=stereo,atrim=duration={_g(tr.dur)},asetpts=PTS-STARTPTS,{fmt_base}"
         else:
-            f0, f1 = tr.f0 - inicio, tr.f1 - inicio
             lenta = tr.velocidad == 0.5
-            cabeza = (f"[1:v]trim=start={_g(f0)}:end={_g(f1)},setpts="
-                      + ("2*(PTS-STARTPTS)" if lenta else "PTS-STARTPTS") + f",fps={FPS}")
-            audio = (f"[1:a]atrim=start={_g(f0)}:end={_g(f1)},asetpts=PTS-STARTPTS"
-                     + (",atempo=0.5" if lenta else "") + f",{audio_fmt}")
+            cabeza = f"[{i}:v]setpts=" + ("2*(PTS-STARTPTS)" if lenta else "PTS-STARTPTS") + f",fps={FPS}"
+            audio = f"[{i}:a]{sincro}" + (",atempo=0.5" if lenta else "") + f",{audio_fmt}"
         cadena = f"{cabeza},{encuadre}"
         if tr.zoom:
-            cadena += "," + _cadena_zoom(tr.zoom[0], tr.zoom[1], n, ancho, alto)
+            filtros.append(f"{cadena}[zi{i}]")
+            cadena = f"[zi{i}]" + _cadena_zoom(tr.zoom[0], tr.zoom[1], n, ancho, alto, e=f"z{i}")
         filtros.append(f"{cadena},tpad=stop_mode=clone:stop=2,trim=end_frame={n},setpts=PTS-STARTPTS,"
                        f"format=yuv420p[{v}]")
         filtros.append(f"{audio},apad=whole_len={muestras},atrim=end_sample={muestras},asetpts=PTS-STARTPTS[{a}]")
@@ -951,13 +1024,13 @@ def orden_ffmpeg(*, salida: str, ancho: int, alto: int, video: dict, tramos: lis
     for i, (ruta, x, y, t0, t1) in enumerate(placas):
         entradas += ["-loop", "1", "-framerate", str(FPS), "-t", d, "-i", ruta]
         sig = f"c{i + 1}"
-        filtros.append(f"[{actual}][{2 + i}:v]overlay={x}:{y}:enable='gte(t,{_g(t0)})*lt(t,{_g(t1)})'[{sig}]")
+        filtros.append(f"[{actual}][{len(tramos) + i}:v]overlay={x}:{y}:enable='gte(t,{_g(t0)})*lt(t,{_g(t1)})'[{sig}]")
         actual = sig
     filtros.append(f"[{actual}]format=yuv420p[out]")
     mapa_audio = "[ac]"
     usados = [(tr, (sfx or {}).get(tr.sfx)) for tr in tramos if tr.sfx]
     if usados:
-        base = 2 + len(placas)
+        base = len(tramos) + len(placas)
         mezcla = ["[ac]"]
         for k, (tr, ruta) in enumerate(usados):
             if not ruta:

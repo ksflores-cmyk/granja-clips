@@ -169,6 +169,16 @@ def resolver_sfx(plan: dict, sfx: dict) -> tuple[dict, list[str]]:
     return {**plan, "momentos": momentos}, avisos
 
 
+def memoria_hijos_mb() -> float:
+    """Memoria máxima (MB) de cualquier proceso hijo ya terminado (ffmpeg incluido); es un máximo acumulado del
+    proceso. En Linux `ru_maxrss` viene en KB; 0.0 donde no hay `resource`."""
+    try:
+        import resource
+        return round(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024, 1)
+    except (ImportError, OSError):
+        return 0.0
+
+
 def _muestras_historia(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, registrar, fichas: list[dict],
                        descargador, sfx: dict) -> None:
     """Muestras con historia: el plan sale del eslabón sin IA (`eslabon: sin-ia`) o es el JSON fijo del YAML."""
@@ -207,6 +217,7 @@ def _muestras_historia(salida: Path, marca: Marca, muestras: list[dict], descarg
         t_render = time.monotonic() - t0
         puntos = estilo.revisar(mp4, plan, marca, ficha)
         t_total = time.monotonic() - t0
+        memoria = memoria_hijos_mb()
         h = plan.get("historia") or {}
         registrar(mid, mp4, plan_ruta, float(plan["duracion"]), puntos,
                   [Linea(**{k: v for k, v in ln.items() if k in ("t0", "t1", "nombre", "frase", "acotacion")})
@@ -216,6 +227,7 @@ def _muestras_historia(salida: Path, marca: Marca, muestras: list[dict], descarg
             "historia": {"proveedor": h.get("proveedor"), "plan": h.get("plan"), "mapa": h.get("mapa"),
                          "intentos": h.get("intentos"), "motivo": h.get("motivo"), "avisos": avisos,
                          "duracion_salida_s": plan["duracion"], "detector": hist.detector,
+                         "memoria_max_hijos_mb": memoria,
                          "efectos": (plan.get("audio") or {}).get("efectos") or []},
             "tiempos_s": {"render": round(t_render, 1), "puerta_de_estilo": round(t_total - t_render, 1),
                           "render_y_puerta": round(t_total, 1)}}, plan)
@@ -334,7 +346,8 @@ def main(argv: list[str] | None = None) -> int:
         extra = ""
         if m.get("historia"):       # #20: qué eslabón armó el plan, con qué detector y cuánto tardó (render + puerta)
             extra = (f"; historia {m['historia']['proveedor']} ({m['historia']['detector']}), render "
-                     f"{m['tiempos_s']['render']} s + puerta {m['tiempos_s']['puerta_de_estilo']} s")
+                     f"{m['tiempos_s']['render']} s + puerta {m['tiempos_s']['puerta_de_estilo']} s"
+                      f"; memoria máx. de ffmpeg (acumulada) {m['historia'].get('memoria_max_hijos_mb')} MB")
             extra += "".join(f"; {a}" for a in m["historia"].get("avisos") or [])
         print(f"{m['id']}: {m['archivo']} {m['duracion_s']} s, puerta {'EN VERDE' if m['puerta_estilo']['en_verde'] else 'EN ROJO'}{extra}")
     return 0 if manifiesto["puerta_estilo_en_verde"] else 1

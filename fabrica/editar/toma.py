@@ -28,6 +28,7 @@ from .lienzo import Toma
 from .marca import Marca
 
 SIN_IA = "sin-ia"          # `Resultado.modelo` cuando el corte no pasó por Gemini
+PLAZO_MIN_HISTORIA_S = 180   # la historia sólo se intenta si al ciclo le quedan al menos estos segundos
 MIN_LINEA_S = 0.3        # una línea más corta que esto tras ajustarla al recorte se descarta
 INICIO_ACOTACION_S = 0.8
 
@@ -258,7 +259,11 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                 # La historia nunca descarta ni gasta una fuente: si no hay plan, o el render o la puerta fallan con
                 # ella, la toma se renderiza como siempre y el plan dice por qué.
                 plan_h, plan, puntos = None, None, None
-                if con_historia:
+                if con_historia and not plazo.queda(PLAZO_MIN_HISTORIA_S):
+                    plan_h = mod_historia.Planificacion(
+                        None, None, [f"historia: quedan menos de {PLAZO_MIN_HISTORIA_S} s del plazo"],
+                        f"quedan menos de {PLAZO_MIN_HISTORIA_S} s del plazo del ciclo")
+                elif con_historia:
                     plan_h = _planificar_historia(raiz, ficha, mirada.datos, inicio, dur, cfg_h, sfx_d,
                                                   video_ojos, lineas)
                 if plan_h is not None and plan_h.plan is not None:
@@ -269,9 +274,9 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                             raise ValueError("la puerta de estilo salió en rojo con historia: " + "; ".join(malos_h[:3]))
                     except plazo.SinTiempo:
                         raise
-                    except (ValueError, subprocess.SubprocessError, OSError) as e:
+                    except Exception as e:  # noqa: BLE001 (la historia nunca descarta una fuente; el plazo ya subió arriba)
                         mp4.unlink(missing_ok=True)
-                        motivo_h = f"el render con historia falló ({type(e).__name__}): {e}"
+                        motivo_h = f"el render con historia falló ({type(e).__name__}): {str(e)[:mod_historia.TOPE_TEXTO]}"
                         plazo.log(f"historia: {motivo_h}; la toma se renderiza sin ella")
                         plan_h = mod_historia.Planificacion(None, None, [*plan_h.intentos, motivo_h], motivo_h)
                         plan, puntos = None, None

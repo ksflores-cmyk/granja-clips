@@ -4,7 +4,9 @@ Todo sin red: transportes falsos. Las pruebas con ffmpeg real (testsrc + seno) v
 """
 import copy
 import json
+import re
 import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -214,12 +216,11 @@ def test_duracion_de_salida_dentro_del_rango_de_la_ficha():
 
 def test_debe_quedar_un_tramo_plano_de_2_s():
     p = plan_base(apertura={"t0": 12.0, "t1": 13.0},
-                  momentos=[momento(0, 6, "zoom_suave"), momento(6, 12, "zoom_suave"),
-                            momento(12, 15, "sfx", sfx="golpe-a"), momento(15, 16.5, "camara_lenta")])
+                  momentos=[momento(0, 4, "zoom_suave"), momento(4, 8, "zoom_suave"),
+                            momento(9, 14, "sfx", sfx="golpe-a"), momento(15, 16.5, "camara_lenta")])
     ok, motivos = validar_(p, sfx=["golpe-a"])
     assert not ok and any("tramo plano" in m for m in motivos)
-    p["momentos"][3]["t1"] = 15.8                 # queda un tramo plano de 2.2 s al final
-    p["momentos"][3]["t0"] = 15.0
+    p["momentos"][3]["t0"] = 15.0                 # queda un tramo plano de 2.2 s al final
     p["momentos"][3]["t1"] = 15.8
     assert validar_(p, sfx=["golpe-a"])[0]
 
@@ -596,7 +597,7 @@ def test_el_prompt_lleva_la_seccion_9_solo_con_historia_activa():
 
 def test_esquema_de_gemini_trae_historia_opcional_con_listas_cerradas():
     from fabrica import ojos
-    e = ojos.esquema_respuesta()
+    e = ojos.esquema_respuesta(historia=True)
     assert "historia" in e["properties"] and "historia" not in e["required"]
     mo = e["properties"]["historia"]["properties"]["momentos"]["items"]["properties"]
     assert mo["tratamiento"]["enum"] == list(h.TRATAMIENTOS) and mo["sentimiento"]["enum"] == list(h.SENTIMIENTOS)
@@ -626,7 +627,8 @@ def test_la_orden_es_una_sola_llamada_de_ffmpeg_con_la_apertura_aparte():
     cmd = orden()
     assert cmd[0] == "ffmpeg" and cmd.count("ffmpeg") == 1 and cmd.count("-filter_complex") == 1
     txt = " ".join(cmd)
-    assert "-ss 12 -t 2 -i v.mp4 -ss 0 -t 18 -i v.mp4" in txt         # entrada 0: la apertura; entrada 1: el recorte
+    assert txt.startswith("ffmpeg -y -hide_banner -loglevel error -ss 12 -t 2 -i v.mp4 -ss 0 -t 2 -i v.mp4")
+    assert txt.count("-i v.mp4") == len(h.mapa(plan_base(), 0.0, 18.0))      # una entrada por tramo: nada se retiene de más
     assert cmd[-1] == "s.mp4" and "-t 21.6" in txt and "-r 30" in txt and "libx264" in txt and "-movflags +faststart" in txt
     assert "-map [out] -map [ac]" in txt
 
@@ -636,7 +638,7 @@ def test_la_orden_corta_cada_tramo_y_une_con_concat_sin_fundidos():
     txt = " ".join(cmd)
     n = len(h.mapa(plan_base(), 0.0, 18.0))
     assert f"concat=n={n}:v=1:a=1[vc][ac]" in txt
-    assert txt.count("trim=start=") >= n - 2 and txt.count("atrim=start=") >= n - 3
+    assert "trim=start=" not in txt          # ningún tramo recorta una entrada compartida
     for prohibido in ("xfade", "fade", "acrossfade", "drawtext", "subtitles", "gradient"):
         assert prohibido not in txt
     assert "overlay=60:150:enable='gte(t,0)*lt(t,21.6)'" in txt
@@ -647,18 +649,19 @@ def test_camara_lenta_es_setpts_x2_y_atempo_antes_de_fps_30():
     filtros = next(c for c in orden() if c.startswith("[0:v]"))
     lenta = next(f for f in filtros.split(";") if "2*(PTS-STARTPTS)" in f)
     assert lenta.index("setpts=2*(PTS-STARTPTS)") < lenta.index("fps=30") < lenta.index("crop=")
-    assert "atempo=0.5" in next(f for f in filtros.split(";") if f.startswith("[1:a]") and "atempo" in f)
+    assert "atempo=0.5" in next(f for f in filtros.split(";") if ":a]" in f[:8] and "atempo" in f)
     assert filtros.count("atempo=0.5") == 1 and filtros.count("2*(PTS-STARTPTS)") == 1
 
 
-def test_la_pausa_clona_el_ultimo_cuadro_en_silencio_y_el_zoom_es_zoompan_centrado():
+def test_la_pausa_clona_el_ultimo_cuadro_en_silencio_y_el_zoom_es_scale_y_overlay_centrado():
     filtros = next(c for c in orden() if c.startswith("[0:v]")).split(";")
     pausa = next(f for f in filtros if "tpad=stop_mode=clone:stop=11" in f and "end_frame=1" in f)      # 12 cuadros = 0.4 s
-    assert pausa.startswith("[1:v]trim=start=")
+    assert re.match(r"\[\d+:v\]setpts=PTS-STARTPTS,fps=30,trim=end_frame=1,", pausa)
     assert any(f.startswith("anullsrc=r=48000:cl=stereo,atrim=duration=0.4") for f in filtros)
-    zoom = next(f for f in filtros if "zoompan" in f)
-    assert "x='iw/2-(iw/zoom/2)'" in zoom and "y='ih/2-(ih/zoom/2)'" in zoom and "s=1080x1920" in zoom and "fps=30" in zoom
-    assert "z='1+" in zoom and zoom.count("zoompan") == 1
+    junto = " ".join(filtros)
+    assert "zoompan" not in junto and junto.count("eval=frame:flags=bicubic") == 1
+    assert "scale=w='2*trunc(1080*(1+" in junto and "overlay=x='(W-w)/2':y='(H-h)/2':eval=frame:shortest=1" in junto
+    assert "split[z2b][z2s]" in junto                          # etiquetas propias por tramo
 
 
 def test_cada_tramo_tiene_un_numero_exacto_de_cuadros_y_de_muestras():
@@ -986,3 +989,352 @@ def test_si_la_puerta_sale_en_rojo_con_historia_se_renderiza_sin_ella(repo_histo
     r = hacer(repo_historia, tmp_path, video20, respuesta_con_historia(PLAN_TOMA))
     assert r.ok and llamadas == ["gemini", None]
     assert "puerta de estilo salió en rojo con historia" in r.plan["historia"]["motivo"] and r.plan["duracion"] == 12.0
+
+
+# ================================================================ ronda 2 (revisión de #20)
+
+def _tonos(ruta, desde, hasta):
+    """RMS del audio del MP4 entre `desde` y `hasta` (mono, 8 kHz)."""
+    r = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(desde), "-t", str(hasta - desde), "-i", str(ruta), "-vn",
+                        "-ac", "1", "-ar", "8000", "-f", "s16le", "-"], capture_output=True, check=True)
+    x = np.frombuffer(r.stdout, dtype=np.int16).astype(np.float64)
+    return float(np.sqrt(np.mean(x ** 2))) if len(x) else 0.0
+
+
+# --- 1. memoria: una entrada por tramo
+
+@pytest.fixture(scope="module")
+def fuente_1080p60(tmp_path_factory):
+    ruta = tmp_path_factory.mktemp("f1080") / "f.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                    "testsrc2=size=1920x1080:rate=60:duration=25", "-f", "lavfi", "-i", "sine=f=440:duration=25",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-pix_fmt", "yuv420p", "-c:a", "aac",
+                    "-shortest", str(ruta)], check=True)
+    return ruta
+
+
+CODIGO_MEMORIA = """
+import resource, subprocess, sys
+sys.path.insert(0, sys.argv[1])
+from fabrica.editar import historia as h
+mo = lambda t0, t1, tr: {"t0": t0, "t1": t1, "sentimiento": "tension", "tratamiento": tr, "sfx": None}
+plan = {"apertura": {"t0": 21.0, "t1": 23.0},
+        "momentos": [mo(3, 5, "zoom_suave"), mo(8, 9, "pausa"), mo(12, 13.2, "camara_lenta")]}
+video = {"ruta": sys.argv[2], "inicio": 0.0, "recorte": {"x": 656, "y": 0, "ancho": 608, "alto": 1080}, "canales": 2}
+cmd = h.orden_ffmpeg(salida=sys.argv[3], ancho=1080, alto=1920, video=video, tramos=h.mapa(plan, 0.0, 25.0), placas=[])
+r = subprocess.run(cmd, capture_output=True, text=True)
+print(r.returncode, resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024, r.stderr[-300:])
+"""
+
+
+@pytest.mark.slow
+def test_un_recorte_1080p60_de_25_s_se_renderiza_con_menos_de_1_gb(fuente_1080p60, tmp_path):
+    """Con varios `trim` de una misma entrada ffmpeg retenía cuadros (4 a 5 GB); con una entrada por tramo, no."""
+    r = subprocess.run([sys.executable, "-I", "-c", CODIGO_MEMORIA, str(RAIZ_REAL), str(fuente_1080p60),
+                        str(tmp_path / "o.mp4")], capture_output=True, text=True, check=True)
+    codigo, mb, *_ = r.stdout.split()
+    assert codigo == "0", r.stdout
+    assert float(mb) < 1024, f"ffmpeg usó {mb} MB"
+    assert estilo.sondear(tmp_path / "o.mp4")["duracion"] == pytest.approx(25 + 2 + 1.2 + 0.4, abs=0.1)
+
+
+def test_las_muestras_miden_la_memoria_de_los_hijos():
+    from fabrica.editar import muestras
+    subprocess.run(["true"], check=True)
+    mb = muestras.memoria_hijos_mb()
+    assert isinstance(mb, float) and mb >= 0.0
+
+
+# --- 2 y 3. la puerta mide el cuerpo principal, en el centro de un cuadro
+
+def test_la_apertura_no_cuenta_como_tramo_plano_del_cuerpo():
+    p = {"apertura": {"t0": 7.0, "t1": 10.0}, "momentos": [momento(0, 5, "zoom_suave"), momento(5, 10, "zoom_suave")]}
+    tr = h.mapa(p, 0.0, 10.0)
+    assert tr[0].plano and tr[0].dur == pytest.approx(3.0)
+    assert h.tramo_plano_largo(tr) is None and h.instante_plano(tr, 1.0) is None
+    ok, motivos = validar_(p, recorte=(0.0, 10.0), rango=(7.0, 30.0))
+    assert not ok and any("zoom suave de 5.00 s" in m for m in motivos)
+
+
+def test_un_zoom_suave_dura_4_s_o_menos_y_queda_cuerpo_plano():
+    largo = plan_base(momentos=[momento(2, 6.5, "zoom_suave"), momento(8, 9.2, "camara_lenta")])
+    assert not validar_(largo)[0] and any("máximo 4 s" in m for m in validar_(largo)[1])
+    justo = plan_base(momentos=[momento(2, 6, "zoom_suave"), momento(8, 9.2, "camara_lenta")])
+    assert validar_(justo)[0]
+    cuerpo = h.mapa(justo, 0.0, 18.0)[1:]
+    assert any(tr.plano and tr.dur >= h.PLANO_MIN_S for tr in cuerpo)
+
+
+@pytest.mark.parametrize("plan", [plan_base(), PLAN_CORTO])
+def test_los_instantes_de_medida_caen_en_el_cuerpo_y_en_el_centro_de_un_cuadro(plan):
+    rec = RECORTE if plan is not PLAN_CORTO else REC_CORTO
+    tr = h.mapa(plan, rec[0], rec[1])
+    for t in np.arange(0.0, h.duracion_salida(tr), 0.07):
+        c = h.instante_plano(tr, float(t))
+        if c is None:
+            continue
+        assert c >= tr[0].s1 + h.MARGEN_PLANO_S - 1 / 60 - 1e-9
+        assert (c * 30 - 0.5) == pytest.approx(round(c * 30 - 0.5), abs=1e-6)               # centro de un cuadro
+        asignado = next(x for x in tr if x.s0 - 1e-6 <= c < x.s1 - 1e-6)
+        assert asignado.plano and c - asignado.s0 >= h.MARGEN_PLANO_S - 1 / 60 - 1e-9 and asignado.s1 - c >= h.MARGEN_PLANO_S - 1 / 60 - 1e-9
+
+
+@pytest.mark.slow
+def test_un_cuerpo_invertido_y_espejado_sale_en_rojo_aunque_la_apertura_sea_buena(render_con_historia, marca, tmp_path):
+    base = render_con_historia
+    malo = tmp_path / "invertido.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(base["mp4"]), "-vf",
+                    "hflip=enable='gte(t,2.0)',vflip=enable='gte(t,2.0)'", "-c:v", "libx264", "-preset", "ultrafast",
+                    "-pix_fmt", "yuv420p", "-c:a", "copy", str(malo)], check=True)
+    # (las placas también se voltean: la comparación con la fuente es la que debe fallar)
+    nombres = {n: ok for n, ok, _ in estilo.revisar(malo, base["plan"], marca)}
+    assert nombres["[fotograma] Apertura en frío = desenlace"] is True
+    assert any(not ok for n, ok in nombres.items() if n != "[fotograma] Apertura en frío = desenlace")
+
+
+def test_sin_un_tramo_plano_la_imagen_esperada_lleva_el_zoom(monkeypatch, marca):
+    plan = {"origen": {"archivo": "x.mp4", "inicio": 0.0, "duracion": 10.0}, "geometria": {"recorte": {}},
+            "historia": {"proveedor": "gemini", "plan": PLAN_CORTO}, "duracion": 13.6}
+    monkeypatch.setattr(estilo, "es_v2", lambda p: True)
+    monkeypatch.setattr(estilo, "_fuente_encuadrada", lambda *a, **k: estilo.Image.new("RGB", (100, 200), "white"))
+    tr = h.mapa(PLAN_CORTO, 0.0, 10.0)
+    zoom = next(x for x in tr if x.zoom)
+    visto = []
+    real = estilo.Image.Image.crop
+    monkeypatch.setattr(estilo.Image.Image, "crop", lambda self, caja: visto.append(caja) or real(self, caja))
+    f = estilo._fuente_esperada(plan, marca, (zoom.s0 + zoom.s1) / 2)
+    assert f.size == (100, 200) and visto and visto[0][0] > 0 and visto[0][2] < 100       # recortó el centro
+
+
+# --- 4. el audio que empieza tarde no se adelanta
+
+@pytest.mark.slow
+def test_un_audio_que_empieza_tarde_no_se_adelanta_en_la_ruta_de_historia(marca, tmp_path):
+    fuente = tmp_path / "tarde.mp4"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                    "testsrc=size=640x360:rate=30:duration=12", "-itsoffset", "1.0", "-f", "lavfi", "-i",
+                    "sine=frequency=440:duration=11", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", str(fuente)], check=True)
+    info = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=start_time",
+                           "-of", "csv=p=0", str(fuente)], capture_output=True, text=True).stdout.strip()
+    assert float(info) == pytest.approx(1.0, abs=0.1)
+    plan = componer.componer(marca, lienzo.Toma(**TOMA), LINEAS, tmp_path / "t.mp4", duracion=10.0,
+                             trabajo=tmp_path / "w", fuente_video=fuente, inicio=0.0,
+                             historia=planificacion(PLAN_CORTO), sfx={}, config_historia=CFG_ACTIVA)
+    assert plan["historia"]["proveedor"] == "gemini"
+    # el cuerpo empieza en el segundo 2 de la salida (tras la apertura) con el segundo 0 de la fuente: silencio hasta 1 s
+    assert _tonos(tmp_path / "t.mp4", 2.15, 2.85) < 30
+    assert _tonos(tmp_path / "t.mp4", 3.2, 3.9) > 500
+
+
+# --- 5. el zoom crece sin temblar
+
+def test_el_zoom_es_monotono_y_no_tiembla(tmp_path):
+    cuadros = 60
+    cadena = h._cadena_zoom(1.0, 1.12, cuadros, 1080, 1920)
+    r = subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i",
+                        f"color=c=black:size=1080x1920:rate=30,drawbox=x=100:y=700:w=300:h=300:color=white:t=fill",
+                        "-vf", cadena + ",format=gray", "-frames:v", str(cuadros), "-f", "rawvideo", "-"],
+                       capture_output=True, check=True)
+    x = np.frombuffer(r.stdout, dtype=np.uint8).reshape(cuadros, 1920, 1080).astype(float)
+    izq = []
+    for f in x[:, 960, :]:                                        # borde izquierdo del recuadro, con precisión de subpíxel
+        i = int(np.argmax(f > 127.5))
+        izq.append(i - (f[i] - 127.5) / max(f[i] - f[i - 1], 1e-9))
+    saltos = np.diff(izq)
+    assert izq[0] == pytest.approx(100, abs=0.7)
+    assert saltos.max() <= 0.5, np.round(izq, 2)                  # sólo se aleja del centro: nunca vuelve (zoompan daba ±2 px)
+    assert (-saltos).max() <= 2.6                                 # y avanza sin saltos grandes
+    assert izq[-1] == pytest.approx(540 - (540 - 100) * 1.12, abs=1.5)
+    assert not any(a < b - 0.5 for a, b in zip(izq, izq[1:]))
+
+
+# --- 6 y 7. fallos del render con historia y guardia de plazo
+
+@pytest.mark.slow
+def test_un_error_cualquiera_del_render_con_historia_vuelve_al_render_de_siempre(repo_historia, tmp_path, video20,
+                                                                               monkeypatch):
+    def rota(**k):
+        raise RuntimeError("fallo raro " + "x" * 500)
+    monkeypatch.setattr(h, "orden_ffmpeg", rota)
+    r = hacer(repo_historia, tmp_path, video20, respuesta_con_historia(PLAN_TOMA))
+    assert r.ok, r.motivos
+    assert r.plan["historia"]["proveedor"] is None and "RuntimeError" in r.plan["historia"]["motivo"]
+    assert len(r.plan["historia"]["motivo"]) < 300 and r.plan["duracion"] == 12.0
+
+
+def test_si_se_acaba_el_plazo_durante_la_historia_sube_el_plazo_y_no_se_traga(repo_historia, tmp_path, video20,
+                                                                             monkeypatch):
+    def sin_tiempo(**k):
+        raise toma.plazo.SinTiempo("sin tiempo de prueba")
+    monkeypatch.setattr(h, "orden_ffmpeg", sin_tiempo)
+    with pytest.raises(toma.plazo.SinTiempo):
+        hacer(repo_historia, tmp_path, video20, respuesta_con_historia(PLAN_TOMA))
+
+
+@pytest.mark.slow
+def test_con_menos_de_180_s_de_plazo_la_historia_no_se_intenta(repo_historia, tmp_path, video20, monkeypatch):
+    llamado = []
+    monkeypatch.setattr(h, "planificar", lambda **k: llamado.append(1))
+    monkeypatch.setattr(toma.plazo, "queda", lambda s: float(s) < 180)
+    r = hacer(repo_historia, tmp_path, video20, respuesta_con_historia(PLAN_TOMA))
+    assert r.ok and not llamado and "menos de 180 s" in r.plan["historia"]["motivo"] and r.plan["duracion"] == 12.0
+
+
+def test_scenedetect_no_corre_con_recortes_largos_ni_con_el_plazo_justo(monkeypatch):
+    assert h.escenas_scenedetect(Path("no-existe.mp4"), 0.0, 120.0) is None          # más de 90 s: va el respaldo
+    monkeypatch.setattr(h.plazo, "activo", lambda: True)
+    monkeypatch.setattr(h.plazo, "queda", lambda s: False)
+    assert h.escenas_scenedetect(Path("no-existe.mp4"), 0.0, 20.0) is None
+
+
+# --- 8. con la historia apagada la petición a Gemini es la de siempre
+
+def test_con_historia_apagada_el_esquema_y_el_prompt_son_los_de_siempre():
+    from fabrica import ojos
+    e = ojos.esquema_respuesta()
+    assert list(e["properties"]) == ["apto", "motivos", "spoiler", "desnudez", "cinematica", "juego_correcto",
+                                     "idioma_original", "lineas", "gancho", "palabra_lapiz", "escena", "acotacion",
+                                     "recorte"] and e["required"] == list(e["properties"])
+    assert json.loads(ojos.cuerpo_peticion("i", b"v", 0.2))["generationConfig"]["responseSchema"] == e
+    marca = Marca.cargar(RAIZ_REAL)
+    temporada = yaml.safe_load((RAIZ_REAL / "temporada.yml").read_text(encoding="utf-8"))
+    sin = ojos.instruccion(marca, temporada, 20.0)
+    assert "historia" not in sin.lower() and "<!--" not in sin and "{{" not in sin
+    con = ojos.instruccion(marca, temporada, 20.0, historia={"cfg": CFG_ACTIVA, "sfx": []})
+    assert "sin salir del rango de tu recorte; si no cabe, omite `historia`" in con.replace("Todo va ", "") \
+        or "Todo va sin salir del rango de tu recorte; si no cabe, omite `historia`" in con
+    assert "recorta de más" not in con
+
+
+@pytest.mark.slow
+def test_la_peticion_a_gemini_con_historia_apagada_no_trae_historia(repo, tmp_path, video20):
+    t = Transporte((200, sobre(respuesta_grabada("valida"))))
+    hacer(repo, tmp_path, video20, t)
+    cuerpo = json.loads(t.llamadas[0][2])
+    assert "historia" not in cuerpo["generationConfig"]["responseSchema"]["properties"]
+    assert "historia" not in cuerpo["contents"][0]["parts"][1]["text"].lower()
+
+
+def test_con_historia_encendida_el_esquema_trae_historia_opcional(repo_historia, tmp_path, video20):
+    from fabrica import ojos
+    assert "historia" in ojos.esquema_respuesta(True)["properties"]
+    assert json.loads(ojos.cuerpo_peticion("i", b"v", 0.2, historia=True))["generationConfig"]["responseSchema"][
+        "properties"].get("historia")
+
+
+# --- 9. números absurdos y textos largos del modelo
+
+def test_un_entero_de_400_digitos_es_un_plan_invalido_y_cae_al_sin_ia():
+    malo = plan_base()
+    malo["apertura"]["t0"] = 10 ** 400
+    malo["momentos"][0]["t1"] = float("inf")
+    ok, motivos = validar_(malo)
+    assert not ok and any("apertura.t0" in m for m in motivos)
+    r = planificar_(datos_gemini={"historia": malo})
+    assert r.proveedor == "sin-ia" and r.intentos[0].startswith("gemini: plan no válido")
+    assert not h._num(10 ** 400) and not h._num(1e30) and h._num(12.5)
+
+
+def test_los_textos_del_modelo_se_truncan_en_motivos_e_intentos():
+    largo = "z" * 5000
+    p = plan_base()
+    p["momentos"][0].update(sentimiento=largo, tratamiento=largo, sfx=largo)
+    p[largo] = 1
+    p["apertura"][largo] = 1
+    p["momentos"][1][largo] = 1
+    ok, motivos = validar_(p)
+    assert not ok and max(len(m) for m in motivos) <= 130
+    r = planificar_(datos_gemini={"historia": p})
+    assert all(len(i) <= 600 for i in r.intentos) and not any(largo[:300] in i for i in r.intentos)
+
+
+# --- 10. segundo proveedor: https, sin redirecciones, tiempo total
+
+def test_el_segundo_proveedor_exige_https():
+    h.reiniciar_contador()
+    t = FalsoHTTP((200, sobre_chat(plan_base())))
+    cfg = {**CFG_ACTIVA, "segundo": {**SEG_ACTIVO, "url": "http://api.ejemplo.test/v1/chat/completions"}}
+    r = planificar_(cfg=cfg, transporte=t, entorno={"SEGUNDO_CLAVE": CLAVE_SEGUNDO}, fotogramas=FOTOS)
+    assert not t.llamadas and any("debe ser https" in i for i in r.intentos) and r.proveedor == "sin-ia"
+
+
+def _servidor(manejador):
+    import http.server
+    import threading
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            manejador(self)
+
+        def log_message(self, *a):
+            pass
+    s = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=s.serve_forever, daemon=True).start()
+    return s
+
+
+def test_no_sigue_redirecciones_ni_reenvia_la_clave():
+    vistos = []
+
+    def destino(rq):
+        vistos.append(dict(rq.headers))
+        rq.send_response(200)
+        rq.end_headers()
+        rq.wfile.write(b"{}")
+    d = _servidor(destino)
+
+    def redirige(rq):
+        rq.send_response(307)
+        rq.send_header("Location", f"http://127.0.0.1:{d.server_port}/robado")
+        rq.end_headers()
+    o = _servidor(redirige)
+    try:
+        estado, _ = h.transporte_urllib(f"http://127.0.0.1:{o.server_port}/v1", {"Authorization": "Bearer secreto-falso"},
+                                        b"{}", 5)
+    finally:
+        o.shutdown()
+        d.shutdown()
+    assert estado == 307 and vistos == []
+
+
+def test_el_tiempo_es_total_y_no_solo_por_socket():
+    import time
+
+    def gotea(rq):
+        rq.send_response(200)
+        rq.send_header("Content-Length", "100")
+        rq.end_headers()
+        for _ in range(40):
+            try:
+                rq.wfile.write(b"x")
+                rq.wfile.flush()
+            except OSError:
+                return
+            time.sleep(0.2)
+    s = _servidor(gotea)
+    try:
+        t0 = time.monotonic()
+        with pytest.raises(h.ErrorHistoria):
+            h.transporte_urllib(f"http://127.0.0.1:{s.server_port}/", {}, b"{}", 1.0)
+        assert time.monotonic() - t0 < 3.0
+    finally:
+        s.shutdown()
+
+
+# --- 11 y 12. archivos de datos y requisitos
+
+def test_todas_las_filas_del_marcador_tienen_las_columnas_de_la_cabecera():
+    import csv
+    from fabrica.registro import CABECERA_MARCADOR
+    filas = list(csv.reader((RAIZ_REAL / "marcador.csv").read_text(encoding="utf-8").splitlines()))
+    assert filas[0] == list(CABECERA_MARCADOR) and len(CABECERA_MARCADOR) == 26
+    assert all(len(f) == 26 for f in filas), [len(f) for f in filas]
+
+
+def test_los_requisitos_fijan_scenedetect_y_opencv_sin_chocar():
+    lineas = [x.strip() for x in (RAIZ_REAL / "requirements.txt").read_text(encoding="utf-8").splitlines()
+              if x.strip() and not x.startswith("#")]
+    assert "scenedetect[opencv-headless]==0.6.7.1" in lineas
+    assert sum(x.startswith("opencv-python-headless==") for x in lineas) == 1
+    assert not any(x.startswith("opencv-python==") or x.startswith("opencv-contrib") for x in lineas)

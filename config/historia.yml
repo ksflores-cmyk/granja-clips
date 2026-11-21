@@ -14,6 +14,7 @@ pausa_max: 1                 # congela el último cuadro del momento, en silenci
 pausa_s: 0.4
 zoom_max_n: 2                # zoom suave centrado de 1.00 a zoom_max a lo largo del momento
 zoom_max: 1.12
+zoom_momento_max_s: 4.0      # un zoom dura 4 s o menos de fuente: así siempre queda cuerpo plano para que la puerta lo mida
 sfx_max: 2                   # efectos de sonido CC0 del catálogo verificado (marca/sfx/efectos.yml)
 sfx_en_campanas: false       # false: ni con reglas.sin_musica ni en campañas (tipo A con campaña) hay efectos
 ganancia_sfx_db: -6

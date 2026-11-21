@@ -652,7 +652,7 @@ def validar_historia(h, inf: Informe) -> None:
         return
     claves = ["activo", "apertura_min_s", "apertura_max_s", "apertura_final_pct", "momentos_min", "momentos_max",
               "momento_min_s", "camara_lenta_max", "camara_lenta_momento_max_s", "pausa_max", "pausa_s", "zoom_max_n",
-              "zoom_max", "sfx_max", "sfx_en_campanas", "ganancia_sfx_db", "segundo"]
+              "zoom_max", "zoom_momento_max_s", "sfx_max", "sfx_en_campanas", "ganancia_sfx_db", "segundo"]
     if not _claves(h, rel, claves, inf):
         return
 
@@ -687,6 +687,7 @@ def validar_historia(h, inf: Informe) -> None:
     zm = num("zoom_max")
     if zm is not None and not 1.0 < zm <= 1.5:
         inf.error(f"{rel}: zoom_max debe estar entre 1 (sin incluir) y 1.5")
+    num("zoom_momento_max_s", 0, 10, estricto_min=True)
     num("sfx_max", 0, entero=True)
     g = num("ganancia_sfx_db", -40, 0)
     s = h["segundo"]

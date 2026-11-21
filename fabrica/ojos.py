@@ -84,8 +84,10 @@ def _error_de_clave(texto) -> bool:
     return any(m in junto for m in ("API_KEY", "PERMISSION_DENIED", "FAILED_PRECONDITION", "UNAUTHENTICATED"))
 
 
-def esquema_respuesta() -> dict:
-    """`responseSchema` de Gemini (subconjunto de OpenAPI) con los campos que pide la especificación."""
+def esquema_respuesta(historia: bool = False) -> dict:
+    """`responseSchema` de Gemini (subconjunto de OpenAPI) con los campos que pide la especificación.
+
+    `historia` añade el plan por momentos (#20); sin él el esquema es el de siempre, campo por campo."""
     texto, booleano, numero = {"type": "STRING"}, {"type": "BOOLEAN"}, {"type": "NUMBER"}
     campos = {
         "apto": booleano,
@@ -100,9 +102,10 @@ def esquema_respuesta() -> dict:
         "recorte": {"type": "OBJECT", "properties": {"inicio": numero, "fin": numero},
                     "required": ["inicio", "fin"]},
     }
-    # `historia` es opcional (no va en `required`): el plan de edición por momentos, sin texto propio (#20)
-    return {"type": "OBJECT", "properties": {**campos, "historia": mod_historia.esquema_gemini()},
-            "required": list(campos)}
+    if historia:        # opcional (no va en `required`): el plan de edición por momentos, sin texto propio (#20)
+        return {"type": "OBJECT", "properties": {**campos, "historia": mod_historia.esquema_gemini()},
+                "required": list(campos)}
+    return {"type": "OBJECT", "properties": campos, "required": list(campos)}
 
 
 def _sin_acentos(t: str) -> str:
@@ -168,13 +171,13 @@ def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: st
     return texto
 
 
-def cuerpo_peticion(instr: str, video: bytes, temperatura: float) -> bytes:
+def cuerpo_peticion(instr: str, video: bytes, temperatura: float, historia: bool = False) -> bytes:
     cuerpo = {
         "contents": [{"parts": [
             {"inline_data": {"mime_type": "video/mp4", "data": base64.b64encode(video).decode("ascii")}},
             {"text": instr}]}],
         "generationConfig": {"responseMimeType": "application/json", "temperature": temperatura,
-                             "responseSchema": esquema_respuesta()},
+                             "responseSchema": esquema_respuesta(historia)},
     }
     return json.dumps(cuerpo).encode("utf-8")
 
@@ -336,7 +339,7 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
         return Mirada(None, motivo=f"el video pesa {tam / 1048576:.1f} MB y el máximo en línea es "
                                    f"{cfg['max_mb_en_linea']} MB", del_material=True)
     cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego, nota, recorte, historia), ruta_video.read_bytes(),
-                             float(cfg["temperatura"]))
+                             float(cfg["temperatura"]), historia=bool(historia))
     if len(cuerpo) > TOPE_PETICION_BYTES:     # el base64 infla un tercio: se mide lo que de verdad se envía
         return Mirada(None, motivo=f"la petición serializada pesa {len(cuerpo) / 1048576:.1f} MB y el tope es "
                                    f"{TOPE_PETICION_BYTES // 1048576} MB", del_material=True)
