@@ -661,6 +661,9 @@ def validar_criticos(c, inf: Informe) -> None:
     for clave in ("tiempo_por_llamada_s", "tope_s"):
         if not _num(c[clave], 1):
             inf.error(f"{rel}: {clave} debe ser un número de 1 o más")
+    for clave in ("reserva_publicar_s", "minimo_ronda2_s"):
+        if not _num(c.get(clave), 0):
+            inf.error(f"{rel}: {clave} debe ser un número de 0 o más")
     if "temperatura" in c and not _num(c["temperatura"], 0, 2):
         inf.error(f"{rel}: temperatura debe ser un número de 0 a 2")
     f = c.get("fotogramas") or {}
@@ -671,8 +674,8 @@ def validar_criticos(c, inf: Informe) -> None:
         inf.error(f"{rel}: juez.con_modelo debe ser true o false")
     cu = c["cupos"]
     g = cu.get("gemini") if isinstance(cu, dict) else None
-    if not (isinstance(g, dict) and all(_es_int(g.get(k)) and g[k] >= 0 for k in ("rpm", "rpd", "reserva_ojos"))):
-        inf.error(f"{rel}: cupos.gemini debe traer rpm, rpd y reserva_ojos (enteros de 0 o más)")
+    if not (isinstance(g, dict) and all(_es_int(g.get(k)) and g[k] >= 0 for k in ("rpm", "rpd", "reserva_ojos", "pausa_429_s"))):
+        inf.error(f"{rel}: cupos.gemini debe traer rpm, rpd, reserva_ojos y pausa_429_s (enteros de 0 o más)")
     elif g["reserva_ojos"] >= g["rpd"]:
         inf.error(f"{rel}: cupos.gemini.reserva_ojos debe ser menor que rpd (si no, los críticos nunca tienen cupo)")
     if not (isinstance(cu, dict) and _num(cu.get("espera_max_s"), 0)):

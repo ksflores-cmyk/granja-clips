@@ -135,6 +135,11 @@ def pedir_json(instruccion: str, imagenes: list[bytes], esquema: dict | None, *,
         g = cup.get("gemini") or {}
         cuerpo = cuerpo_gemini(instruccion, imagenes, esquema, temp)
         encabezados = {"Content-Type": "application/json", "x-goog-api-key": clave}
+        pausa = cuenta.pausado("gemini")
+        if pausa > 0:                       # un 429 reciente: los críticos esperan (los ojos no se enteran)
+            r.intentos.append(f"gemini: agotado por un 429 reciente; faltan {pausa:.0f} s")
+            r.pasajero, r.motivo = True, "Gemini agotado (429 reciente)"
+            modelos = []
         for modelo in modelos:
             quedan = presupuesto()
             if quedan < MINIMO_LLAMADA_S:
@@ -163,6 +168,7 @@ def pedir_json(instruccion: str, imagenes: list[bytes], esquema: dict | None, *,
             if estado == 429:
                 r.intentos.append(f"{modelo}: HTTP 429")
                 r.pasajero, r.motivo = True, "Gemini respondió HTTP 429"
+                cuenta.pausar("gemini", float(g.get("pausa_429_s", 600)))
                 break                                    # el cupo es del proyecto: otro modelo no ayuda
             if 500 <= estado < 600:
                 r.intentos.append(f"{modelo}: HTTP {estado}")

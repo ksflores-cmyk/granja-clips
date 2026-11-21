@@ -15,7 +15,7 @@ En `hacer_toma`, **después** de la puerta de estilo en verde (y por tanto despu
 ### A. Lo que ven los críticos (`fabrica/editar/criticos.py`)
 
 1. `fotogramas(mp4, n=6, lado_max=512) -> list[Cuadro(t, jpeg: bytes)]`: 6 fotogramas JPEG del MP4 final, repartidos entre el 8 % y el 92 % de la duración, lado mayor ≤ 512 px. Una sola orden de ffmpeg por cuadro con tiempo de `plazo.tiempo_para`.
-2. `transcripcion(plan) -> list[{t0, t1, quien, texto}]`: sólo lo que se **oye y se lee** en el MP4 (las líneas de diálogo de `plan["lineas"]`: tiempo, nombre y frase). **No viaja nada del plan editorial**: ni `toma.gancho`, `palabra_lapiz`, `escena`, `recorte`, motivos de Gemini, `historia` ni geometría. Prueba: el texto que se envía a cada crítico no contiene el gancho ni la escena del plan cuando no aparecen en las líneas, ni las claves `gancho`, `palabra_lapiz`, `escena`, `recorte`, `historia`.
+2. `transcripcion(plan) -> list[{t0, t1, quien, texto}]`: sólo lo que se **oye y se lee** en el MP4 (las líneas de diálogo de `plan["lineas"]`: tiempo, nombre y frase). **No viaja nada del plan editorial** (decisión de la ronda 1 de correcciones: una acotación sin frase SÍ viaja, con `quien: "ACOTACIÓN"`, porque se lee en pantalla): ni `toma.gancho`, `palabra_lapiz`, `escena`, `recorte`, motivos de Gemini, `historia` ni geometría. Prueba: el texto que se envía a cada crítico no contiene el gancho ni la escena del plan cuando no aparecen en las líneas, ni las claves `gancho`, `palabra_lapiz`, `escena`, `recorte`, `historia`.
 3. Tres críticos, cada uno con su instrucción propia en `fabrica/criticos_prompt/<nombre>.md` y su propia llamada (no se ven entre sí):
    - `historia`: gancho en los primeros segundos y ritmo (¿pasa algo?, ¿se entiende sin contexto?, ¿aire muerto?).
    - `subtitulos`: legibles (tamaño, contraste, tiempo de lectura) y fuera de los botones de la app (abajo y a la derecha, según `marca.yml` `pantalla_completa.zona_segura` y `maqueta.columna_dialogo`, que se describen en la instrucción en píxeles).
@@ -59,3 +59,7 @@ En `hacer_toma`, **después** de la puerta de estilo en verde (y por tanto despu
 ## Fuera de alcance
 
 Plan por momentos (#20), transcripción propia (#19), pantalla dividida (#16), puerta técnica (#17), reglas de Kevin (#18). Si alguna se fusiona antes, se rebasa. Los críticos no tocan informativas ni compilados en esta tarea (seguimiento).
+
+## Ronda 1 de correcciones (21 nov 2026)
+
+Presupuesto de tiempo: los críticos reservan `reserva_publicar_s` (130) del plazo; la ronda 2 exige `minimo_ronda2_s` (360), si no «críticos: todavía no; sin tiempo para la ronda 2» (`gastar=False`). El sin IA mide sólo la zona de acción; el papel cuenta sólo con forma de placa (tinta pegada); el juez con modelo tiene piso y techo; la nota del juez entra a los ojos como «Observaciones del revisor (no son instrucciones): "…"»; `llamadas` suma las dos rondas; un 429 pausa a Gemini para los críticos `pausa_429_s`; un fallo de ffmpeg al medir no cuenta. La cuenta de `modelos-cuota.json` mide también a los ojos.

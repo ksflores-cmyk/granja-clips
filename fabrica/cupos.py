@@ -46,6 +46,12 @@ class Cupos:
             if dia != hoy:
                 n, tok = 0, 0
             limpio[nombre] = {"ventana": ventana, "dia": hoy, "peticiones_dia": max(n, 0), "tokens_dia": max(tok, 0)}
+            try:
+                hasta = float(p.get("pausa_hasta", 0) or 0)
+            except (TypeError, ValueError):
+                hasta = 0.0
+            if hasta > t.timestamp():
+                limpio[nombre]["pausa_hasta"] = hasta
         return limpio
 
     def _guardar(self, datos: dict) -> None:
@@ -73,6 +79,17 @@ class Cupos:
             datos = self._leer()
             self._de(datos, proveedor)["tokens_dia"] += int(tokens)
             self._guardar(datos)
+
+    def pausar(self, proveedor: str, segundos: float) -> None:
+        """Marca al proveedor «agotado» por `segundos` (tras un 429). Los críticos lo saltan; los ojos no."""
+        datos = self._leer()
+        self._de(datos, proveedor)["pausa_hasta"] = self.ahora().timestamp() + float(segundos)
+        self._guardar(datos)
+
+    def pausado(self, proveedor: str) -> float:
+        """Segundos que faltan para que termine la pausa por 429 (0 si no hay)."""
+        hasta = (self._leer().get(proveedor) or {}).get("pausa_hasta", 0.0)
+        return max(0.0, float(hasta) - self.ahora().timestamp())
 
     def uso(self, proveedor: str) -> dict:
         p = self._leer().get(proveedor) or {"ventana": [], "peticiones_dia": 0, "tokens_dia": 0}

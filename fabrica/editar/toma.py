@@ -149,7 +149,7 @@ def hacer_toma(raiz, candidato, ficha: dict | None, ahora: datetime, *, salida: 
 
 def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, transporte, espera, entorno,
                 transporte_lista=None, transporte_criticos=None, nota_juez: str | None = None, ronda: int = 1,
-                descarga=None) -> Resultado:
+                descarga=None, llamadas_previas: dict | None = None) -> Resultado:
     raiz = raiz_repo(raiz)
     salida.mkdir(parents=True, exist_ok=True)
     marca = Marca.cargar(raiz)
@@ -256,13 +256,18 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             dec = mod_criticos.decidir(
                 raiz, mp4, plan, marca, ronda=ronda, con_corte_gemini=por_sin_ia is None, fuente=candidato.id_origen,
                 entorno=entorno, transporte=transporte_criticos, espera=espera, transporte_lista=transporte_lista,
-                modo="sin_ia" if transporte is not None and transporte_criticos is None else None)
+                modo="sin_ia" if transporte is not None and transporte_criticos is None else None,
+                llamadas_previas=llamadas_previas)
             if dec.bloque is not None:
                 plan["criticos"] = dec.bloque
             if dec.accion == "replantear":       # ronda 1 con corte de Gemini: una vuelta a los ojos con la nota del juez
                 mp4.unlink(missing_ok=True)
                 return _hacer_toma(raiz, candidato, ficha, ahora, salida, abrir, ejecutor, transporte, espera, entorno,
-                                   transporte_lista, transporte_criticos, nota_juez=dec.nota, ronda=2, descarga=d)
+                                   transporte_lista, transporte_criticos, nota_juez=dec.nota, ronda=2, descarga=d,
+                                   llamadas_previas=dec.bloque["llamadas"])
+            if dec.accion == "sin_tiempo":       # no cabe la ronda 2 junto con publicar: la fuente no se gasta
+                mp4.unlink(missing_ok=True)
+                return Resultado(False, dec.motivos, None, plan, mirada.datos, mirada.modelo, puntos, gastar=False)
             if dec.accion == "descartar":        # el fallo es del material: la fuente se gasta
                 mp4.unlink(missing_ok=True)
                 return Resultado(False, dec.motivos, None, plan, mirada.datos, mirada.modelo, puntos, gastar=True)

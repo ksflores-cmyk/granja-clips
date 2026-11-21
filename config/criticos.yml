@@ -6,14 +6,19 @@ modo: cadena                 # cadena = Gemini y, si falla, sin IA; sin_ia = só
 temperatura: 0.2
 tiempo_por_llamada_s: 40     # tope de cada petición (se recorta a lo que quede de `tope_s` y del plazo del ciclo)
 tope_s: 120                  # presupuesto por ronda (3 críticos + juez); lo que no quepa cae a sin IA
+reserva_publicar_s: 130      # del plazo del ciclo los críticos nunca tocan esto (TIEMPO_MIN_PUBLICAR_S 120 + 10); sin
+                             # ese margen no hay decisión y la toma sale como hoy. (ciclo.py no se importa: ciclo importa toma)
+minimo_ronda2_s: 360         # plazo mínimo para replantear (TIEMPO_MIN_INTENTO_S 240 + TIEMPO_MIN_PUBLICAR_S 120); si no
+                             # alcanza: descarte pasajero («sin tiempo para la ronda 2»), la fuente no se gasta
 fotogramas: {n: 6, lado_max: 512}
 juez:
   con_modelo: true           # false: decide sólo la regla (siempre es el respaldo y fija el piso de seguridad)
-cupos:                       # topes CONSERVADORES: Google no publica una cifra fija para el plan gratis (varía por
+cupos:                       # la cuenta (estado/modelos-cuota.json) mide también las peticiones de los ojos. Topes CONSERVADORES: Google no publica una cifra fija para el plan gratis (varía por
   gemini:                    # proyecto, ver AI Studio); la cuenta real se mide en estado/modelos-cuota.json
     rpm: 10                  # peticiones por ventana de 60 s
     rpd: 200                 # peticiones por día (hora de Guatemala)
     reserva_ojos: 20         # peticiones del día que los críticos nunca usan, para que los ojos sigan teniendo cupo
+    pausa_429_s: 600         # tras un 429 los críticos saltan a Gemini este tiempo (los ojos no)
   espera_max_s: 45           # si la ventana de un minuto está llena se espera hasta esto; si no, sin IA
 segundo:                     # segundo proveedor: cliente genérico chat/completions compatible con OpenAI
   activo: false
@@ -22,10 +27,13 @@ segundo:                     # segundo proveedor: cliente genérico chat/complet
   modelo: "por-definir"
   secreto: SEGUNDO_PROVEEDOR_CLAVE   # NOMBRE de la variable de entorno; la clave nunca entra al repo
 sin_ia:                      # umbrales de los críticos sin IA (deterministas).
-  # Calibración (21 nov 2026, Sintel y BBB reales de `muestras`, 3 piezas con video): cambio entre fotogramas 5 a 66
-  # (mínimo 5.1; umbral 2); nitidez 234 a 1309 (umbral 40); luma media 48 a 159; papel en botones 0 a 0.7 % (umbral
-  # 6 %); volumen medio -44 a -25 dB (Sintel es el más bajo, -44.1: por eso el mínimo es -55); caracteres por
-  # segundo 2.7 a 9.8 (umbral 17). Las tres pasan los tres críticos. La corrida `muestras` en CI lo confirma.
+  # Calibración (21 nov 2026, Sintel y BBB reales de `muestras`). Cambio, luma y nitidez se miden SÓLO en el recorte
+  # de `pantalla_completa.zona_accion` (ahí no va ninguna placa: se mide el video, no la marca). Resultados de las 3
+  # piezas: cambio entre fotogramas 5.7 a 96 (umbral 2); nitidez 3 a 202 (Sintel, animación suave, es la más baja:
+  # umbral 2.5; un clip con gblur sigma 40 da ~2.1 en los 6 fotogramas); luma media 33 a 185 (umbral negro 12 / blanco 248); papel con forma
+  # de placa en la franja de botones 0 % (umbral 6 %; el papel plano sin tinta, p. ej. una pared crema, no cuenta);
+  # volumen medio -44 a -25 dB (Sintel -44.1: por eso el mínimo es -55); caracteres por segundo 2.7 a 9.8 (umbral 17).
+  # Las tres piezas pasan los tres críticos. Dos o más fotogramas casi negros o blancos de 6 = puntaje 2.
   historia:
     audio_inicio_s: 2        # el audio de los primeros N s no debe ser silencio (gancho inmediato)
     silencio_db: -50         # pico por debajo de esto = silencio
@@ -38,7 +46,7 @@ sin_ia:                      # umbrales de los críticos sin IA (deterministas).
   tecnica:
     negro_max: 12            # luma media de un fotograma por debajo de esto = casi negro
     blanco_min: 248          # luma media por encima de esto = casi blanco
-    min_nitidez: 40.0        # varianza del laplaciano (gris, fotograma de 512 px) mínima
+    min_nitidez: 2.5         # varianza del laplaciano (gris) del recorte de la zona de acción, mínima
     min_cuadros_nitidos: 4   # de 6
     vol_min_db: -55          # volumen medio (volumedetect) mínimo
     vol_max_db: -3           # y máximo
