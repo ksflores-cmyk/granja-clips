@@ -111,28 +111,16 @@ def armar(datos: dict, marca: Marca, ficha: dict, numero: int,
     return toma, lineas, ini, dur
 
 
-def _idioma_pista(cfg, datos: dict | None):
-    """Pista de idioma para whisper: la de la config, salvo que Gemini oyera otro idioma (ahí, autodetectar: forzar
-    español sobre audio en inglés da texto basura que reemplazaría a una buena traducción)."""
-    oido = str((datos or {}).get("idioma_original") or "").strip().lower()
-    if oido and not (oido.startswith("es") or oido.startswith("desconoc")):
-        return None
-    return cfg.idioma
-
-
 def lineas_con_voces(res, lineas: list[Linea], modo: str) -> tuple[list[Linea], str]:
     """Líneas de la toma en el tiempo de la toma (ya sin los silencios cortados) y de dónde salen ("voces"|"gemini").
 
     Con la transcripción en español: reemplaza a las de Gemini (modo principal) o las rellena si no había
-    (respaldo, o corte sin IA); la acotación de Gemini se conserva en la primera línea. Si no reemplaza, las de
-    Gemini siguen, con su voz asignada por solape con los turnos y sus tiempos remapeados."""
+    (respaldo, o corte sin IA); la acotación de Gemini la pone `_etapa_voces` en la primera línea que sobreviva. Si no
+    reemplaza, las de Gemini siguen, con su voz asignada por solape con los turnos y sus tiempos remapeados."""
     hay_frases = any(ln.frase for ln in lineas)
-    acot = next((ln.acotacion for ln in lineas if ln.acotacion), None)
     if res.es_espanol and res.lineas and (modo == "principal" or not hay_frases):
         nuevas = [Linea(t0=ln["t0"], t1=ln["t1"], nombre=ln["hablante"], frase=ln["es"], original=ln["original"],
                         voz=ln["voz"]) for ln in res.lineas]
-        if acot:
-            nuevas[0].acotacion = acot
         return nuevas, "voces"
     return lineas_de_gemini(res, lineas), "gemini"
 
@@ -156,40 +144,67 @@ def ajustar_a_toma(lineas: list[Linea], dur: float, marca: Marca) -> list[Linea]
     return salida
 
 
+@dataclass
+class EtapaVoces:
+    """Lo que la etapa de voces decide para la toma."""
+    lineas: list
+    dur: float
+    tramos: list | None = None
+    info: dict | None = None             # va a plan["voces"]
+    transcripcion: dict | None = None    # va a plan["transcripcion"]
+    alterno: tuple | None = None         # (líneas de Gemini, duración, transcripción) sin cortes, por si compone mal
+
+
+def _transcripcion_plan(res) -> dict | None:
+    return ({"motor": "faster-whisper", "modelo": res.modelo, "idioma": res.idioma, "palabras": res.palabras}
+            if res.modelo else None)
+
+
+def _info_voces(res, cfg, fuente: str) -> dict:
+    info = {"motor": "faster-whisper", "modelo": res.modelo, "idioma": res.idioma, "segundos": res.segundos,
+            "modo": cfg.modo, "fuente_lineas": fuente, "hablantes": res.hablantes,
+            "cortes": [[round(a, 3), round(b, 3)] for a, b in res.cortes], "golpes": res.golpes,
+            "descartados": res.descartados}
+    if res.motivo:
+        info["motivo"] = res.motivo
+    return info
+
+
 def _etapa_voces(raiz, marca: Marca, video, inicio: float, dur: float, lineas: list[Linea], datos: dict,
-                 nombre_streamer: str | None, minimo_s: float, transcriptor=None):
-    """Analiza el audio (transcripción, voces, silencios, golpes) y devuelve (líneas, duración, tramos, info del plan,
-    transcripción del plan). Nunca rompe la toma: sin voces, todo sigue igual y `info` trae el `motivo`."""
-    sin = (lineas, dur, None, None, None)
+                 nombre_streamer: str | None, minimo_s: float, transcriptor=None) -> EtapaVoces:
+    """Analiza el audio (transcripción, voces, silencios, golpes) y decide líneas, duración y tramos de la toma.
+    Nunca rompe la toma: sin voces, todo sigue igual y `info` trae el `motivo`."""
     cfg = mod_voces.Cfg.cargar(raiz)
     if cfg is None or not cfg.activo:
-        return sin
-    if not plazo.queda(cfg.tope_s):
-        plazo.log(f"voces: quedan menos de {cfg.tope_s:g} s del ciclo; la toma sigue sin voces")
-        return lineas, dur, None, {"motivo": "sin tiempo del ciclo para las voces"}, None
+        return EtapaVoces(lineas, dur)
+    if not plazo.queda(cfg.tope_s + cfg.reserva_s):          # además del tope, lo que hace falta para componer y la puerta
+        plazo.log(f"voces: quedan menos de {cfg.tope_s + cfg.reserva_s:g} s del ciclo; la toma sigue sin voces")
+        return EtapaVoces(lineas, dur, info={"motivo": "sin tiempo del ciclo para las voces"})
     try:
         with plazo.etapa("voces"):
-            res = mod_voces.analizar(video, inicio, dur, marca, replace(cfg, idioma=_idioma_pista(cfg, datos)),
-                                     minimo_s=minimo_s, nombre_streamer=nombre_streamer, transcriptor=transcriptor)
+            res = mod_voces.analizar(video, inicio, dur, marca, cfg, minimo_s=minimo_s,
+                                     nombre_streamer=nombre_streamer, transcriptor=transcriptor)
     except plazo.SinTiempo:
         raise
     except Exception as e:  # noqa: BLE001 (las voces nunca rompen la toma)
-        return lineas, dur, None, {"motivo": f"voces: {type(e).__name__}: {str(e)[:160]}"}, None
+        return EtapaVoces(lineas, dur, info={"motivo": f"voces: {type(e).__name__}: {str(e)[:160]}"})
     if res.hay_cortes and res.duracion_toma < minimo_s - 1e-6:
         res = res.sin_cortes()                           # nunca por debajo del mínimo de la ficha
+    acot = next((ln.acotacion for ln in lineas if ln.acotacion), None)
     nuevas, fuente = lineas_con_voces(res, lineas, cfg.modo)
     dur_final = round(res.duracion_toma, 3)
     nuevas = ajustar_a_toma(nuevas, dur_final, marca)
     if fuente == "voces" and not nuevas:                 # ninguna línea de la transcripción cabe: las de Gemini
         fuente, nuevas = "gemini", ajustar_a_toma(lineas_de_gemini(res, lineas), dur_final, marca)
-    info = {"motor": "faster-whisper", "modelo": res.modelo, "idioma": res.idioma, "segundos": res.segundos,
-            "modo": cfg.modo, "fuente_lineas": fuente, "hablantes": res.hablantes,
-            "cortes": [[round(a, 3), round(b, 3)] for a, b in res.cortes], "golpes": res.golpes}
-    if res.motivo:
-        info["motivo"] = res.motivo
-    transcripcion = ({"motor": "faster-whisper", "modelo": res.modelo, "idioma": res.idioma, "palabras": res.palabras}
-                     if res.modelo else None)
-    return nuevas, dur_final, (res.tramos if res.hay_cortes else None), info, transcripcion
+    if fuente == "voces" and acot and nuevas:            # la acotación de Gemini, en la primera línea que sobrevive
+        nuevas[0].acotacion = acot
+    alterno = None
+    if fuente == "voces" or res.hay_cortes:
+        liso = res.sin_cortes()
+        alterno = (ajustar_a_toma(lineas_de_gemini(liso, lineas), dur, marca), dur, _transcripcion_plan(liso),
+                   liso.golpes)
+    return EtapaVoces(nuevas, dur_final, res.tramos if res.hay_cortes else None, _info_voces(res, cfg, fuente),
+                      _transcripcion_plan(res), alterno)
 
 
 def fila_marcador(candidato, ficha: dict, toma: Toma, dur: float, ahora: datetime) -> dict:
@@ -295,8 +310,8 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             mp4 = salida / f"toma-{numero:03d}-{_nombre_seguro(candidato.id_origen)}.mp4"
             plan_ruta = mp4.with_suffix(".plan.json")
             creador = entrada["creador"] if entrada else ficha.get("creador")
-            lineas, dur, tramos, info_voces, transcripcion = _etapa_voces(
-                raiz, marca, d.ruta, inicio, dur, lineas, mirada.datos, creador, recorte[0])
+            ev = _etapa_voces(raiz, marca, d.ruta, inicio, dur, lineas, mirada.datos, creador, recorte[0])
+            lineas, dur, tramos, info_voces, transcripcion = ev.lineas, ev.dur, ev.tramos, ev.info, ev.transcripcion
             pista, aviso_musica = None, None
             try:
                 # Música CC0 sólo si la fuente no trae audio y la ficha no dice sin_musica. Sin pista disponible
@@ -307,13 +322,34 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                         aviso_musica = ("la fuente no trae audio y no hay pista de música CC0 disponible "
                                         f"(GRANJA_MUSICA_DIR={mod_musica.carpeta() or ''}): sigue en silencio")
                         print(f"AVISO: {aviso_musica}")
-                with tempfile.TemporaryDirectory(prefix="trabajo-toma-") as trabajo:
-                    with plazo.etapa("componer"):
-                        plan = componer(marca, toma, lineas, mp4, duracion=dur, trabajo=Path(trabajo),
-                                        fuente_video=d.ruta, inicio=inicio, plan_salida=plan_ruta, ficha=ficha,
-                                        musica=pista, tramos=tramos)
-                with plazo.etapa("puerta de estilo"):
-                    puntos = estilo.revisar(mp4, plan, marca, ficha=ficha)
+                def compuesta(lineas_, dur_, tramos_):
+                    with tempfile.TemporaryDirectory(prefix="trabajo-toma-") as trabajo:
+                        with plazo.etapa("componer"):
+                            plan_ = componer(marca, toma, lineas_, mp4, duracion=dur_, trabajo=Path(trabajo),
+                                             fuente_video=d.ruta, inicio=inicio, plan_salida=plan_ruta, ficha=ficha,
+                                             musica=pista, tramos=tramos_)
+                    with plazo.etapa("puerta de estilo"):
+                        return plan_, estilo.revisar(mp4, plan_, marca, ficha=ficha)
+
+                # Si algo de las voces (líneas de la transcripción o cortes) hace fallar el compositor o la puerta,
+                # se reintenta UNA vez con las líneas de Gemini y sin cortes antes de descartar la toma.
+                falla, error0 = None, None
+                try:
+                    plan, puntos = compuesta(lineas, dur, tramos)
+                    malos = [n for n, ok_p, _ in puntos if not ok_p]
+                    falla = ("la puerta de estilo salió en rojo: " + "; ".join(malos)) if malos else None
+                except ValueError as e0:
+                    error0, falla = e0, f"{type(e0).__name__}: {e0}"
+                if falla and ev.alterno is not None:
+                    mp4.unlink(missing_ok=True)
+                    plazo.log(f"voces: {falla[:200]}; se reintenta con las líneas de Gemini y sin cortes")
+                    lineas, dur, transcripcion, golpes_sin_cortes = ev.alterno[0], ev.alterno[1], ev.alterno[2], ev.alterno[3]
+                    tramos = None
+                    info_voces = {**info_voces, "fuente_lineas": "gemini", "cortes": [], "golpes": golpes_sin_cortes,
+                                  "reintento": f"líneas de Gemini sin cortes tras: {falla[:300]}"}
+                    plan, puntos = compuesta(lineas, dur, None)
+                elif error0 is not None:
+                    raise error0
             except (ValueError, subprocess.SubprocessError, OSError) as e:
                 mp4.unlink(missing_ok=True)
                 # Sólo es del material si el editor corrió y falló (ffmpeg con código ≠ 0) o dio datos inválidos

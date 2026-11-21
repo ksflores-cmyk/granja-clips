@@ -133,13 +133,22 @@ def test_nunca_corta_encima_de_una_palabra():
 
 def test_los_tramos_dejan_el_margen_y_respetan_el_minimo():
     tramos = voces.tramos_a_conservar(12.0, [(3.4, 4.6)], 0.12, 7.0)
-    assert tramos == [(0.0, 3.52), (4.48, 12.0)]
-    assert voces._quitados(12.0, tramos) == [(3.52, 4.48)]
+    assert [(a, b) for a, b in tramos] == [(0.0, 3.533333), (4.466667, 12.0)]       # bordes en múltiplos de 1/30
+    assert all(abs(t * 30 - round(t * 30)) < 1e-4 for tr in tramos for t in tr)
+    assert voces._quitados(12.0, tramos) == [(3.533333, 4.466667)]
     # si lo que queda no llega al mínimo, no se corta nada
     assert voces.tramos_a_conservar(12.0, [(1.0, 11.0)], 0.12, 7.0) == [(0.0, 12.0)]
     assert voces.tramos_a_conservar(12.0, [], 0.12, 7.0) == [(0.0, 12.0)]
     # un silencio que no pasa del doble del margen no se toca
     assert voces.tramos_a_conservar(12.0, [(3.0, 3.2)], 0.12, 7.0) == [(0.0, 12.0)]
+
+
+def test_un_silencio_que_toca_el_inicio_o_el_final_se_quita_entero():
+    tramos = voces.tramos_a_conservar(12.0, [(0.0, 1.0), (11.0, 12.0)], 0.12, 7.0)
+    assert tramos == [(0.866667, 11.133333)]       # se quita desde 0 y hasta el final; el margen queda sólo del lado de la voz
+    assert voces.tramos_a_conservar(12.0, [(0.0, 0.5)], 0.12, 7.0) == [(0.366667, 12.0)]
+    sin_borde = voces.tramos_a_conservar(12.0, [(5.0, 6.0)], 0.12, 7.0)
+    assert sin_borde[0][0] == 0.0 and sin_borde[-1][1] == 12.0 and len(sin_borde) == 2
 
 
 def test_a_toma_y_a_fuente_son_inversos_dentro_de_los_tramos():
@@ -162,6 +171,13 @@ def test_encuentra_el_golpe_de_ruido():
     mejor = max(g, key=lambda e: e["db"])
     assert abs(mejor["t"] - t_golpe) < 0.08 and mejor["db"] > -10
     assert [e["t"] for e in g] == sorted(e["t"] for e in g)
+
+
+def test_los_golpes_no_bajan_del_piso_absoluto():
+    rng = np.random.default_rng(5)
+    quedito = np.concatenate([silencio(1.0, rng), 0.03 * golpe(0.05, rng), silencio(1.0, rng)])      # ~ -36 dBFS, sobre la mediana
+    assert voces.golpes(quedito, SR, replace(Cfg(), golpes={**Cfg().golpes, "piso_db": -100})) != []
+    assert voces.golpes(quedito, SR, Cfg()) == []                                                       # piso de -30 dBFS
 
 
 def test_los_golpes_respetan_separacion_y_maximo():
@@ -201,16 +217,48 @@ def test_la_voz_minoritaria_con_poco_tiempo_no_cuenta():
 
 # ---------------------------------------------------------------- transcripción
 
-def test_descarta_alucinaciones(tmp_path):
+def test_descarta_alucinaciones_y_cuenta_lo_descartado(tmp_path):
     base = {"t0": 0, "t1": 2, "no_speech_prob": 0.0, "avg_logprob": -0.2, "palabras": []}
     segs = [{**base, "texto": "Hola, ¿qué tal?"},
             {**base, "texto": "Subtítulos realizados por la comunidad de Amara.org"},
-            {**base, "texto": "¡Gracias por ver el vídeo!"},
+            {**base, "texto": "¡Gracias por ver!"},                                       # igual a una frase de la lista
+            {**base, "texto": "Gracias por ver el stream de hoy, nos vemos mañana a las ocho"},   # con texto real: se queda
+            {**base, "texto": "♪"}, {**base, "texto": "[Música]"}, {**base, "texto": "(música)"},
             {**base, "texto": "mmm", "no_speech_prob": 0.9, "avg_logprob": -1.5},
             {**base, "texto": "dudoso pero sonó", "no_speech_prob": 0.9, "avg_logprob": -0.3},     # sólo una de las dos
             {**base, "texto": "   "}]
     tr = voces.transcribir(tmp_path / "x.wav", Cfg(), transcriptor=falso(segs))
-    assert [s["texto"] for s in tr.segmentos] == ["Hola, ¿qué tal?", "dudoso pero sonó"]
+    assert [x["texto"] for x in tr.segmentos] == ["Hola, ¿qué tal?",
+                                                  "Gracias por ver el stream de hoy, nos vemos mañana a las ocho",
+                                                  "dudoso pero sonó"]
+    assert tr.descartados == {"segmentos": 7, "palabras": 0}
+
+
+def test_descarta_palabras_dudosas_y_simbolos_sueltos(tmp_path):
+    def w(t, texto, p=0.9):
+        return {"texto": texto, "t0": t, "t1": t + 0.3, "p": p}
+    seg = {"t0": 0, "t1": 3, "texto": "x", "no_speech_prob": 0.0, "avg_logprob": -0.2,
+           "palabras": [w(0.0, "♪"), w(0.4, "hola"), w(0.8, "[Música]"), w(1.2, "mundo", 0.2), w(1.6, "bien"),
+                        w(2.0, "(risas)")]}
+    solo_basura = {"t0": 4, "t1": 5, "texto": "♪ ♪", "no_speech_prob": 0.0, "avg_logprob": -0.2,
+                   "palabras": [w(4.0, "♪"), w(4.4, "♪♪")]}
+    tr = voces.transcribir(tmp_path / "x.wav", Cfg(), transcriptor=falso([seg, solo_basura]))
+    assert [p["texto"] for p in tr.segmentos[0]["palabras"]] == ["hola", "bien"] and tr.segmentos[0]["texto"] == "hola bien"
+    assert len(tr.segmentos) == 1 and tr.descartados == {"segmentos": 1, "palabras": 6}
+
+
+def test_nunca_se_le_da_el_idioma_a_whisper_y_hay_que_pasar_la_probabilidad(tmp_path, marca):
+    """Un transcriptor que devuelve el idioma que le piden no debe convertir audio "desconocido" en español."""
+    pedidos = []
+
+    def eco(wav, cfg, nombre):
+        pedidos.append(cfg.idioma)
+        return Transcripcion(cfg.idioma or "zz", 1.0 if cfg.idioma else 0.2, [], nombre, 0.1)
+    tr = voces.transcribir(tmp_path / "x.wav", replace(Cfg(), idioma="es"), transcriptor=eco)
+    assert pedidos == [None] and tr.idioma == "zz"
+    mudo = Voces(duracion=5, duracion_toma=5, idioma="es", prob_idioma=0.3)
+    assert not mudo.es_espanol                                   # "es" con probabilidad baja no vale
+    assert replace(mudo, prob_idioma=0.8).es_espanol and not replace(mudo, idioma="en", prob_idioma=0.99).es_espanol
 
 
 def test_sin_faster_whisper_devuelve_none_con_motivo(monkeypatch, tmp_path):
@@ -240,16 +288,16 @@ def test_whisper_se_llama_con_los_ajustes_de_la_tarea_y_el_modelo_queda_en_cache
     monkeypatch.setitem(sys.modules, "faster_whisper", falso_mod)
     monkeypatch.setattr(voces, "_modelos", {})
     wav = guardar_wav(tmp_path / "a.wav", np.zeros(SR, dtype=np.float32))
-    tr = voces.transcribir(wav, Cfg())
+    tr = voces.transcribir(wav, replace(Cfg(), idioma="es"))            # aunque la config diga "es": se autodetecta
     assert cargas == [("base", {"device": "cpu", "compute_type": "int8"})]
     audio, kw = llamadas[0]
     assert audio.dtype == np.float32 and len(audio) == SR
-    assert kw == {"language": "es", "word_timestamps": True, "vad_filter": True, "beam_size": 1,
+    assert kw == {"language": None, "word_timestamps": True, "vad_filter": True, "beam_size": 1,
                   "condition_on_previous_text": False}
     assert tr.idioma == "es" and tr.modelo == "base" and tr.prob_idioma == pytest.approx(0.97)
     assert tr.segmentos[0]["palabras"][0] == {"texto": "Hola", "t0": 0.5, "t1": 0.9, "p": 0.9}
     tr2 = voces.transcribir(wav, replace(Cfg(), idioma=None), modelo="small")
-    assert [c[0] for c in cargas] == ["base", "small"] and llamadas[1][1]["language"] is None
+    assert [c[0] for c in cargas] == ["base", "small"] and llamadas[1][1]["language"] is None and llamadas[0][1]["language"] is None
     voces.transcribir(wav, Cfg())                                          # el modelo ya cargado no se vuelve a cargar
     assert len(cargas) == 2 and tr2.segundos_carga >= 0
 
@@ -414,7 +462,8 @@ def test_la_orden_con_tramos_usa_select_y_atrim_concat():
     o = componer.orden_ffmpeg_pantalla_completa(salida="s.mp4", duracion=3.0, ancho=1080, alto=1920, video=VIDEO,
                                                 placas=[("p.png", 60, 150, 0.0, 2.5)], tramos=tramos)
     filtro = o[o.index("-filter_complex") + 1]
-    assert filtro.startswith("[0:v]fps=30,select='gte(t,0)*lt(t,1.5)+gte(t,2.5)*lt(t,4)',setpts=N/FRAME_RATE/TB,crop=")
+    assert filtro.startswith("[0:v]fps=30,select='gte(t,-0.016)*lt(t,1.484)+gte(t,2.484)*lt(t,3.984)',"
+                             "setpts=N/FRAME_RATE/TB,crop=")
     assert ("[0:a]asplit=2[s0][s1];[s0]atrim=start=0:end=1.5,asetpts=PTS-STARTPTS[x0];"
             "[s1]atrim=start=2.5:end=4,asetpts=PTS-STARTPTS[x1];[x0][x1]concat=n=2:v=0:a=1[a0]") in filtro
     assert o[o.index("[out]") + 1:o.index("[out]") + 3] == ["-map", "[a0]"]
@@ -523,7 +572,7 @@ def lavfi_con_chirrido(ruta, seg=4):
     """Fuente 16:9 con un chirrido que sube (cada instante suena distinto: un mapa de tiempo mal puesto se nota)."""
     subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
                     f"testsrc=size=640x360:rate=30:duration={seg}", "-f", "lavfi", "-i",
-                    f"aevalsrc=0.5*sin(2*PI*(300+150*t)*t):s=44100:d={seg}", "-c:v", "libx264", "-preset", "ultrafast",
+                    f"aevalsrc=0.5*sin(2*PI*(300+30*t)*t):s=44100:d={seg}", "-c:v", "libx264", "-preset", "ultrafast",
                     "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(ruta)], check=True)
     return ruta
 
@@ -670,9 +719,9 @@ def test_sin_lineas_de_gemini_la_transcripcion_las_rellena_aunque_el_modo_sea_re
     nuevas, fuente = toma.lineas_con_voces(voces_falsas, [], "respaldo")
     assert fuente == "voces" and [ln.frase for ln in nuevas] == ["Hola a todos.", "¿Qué tal?", "Mira esto."]
     assert nuevas[1].voz == "otra" and nuevas[0].nombre == "PROBADOR"
-    # una acotación suelta de Gemini (sin frases) tampoco impide rellenar, y se conserva en la primera línea
+    # una acotación suelta de Gemini (sin frases) tampoco impide rellenar
     nuevas, fuente = toma.lineas_con_voces(voces_falsas, [Linea(0.8, 5.0, acotacion="(se ríe)")], "respaldo")
-    assert fuente == "voces" and nuevas[0].acotacion == "(se ríe)"
+    assert fuente == "voces"
     # con líneas de Gemini, el modo respaldo no las reemplaza; el principal sí
     previas = [Linea(0.5, 2.0, "X", "de Gemini")]
     mantenidas, fuente = toma.lineas_con_voces(voces_falsas, previas, "respaldo")
@@ -686,23 +735,15 @@ def test_la_etapa_de_voces_se_salta_si_no_queda_tiempo(repo, editar_yaml, marca,
     monkeypatch.setattr(toma.mod_voces, "analizar", lambda *a, **k: pytest.fail("no debía analizar"))
     registro = []
     plazo.registrar(registro.append)
-    plazo.iniciar(60)                                     # quedan menos de tope_s (150 s)
+    plazo.iniciar(200)                                    # quedan menos de tope_s + reserva_s (300 s)
     try:
         lineas = [Linea(0.5, 2.0, "A", "x")]
         res = toma._etapa_voces(repo, marca, "video.mp4", 2.0, 12.0, lineas, {"idioma_original": "inglés"}, "x", 7.0)
     finally:
         plazo.detener()
         plazo.registrar()
-    assert res[0] is lineas and res[1] == 12.0 and res[2] is None and "sin tiempo" in res[3]["motivo"]
+    assert res.lineas is lineas and res.dur == 12.0 and res.tramos is None and "sin tiempo" in res.info["motivo"]
     assert any("sin voces" in r for r in registro)
-
-
-def test_la_pista_de_idioma_respeta_lo_que_oyo_gemini():
-    cfg = Cfg()
-    assert toma._idioma_pista(cfg, {"idioma_original": "inglés"}) is None          # no se fuerza español sobre inglés
-    assert toma._idioma_pista(cfg, {"idioma_original": "español"}) == "es"
-    assert toma._idioma_pista(cfg, {"idioma_original": "desconocido"}) == "es"
-    assert toma._idioma_pista(cfg, None) == "es"
 
 
 def test_las_pruebas_parten_con_las_voces_apagadas(repo):
@@ -736,7 +777,7 @@ def test_la_muestra_con_voces_renderiza_sin_whisper_y_escribe_voces_json(tmp_pat
     assert [x["modelo"] for x in vj["medicion"]["modelos"]] == ["base", "small"]
     assert all("error" in x for x in vj["medicion"]["modelos"])
     hecha = next(x for x in man["muestras"] if x["id"] == "voces-sintel")
-    assert hecha["puerta_estilo"]["en_verde"], hecha["puerta_estilo"]
+    assert hecha["puerta_estilo"]["en_verde"], [p for p in hecha["puerta_estilo"]["puntos"] if not p["ok"]]
     assert [ln["frase"] for ln in hecha["lineas"]][:2] == ["¿Qué te trae a la tierra de los guardianes?", "Busco a alguien."]
     plan = json.loads((salida / "voces-sintel.plan.json").read_text(encoding="utf-8"))
     assert plan["voces"]["motivo"] and plan["origen"]["duracion"] == pytest.approx(hecha["duracion_s"], abs=0.1)
@@ -770,10 +811,85 @@ def test_la_muestra_con_voces_y_transcriptor_falso_colorea_las_voces_y_corta_el_
                            descargador=lambda url, sha, destino: video,
                            transcriptor_voces=falso(palabras_de(turnos), idioma="en"))
     hecha = man["muestras"][0]
-    assert hecha["puerta_estilo"]["en_verde"], hecha["puerta_estilo"]
+    assert hecha["puerta_estilo"]["en_verde"], [p for p in hecha["puerta_estilo"]["puntos"] if not p["ok"]]
     assert [ln.get("voz") for ln in hecha["lineas"]] == ["streamer", "otra", "streamer"]
     vj = json.loads((salida / "voces.json").read_text(encoding="utf-8"))
     assert vj["hablantes"] == 2 and len(vj["cortes"]) == 1 and vj["idioma"] == "en"
     assert vj["duracion_toma_s"] < vj["duracion_recorte_s"] and hecha["duracion_s"] == pytest.approx(vj["duracion_toma_s"], abs=0.1)
     assert {x["modelo"] for x in vj["medicion"]["modelos"]} == {"base", "small"}
     assert all("segundos" in x and "segundos_carga" in x for x in vj["medicion"]["modelos"])
+
+
+# ---------------------------------------------------------------- ronda 1: reintento, 8 cortes, medición
+
+@pytest.mark.slow
+@necesita_ffmpeg
+def test_si_las_lineas_de_voces_no_componen_se_reintenta_con_las_de_gemini_sin_cortes(entorno_toma, tmp_path):
+    v = _voces_falsas([(0.0, 5.0), (6.0, 12.0)])
+    v.crudo["lineas"][1]["es"] = "palabra " * 120                       # no cabe en la columna: ValueError al componer
+    v = v.con_tramos([(0.0, 5.0), (6.0, 12.0)])
+    r, _ = entorno_toma(tmp_path, v)
+    assert r.ok, r.motivos
+    p = r.plan
+    assert p["duracion"] == 12.0 and "tramos" not in p["origen"]
+    assert p["voces"]["fuente_lineas"] == "gemini" and "reintento" in p["voces"] and p["voces"]["cortes"] == []
+    assert [ln["frase"] for ln in p["lineas"]] == ["Por fin estoy en la ciudad.", "Mira esta vista."]
+    assert p["transcripcion"]["palabras"][1]["t0"] == pytest.approx(8.0)       # tiempos de la toma sin cortes
+    assert estilo.sondear(r.mp4)["duracion"] == pytest.approx(12.0, abs=0.1)
+
+
+def test_la_acotacion_de_gemini_va_en_la_primera_linea_que_sobrevive(repo, editar_yaml, marca, monkeypatch):
+    editar_yaml(repo, "config/voces.yml", lambda d: d.update(activo=True))
+    v = _voces_falsas([(0.0, 12.0)])
+    v.crudo["lineas"][0].update(t0=0.0, t1=0.1)                           # la primera es demasiado corta y se descarta
+    v = v.con_tramos([(0.0, 12.0)])
+    monkeypatch.setattr(toma.mod_voces, "analizar", lambda *a, **k: v)
+    ev = toma._etapa_voces(repo, marca, "v.mp4", 2.0, 12.0, [Linea(0.5, 4.0, "G", "x", acotacion="(se ríe)")],
+                           {"idioma_original": "español"}, "probador", 7.0)
+    assert ev.info["fuente_lineas"] == "voces" and ev.lineas[0].frase == "¿Qué tal?" and ev.lineas[0].acotacion == "(se ríe)"
+    assert ev.info["descartados"] == {} and ev.alterno is not None
+
+
+def cuadros_y_audio(mp4):
+    out = subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries",
+                          "stream=nb_read_frames", "-of", "csv=p=0", str(mp4)], capture_output=True, text=True).stdout
+    pcm = subprocess.run(["ffmpeg", "-v", "error", "-i", str(mp4), "-vn", "-ac", "1", "-ar", "48000", "-f", "s16le", "-"],
+                         capture_output=True).stdout
+    return int(out.strip()), len(pcm) // 2 / 48000
+
+
+@pytest.mark.slow
+@necesita_ffmpeg
+def test_8_cortes_renderizados_no_derivan_entre_audio_y_video(tmp_path, marca):
+    fuente = lavfi_con_chirrido(tmp_path / "f.mp4", seg=20)
+    sil = [(1.0 + 2.3 * i, 1.0 + 2.3 * i + 0.83) for i in range(8)]
+    tramos = voces.tramos_a_conservar(20.0, sil, 0.12, 7.0)
+    assert len(tramos) == 9
+    dur = round(sum(b - a for a, b in tramos), 3)
+    t = lienzo.Toma(numero=7, gancho="Ella busca a un dragón", palabra_lapiz="DRAGÓN", lapiz="círculo",
+                    escena="INT. CABAÑA — NOCHE", credito="Con: prueba")
+    mp4 = tmp_path / "t.mp4"
+    plan = componer.componer(marca, t, [Linea(0.5, 2.0, "A", "Hola.")], mp4, duracion=dur, trabajo=tmp_path / "w",
+                             fuente_video=fuente, inicio=0.0, tramos=tramos)
+    cuadros, audio_s = cuadros_y_audio(mp4)
+    assert cuadros / 30 == pytest.approx(audio_s, abs=0.001), (cuadros, audio_s)
+    assert cuadros / 30 == pytest.approx(sum(b - a for a, b in tramos), abs=0.035)
+    assert en_rojo(estilo.revisar(mp4, plan, marca)) == []
+
+
+def test_medir_vacia_la_cache_y_guarda_las_transcripciones(tmp_path, monkeypatch):
+    x, turnos, _ = escena()
+    wav = guardar_wav(tmp_path / "escena.wav", x)
+    voces._modelos["base"] = object()                                     # un modelo "ya cargado" de antes
+    vistos = []
+
+    def tr(w, cfg, nombre):
+        vistos.append(dict(voces._modelos))
+        return Transcripcion("es", 0.99, palabras_de(turnos), nombre, 1.0, 0.5)
+    guardadas = {}
+    res = voces.medir(wav, 0.0, 12.6, Cfg(), ["base", "small"], transcriptor=tr, guardar=guardadas)
+    assert vistos == [{}, {}] and set(guardadas) == {"base", "small"}
+    assert all("voz" in sg for sg in res["modelos"][0]["segmentos"])
+    md = voces.resumen_md(res, "prueba")
+    assert "| base | 0.5 | 1.0 | es | 0.99 |" in md and "[streamer]" in md and "[otra]" in md and "Hablantes: 2" in md
+    assert "cortes de silencio: 1" in md and "golpes:" in md

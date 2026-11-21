@@ -20,7 +20,9 @@ Medición: `python -m fabrica.voces --medir VIDEO --inicio S --duracion S --sali
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
+import math
 import re
 import subprocess
 import sys
@@ -63,16 +65,19 @@ class Cfg:
     modo: str = "principal"
     modelo: str = "base"
     modelos_medir: list = field(default_factory=lambda: ["base", "small"])
-    idioma: str | None = "es"
+    idioma: str | None = None            # sin uso: whisper siempre autodetecta (con idioma dado no detecta nada)
+    idioma_prob_min: float = 0.5         # probabilidad mínima del idioma detectado para creer que es español
+    p_palabra_min: float = 0.35          # una palabra con menos probabilidad que esto se descarta
     tope_s: float = 150.0
+    reserva_s: float = 150.0             # tiempo del ciclo que debe quedar además del tope, para componer y la puerta
     silencio_min_s: float = 0.6
     margen_s: float = 0.12
     umbral_db: float = -40.0
-    golpes: dict = field(default_factory=lambda: {"sobre_mediana_db": 12, "separacion_s": 1.0, "max": 8})
+    golpes: dict = field(default_factory=lambda: {"sobre_mediana_db": 12, "piso_db": -30, "separacion_s": 1.0, "max": 8})
     hablantes: dict = field(default_factory=lambda: {"max": 2, "separacion_min": 0.25, "minimo_s": 1.5})
     lineas: dict = field(default_factory=lambda: {"pausa_s": 0.5, "max_s": 4.5})
     alucinaciones: list = field(default_factory=lambda: [
-        "amara.org", "subtítulos realizados por", "gracias por ver", "suscríbete"])
+        "subtítulos realizados por la comunidad de amara.org", "gracias por ver", "suscríbete"])
     nombre_otra: str = "OTRA VOZ"
 
     @classmethod
@@ -105,6 +110,7 @@ class Transcripcion:
     modelo: str
     segundos: float          # tiempo de transcribir (sin la carga del modelo)
     segundos_carga: float = 0.0
+    descartados: dict = field(default_factory=dict)      # {"segmentos": n, "palabras": n} quitados por alucinación
 
 
 @dataclass
@@ -122,6 +128,8 @@ class Voces:
     hablantes: int = 0                              # voces distintas que se oyeron
     idioma: str | None = None
     prob_idioma: float = 0.0
+    prob_idioma_min: float = 0.5
+    descartados: dict = field(default_factory=dict)
     modelo: str | None = None
     segundos: float = 0.0
     motivo: str | None = None                       # por qué falta algo (sin biblioteca, sin modelo, sin audio)
@@ -129,7 +137,9 @@ class Voces:
 
     @property
     def es_espanol(self) -> bool:
-        return bool(self.idioma) and str(self.idioma).lower().startswith("es")
+        """Español sólo si whisper lo detectó (nunca se le da el idioma) con probabilidad suficiente."""
+        return (bool(self.idioma) and str(self.idioma).lower().startswith("es")
+                and float(self.prob_idioma) >= float(self.prob_idioma_min))
 
     @property
     def hay_cortes(self) -> bool:
@@ -206,22 +216,60 @@ def _normal(texto: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^\w\s.]", " ", s)).strip()
 
 
+PARECIDO_FRASE = 0.85            # un segmento entero así de parecido a una frase de la lista es una alucinación
+
+
+def _solo_simbolos_o_entre_signos(texto: str) -> bool:
+    """Un token como ♪, ♪♪, [Música], (música) o *aplausos*: sin letras ni números, o todo entre [] o ()."""
+    t = str(texto).strip()
+    if not any(c.isalnum() for c in t):
+        return True
+    return bool(re.fullmatch(r"[\[(][^\])]*[\])][.!?…]*", t) or re.fullmatch(r"\*[^*]+\*", t))
+
+
 def es_alucinacion(seg: dict, cfg: Cfg) -> bool:
-    """Un segmento inventado por whisper: frase típica de la lista, o muy probable silencio con confianza baja."""
-    texto = _normal(seg.get("texto", ""))
-    if not texto:
+    """Un segmento inventado por whisper: sólo símbolos o entre corchetes, el texto ENTERO igual o casi igual a una
+    frase típica de la lista (no por subcadena: «gracias por ver el stream» con más texto real se queda), o muy
+    probable silencio con confianza baja."""
+    if _solo_simbolos_o_entre_signos(seg.get("texto", "")):
         return True
-    if any(_normal(f) and _normal(f) in texto for f in cfg.alucinaciones):
-        return True
+    texto = _normal(seg.get("texto", "")).strip(". ")
+    for f in cfg.alucinaciones:
+        frase = _normal(f).strip(". ")
+        if frase and (texto == frase or difflib.SequenceMatcher(None, texto, frase).ratio() >= PARECIDO_FRASE):
+            return True
     return (float(seg.get("no_speech_prob") or 0.0) > NO_SPEECH_MAX
             and float(seg.get("avg_logprob") if seg.get("avg_logprob") is not None else 0.0) < LOGPROB_MIN)
+
+
+def limpiar(tr: Transcripcion, cfg: Cfg) -> Transcripcion:
+    """Quita palabras sueltas dudosas (símbolos, entre signos, probabilidad menor a `p_palabra_min`) y segmentos
+    alucinados. Cuenta lo descartado en `descartados`."""
+    palabras_fuera, buenos = 0, []
+    segs_fuera = 0
+    for s in tr.segmentos:
+        originales = s.get("palabras", [])
+        firmes = [w for w in originales if not _solo_simbolos_o_entre_signos(w["texto"])
+                  and float(w.get("p", 1.0)) >= cfg.p_palabra_min]
+        palabras_fuera += len(originales) - len(firmes)
+        if originales and not firmes:                 # todas sus palabras eran basura
+            segs_fuera += 1
+            continue
+        if len(firmes) != len(originales):
+            s = {**s, "palabras": firmes, "texto": " ".join(w["texto"] for w in firmes)}
+        if es_alucinacion(s, cfg):
+            segs_fuera += 1
+            palabras_fuera += len(firmes)
+            continue
+        buenos.append(s)
+    return replace(tr, segmentos=buenos, descartados={"segmentos": segs_fuera, "palabras": palabras_fuera})
 
 
 def _con_whisper(wav, cfg: Cfg, nombre: str) -> Transcripcion:
     modelo, carga = cargar_modelo(nombre)
     muestras, _ = leer_wav(wav)
     t0 = time.monotonic()
-    gen, info = modelo.transcribe(muestras, language=cfg.idioma, word_timestamps=True, vad_filter=True,
+    gen, info = modelo.transcribe(muestras, language=None, word_timestamps=True, vad_filter=True,
                                   beam_size=1, condition_on_previous_text=False)
     segmentos = []
     for s in gen:                              # el generador hace el trabajo: aquí se vigila el tiempo
@@ -245,6 +293,7 @@ def transcribir(wav, cfg: Cfg, *, modelo: str | None = None, transcriptor=None) 
     los segmentos alucinados. Cualquier error deja `motivo_de_fallo()` y devuelve None; sólo `plazo.SinTiempo` sube.
     """
     nombre = modelo or cfg.modelo
+    cfg = replace(cfg, idioma=None)           # nunca se le da el idioma: con `language` whisper no detecta nada
     _ultimo_motivo[0] = None
     try:
         tr = transcriptor(wav, cfg, nombre) if transcriptor is not None else _con_whisper(wav, cfg, nombre)
@@ -256,8 +305,7 @@ def transcribir(wav, cfg: Cfg, *, modelo: str | None = None, transcriptor=None) 
     except Exception as e:  # noqa: BLE001 (modelo que no baja, audio raro, tiempo propio: nada rompe la toma)
         _ultimo_motivo[0] = f"transcripción: {type(e).__name__}: {str(e)[:160]}"
         return None
-    buenos = [s for s in tr.segmentos if not es_alucinacion(s, cfg)]
-    return replace(tr, segmentos=buenos)
+    return limpiar(tr, cfg)
 
 
 # ------------------------------------------------------------------ volumen, silencios y cortes
@@ -303,26 +351,44 @@ def silencios(muestras: np.ndarray, sr: int, palabras: list, cfg: Cfg) -> list[t
     return salida
 
 
+CUADROS_S = 30                   # los bordes de los tramos van en múltiplos de 1/30 s (los fotogramas de la salida)
+
+
+def _al_cuadro(t: float) -> float:
+    return round(round(t * CUADROS_S) / CUADROS_S, 6)
+
+
 def tramos_a_conservar(duracion: float, silencios_: list, margen_s: float, minimo_s: float) -> list[tuple[float, float]]:
     """Trozos de [0, duracion] que quedan al quitar de cada silencio (a, b) el tramo [a + margen, b - margen].
 
-    Si lo que queda no llega a `minimo_s`, no se corta nada: [(0, duracion)]."""
-    cortes = [(a + margen_s, b - margen_s) for a, b in sorted(silencios_) if b - a > 2 * margen_s]
+    Si hay cortes, los bordes se redondean a múltiplos de 1/30 s (sin deriva entre audio y video). Un silencio que
+    toca el inicio o el final del recorte se quita entero (no queda un microtramo de `margen_s`). Si lo que queda no
+    llega a `minimo_s`, no se corta nada: [(0, duracion)]."""
+    entero = (0.0, float(duracion))
+    cuadro = 1.0 / CUADROS_S
+    cortes = []
+    for a, b in sorted(silencios_):
+        if b - a <= 2 * margen_s:
+            continue
+        ini = 0.0 if a <= cuadro else a + margen_s
+        fin = float(duracion) if b >= duracion - cuadro else b - margen_s
+        cortes.append((_al_cuadro(ini), _al_cuadro(fin)))
+    fin_util = math.floor(duracion * CUADROS_S + 1e-9) / CUADROS_S       # el último cuadro entero del recorte
     tramos: list[tuple[float, float]] = []
     cursor = 0.0
     for a, b in cortes:
-        a, b = max(a, cursor), min(b, duracion)
+        a, b = max(a, cursor), min(b, fin_util)
         if b <= a:
             continue
         if a > cursor:
             tramos.append((cursor, a))
         cursor = b
-    if cursor < duracion:
-        tramos.append((cursor, duracion))
+    if cursor < fin_util:
+        tramos.append((cursor, round(fin_util, 6)))
     total = sum(b - a for a, b in tramos)
-    if not tramos or total < minimo_s - 1e-9:
-        return [(0.0, float(duracion))]
-    return [(round(a, 3), round(b, 3)) for a, b in tramos]
+    if not cortes or not tramos or total < minimo_s - 1e-9 or len(tramos) == 1 and tramos[0][0] == 0.0:
+        return [entero]
+    return [(round(a, 6), round(b, 6)) for a, b in tramos]
 
 
 def _quitados(duracion: float, tramos: list) -> list[tuple[float, float]]:
@@ -330,10 +396,10 @@ def _quitados(duracion: float, tramos: list) -> list[tuple[float, float]]:
     salida, cursor = [], 0.0
     for a, b in tramos:
         if a > cursor + 1e-9:
-            salida.append((round(cursor, 3), round(a, 3)))
+            salida.append((round(cursor, 6), round(a, 6)))
         cursor = b
     if cursor < duracion - 1e-9:
-        salida.append((round(cursor, 3), round(duracion, 3)))
+        salida.append((round(cursor, 6), round(duracion, 6)))
     return salida
 
 
@@ -369,7 +435,7 @@ def golpes(muestras: np.ndarray, sr: int, cfg: Cfg) -> list[dict]:
     env = rms_db(muestras, sr)
     if len(env) < 3 or int(g["max"]) <= 0:
         return []
-    umbral = float(np.median(env)) + float(g["sobre_mediana_db"])
+    umbral = max(float(np.median(env)) + float(g["sobre_mediana_db"]), float(g.get("piso_db", -100.0)))
     radio = max(1, int(round(0.1 / VENTANA_S)))
     candidatos = []
     for i in np.flatnonzero(env >= umbral):
@@ -711,6 +777,7 @@ def analizar(ruta_video, inicio: float, duracion: float, marca: Marca, cfg: Cfg,
         v.motivo = motivo_de_fallo()
     else:
         v.idioma, v.prob_idioma, v.modelo = tr.idioma, tr.prob_idioma, tr.modelo
+        v.prob_idioma_min, v.descartados = cfg.idioma_prob_min, dict(tr.descartados)
     turnos, sil, gol = _resultados_de_audio(muestras, sr, tr, cfg)
     v.turnos = turnos
     v.hablantes = len({t["voz"] for t in turnos})
@@ -727,9 +794,13 @@ def analizar(ruta_video, inicio: float, duracion: float, marca: Marca, cfg: Cfg,
 
 # ------------------------------------------------------------------ medición (la muestra y la línea de comandos)
 
-def medir(ruta_video, inicio: float, duracion: float, cfg: Cfg, modelos: list, *, transcriptor=None) -> dict:
-    """Mide cada modelo sobre el mismo trozo: segundos de carga y de transcripción, idioma y texto; y el análisis de
-    audio (hablantes, cortes, golpes) con el primer modelo que funcione. Nada lanza; un fallo queda en `error`."""
+def medir(ruta_video, inicio: float, duracion: float, cfg: Cfg, modelos: list, *, transcriptor=None,
+          guardar: dict | None = None) -> dict:
+    """Mide cada modelo sobre el mismo trozo: segundos de carga (de verdad: la caché de modelos del proceso se vacía
+    antes de cada uno) y de transcripción, idioma y texto con la voz de cada segmento; y el análisis de audio
+    (hablantes, cortes, golpes) con el primer modelo que funcione. Nada lanza; un fallo queda en `error`.
+
+    `guardar`: si se da, recibe {modelo: Transcripcion} para que quien llame no tenga que transcribir otra vez."""
     salida: dict = {"video": Path(str(ruta_video)).name, "inicio_s": inicio, "duracion_s": duracion,
                     "motor": "faster-whisper", "modelos": [], "hablantes": None, "cortes": [], "golpes": []}
     with tempfile.TemporaryDirectory(prefix="voces-medir-") as tmp:
@@ -744,6 +815,7 @@ def medir(ruta_video, inicio: float, duracion: float, cfg: Cfg, modelos: list, *
         principal = None
         for nombre in modelos:
             fila: dict = {"modelo": nombre}
+            _modelos.clear()                                  # carga medida sin modelo ya cargado
             tr = transcribir(wav, cfg, modelo=nombre, transcriptor=transcriptor)
             if tr is None:
                 fila["error"] = motivo_de_fallo()
@@ -751,27 +823,79 @@ def medir(ruta_video, inicio: float, duracion: float, cfg: Cfg, modelos: list, *
                 palabras = _palabras_planas(tr.segmentos)
                 fila.update({"segundos_carga": round(tr.segundos_carga, 2), "segundos": round(tr.segundos, 2),
                              "idioma": tr.idioma, "prob_idioma": round(tr.prob_idioma, 3),
-                             "palabras": len(palabras), "texto": " ".join(s["texto"] for s in tr.segmentos),
+                             "descartados": dict(tr.descartados), "palabras": len(palabras), "texto": " ".join(s["texto"] for s in tr.segmentos),
                              "segmentos": [{"t0": round(s["t0"], 2), "t1": round(s["t1"], 2), "texto": s["texto"]}
                                            for s in tr.segmentos]})
                 principal = principal or tr
+                if guardar is not None:
+                    guardar[nombre] = tr
             salida["modelos"].append(fila)
         turnos, sil, gol = _resultados_de_audio(muestras, sr, principal, cfg)
         tramos = tramos_a_conservar(float(duracion), sil, cfg.margen_s, 0.0)
         salida["hablantes"] = {"n": len({t["voz"] for t in turnos}), "turnos": turnos}
         salida["cortes"] = [list(c) for c in _quitados(float(duracion), tramos)] if tramos != [(0.0, float(duracion))] else []
         salida["golpes"] = gol
+        for fila in salida["modelos"]:                        # la voz de cada segmento, por solape con los turnos
+            segs = fila.get("segmentos") or []
+            for sg, v in zip(segs, asignar_voz(segs, turnos)):
+                sg["voz"] = v
     return salida
+
+
+def resumen_md(datos: dict, titulo: str) -> str:
+    """Resumen legible (Markdown) de `voces.json` de la muestra o de la salida de `medir`."""
+    med = datos.get("medicion", datos)
+    out = [f"### {titulo}", ""]
+    if datos.get("motivo"):
+        out.append(f"- Sin voces en el análisis: {datos['motivo']}")
+    if med.get("error"):
+        out.append(f"- Error de la medición: {med['error']}")
+    out.append(f"- Fuente: `{med.get('video')}` desde {med.get('inicio_s')} s, {med.get('duracion_s')} s")
+    h = med.get("hablantes") or {}
+    cortes, gol = med.get("cortes") or [], med.get("golpes") or []
+    out.append(f"- Hablantes: {h.get('n', 0)}; cortes de silencio: {len(cortes)} "
+               f"({', '.join(f'{a:g}-{b:g}' for a, b in cortes) or 'ninguno'}); golpes: {len(gol)} "
+               f"({', '.join(f'{g['t']:g} s {g['db']:g} dB' for g in gol) or 'ninguno'})")
+    if "duracion_toma_s" in datos:
+        out.append(f"- Recorte {datos['duracion_recorte_s']:g} s -> toma {datos['duracion_toma_s']:g} s")
+    out += ["", "| modelo | carga (s) | transcripción (s) | idioma | prob. | palabras | descartados |",
+            "|---|---|---|---|---|---|---|"]
+    for m in med.get("modelos", []):
+        if "error" in m:
+            out.append(f"| {m['modelo']} | - | - | - | - | - | error: {m['error']} |")
+        else:
+            d = m.get("descartados") or {}
+            out.append(f"| {m['modelo']} | {m['segundos_carga']} | {m['segundos']} | {m['idioma']} | {m['prob_idioma']} "
+                       f"| {m['palabras']} | {d.get('segmentos', 0)} seg, {d.get('palabras', 0)} pal |")
+    for m in med.get("modelos", []):
+        if m.get("segmentos"):
+            out += ["", f"Texto de `{m['modelo']}` (tiempo, voz):", ""]
+            out += [f"- {sg['t0']:g}-{sg['t1']:g} s [{sg.get('voz', '?')}] {sg['texto']}" for sg in m["segmentos"]]
+    if datos.get("lineas"):
+        out += ["", "Líneas de la toma (tiempo de la toma):", ""]
+        out += [f"- {ln['t0']:g}-{ln['t1']:g} s [{ln.get('voz') or '-'}] {ln.get('nombre') or ''}: {ln.get('frase') or ''}"
+                for ln in datos["lineas"]]
+    return "\n".join(out) + "\n"
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m fabrica.voces", description="Mide la transcripción y el análisis de audio.")
-    ap.add_argument("--medir", required=True, metavar="VIDEO")
+    ap.add_argument("--medir", metavar="VIDEO")
+    ap.add_argument("--resumen", nargs="+", metavar="JSON", help="imprime un resumen legible de estos JSON y sale")
     ap.add_argument("--inicio", type=float, default=0.0)
-    ap.add_argument("--duracion", type=float, required=True)
-    ap.add_argument("--salida", required=True, metavar="JSON")
+    ap.add_argument("--duracion", type=float)
+    ap.add_argument("--salida", metavar="JSON")
     ap.add_argument("--modelos", nargs="+", default=None, help="por omisión, `modelos_medir` de config/voces.yml")
     args = ap.parse_args(argv)
+    if args.resumen:
+        for ruta in args.resumen:
+            if Path(ruta).is_file():
+                print(resumen_md(json.loads(Path(ruta).read_text(encoding="utf-8")), Path(ruta).name))
+            else:
+                print(f"### {Path(ruta).name}\n\n- no hay archivo (aviso: sin esta medición)\n")
+        return 0
+    if not (args.medir and args.duracion and args.salida):
+        ap.error("--medir necesita VIDEO, --duracion y --salida")
     cfg = Cfg.cargar() or Cfg()
     # Sin pista de idioma: así se ve qué idioma detecta cada modelo (el audio puede no ser español).
     res = medir(args.medir, args.inicio, args.duracion, replace(cfg, idioma=None), args.modelos or cfg.modelos_medir)

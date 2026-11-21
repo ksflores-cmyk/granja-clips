@@ -685,6 +685,9 @@ def validar_voces(v, inf: Informe) -> None:
         inf.error(f"{rel}: idioma debe ser un código de 2 o 3 letras (es) o null")
     if not _numero(v["tope_s"], 10, 600):
         inf.error(f"{rel}: tope_s debe ser un número de 10 a 600")
+    for clave, lo, hi in (("reserva_s", 0, 600), ("idioma_prob_min", 0, 1), ("p_palabra_min", 0, 1)):     # opcionales
+        if clave in v and not _numero(v[clave], lo, hi):
+            inf.error(f"{rel}: {clave} debe ser un número de {lo} a {hi}")
     if not _numero(v["silencio_min_s"], 0.1, 5):
         inf.error(f"{rel}: silencio_min_s debe ser un número de 0.1 a 5")
     if not _numero(v["margen_s"], 0, 1):
@@ -693,7 +696,7 @@ def validar_voces(v, inf: Informe) -> None:
         inf.error(f"{rel}: silencio_min_s debe ser mayor que el doble de margen_s")
     if not _numero(v["umbral_db"], -90, -10):
         inf.error(f"{rel}: umbral_db debe ser un número de -90 a -10")
-    bloques = {"golpes": {"sobre_mediana_db": (1, 60), "separacion_s": (0.1, 10), "max": (0, 50)},
+    bloques = {"golpes": {"sobre_mediana_db": (1, 60), "piso_db": (-90, 0), "separacion_s": (0.1, 10), "max": (0, 50)},
                "hablantes": {"max": (1, 2), "separacion_min": (0, 1), "minimo_s": (0, 60)},
                "lineas": {"pausa_s": (0.1, 5), "max_s": (1, 10)}}
     for nombre, campos in bloques.items():

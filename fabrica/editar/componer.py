@@ -187,9 +187,19 @@ def orden_ffmpeg(*, salida: str, duracion: float, ancho: int, cierre_s: float,
     return _orden(entradas, filtros, f"{idx_cierre + 1}:a", d, salida)
 
 
+MEDIO_CUADRO_S = 0.016           # un poco menos de medio fotograma (1/60 s)
+
+
+def _n(x: float) -> str:
+    """Segundo con 6 decimales sin ceros de sobra (los bordes de tramo son múltiplos de 1/30: 14.666667)."""
+    return f"{float(x):.6f}".rstrip("0").rstrip(".") or "0"
+
+
 def _expresion_tramos(tramos: list) -> str:
-    """Expresión de select: verdadera dentro de alguno de los tramos [a, b) (segundos del recorte)."""
-    return "+".join(f"gte(t,{a:g})*lt(t,{b:g})" for a, b in tramos)
+    """Expresión de select: verdadera en los fotogramas que caen dentro de alguno de los tramos [a, b) (segundos del
+    recorte). Los bordes se corren medio cuadro para que un fotograma exactamente en el borde (a o b) no dependa del
+    redondeo del decimal: el cuadro en `a` entra y el cuadro en `b` no."""
+    return "+".join(f"gte(t,{_n(a - MEDIO_CUADRO_S)})*lt(t,{_n(b - MEDIO_CUADRO_S)})" for a, b in tramos)
 
 
 def _filtro_audio_tramos(tramos: list) -> str:
@@ -197,9 +207,9 @@ def _filtro_audio_tramos(tramos: list) -> str:
     y cada corte desfasaba el sonido; medido: correlación 0.41 con aselect contra 0.99999 con atrim."""
     n = len(tramos)
     if n == 1:
-        return f"[0:a]atrim=start={tramos[0][0]:g}:end={tramos[0][1]:g},asetpts=PTS-STARTPTS[a0]"
+        return f"[0:a]atrim=start={_n(tramos[0][0])}:end={_n(tramos[0][1])},asetpts=PTS-STARTPTS[a0]"
     partes = [f"[0:a]asplit={n}" + "".join(f"[s{i}]" for i in range(n))]
-    partes += [f"[s{i}]atrim=start={a:g}:end={b:g},asetpts=PTS-STARTPTS[x{i}]" for i, (a, b) in enumerate(tramos)]
+    partes += [f"[s{i}]atrim=start={_n(a)}:end={_n(b)},asetpts=PTS-STARTPTS[x{i}]" for i, (a, b) in enumerate(tramos)]
     partes.append("".join(f"[x{i}]" for i in range(n)) + f"concat=n={n}:v=0:a=1[a0]")
     return ";".join(partes)
 
@@ -222,7 +232,7 @@ def orden_ffmpeg_pantalla_completa(*, salida: str, duracion: float, ancho: int, 
         raise ValueError("el video trae audio propio: no se le añade música")
     d = f"{duracion:g}"
     r = video["recorte"]
-    d_in = f"{tramos[-1][1]:g}" if tramos else d
+    d_in = _n(tramos[-1][1]) if tramos else d
     entradas = ["-ss", f"{video['inicio']:g}", "-t", d_in, "-i", video["ruta"]]
     quitar = (f"select='{_expresion_tramos(tramos)}',setpts=N/FRAME_RATE/TB," if tramos else "")
     filtros = [f"[0:v]fps=30,{quitar}crop={r['ancho']}:{r['alto']}:{r['x']}:{r['y']},scale={ancho}:{alto}:flags=lanczos,"

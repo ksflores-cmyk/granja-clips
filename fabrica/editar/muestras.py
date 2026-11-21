@@ -156,12 +156,25 @@ def _voces_de_muestra(marca: Marca, m: dict, ruta_video: Path, inicio: float, du
     from . import toma as mod_toma
     cfg = mod_voces.Cfg.cargar(marca.raiz) or mod_voces.Cfg()
     cfg = replace(cfg, idioma=None)             # la muestra no sabe el idioma de antemano: se autodetecta
+    # Primero se mide (carga y transcripción de cada modelo de `modelos_medir`); `analizar` reutiliza la transcripción
+    # del modelo del ciclo para no transcribir dos veces.
+    medidas: dict = {}
+    medicion = mod_voces.medir(ruta_video, inicio, duracion, cfg, list(cfg.modelos_medir), transcriptor=transcriptor,
+                               guardar=medidas)
+
+    def de_la_medicion(wav, cfg_, nombre):
+        if nombre in medidas:
+            return medidas[nombre]
+        if nombre in cfg.modelos_medir:             # se midió y falló: no se reintenta
+            fallo = next((f.get("error") for f in medicion["modelos"] if f["modelo"] == nombre), None)
+            raise RuntimeError(fallo or f"{nombre} no se pudo medir")
+        return (transcriptor or mod_voces._con_whisper)(wav, cfg_, nombre)
+
     res = mod_voces.analizar(ruta_video, inicio, duracion, marca, cfg, minimo_s=MINIMO_VOCES_S,
-                             nombre_streamer=m["toma"].get("credito"), transcriptor=transcriptor)
+                             nombre_streamer=m["toma"].get("credito"), transcriptor=de_la_medicion)
     nuevas, fuente = mod_toma.lineas_con_voces(res, lineas, "respaldo")
     dur = round(res.duracion_toma, 3)
     nuevas = mod_toma.ajustar_a_toma(nuevas, dur, marca)
-    medicion = mod_voces.medir(ruta_video, inicio, duracion, cfg, list(cfg.modelos_medir), transcriptor=transcriptor)
     resumen = {"motor": "faster-whisper", "modelo": res.modelo, "idioma": res.idioma, "segundos": res.segundos,
                "fuente_lineas": fuente, "hablantes": res.hablantes,
                "cortes": [[round(a, 3), round(b, 3)] for a, b in res.cortes], "golpes": res.golpes}
