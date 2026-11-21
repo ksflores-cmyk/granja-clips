@@ -281,8 +281,7 @@ def test_la_peticion_lleva_video_en_linea_esquema_temperatura_y_la_instruccion(t
     assert gc["responseMimeType"] == "application/json" and gc["temperature"] == 0.2
     campos = set(gc["responseSchema"]["properties"])
     assert campos == {"apto", "motivos", "spoiler", "desnudez", "cinematica", "juego_correcto", "idioma_original",
-                      "lineas", "gancho", "palabra_lapiz", "escena", "acotacion", "recorte", "historia"}
-    assert "historia" not in gc["responseSchema"]["required"]       # #20: el plan de historia es opcional
+                      "lineas", "gancho", "palabra_lapiz", "escena", "acotacion", "recorte"}
     assert set(gc["responseSchema"]["properties"]["lineas"]["items"]["properties"]) == \
         {"t0", "t1", "hablante", "original", "es"}
     texto = partes[1]["text"]
