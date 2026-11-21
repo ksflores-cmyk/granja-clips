@@ -3,7 +3,7 @@
 activo: true                 # false: no se analiza el audio; todo como antes
 modo: principal              # principal: si el idioma es español, las líneas salen de la transcripción (la acotación de Gemini se conserva)
                              # respaldo: sólo cuando Gemini no dio líneas (o el corte fue sin IA)
-modelo: base                 # modelo de faster-whisper del ciclo (base | small ...); se baja una vez y queda en caché
+modelo: small                # modelo de faster-whisper del ciclo (base | small ...); se baja una vez y queda en caché
 modelos_medir: [base, small] # sólo para la muestra: mide el tiempo de carga y de transcripción de cada uno
 idioma: null                 # siempre null: whisper AUTODETECTA. Con `language` dado no detecta nada (devuelve lo pedido con prob 1) y
                              # convertiría audio en otro idioma en "español". El código ignora cualquier otro valor.

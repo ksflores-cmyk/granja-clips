@@ -50,7 +50,8 @@ SEMILLAS = tuple(range(8))       # semillas fijas de las k-medias
 MIN_TURNOS = 4                   # con menos turnos no hay forma de separar dos voces
 MIN_CUADROS = 8                  # un turno con menos cuadros con voz no da rasgos fiables
 SEPARACION_CENTROS_MIN = 0.6     # distancia mínima (RMS por rasgo) entre los centros de las dos voces
-PESO_TONO = 2.0                  # el tono pesa más que cada coeficiente MFCC suelto
+PESO_TONO = 4.0                  # (medido en Sintel: con 2 la silueta quedaba en 0.24 y con 4 en 0.38)
+SALTO_F0_MIN = 0.3               # diferencia mínima del tono mediano entre las dos voces (log: ~35 %, unos 5 semitonos; Sintel: 0.81)
 HOLGURA_S = 0.25                 # la línea sigue en pantalla un poco después de su última palabra
 MIN_LINEA_VISIBLE_S = 0.8        # y no dura menos que esto (si el hueco hasta la siguiente lo permite)
 STREAMER, OTRA = "streamer", "otra"
@@ -126,6 +127,7 @@ class Voces:
     cortes: list = field(default_factory=list)      # [(a, b)] silencios quitados
     turnos: list = field(default_factory=list)      # [{t0, t1, voz}] en tiempo de la fuente
     hablantes: int = 0                              # voces distintas que se oyeron
+    diagnostico: dict = field(default_factory=dict)  # por qué una o dos voces: silueta, distancia, F0 por voz
     idioma: str | None = None
     prob_idioma: float = 0.0
     prob_idioma_min: float = 0.5
@@ -597,19 +599,36 @@ def _silueta(X: np.ndarray, etiquetas: np.ndarray) -> float:
 def hablantes(muestras: np.ndarray, sr: int, turnos: list, cfg: Cfg) -> list[str]:
     """Voz de cada turno (t0, t1): "streamer" (la que más habla) u "otra". Todo "streamer" si no se separan con claridad.
 
-    Rasgos por turno (MFCC y tono), estandarizados; k-medias de 2 con semillas fijas; se cree en las dos voces sólo si
-    la silueta llega a `separacion_min` y la voz minoritaria habla al menos `minimo_s`."""
+    Ver `clasificar_hablantes`: éste devuelve sólo las etiquetas."""
+    return clasificar_hablantes(muestras, sr, turnos, cfg)[0]
+
+
+def clasificar_hablantes(muestras: np.ndarray, sr: int, turnos: list, cfg: Cfg) -> tuple[list[str], dict]:
+    """(voz de cada turno, diagnóstico). El diagnóstico trae `separadas`, `motivo` (por qué todo es del streamer),
+    `silueta`, `distancia` (RMS entre centros), `f0_hz` por voz, `salto_f0` (log), y los tiempos de cada voz.
+
+    Rasgos por turno (MFCC y tono), estandarizados; k-medias de 2 con semillas fijas. Se cree en las dos voces sólo si:
+    la silueta llega a `separacion_min`; los centros están lejos en términos absolutos; los tonos medianos de las dos
+    voces se separan al menos `SALTO_F0_MIN` (el MFCC solo, con pocos turnos, se confunde con el ruido y la música);
+    y la voz minoritaria habla al menos `minimo_s`."""
     todo = [STREAMER] * len(turnos)
+    diag: dict = {"turnos": len(turnos), "separadas": False, "motivo": None}
     h = cfg.hablantes
-    if int(h["max"]) < 2 or len(turnos) < MIN_TURNOS:
-        return todo
+    if int(h["max"]) < 2:
+        diag["motivo"] = "hablantes.max es 1"
+        return todo, diag
+    if len(turnos) < MIN_TURNOS:
+        diag["motivo"] = f"menos de {MIN_TURNOS} turnos ({len(turnos)})"
+        return todo, diag
     rasgos = [rasgos_turno(muestras[int(max(0.0, t0) * sr): int(max(0.0, t1) * sr)], sr) for t0, t1 in turnos]
     validos = [i for i, r in enumerate(rasgos) if r is not None]
     if len(validos) < MIN_TURNOS:
-        return todo
+        diag["motivo"] = f"menos de {MIN_TURNOS} turnos con rasgos fiables ({len(validos)})"
+        return todo, diag
     X = np.stack([rasgos[i] for i in validos])
-    tonos = X[:, -1]
-    if np.isnan(tonos).all():
+    tonos = X[:, -1].copy()                                     # log Hz por turno (NaN si no hubo tono)
+    hay_tono = not np.isnan(tonos).all()
+    if not hay_tono:
         X = X[:, :-1]
     else:
         X[np.isnan(tonos), -1] = np.nanmedian(tonos)
@@ -617,26 +636,44 @@ def hablantes(muestras: np.ndarray, sr: int, turnos: list, cfg: Cfg) -> list[str
     # amplifica; el piso es la variación mínima que cuenta como diferencia real (MFCC, desviaciones, tono).
     piso = np.array([1.0] * 12 + [0.5] * 12 + [0.05])[: X.shape[1]]
     X = (X - X.mean(axis=0)) / np.maximum(X.std(axis=0), piso)
-    if not np.isnan(tonos).all():
+    if hay_tono:
         X[:, -1] *= PESO_TONO
     mejor, mejor_inercia = None, None
     for semilla in SEMILLAS:
         etiquetas, inercia = _kmedias(X, semilla)
         if mejor is None or inercia < mejor_inercia - 1e-12:
             mejor, mejor_inercia = etiquetas, inercia
-    if _silueta(X, mejor) < float(h["separacion_min"]):
-        return todo
-    # La silueta es relativa: dos mitades de la misma voz también "se separan". Además los centros de los dos grupos
-    # deben estar lejos en términos absolutos (diferencia RMS por rasgo, en unidades de variación real).
+    diag["silueta"] = round(_silueta(X, mejor), 3)
+    if len(set(mejor.tolist())) < 2:
+        diag["motivo"] = "k-medias dejó un solo grupo"
+        return todo, diag
     dif = X[mejor == 0].mean(axis=0) - X[mejor == 1].mean(axis=0)
-    if float(np.sqrt((dif ** 2).mean())) < SEPARACION_CENTROS_MIN:
-        return todo
+    diag["distancia"] = round(float(np.sqrt((dif ** 2).mean())), 3)
     tiempo = [0.0, 0.0]
     for i, e in zip(validos, mejor):
         tiempo[int(e)] += turnos[i][1] - turnos[i][0]
-    if min(tiempo) < float(h["minimo_s"]):
-        return todo
     grande = 0 if tiempo[0] >= tiempo[1] else 1
+    f0 = {}
+    if hay_tono:
+        for g, nombre in ((grande, STREAMER), (1 - grande, OTRA)):
+            t = tonos[(mejor == g) & ~np.isnan(tonos)]
+            if len(t):
+                f0[nombre] = round(float(np.exp(np.median(t))), 1)
+        if len(f0) == 2:
+            diag["salto_f0"] = round(abs(float(np.log(f0[STREAMER] / f0[OTRA]))), 3)
+    diag["f0_hz"] = f0
+    diag["tiempo_s"] = {STREAMER: round(tiempo[grande], 2), OTRA: round(tiempo[1 - grande], 2)}
+    if diag["silueta"] < float(h["separacion_min"]):
+        diag["motivo"] = f"silueta {diag['silueta']} menor que {h['separacion_min']}"
+    elif diag["distancia"] < SEPARACION_CENTROS_MIN:
+        diag["motivo"] = f"distancia entre centros {diag['distancia']} menor que {SEPARACION_CENTROS_MIN}"
+    elif hay_tono and diag.get("salto_f0", 0.0) < SALTO_F0_MIN:
+        diag["motivo"] = f"los tonos de los dos grupos se parecen (salto {diag.get('salto_f0')} < {SALTO_F0_MIN})"
+    elif min(tiempo) < float(h["minimo_s"]):
+        diag["motivo"] = f"la voz minoritaria habla {min(tiempo):.1f} s (mínimo {h['minimo_s']})"
+    if diag["motivo"]:
+        return todo, diag
+    diag["separadas"] = True
     voz = {i: (STREAMER if int(e) == grande else OTRA) for i, e in zip(validos, mejor)}
     salida = []
     for i in range(len(turnos)):                  # un turno sin rasgos fiables toma la voz del turno anterior
@@ -646,7 +683,7 @@ def hablantes(muestras: np.ndarray, sr: int, turnos: list, cfg: Cfg) -> list[str
             previo = next((salida[j] for j in range(i - 1, -1, -1)), None)
             siguiente = next((voz[j] for j in range(i + 1, len(turnos)) if j in voz), None)
             salida.append(previo or siguiente or STREAMER)
-    return salida
+    return salida, diag
 
 
 # ------------------------------------------------------------------ líneas de subtítulo
@@ -741,12 +778,12 @@ def lineas_desde_transcripcion(tr: Transcripcion, voces_turnos: list, marca: Mar
 # ------------------------------------------------------------------ todo junto
 
 def _resultados_de_audio(muestras: np.ndarray, sr: int, tr: Transcripcion | None, cfg: Cfg):
-    """(turnos con voz, silencios, golpes) en tiempo de la fuente."""
+    """(turnos con voz, silencios, golpes, diagnóstico de hablantes) en tiempo de la fuente."""
     palabras = _palabras_planas(tr.segmentos) if tr else []
     turnos = turnos_de_palabras(tr.segmentos) if tr else []
-    etiquetas = hablantes(muestras, sr, turnos, cfg) if turnos else []
+    etiquetas, diag = clasificar_hablantes(muestras, sr, turnos, cfg) if turnos else ([], {"motivo": "sin turnos"})
     con_voz = [{"t0": round(t0, 3), "t1": round(t1, 3), "voz": v} for (t0, t1), v in zip(turnos, etiquetas)]
-    return con_voz, silencios(muestras, sr, palabras, cfg), golpes(muestras, sr, cfg)
+    return con_voz, silencios(muestras, sr, palabras, cfg), golpes(muestras, sr, cfg), diag
 
 
 def analizar(ruta_video, inicio: float, duracion: float, marca: Marca, cfg: Cfg, *, minimo_s: float,
@@ -778,8 +815,8 @@ def analizar(ruta_video, inicio: float, duracion: float, marca: Marca, cfg: Cfg,
     else:
         v.idioma, v.prob_idioma, v.modelo = tr.idioma, tr.prob_idioma, tr.modelo
         v.prob_idioma_min, v.descartados = cfg.idioma_prob_min, dict(tr.descartados)
-    turnos, sil, gol = _resultados_de_audio(muestras, sr, tr, cfg)
-    v.turnos = turnos
+    turnos, sil, gol, diag = _resultados_de_audio(muestras, sr, tr, cfg)
+    v.turnos, v.diagnostico = turnos, diag
     v.hablantes = len({t["voz"] for t in turnos})
     v.crudo = {"golpes": gol,
                "palabras": [{"texto": p["texto"], "t0": float(p["t0"]), "t1": float(p["t1"])}
@@ -830,9 +867,9 @@ def medir(ruta_video, inicio: float, duracion: float, cfg: Cfg, modelos: list, *
                 if guardar is not None:
                     guardar[nombre] = tr
             salida["modelos"].append(fila)
-        turnos, sil, gol = _resultados_de_audio(muestras, sr, principal, cfg)
+        turnos, sil, gol, diag = _resultados_de_audio(muestras, sr, principal, cfg)
         tramos = tramos_a_conservar(float(duracion), sil, cfg.margen_s, 0.0)
-        salida["hablantes"] = {"n": len({t["voz"] for t in turnos}), "turnos": turnos}
+        salida["hablantes"] = {"n": len({t["voz"] for t in turnos}), "turnos": turnos, "diagnostico": diag}
         salida["cortes"] = [list(c) for c in _quitados(float(duracion), tramos)] if tramos != [(0.0, float(duracion))] else []
         salida["golpes"] = gol
         for fila in salida["modelos"]:                        # la voz de cada segmento, por solape con los turnos
@@ -856,6 +893,11 @@ def resumen_md(datos: dict, titulo: str) -> str:
     out.append(f"- Hablantes: {h.get('n', 0)}; cortes de silencio: {len(cortes)} "
                f"({', '.join(f'{a:g}-{b:g}' for a, b in cortes) or 'ninguno'}); golpes: {len(gol)} "
                f"({', '.join(f'{g['t']:g} s {g['db']:g} dB' for g in gol) or 'ninguno'})")
+    dg = h.get("diagnostico") or datos.get("diagnostico") or {}
+    if dg:
+        out.append("- Diagnóstico de voces: " + ", ".join(
+            f"{k} {dg[k]}" for k in ("separadas", "silueta", "distancia", "f0_hz", "salto_f0", "tiempo_s", "motivo")
+            if dg.get(k) is not None))
     if "duracion_toma_s" in datos:
         out.append(f"- Recorte {datos['duracion_recorte_s']:g} s -> toma {datos['duracion_toma_s']:g} s")
     out += ["", "| modelo | carga (s) | transcripción (s) | idioma | prob. | palabras | descartados |",

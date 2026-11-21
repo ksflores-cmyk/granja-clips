@@ -164,7 +164,7 @@ def _info_voces(res, cfg, fuente: str) -> dict:
     info = {"motor": "faster-whisper", "modelo": res.modelo, "idioma": res.idioma, "segundos": res.segundos,
             "modo": cfg.modo, "fuente_lineas": fuente, "hablantes": res.hablantes,
             "cortes": [[round(a, 3), round(b, 3)] for a, b in res.cortes], "golpes": res.golpes,
-            "descartados": res.descartados}
+            "descartados": res.descartados, "hablantes_diagnostico": res.diagnostico}
     if res.motivo:
         info["motivo"] = res.motivo
     return info

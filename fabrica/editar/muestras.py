@@ -176,7 +176,7 @@ def _voces_de_muestra(marca: Marca, m: dict, ruta_video: Path, inicio: float, du
     dur = round(res.duracion_toma, 3)
     nuevas = mod_toma.ajustar_a_toma(nuevas, dur, marca)
     resumen = {"motor": "faster-whisper", "modelo": res.modelo, "idioma": res.idioma, "segundos": res.segundos,
-               "fuente_lineas": fuente, "hablantes": res.hablantes,
+               "fuente_lineas": fuente, "hablantes": res.hablantes, "diagnostico": res.diagnostico,
                "cortes": [[round(a, 3), round(b, 3)] for a, b in res.cortes], "golpes": res.golpes}
     if res.motivo:
         resumen["motivo"] = res.motivo

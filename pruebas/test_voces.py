@@ -893,3 +893,84 @@ def test_medir_vacia_la_cache_y_guarda_las_transcripciones(tmp_path, monkeypatch
     md = voces.resumen_md(res, "prueba")
     assert "| base | 0.5 | 1.0 | es | 0.99 |" in md and "[streamer]" in md and "[otra]" in md and "Hablantes: 2" in md
     assert "cortes de silencio: 1" in md and "golpes:" in md
+
+
+# ---------------------------------------------------------------- ronda 2: hablantes calibrados con audio real
+
+TURNOS_SINTEL = [(0.75, 3.09, "C"), (6.33, 8.11, "S"), (9.05, 10.37, "C"), (11.61, 12.47, "C"), (15.12, 15.70, "S")]
+
+
+def sintel_wav(tmp_path):
+    import os
+    from pathlib import Path
+    ruta = Path(os.environ.get("GRANJA_SINTEL", "/tmp/claude-0/sintel.mp4"))
+    if not ruta.is_file():
+        pytest.skip("no está el video de Sintel (GRANJA_SINTEL o /tmp/claude-0/sintel.mp4)")
+    import hashlib
+    if hashlib.sha256(ruta.read_bytes()).hexdigest()[:8] != "358447f3":
+        pytest.skip("el archivo no es el sintel-short.mp4 esperado")
+    return voces.leer_wav(voces.extraer_audio(ruta, 39.6, 17.0, tmp_path / "sintel.wav"))
+
+
+@necesita_ffmpeg
+def test_sintel_real_chaman_y_sintel_salen_en_dos_voces(tmp_path):
+    x, sr = sintel_wav(tmp_path)
+    etiquetas, dg = voces.clasificar_hablantes(x, sr, [(a, b) for a, b, _ in TURNOS_SINTEL], Cfg())
+    assert etiquetas == ["streamer", "otra", "streamer", "streamer", "otra"], dg      # CHAMÁN = streamer (más tiempo)
+    assert dg["separadas"] and dg["f0_hz"]["streamer"] < 120 < dg["f0_hz"]["otra"] and dg["salto_f0"] > 0.5
+    assert dg["silueta"] >= 0.25 and dg["distancia"] >= voces.SEPARACION_CENTROS_MIN
+    assert dg["tiempo_s"]["otra"] >= 1.5
+
+
+@necesita_ffmpeg
+def test_sintel_real_solo_los_turnos_del_chaman_dan_una_voz(tmp_path):
+    x, sr = sintel_wav(tmp_path)
+    solo = [(a, b) for a, b, q in TURNOS_SINTEL if q == "C"]
+    assert set(voces.hablantes(x, sr, solo, Cfg())) == {"streamer"}                   # tres turnos: no alcanzan
+    partidos = []
+    for a, b in solo:                                                                  # y partidos en seis: sigue siendo uno
+        partidos += [(a, (a + b) / 2), ((a + b) / 2, b)]
+    etiquetas, dg = voces.clasificar_hablantes(x, sr, partidos, Cfg())
+    assert set(etiquetas) == {"streamer"} and not dg["separadas"] and "tonos" in dg["motivo"]
+
+
+def musica_de_fondo(n, rng, amp=0.05):
+    t = np.arange(n) / SR
+    acorde = sum(np.sin(2 * np.pi * f * t) for f in (196.0, 247.0, 392.0, 494.0)) / 4
+    return (amp * acorde * (0.7 + 0.3 * np.sin(2 * np.pi * 0.4 * t)) + 0.004 * rng.standard_normal(n)).astype(np.float32)
+
+
+def test_voz_grave_larga_y_voz_aguda_corta_con_musica_de_fondo():
+    rng = np.random.default_rng(11)
+    guion = [("A", 2.3), ("B", 1.8), ("A", 1.3), ("A", 0.9), ("B", 0.6), ("A", 1.2)]     # B: 2,4 s en dos turnos
+    partes, turnos, t = [], [], 0.0
+    for q, d in guion:
+        partes += [(voz_a if q == "A" else voz_b)(d, rng), silencio(0.3, rng)]
+        turnos.append((t, t + d, q))
+        t += d + 0.3
+    x = np.concatenate(partes)
+    x = x + musica_de_fondo(len(x), rng)
+    etiquetas, dg = voces.clasificar_hablantes(x, SR, [(a, b) for a, b, _ in turnos], Cfg())
+    assert etiquetas == ["streamer" if q == "A" else "otra" for _, _, q in turnos], dg
+    assert dg["f0_hz"]["streamer"] < 130 and dg["f0_hz"]["otra"] > 200
+
+
+def test_una_voz_con_entonacion_variable_y_musica_sigue_siendo_una():
+    rng = np.random.default_rng(12)
+    partes, turnos, t = [], [], 0.0
+    for f0, d in [(100, 1.6), (125, 1.2), (105, 1.8), (118, 1.0), (95, 1.5), (122, 1.4)]:
+        partes += [voz(f0, [(500, 150), (1500, 250)], d, rng), silencio(0.3, rng)]
+        turnos.append((t, t + d))
+        t += d + 0.3
+    x = np.concatenate(partes)
+    x = x + musica_de_fondo(len(x), rng)
+    etiquetas, dg = voces.clasificar_hablantes(x, SR, turnos, Cfg())
+    assert set(etiquetas) == {"streamer"} and not dg["separadas"], dg
+
+
+def test_el_diagnostico_va_en_el_resumen():
+    dg = {"separadas": True, "silueta": 0.383, "distancia": 2.01, "f0_hz": {"streamer": 87.0, "otra": 196.3},
+          "salto_f0": 0.81, "tiempo_s": {"streamer": 4.5, "otra": 2.4}}
+    md = voces.resumen_md({"video": "x.mp4", "inicio_s": 0, "duracion_s": 17, "modelos": [],
+                           "hablantes": {"n": 2, "turnos": [], "diagnostico": dg}, "cortes": [], "golpes": []}, "t")
+    assert "Diagnóstico de voces: separadas True, silueta 0.383, distancia 2.01" in md and "'otra': 196.3" in md
