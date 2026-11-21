@@ -977,11 +977,10 @@ def test_si_la_puerta_sale_en_rojo_con_historia_se_renderiza_sin_ella(repo_histo
     llamadas = []
 
     def revisar(video, plan, marca, ficha=None):
-        puntos = reales(video, plan, marca, ficha=ficha)
         llamadas.append(plan.get("historia", {}).get("proveedor"))
-        if plan.get("historia", {}).get("proveedor"):
-            puntos = [*puntos, ("[fotograma] prueba roja", False, "forzado")]
-        return puntos
+        if plan.get("historia", {}).get("proveedor"):          # la corrida con historia se descarta: no hace falta medirla
+            return [("[fotograma] prueba roja", False, "forzado")]
+        return reales(video, plan, marca, ficha=ficha)
     monkeypatch.setattr(toma.estilo, "revisar", revisar)
     r = hacer(repo_historia, tmp_path, video20, respuesta_con_historia(PLAN_TOMA))
     assert r.ok and llamadas == ["gemini", None]
