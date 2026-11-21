@@ -21,6 +21,7 @@ import yaml
 
 from .. import fuentes as mod_fuentes
 from ..registro import ZONA
+from . import criticos as mod_criticos
 from . import estilo
 from . import musica as mod_musica
 from .componer import Linea, componer, sondear_video
@@ -140,6 +141,14 @@ def _muestra_con_musica(salida: Path, marca: Marca, registrar, omitir, hoy) -> N
         "enlace": pista["pagina"]}, plan)
 
 
+def _criticos_sin_ia(mp4: Path, plan: dict, marca: Marca):
+    """Corre los críticos sin IA (sin red ni clave) sobre una muestra con video; None si no aplica o están apagados."""
+    cfg = mod_criticos.cargar_config(marca.raiz)
+    if not cfg or cfg.get("activo") is not True or not plan.get("origen"):
+        return None
+    return mod_criticos.revisar(mp4, plan, marca, raiz=marca.raiz, config=cfg, modo="sin_ia", entorno={})
+
+
 def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *,
             fichas: list[dict] | None = None, hoy=None, descargador=descargar) -> dict:
     if fichas is None:
@@ -156,6 +165,10 @@ def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *
         cuadros = fotogramas(mp4, duracion, salida, mid)
         ok = all(p[1] for p in puntos)
         informe.append(estilo.informe_md(f"{mid} ({'EN VERDE' if ok else 'EN ROJO'})", puntos))
+        crit = _criticos_sin_ia(mp4, plan, marca)       # tarea #21: sin clave, sin IA: sólo el código
+        if crit is not None:
+            informe.append(mod_criticos.informe_md(mid, crit))
+            ok = ok and crit.decision == "pasa"
         manifiesto["muestras"].append({
             "id": mid,
             "archivo": mp4.name,
@@ -167,6 +180,8 @@ def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *
             "lineas": [{"t0": ln.t0, "t1": ln.t1, "nombre": ln.nombre, "frase": ln.frase,
                         "acotacion": ln.acotacion, "original": ln.original} for ln in lineas],
             "audio": plan.get("audio"),
+            "criticos": None if crit is None else {"decision": crit.decision, "segundos": crit.segundos,
+                                                   "criticas": [c.como_dict() for c in crit.criticas]},
             "puerta_estilo": {"en_verde": ok,
                               "puntos": [{"punto": n, "ok": o, "detalle": d} for n, o, d in puntos]},
         })

@@ -21,6 +21,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import cupos as mod_cupos
 from . import plazo
 from .config import cargar_yaml
 from .editar import dialogo as mod_dialogo
@@ -306,7 +307,8 @@ def _modelos_a_probar(cfg: dict, clave: str, mirada: Mirada, transporte, transpo
 def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracion: float | None = None,
           transporte=None, espera=time.sleep, entorno=None, config: dict | None = None,
           juego: str | None = None, nota: str | None = None,
-          recorte: tuple[float, float] | None = None, transporte_lista=None) -> Mirada:
+          recorte: tuple[float, float] | None = None, transporte_lista=None,
+          registrar_cupos: bool = False) -> Mirada:
     """Le pide a Gemini el análisis del clip. Reintenta una vez ante 429 o 5xx; ante 404 prueba el modelo siguiente.
 
     Antes consulta ListModels (si `listar_modelos`) y salta los modelos que no existen. Con un `transporte`
@@ -335,12 +337,20 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
         """Segundos que quedan: lo que resta del tope de ojos y lo que resta del plazo del ciclo."""
         return min(tope_ojos - (time.monotonic() - inicio_ojos), plazo.restante() - plazo.MARGEN_S)
 
+    cuenta = mod_cupos.Cupos(raiz) if registrar_cupos else None    # #21: cada petición queda en la cuenta del día
+
     def llamar(url, encabezados, cuerpo, tiempo):
+        if cuenta is not None:
+            cuenta.registrar("gemini")
         if transporte is None:
-            return transporte_urllib(url, encabezados, cuerpo, tiempo=tiempo)
-        if _acepta_tiempo(transporte):
-            return transporte(url, encabezados, cuerpo, tiempo)
-        return transporte(url, encabezados, cuerpo)      # los transportes inyectados antiguos reciben 3 argumentos
+            estado_t, texto_t = transporte_urllib(url, encabezados, cuerpo, tiempo=tiempo)
+        elif _acepta_tiempo(transporte):
+            estado_t, texto_t = transporte(url, encabezados, cuerpo, tiempo)
+        else:
+            estado_t, texto_t = transporte(url, encabezados, cuerpo)    # los transportes antiguos reciben 3 argumentos
+        if cuenta is not None and estado_t == 200:
+            cuenta.sumar_tokens("gemini", mod_cupos.tokens_de_gemini(texto_t))
+        return estado_t, texto_t
     encabezados = {"Content-Type": "application/json", "x-goog-api-key": clave}
     mirada = Mirada(None)
     # ante 429/5xx/red persistentes se prueban hasta N modelos más (18 nov: 503 y timeouts)
