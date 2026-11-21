@@ -215,7 +215,7 @@ def _muestras_historia(salida: Path, marca: Marca, muestras: list[dict], descarg
             "recorte": m.get("recorte"), "licencia": m["licencia"], "enlace": m.get("enlace_licencia"),
             "historia": {"proveedor": h.get("proveedor"), "plan": h.get("plan"), "mapa": h.get("mapa"),
                          "intentos": h.get("intentos"), "motivo": h.get("motivo"), "avisos": avisos,
-                         "duracion_salida_s": plan["duracion"], "detector": (hist.intentos or [""])[-1],
+                         "duracion_salida_s": plan["duracion"], "detector": hist.detector,
                          "efectos": (plan.get("audio") or {}).get("efectos") or []},
             "tiempos_s": {"render": round(t_render, 1), "puerta_de_estilo": round(t_total - t_render, 1),
                           "render_y_puerta": round(t_total, 1)}}, plan)
@@ -331,7 +331,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"ERROR: {e}", file=sys.stderr)
             return 2
     for m in manifiesto["muestras"]:
-        print(f"{m['id']}: {m['archivo']} {m['duracion_s']} s, puerta {'EN VERDE' if m['puerta_estilo']['en_verde'] else 'EN ROJO'}")
+        extra = ""
+        if m.get("historia"):       # #20: qué eslabón armó el plan, con qué detector y cuánto tardó (render + puerta)
+            extra = (f"; historia {m['historia']['proveedor']} ({m['historia']['detector']}), render "
+                     f"{m['tiempos_s']['render']} s + puerta {m['tiempos_s']['puerta_de_estilo']} s")
+            extra += "".join(f"; {a}" for a in m["historia"].get("avisos") or [])
+        print(f"{m['id']}: {m['archivo']} {m['duracion_s']} s, puerta {'EN VERDE' if m['puerta_estilo']['en_verde'] else 'EN ROJO'}{extra}")
     return 0 if manifiesto["puerta_estilo_en_verde"] else 1
 
 

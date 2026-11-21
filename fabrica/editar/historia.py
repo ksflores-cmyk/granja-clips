@@ -813,6 +813,7 @@ class Planificacion:
     proveedor: str | None
     intentos: list[str] = field(default_factory=list)
     motivo: str | None = None          # por qué no hay plan (sólo cuando plan es None)
+    detector: str | None = None        # sin IA: "scenedetect" o "ffmpeg" (quién dio los cambios de escena)
 
     def resumen(self, tramos: list[Tramo] | None = None) -> dict:
         """Lo que guarda el plan de la toma en `historia`."""
@@ -870,7 +871,7 @@ def planificar(*, raiz=None, ficha: dict | None, recorte: tuple[float, float], r
     plan = plan_sin_ia(sen, recorte, rango_duracion, sfx_golpe=golpe, ficha=ficha, cfg=cfg, sfx_ids=ids)
     if plan is not None:
         intentos.append(f"sin-ia: plan válido ({sen.get('detector', 'señales dadas')})")
-        return Planificacion(plan, "sin-ia", intentos)
+        return Planificacion(plan, "sin-ia", intentos, detector=sen.get("detector"))
     intentos.append("sin-ia: ningún plan por reglas cabe en el rango de duración")
     return Planificacion(None, None, intentos, "ningún eslabón dio un plan válido")
 

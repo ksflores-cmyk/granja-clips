@@ -416,7 +416,7 @@ def test_gemini_valido_gana_y_viaja_en_la_misma_llamada_de_los_ojos():
 def test_gemini_invalido_cae_al_segundo_apagado_y_luego_al_sin_ia():
     malo = plan_base(titulo="un texto")
     r = planificar_(datos_gemini={"historia": malo})
-    assert r.proveedor == "sin-ia" and r.plan is not None
+    assert r.proveedor == "sin-ia" and r.plan is not None and r.detector == "prueba"
     assert r.intentos[0].startswith("gemini: plan no válido")
     assert "segundo: apagado (GitHub Models retirado el 30 jul 2026)" in r.intentos
     r2 = planificar_(datos_gemini={"motivos": []})
@@ -534,6 +534,34 @@ def test_fotogramas_jpeg_son_6_y_de_512_px_o_menos(video20):
     for f in fotos:
         im = Image.open(BytesIO(f))
         assert im.format == "JPEG" and max(im.size) <= 512
+
+
+# ---------------------------------------------------------------- F. las muestras
+
+def test_las_muestras_de_historia_son_las_dos_pedidas_y_estan_autorizadas():
+    from datetime import date
+    from fabrica import fuentes
+    from fabrica.editar import muestras
+    ms = muestras.cargar_muestras_historia()
+    assert [m["id"] for m in ms] == ["historia-bbb", "historia-sintel"]
+    assert [m["historia"]["eslabon"] for m in ms] == ["sin-ia", "fijo"]
+    for m in ms:
+        muestras.autorizar(m, fuentes.cargar_fuentes(), date(2026, 11, 21))      # lista blanca de fuentes.yml
+        assert m["fuente_id"] in ("sintel-cc-by", "bbb-cc-by") and m["video"]["sha256"]
+    assert [m["id"] for m in muestras.cargar_muestras()] == ["dialogo-sintel", "momento-bbb", "pajaro-bbb"]
+
+
+def test_la_muestra_sintel_lleva_camara_lenta_pausa_zoom_suave_y_un_efecto():
+    from fabrica.editar import muestras
+    m = muestras.cargar_muestras_historia()[1]
+    ini = m["recorte"]["inicio"]
+    rec = (ini, ini + m["recorte"]["duracion"])
+    con, avisos = muestras.resolver_sfx(m["historia"]["plan"], {"golpe-a": {"id": "golpe-a", "tipo": "golpe"}})
+    assert avisos == [] and sorted(x["tratamiento"] for x in con["momentos"]) == ["camara_lenta", "pausa", "sfx", "zoom_suave"]
+    assert validar_(con, recorte=rec, sfx=["golpe-a"])[0]
+    sin, avisos = muestras.resolver_sfx(m["historia"]["plan"], {})          # sin efectos del release: zoom_suave y el aviso
+    assert len(avisos) == 1 and "zoom_suave" in avisos[0] and "sfx" not in [x["tratamiento"] for x in sin["momentos"]]
+    assert validar_(sin, recorte=rec)[0]
 
 
 # ---------------------------------------------------------------- el prompt y el esquema de Gemini
