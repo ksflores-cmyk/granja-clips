@@ -41,7 +41,7 @@ POR_OMISION: dict = {
     "ducking": {"margen_db": 12, "ventana_s": 0.1, "voz_activa_db": -40, "tolerancia_fraccion": 0.02,
                 "max_seguidas": 3, "musica_base_db": -8,
                 "sidechain": {"threshold": 0.01, "ratio": 16, "attack": 10, "release": 250, "makeup": 1}},
-    "clipping": {"umbral": 0.99, "muestras_seguidas": 3},
+    "clipping": {"umbral": 0.9, "muestras_seguidas": 3, "plano_max": 1e-4},
     "analisis": {"ancho": 135, "alto": 240},
 }
 
@@ -125,7 +125,11 @@ def medir_cuadros(video: Path, cfg: dict) -> dict:
     cmd = ["ffmpeg", "-v", "error", "-nostdin", "-i", str(video), "-an", "-vf", f"scale={a}:{h}:flags=area,format=gray",
            "-fps_mode", "passthrough", "-f", "rawvideo", "-"]
     tope = plazo.tiempo_para(300)
-    errores = tempfile.TemporaryFile()
+    with tempfile.TemporaryFile() as errores:
+        return _leer_cuadros(cmd, tope, errores, a, h, d=d, c=c, fps=fps)
+
+
+def _leer_cuadros(cmd, tope, errores, a, h, *, d, c, fps) -> dict:
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=errores)
     vencio = threading.Event()
 
@@ -173,16 +177,24 @@ def medir_cuadros(video: Path, cfg: dict) -> dict:
             "ancla": np.array(ancla), "dif": np.array(dif)}
 
 
-def medir_audio(video: Path) -> tuple[np.ndarray, int] | None:
-    """(muestras f32 [n, canales], frecuencia) con los canales nativos, o None si el MP4 no trae audio."""
+def medir_audio(video: Path, inicio: float | None = None, duracion: float | None = None
+                ) -> tuple[np.ndarray, int] | None:
+    """(muestras f32 [n, canales], frecuencia) con los canales nativos, o None si el archivo no trae audio.
+
+    `inicio` y `duracion` (s) recortan el tramo que se decodifica (la fuente de una toma)."""
     sonda = json.loads(subprocess.check_output([
         "ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=channels,sample_rate",
         "-of", "json", str(video)], timeout=plazo.tiempo_para(60)))
     pistas = sonda.get("streams") or []
     if not pistas:
         return None
-    canales, sr = int(pistas[0]["channels"]), int(pistas[0]["sample_rate"])
-    r = subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-i", str(video), "-vn", "-map", "0:a:0", "-f", "f32le", "-"],
+    try:
+        canales, sr = int(pistas[0].get("channels") or 2), int(pistas[0].get("sample_rate") or 48000)
+    except (TypeError, ValueError):
+        canales, sr = 2, 48000                 # ffprobe no dio números: valores por omisión
+    recorte = (["-ss", f"{float(inicio):.3f}"] if inicio else []) + (["-t", f"{float(duracion):.3f}"] if duracion else [])
+    r = subprocess.run(["ffmpeg", "-v", "error", "-nostdin", *recorte, "-i", str(video), "-vn", "-map", "0:a:0",
+                        "-ac", str(canales), "-ar", str(sr), "-f", "f32le", "-"],
                        capture_output=True, timeout=plazo.tiempo_para(300))
     if r.returncode != 0:
         raise subprocess.CalledProcessError(r.returncode, "ffmpeg", stderr=r.stderr)
@@ -252,13 +264,21 @@ def _tramos_iguales(ancla: np.ndarray) -> list[tuple[int, int]]:
 
 
 def clipping(x: np.ndarray, sr: int, cfg: dict) -> tuple[list[tuple[int, int]], list[str]]:
-    """(lista de (canal, muestra) de cada tramo, instantes de los primeros 5) con tramos de muestras recortadas."""
-    k = int(cfg["clipping"]["muestras_seguidas"])
+    """(lista de (canal, muestra) de cada tramo, instantes de los primeros 5) con crestas planas.
+
+    Cresta plana: `muestras_seguidas` o más muestras seguidas del mismo canal con |x| ≥ `umbral` y diferencia entre
+    vecinas menor que `plano_max`. Un pico alto pero redondo no cuenta; un recorte duro deja la cresta plana."""
+    c = cfg["clipping"]
+    k = int(c["muestras_seguidas"])
     tramos: list[tuple[int, int]] = []
     for canal in range(x.shape[1]):
-        for i, j in _tramos(np.abs(x[:, canal]) >= cfg["clipping"]["umbral"]):
-            if j - i >= k:
-                tramos.append((canal, i))
+        v = x[:, canal]
+        alto = np.abs(v) >= c["umbral"]
+        par = np.zeros(len(v), dtype=bool)               # par[i]: la muestra i sigue plana desde la i - 1
+        par[1:] = alto[1:] & alto[:-1] & (np.abs(np.diff(v)) < c["plano_max"])
+        for i, j in _tramos(par):
+            if j - i >= k - 1:
+                tramos.append((canal, i - 1))
     tramos.sort(key=lambda t: t[1])
     return tramos, [f"{_s(i / sr)} s" for _, i in tramos[:5]]
 
@@ -297,11 +317,16 @@ def _ducking_malo(tramos, con_voz: int, malas: int, cfg: dict, ventana: float) -
     return bool(con_voz) and (malas > d["tolerancia_fraccion"] * con_voz or seguidas >= d["max_seguidas"])
 
 
+def _primera_palabra(texto) -> str:
+    """Primer token del texto con letras o cifras («— ¡Vamos ya!» da «¡Vamos»); vacío si no hay ninguno."""
+    return next((t for t in str(texto or "").split() if _norm(t)), "")
+
+
 def subtitulos(plan: dict, cfg: dict) -> tuple[bool, str]:
     """Cada línea con voz empieza a `tolerancia_s` o menos de su primera palabra en la transcripción por palabra."""
     s = cfg["subtitulos"]
     lineas = [(i, ln) for i, ln in enumerate(plan.get("lineas") or [], start=1)
-              if str(ln.get("frase") or "").strip() and str(ln.get("original") or "").strip()]
+              if str(ln.get("frase") or "").strip() and _primera_palabra(ln.get("original"))]
     if not lineas:
         return True, "no aplica (la pieza no trae líneas con voz)"
     palabras = ((plan.get("transcripcion") or {}).get("palabras")) or []
@@ -312,7 +337,7 @@ def subtitulos(plan: dict, cfg: dict) -> tuple[bool, str]:
     fallas, medidas = [], []
     for i, ln in lineas:
         t0 = float(ln.get("t0", 0))
-        primera = str(ln["original"]).split()[0]
+        primera = _primera_palabra(ln["original"])
         buscada = _norm(primera)
         cerca = [p for p in palabras if abs(float(p["t0"]) - t0) <= s["ventana_s"]
                  and difflib.SequenceMatcher(None, buscada, _norm(p["texto"])).ratio() >= s["parecido_min"]]
@@ -331,6 +356,24 @@ def subtitulos(plan: dict, cfg: dict) -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------- la puerta
+
+def _audio_a_medir(video: Path, plan: dict):
+    """((muestras, frecuencia) | None, «en la fuente» | «en el MP4»).
+
+    El recorte duro está en el audio que aún no pasó por el AAC de la toma: el AAC redondea las crestas y borra la
+    prueba (y a la inversa, un pico limpio se pasa de 1,0 al codificarse). Si el plan es de video con audio original y la
+    fuente sigue en disco, se decodifica su tramo; si no (música, informativa, compilado, fuente borrada), se mide el MP4."""
+    origen = plan.get("origen") or {}
+    ruta = Path(str(origen.get("archivo") or ""))
+    if estilo.tipo_audio(plan) == "original" and origen.get("archivo") and ruta.is_file():
+        try:
+            m = medir_audio(ruta, float(origen.get("inicio") or 0), float(origen.get("duracion") or plan.get("duracion") or 0) or None)
+        except (subprocess.SubprocessError, OSError, ValueError, KeyError):
+            m = None
+        if m is not None:
+            return m, "en la fuente"
+    return medir_audio(video), "en el MP4"
+
 
 def revisar(video: Path, plan: dict, cfg: dict, *, pistas: dict | None = None) -> list[tuple[str, bool, str]]:
     """Los 5 puntos como (nombre, ok, detalle); cada nombre empieza con `[técnica]`. Sin LLM.
@@ -375,10 +418,10 @@ def revisar(video: Path, plan: dict, cfg: dict, *, pistas: dict | None = None) -
                               f"la música queda a menos de {du['margen_db']:g} dB de la voz en {lista} "
                               f"({malas} de {con_voz} ventanas con voz)"))
         else:
-            res.append(_punto(nombre_duck, True, f"{malas} de {con_voz} ventanas con voz por encima del margen"
+            res.append(_punto(nombre_duck, True, f"{malas} de {con_voz} ventanas con voz incumplen el margen"
                                                  if con_voz else "sin ventanas con voz"))
 
-    muestras = medir_audio(video)
+    muestras, donde = _audio_a_medir(video, plan)
     if muestras is None:
         res.append(_punto("Sin recortes de audio (clipping)", True, "no aplica (el MP4 no trae audio)"))
     else:
@@ -387,11 +430,11 @@ def revisar(video: Path, plan: dict, cfg: dict, *, pistas: dict | None = None) -
         pico = float(np.abs(x).max()) if x.size else 0.0
         if tramos:
             res.append(_punto("Sin recortes de audio (clipping)", False,
-                              f"{len(tramos)} recortes (≥ {cl['muestras_seguidas']} muestras seguidas a "
-                              f"{cl['umbral']:g} o más) en {', '.join(instantes)}"
+                              f"{len(tramos)} crestas planas (≥ {cl['muestras_seguidas']} muestras seguidas a "
+                              f"{cl['umbral']:g} o más, {donde}) en {', '.join(instantes)}"
                               + (f" y {len(tramos) - len(instantes)} más" if len(tramos) > len(instantes) else "")))
         else:
-            res.append(_punto("Sin recortes de audio (clipping)", True, f"pico {pico:.3f} (umbral {cl['umbral']:g})"))
+            res.append(_punto("Sin recortes de audio (clipping)", True, f"pico {pico:.3f}, sin crestas planas {donde} (umbral {cl['umbral']:g})"))
     return res
 
 

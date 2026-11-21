@@ -40,8 +40,9 @@ ducking:
 
 # 5. Recortes de audio (clipping).
 clipping:
-  umbral: 0.99                  # una muestra recorta si su valor absoluto llega a esto (escala 0 a 1)
-  muestras_seguidas: 3          # y recortan al menos este número de muestras seguidas del mismo canal
+  umbral: 0.9                   # una muestra está en la cresta si su valor absoluto llega a esto (escala 0 a 1)
+  muestras_seguidas: 3          # cresta plana: al menos este número de muestras seguidas del mismo canal
+  plano_max: 0.0001             # y con diferencia entre vecinas menor que esto (un recorte duro deja la cresta plana)
 
 # Resolución del análisis de cuadros (miniatura en gris; vale para cualquier resolución del MP4).
 analisis:

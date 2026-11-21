@@ -78,7 +78,7 @@ def test_cargar_fusiona_un_archivo_parcial(tmp_path):
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "tecnica.yml").write_text("congelados:\n  max_s: 0.9\n", encoding="utf-8")
     c = tecnica.cargar(tmp_path)
-    assert c["congelados"]["max_s"] == 0.9 and c["congelados"]["dif_max"] == 3.0 and c["clipping"]["umbral"] == 0.99
+    assert c["congelados"]["max_s"] == 0.9 and c["congelados"]["dif_max"] == 3.0 and c["clipping"]["umbral"] == 0.9
     (tmp_path / "config" / "tecnica.yml").write_text("{ roto: [", encoding="utf-8")
     assert tecnica.cargar(tmp_path) == tecnica.POR_OMISION
 
@@ -178,14 +178,14 @@ def test_un_compilado_cuenta_como_pieza_con_video(carpeta):
 def test_un_audio_recortado_falla_con_los_instantes(carpeta):
     ruta = clip(carpeta / "recorte.mp4", audio="aevalsrc='clip(2.5*sin(2*PI*220*t),-1,1)':s=48000:d=3")
     ok, det = punto(tecnica.revisar(ruta, PLAN_VIDEO, CFG), "clipping")
-    assert not ok and "recortes" in det and " s" in det and "0,0" in det
+    assert not ok and "crestas planas" in det and "en el MP4" in det and " s" in det and "0,0" in det
 
 
 def test_un_audio_fuerte_pero_sin_recorte_pasa(carpeta):
     # con entrada suave: un seno que arranca en seco a 0,9 hace que el AAC sobrepase 1,0 en el primer cuadro de audio
     ruta = clip(carpeta / "fuerte.mp4", audio="aevalsrc='0.9*sin(2*PI*220*t)*min(1,t*20)':s=48000:d=3")
     ok, det = punto(tecnica.revisar(ruta, PLAN_VIDEO, CFG), "clipping")
-    assert ok and "pico 0.90" in det
+    assert ok and "pico 0.90" in det and "en el MP4" in det
 
 
 def test_sin_audio_el_clipping_no_aplica(carpeta):
@@ -194,15 +194,56 @@ def test_sin_audio_el_clipping_no_aplica(carpeta):
     assert ok and det.startswith("no aplica")
 
 
-def test_clipping_cuenta_muestras_seguidas_del_mismo_canal():
+def test_clipping_busca_crestas_planas_en_el_mismo_canal():
     import numpy as np
     x = np.zeros((1000, 2), dtype=np.float32)
-    x[100:102, 0] = 1.0                       # sólo 2 seguidas: no es recorte
-    x[200:204, 1] = -1.0                      # 4 seguidas: sí
+    x[100:102, 0] = 1.0                       # sólo 2 seguidas: no es cresta plana
+    x[200:204, 1] = -1.0                      # 4 planas seguidas: sí
     x[300:302, 0] = 1.0
     x[302:304, 1] = 1.0                       # seguidas pero de canales distintos: no
+    t = np.arange(1000)
+    x[:, 0] += 0.95 * np.sin(2 * np.pi * 300 * t / 48000).astype(np.float32) * (t > 500)   # pico alto y redondo
     tramos, instantes = tecnica.clipping(x, 1000, CFG)
     assert tramos == [(1, 200)] and instantes == ["0,20 s"]
+
+
+ARMONICOS = "(0.6*sin(2*PI*150*t)+0.3*sin(2*PI*300*t)+0.2*sin(2*PI*450*t))"
+
+
+def plan_con_fuente(fuente: Path, inicio=0.0, duracion=2.0):
+    return {**PLAN_VIDEO, "duracion": duracion, "origen": {"archivo": str(fuente), "inicio": inicio, "duracion": duracion,
+                                                           "audio": "original"}}
+
+
+def test_un_recorte_duro_en_la_fuente_sale_rojo_aunque_el_aac_lo_redondee(carpeta, limpio):
+    from fabrica.editar.componer import Linea, componer
+    from fabrica.editar.lienzo import Toma
+    from fabrica.editar.marca import Marca
+    marca = Marca.cargar(RAIZ_REAL)
+    fuente = carpeta / "fuente-recortada.mp4"
+    ffmpeg("-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30:duration=5", "-f", "lavfi", "-i",
+           f"aevalsrc='clip(4*{ARMONICOS},-1,1)':s=48000:d=5", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt",
+           "yuv420p", "-c:a", "aac", "-b:a", "192k", "-shortest", fuente)
+    t = Toma(numero=1, gancho="Esto cambia todo", palabra_lapiz="TODO", lapiz="subrayado", escena="INT. CASA",
+             credito="Con: @x")
+    mp4 = carpeta / "compuesta.mp4"
+    plan = componer(marca, t, [Linea(t0=0.5, t1=3, nombre="ANA", frase="Hola")], mp4, duracion=4,
+                    trabajo=carpeta / "trabajo", fuente_video=fuente, inicio=0.5)
+    ok, det = punto(tecnica.revisar(mp4, plan, CFG), "clipping")
+    assert not ok and "crestas planas" in det and "en la fuente" in det
+    # sin la fuente en disco se mide el MP4 y se dice
+    plan["origen"]["archivo"] = str(carpeta / "borrada.mp4")
+    assert "en el MP4" in punto(tecnica.revisar(mp4, plan, CFG), "clipping")[1]
+
+
+def test_una_fuente_limpia_con_picos_a_menos_1_dbfs_pasa_en_todos_los_cortes(carpeta, limpio):
+    fuente = carpeta / "fuente-limpia.mp4"
+    ffmpeg("-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=6", "-f", "lavfi", "-i",
+           f"aevalsrc='0.81*{ARMONICOS}':s=48000:d=6", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+           "-c:a", "aac", "-b:a", "192k", "-shortest", fuente)
+    for inicio in (0.0, 0.37, 1.1, 2.9, 3.33):
+        ok, det = punto(tecnica.revisar(limpio, plan_con_fuente(fuente, inicio), CFG), "clipping")
+        assert ok and "en la fuente" in det, (inicio, det)
 
 
 # ---------------------------------------------------------------- 4. ducking
@@ -233,7 +274,7 @@ def test_el_ducking_deja_la_musica_12_db_bajo_la_voz(carpeta, limpio, fuentes_de
     plan = {"lineas": [], "audio": {"tipo": "mezcla"}}
     ok, det = punto(tecnica.revisar(limpio, plan, CFG, pistas={"voz": pistas["voz"], "musica": pistas["musica"]}),
                     "ducking")
-    assert ok, det
+    assert ok and "0 de " in det and "ventanas con voz incumplen el margen" in det, det
     tramos, con_voz, malas = tecnica.ducking(tecnica._mono(pistas["voz"]), tecnica._mono(pistas["musica"]), 16000, CFG)
     assert tramos == [] and con_voz > 10 and malas == 0
 
@@ -245,6 +286,16 @@ def test_la_mezcla_sin_ducking_a_igual_sonoridad_sale_roja(carpeta, limpio, fuen
     ok, det = punto(tecnica.revisar(limpio, {"lineas": [], "audio": {"tipo": "mezcla"}}, CFG,
                                     pistas={"voz": pistas["voz"], "musica": pistas["musica"]}), "ducking")
     assert not ok and "menos de 12 dB de la voz en" in det and " s" in det and "ventanas con voz" in det
+
+
+def test_la_mezcla_dura_lo_que_pide_aunque_la_voz_sea_mas_corta(carpeta, fuentes_de_mezcla):
+    _, musica = fuentes_de_mezcla
+    ffmpeg("-f", "lavfi", "-i", VOZ.replace(":d=4", ":d=2"), "-ar", "48000", carpeta / "voz-corta.wav")
+    pistas = mezcla.mezclar(carpeta / "voz-corta.wav", musica, carpeta / "corta.wav", duracion=4, cfg=CFG)
+    for nombre in ("salida", "musica", "voz"):
+        dur = float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
+                                             "csv=p=0", str(pistas[nombre])], text=True))
+        assert dur == pytest.approx(4.0, abs=0.05), nombre
 
 
 def test_una_mezcla_sin_sus_pistas_es_rojo_y_sin_mezcla_no_aplica(limpio):
@@ -307,6 +358,21 @@ def test_la_palabra_se_compara_sin_acentos_ni_puntuacion_y_gana_la_mas_cercana()
     palabras = [{"texto": "cuidado", "t0": 2.2, "t1": 2.4}, {"texto": "Cuidado", "t0": 3.05, "t1": 3.3}]
     ok, det = tecnica.subtitulos(plan_con([linea(3.10, original="¡Cuídado!")], palabras), CFG)
     assert ok and "0,05 s" in det
+
+
+def test_la_primera_palabra_es_el_primer_token_con_letras():
+    for original, texto in (("— ¡Vamos ya!", "vamos"), ("¿ Qué pasó", "que"), ("... Hola", "hola")):
+        ok, det = tecnica.subtitulos(plan_con([linea(1.0, original=original)], [{"texto": texto, "t0": 1.0, "t1": 1.3}]), CFG)
+        assert ok, (original, det)
+    assert tecnica.subtitulos(plan_con([linea(1.0, original="— ¡¿ …")]), CFG)[1].startswith("no aplica (la pieza no trae")
+
+
+def test_medir_audio_sin_canales_ni_frecuencia_en_ffprobe_usa_los_valores_por_omision(limpio, monkeypatch):
+    real = subprocess.check_output
+    monkeypatch.setattr(tecnica.subprocess, "check_output", lambda *a, **k: '{"streams": [{}]}')
+    x, sr = tecnica.medir_audio(limpio)
+    monkeypatch.setattr(tecnica.subprocess, "check_output", real)
+    assert sr == 48000 and x.shape[1] == 2 and len(x) > 100000
 
 
 def test_sin_lineas_con_voz_o_sin_transcripcion_no_aplica():
@@ -399,6 +465,17 @@ def test_una_tecnica_roja_descarta_la_toma_sin_correr_la_de_estilo(repo, tmp_pat
     assert not list((tmp_path / "s").glob("*.mp4"))              # el MP4 descartado no queda
 
 
+def test_una_tecnica_roja_sin_pista_de_musica_no_gasta_la_fuente(repo, tmp_path, video20, carpeta, monkeypatch):
+    monkeypatch.setattr(toma, "componer", ComponerQueCopia(congelado(carpeta, "toma-congelada2.mp4", 30, 59),
+                                                           {**PLAN_VIDEO, "duracion": 3.0}))
+    monkeypatch.setattr(toma.mod_musica, "lleva_musica", lambda *a, **k: True)
+    monkeypatch.setattr(toma.mod_musica, "elegir", lambda *a, **k: None)
+    monkeypatch.setattr(estilo, "revisar", estilo_prohibido)
+    r = hacer(repo, tmp_path, video20)
+    assert not r.ok and r.gastar is False
+    assert r.motivos[0].startswith("puerta técnica:") and r.motivos[-1].startswith("música: ")
+
+
 def test_una_tecnica_en_verde_deja_pasar_a_la_puerta_de_estilo(repo, tmp_path, video20, limpio, monkeypatch):
     monkeypatch.setattr(toma, "componer", ComponerQueCopia(limpio, {**PLAN_VIDEO, "duracion": 3.0}))
     llamadas = []
@@ -450,6 +527,7 @@ def test_el_repo_con_tecnica_valida_pasa(repo):
     ("ducking", "margen_db", True, "ducking.margen_db"),
     ("ducking", "voz_activa_db", 5, "ducking.voz_activa_db"),
     ("clipping", "umbral", 2, "clipping.umbral"),
+    ("clipping", "plano_max", 0, "clipping.plano_max"),
     ("clipping", "muestras_seguidas", 0, "clipping.muestras_seguidas"),
     ("analisis", "ancho", 2, "analisis.ancho"),
 ])

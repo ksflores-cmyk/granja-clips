@@ -232,8 +232,11 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                     puntos_t = tecnica.revisar(mp4, tecnica.con_originales(plan, lineas), tecnica.cargar(raiz))
                 if any(not ok_t for _, ok_t, _ in puntos_t):
                     mp4.unlink(missing_ok=True)
-                    return Resultado(False, tecnica.rojos(puntos_t), None, plan, mirada.datos, mirada.modelo, puntos_t,
-                                     gastar=True)
+                    motivos_t = tecnica.rojos(puntos_t)
+                    if aviso_musica:
+                        motivos_t.append(f"música: {aviso_musica}")
+                    return Resultado(False, motivos_t, None, plan, mirada.datos, mirada.modelo, puntos_t,
+                                     gastar=not aviso_musica)
                 with plazo.etapa("puerta de estilo"):
                     puntos = puntos_t + estilo.revisar(mp4, plan, marca, ficha=ficha)
             except (ValueError, subprocess.SubprocessError, OSError) as e:

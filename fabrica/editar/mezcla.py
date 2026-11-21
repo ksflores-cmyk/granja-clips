@@ -34,7 +34,7 @@ def orden_mezcla(voz: Path, musica: Path, salida: Path, *, duracion: float, cfg:
     base = float(cfg["ducking"]["musica_base_db"])
     comprimir = (f"[m0][v_lat]{filtro_ducking(cfg)}[md]" if ducking else "[v_lat]anullsink;[m0]anull[md]")
     filtros = [
-        f"[0:a]{FORMATO},atrim=duration={d},asetpts=PTS-STARTPTS,asplit=3[v_mix][v_lat][v_ref]",
+        f"[0:a]{FORMATO},apad,atrim=duration={d},asetpts=PTS-STARTPTS,asplit=3[v_mix][v_lat][v_ref]",
         f"[1:a]{FORMATO},volume={base:g}dB,atrim=duration={d},asetpts=PTS-STARTPTS[m0]",
         comprimir,
         "[md]asplit=2[md_mix][md_ref]",

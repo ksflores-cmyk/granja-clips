@@ -719,8 +719,9 @@ def validar_tecnica(t, inf: Informe) -> None:
                 num(s, "attack", 0.01, 2000)
                 num(s, "release", 0.01, 9000)
                 num(s, "makeup", 1, 64)
-    b = bloque("clipping", ["umbral", "muestras_seguidas"])
+    b = bloque("clipping", ["umbral", "muestras_seguidas", "plano_max"])
     if b:
+        num(b, "plano_max", 0, 1, estricto=True)
         num(b, "umbral", 0, 1, estricto=True)
         num(b, "muestras_seguidas", 1, 1000, entero=True)
     b = bloque("analisis", ["ancho", "alto"])
