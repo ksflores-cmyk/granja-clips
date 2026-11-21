@@ -234,11 +234,19 @@ def test_leer_documento_privado_queda_como_error_sin_romper(tmp_path):
     assert r["pausada"] and r["docs"][DOC].startswith("error: ValueError")
 
 
-@pytest.mark.parametrize("cuerpo,url", [("Join to unlock 1 file", "https://contentrewards.com/c/campaigns/x"),
-                                        ("Inicia sesión", "https://contentrewards.com/login?next=x")])
-def test_leer_sin_sesion_unida_es_sesion_vencida(tmp_path, cuerpo, url):
+def test_leer_redirigido_a_login_es_sesion_vencida(tmp_path):
     with pytest.raises(enviar_cr.SesionVencida):
-        brief_cr.leer(_Pagina(cuerpo, [], url=url), ID, tmp_path)
+        brief_cr.leer(_Pagina("Inicia sesión", [], url="https://contentrewards.com/login?next=x"), ID, tmp_path)
+
+
+def test_leer_con_parte_bloqueada_la_anota_y_sigue(tmp_path, monkeypatch):
+    resumen = tmp_path / "resumen.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(resumen))
+    r = brief_cr.leer(_Pagina("Expedia\nJoin to unlock 1 requirement", [DOC]), ID, tmp_path,
+                      abrir=lambda req, timeout: _Resp())
+    assert r["bloqueada"] and r["enlaces"] == [DOC] and (tmp_path / f"{ID}.png").exists()
+    brief_cr._resumen_paso(r)
+    assert f"| {ID} | Expedia | 1 | 1 | no | sí |" in resumen.read_text(encoding="utf-8")
 
 
 def test_principal_rechaza_ids_invalidos_y_sin_sesion_sale_3(tmp_path, monkeypatch, capsys):

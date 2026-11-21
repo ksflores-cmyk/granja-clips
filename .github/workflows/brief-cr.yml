@@ -32,6 +32,7 @@ jobs:
         env:
           CAMPANAS: ${{ inputs.campanas }}
         run: |
+          printf '| campaña | título | enlaces | documentos | pausada | bloqueada |\n|---|---|---|---|---|---|\n' >> "$GITHUB_STEP_SUMMARY"
           args=""; for c in $CAMPANAS; do args="$args --campana $c"; done
           python -m fabrica.brief_cr $args --salida "$RUNNER_TEMP/briefs"
       - uses: actions/upload-artifact@v4

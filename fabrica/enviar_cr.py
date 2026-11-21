@@ -91,7 +91,7 @@ def pendientes(filas: list[dict], hechos: dict, mapa: dict, ahora: datetime) -> 
 # «N publicaciones antiguas no se pueden enviar» sólo cuenta otras y va después.
 MOTIVOS = (
     re.compile(r"Publicado hace|Posted .* ago|hasta 30 minutos|within 30 minutes", re.I),
-    re.compile(r"vinculad|not linked|connect", re.I),
+    re.compile(r"vinculad|not (?:linked|connected)|connect your", re.I),
     re.compile(r"no se puede|cannot|can't", re.I),
 )
 

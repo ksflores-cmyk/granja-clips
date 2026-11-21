@@ -130,3 +130,10 @@ def test_motivo_sin_pista_da_boton_desactivado(texto):
 
 def test_motivo_se_recorta_a_200():
     assert len(cr.motivo_rechazo("Publicado hace " + "x" * 400)) == 200
+
+
+def test_motivo_no_confunde_cuentas_conectadas_con_el_rechazo():
+    texto = "Connected accounts: TikTok, YouTube\n2 publicaciones antiguas no se pueden enviar"
+    assert cr.motivo_rechazo(texto) == "2 publicaciones antiguas no se pueden enviar"
+    assert cr.motivo_rechazo("Connected accounts\nThis account is not linked to your profile") \
+        == "This account is not linked to your profile"

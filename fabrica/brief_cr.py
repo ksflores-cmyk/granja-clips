@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import urllib.request
@@ -65,10 +66,10 @@ def leer(page, campaign_id: str, salida: Path, abrir=urllib.request.urlopen) -> 
     if re.search(r"/(login|sign-?in|auth)", page.url) or "whop.com/login" in page.url:
         raise SesionVencida(f"redirigido a {page.url.split('?')[0]}")
     cuerpo = page.inner_text("body")
-    if re.search(r"Join to unlock|Visible once you join", cuerpo, re.I):
-        raise SesionVencida("la página sigue bloqueada («Join to unlock»): la sesión no es la de Kevin")
+    # «Join to unlock» puede quedar en una parte (p. ej. un requisito) aun estando unido: se anota y se sigue.
+    bloqueada = bool(re.search(r"Join to unlock|Visible once you join", cuerpo, re.I))
     hrefs = page.eval_on_selector_all("a[href]", "els => els.map(e => e.href)")
-    page.screenshot(path=str(salida / f"{campaign_id}.png"), full_page=True)
+    page.screenshot(path=str(salida / f"{campaign_id}.png"))      # sólo la parte visible: menos datos de la cuenta
     (salida / f"{campaign_id}.txt").write_text(cuerpo, encoding="utf-8")
     enlaces = enlaces_utiles(hrefs)
     docs = {}
@@ -83,8 +84,18 @@ def leer(page, campaign_id: str, salida: Path, abrir=urllib.request.urlopen) -> 
         except Exception as e:  # noqa: BLE001
             docs[u] = f"error: {type(e).__name__}: {str(e)[:120]}"
     titulo = next((ln.strip() for ln in cuerpo.splitlines() if ln.strip()), "")
-    return {"cr_campaign_id": campaign_id, "titulo": titulo, "pausada": bool(
+    return {"cr_campaign_id": campaign_id, "titulo": titulo, "bloqueada": bloqueada, "pausada": bool(
         re.search(r"Pausada por la marca|Paused by the brand", cuerpo, re.I)), "enlaces": enlaces, "docs": docs}
+
+
+def _resumen_paso(r: dict) -> None:
+    """Una fila en el resumen del paso de Actions (sin abrir el artefacto)."""
+    ruta = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not ruta:
+        return
+    with open(ruta, "a", encoding="utf-8") as f:
+        f.write(f"| {r['cr_campaign_id']} | {r['titulo'][:60]} | {len(r['enlaces'])} | {len(r['docs'])} | "
+                f"{'sí' if r['pausada'] else 'no'} | {'sí' if r['bloqueada'] else 'no'} |\n")
 
 
 def principal(argv=None) -> int:
@@ -116,7 +127,8 @@ def principal(argv=None) -> int:
                     r = leer(page, cid, salida)
                     resumen.append(r)
                     print(f"{cid}: {r['titulo'][:80]} — {len(r['enlaces'])} enlaces, {len(r['docs'])} documentos"
-                          + (" — PAUSADA" if r["pausada"] else ""))
+                          + (" — PAUSADA" if r["pausada"] else "") + (" — BLOQUEADA" if r["bloqueada"] else ""))
+                    _resumen_paso(r)
                 except SesionVencida as e:
                     print(f"{cid}: sesión vencida ({e})")
                     return SALIDA_SESION
