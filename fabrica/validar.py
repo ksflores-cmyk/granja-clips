@@ -846,6 +846,7 @@ def validar(raiz=None) -> Informe:
     musica = _cargar(raiz, "marca/musica/pistas.yml", inf)
     if musica is not None:
         validar_musica(raiz, musica, inf)
+    validar_sfx(raiz, inf)
     validar_pausa(raiz, inf)
     validar_pausa_t(raiz, inf)
     validar_csv(raiz, "marcador.csv", CABECERA_MARCADOR, inf)
@@ -853,6 +854,80 @@ def validar(raiz=None) -> Informe:
     validar_sin_media(raiz, inf)
     validar_sin_claves(raiz, inf)
     return inf
+
+
+def validar_sfx(raiz: Path, inf: Informe) -> None:
+    """`marca/sfx/efectos.yml` (si existe): sólo CC0, duraciones coherentes y LICENCIA.md si está verificada."""
+    rel = "marca/sfx/efectos.yml"
+    ruta = Path(raiz) / rel
+    if not ruta.is_file():
+        return
+    try:
+        datos = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        inf.error(f"{rel}: YAML inválido: {e}")
+        return
+    if not isinstance(datos, dict):
+        inf.error(f"{rel}: debe ser un diccionario")
+        return
+    permitidas = datos.get("licencias_permitidas")
+    if not (isinstance(permitidas, list) and permitidas and set(permitidas) <= {"CC0"}):
+        inf.error(f"{rel}: licencias_permitidas debe ser una lista que sólo contenga CC0")
+        permitidas = []
+    if not (isinstance(datos.get("release"), str) and datos["release"]):
+        inf.error(f"{rel}: falta release")
+    num = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)  # noqa: E731
+    dmin, dmax = datos.get("duracion_min_s"), datos.get("duracion_max_s")
+    if not (num(dmin) and dmin > 0):
+        inf.error(f"{rel}: duracion_min_s debe ser un número positivo")
+    if not (num(dmax) and dmax > 0 and (not num(dmin) or dmax > dmin)):
+        inf.error(f"{rel}: duracion_max_s debe ser un número mayor que duracion_min_s")
+    minimo = datos.get("minimo")
+    if not (isinstance(minimo, int) and not isinstance(minimo, bool) and minimo >= 1):
+        inf.error(f"{rel}: minimo debe ser un entero de 1 o más")
+    efectos = datos.get("efectos")
+    if not isinstance(efectos, list):
+        inf.error(f"{rel}: efectos debe ser una lista")
+        return
+    vistos: set[str] = set()
+    for i, e in enumerate(efectos):
+        if not isinstance(e, dict):
+            inf.error(f"{rel}: efectos[{i}] debe ser un diccionario")
+            continue
+        eid = e.get("id")
+        et = f"{rel}: efecto {eid if isinstance(eid, str) else i}"
+        if not (isinstance(eid, str) and RE_ID.match(eid)):
+            inf.error(f"{et}: id inválido (minúsculas, números y guiones)")
+        elif eid in vistos:
+            inf.error(f"{et}: id repetido")
+        else:
+            vistos.add(eid)
+        if e.get("licencia") not in permitidas:
+            inf.error(f"{et}: licencia {e.get('licencia')!r} fuera de licencias_permitidas (sólo CC0)")
+        if not _es_https(e.get("pagina")):
+            inf.error(f"{et}: pagina debe ser un enlace https")
+        if not (isinstance(e.get("tipo"), str) and e["tipo"]):
+            inf.error(f"{et}: falta tipo")
+        asset = e.get("asset")
+        if not (isinstance(asset, str) and asset and "/" not in asset and "\\" not in asset
+                and not asset.startswith(".")):
+            inf.error(f"{et}: asset debe ser un nombre de archivo sin barras")
+        if e.get("estado") not in ("candidata", "verificada", "descartada"):
+            inf.error(f"{et}: estado debe ser candidata, verificada o descartada")
+        if e.get("estado") == "verificada":
+            if not (isinstance(e.get("sha256"), str) and RE_SHA256.match(e["sha256"])):
+                inf.error(f"{et}: verificada exige sha256 hexadecimal de 64 caracteres")
+            lic = Path(raiz) / "marca" / "sfx" / str(eid) / "LICENCIA.md"
+            if not lic.is_file():
+                inf.error(f"{et}: verificada exige marca/sfx/{eid}/LICENCIA.md")
+            else:
+                texto = lic.read_text(encoding="utf-8", errors="ignore")
+                faltan = [c for c in CAMPOS_LICENCIA
+                          if not re.search(rf"(?m)^\s*[-*]?\s*\**{re.escape(c[:-1])}(?::\**|\**:)[ \t]*\S", texto)]
+                if faltan:
+                    inf.error(f"{et}: LICENCIA.md sin las líneas {', '.join(faltan)}")
+                elif not re.search(r"(?m)^\s*[-*]?\s*\**Licencia(?::\**|\**:)[^\n]*\bCC0\b", texto):
+                    inf.error(f"{et}: la línea Licencia: de LICENCIA.md debe decir CC0")
 
 
 def main(argv: list[str] | None = None) -> int:

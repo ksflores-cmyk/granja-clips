@@ -1,4 +1,9 @@
-"""Sube al release privado `musica` las pistas de `marca/musica/pistas.yml`, comprobando su licencia.
+"""Sube a un release privado las pistas (`musica`) o efectos (`sfx`) de un catálogo, comprobando su licencia.
+
+Por defecto lee `marca/musica/pistas.yml` y sube al release de su clave `release`; con `--manifiesto` y
+`--release` sirve a otros catálogos (`marca/sfx/efectos.yml`). La lista puede llamarse `pistas` o `efectos`.
+Claves opcionales del catálogo: `duracion_min_s` (12), `duracion_max_s` (sin máximo), `minimo` (6).
+Varias entradas pueden salir del mismo zip: se baja una sola vez por URL.
 
 Corre sólo dentro de GitHub Actions (workflow `musica.yml`): la sesión de Claude no llega a los sitios
 de origen. Para cada pista no descartada:
@@ -35,6 +40,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 MANIFIESTO = RAIZ / "marca" / "musica" / "pistas.yml"
 MINIMO = 6
 DURACION_MIN_S = 12.0
+DURACION_MAX_S = None
 TOPE_BYTES = 60 * 1024 * 1024
 TIEMPO_S = 60
 AGENTE = "granja-clips-musica/1.0 (+https://github.com/ksflores-cmyk/granja-clips)"
@@ -97,10 +103,27 @@ def _duracion(ruta: Path) -> float:
     return float(out.stdout.strip())
 
 
-def procesar(p: dict, permitidas: set[str], salida: Path) -> dict:
+def _miembro_zip(nombres: list[str], pedido: str) -> str | None:
+    """Prefiere el miembro con ese nombre exacto (ruta o nombre de archivo); si no, el primero que termine así."""
+    validos = [n for n in nombres if not n.startswith("__MACOSX") and not n.endswith("/")]
+    pl = pedido.lower().replace("\\", "/")
+    for n in validos:
+        nl = n.lower()
+        if nl == pl or nl.rsplit("/", 1)[-1] == pl.rsplit("/", 1)[-1] and nl.endswith(pl):
+            return n
+    for n in validos:
+        if n.lower().endswith(pl):
+            return n
+    return None
+
+
+def procesar(p: dict, permitidas: set[str], salida: Path, dur_min: float = DURACION_MIN_S,
+             dur_max: float | None = DURACION_MAX_S, cache: dict | None = None) -> dict:
+    cache = cache if cache is not None else {}
     lectura = {"id": p["id"], "pagina": p["pagina"], "leido_el": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-    pag = _bajar(p["pagina"], 5 * 1024 * 1024).decode("utf-8", "replace")
-    info = leer_pagina(pag, p["pagina"])
+    if ("pag", p["pagina"]) not in cache:
+        cache[("pag", p["pagina"])] = _bajar(p["pagina"], 5 * 1024 * 1024).decode("utf-8", "replace")
+    info = leer_pagina(cache[("pag", p["pagina"])], p["pagina"])
     lectura.update(licencias_leidas=info["licencias"], autor_leido=info["autor"],
                    texto_licencia=info["texto_licencia"])
     if not info["licencias"] or not set(info["licencias"]) & permitidas:
@@ -109,26 +132,30 @@ def procesar(p: dict, permitidas: set[str], salida: Path) -> dict:
     if not url:
         raise ValueError(f"'{p['archivo']}' no está en File(s): {sorted(info['archivos'])}")
     lectura["archivo_url"] = url
-    datos = _bajar(url)
+    if ("url", url) not in cache:
+        cache[("url", url)] = _bajar(url)
+    datos = cache[("url", url)]
     lectura["sha256_origen"] = hashlib.sha256(datos).hexdigest()
     if p.get("zip_miembro"):
         with zipfile.ZipFile(io.BytesIO(datos)) as z:
-            miembros = [n for n in z.namelist() if n.lower().endswith(p["zip_miembro"].lower())
-                        and not n.startswith("__MACOSX")]
-            if not miembros:
-                raise ValueError(f"el zip no trae ningún *{p['zip_miembro']}: {z.namelist()}")
-            if z.getinfo(miembros[0]).file_size > TOPE_BYTES:
-                raise ValueError(f"{miembros[0]} descomprimido pasa de {TOPE_BYTES} bytes")
-            lectura["zip_miembro"] = miembros[0]
-            with z.open(miembros[0]) as f:
+            miembro = _miembro_zip(z.namelist(), p["zip_miembro"])
+            if not miembro:
+                raise ValueError(f"el zip no trae ningún *{p['zip_miembro']}; miembros del zip "
+                                 f"({len(z.namelist())}): {z.namelist()}")
+            if z.getinfo(miembro).file_size > TOPE_BYTES:
+                raise ValueError(f"{miembro} descomprimido pasa de {TOPE_BYTES} bytes")
+            lectura["zip_miembro"] = miembro
+            with z.open(miembro) as f:
                 datos = f.read(TOPE_BYTES + 1)
             if len(datos) > TOPE_BYTES:
-                raise ValueError(f"{miembros[0]} descomprimido pasa de {TOPE_BYTES} bytes")
+                raise ValueError(f"{miembro} descomprimido pasa de {TOPE_BYTES} bytes")
     destino = salida / p["asset"]
     destino.write_bytes(datos)
     dur = _duracion(destino)
-    if dur < DURACION_MIN_S:
-        raise ValueError(f"dura {dur:.1f} s (mínimo {DURACION_MIN_S:g})")
+    if dur < dur_min or (dur_max is not None and dur > dur_max):
+        destino.unlink()
+        raise ValueError(f"dura {dur:.2f} s (mínimo {dur_min:g}"
+                         + (f", máximo {dur_max:g}" if dur_max is not None else "") + ")")
     lectura["duracion_s"] = round(dur, 2)
     lectura["sha256"] = hashlib.sha256(datos).hexdigest()
     if p.get("sha256") and p["sha256"] != lectura["sha256"]:
@@ -141,18 +168,26 @@ def procesar(p: dict, permitidas: set[str], salida: Path) -> dict:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m fabrica.musica_release")
     ap.add_argument("--salida", required=True)
+    ap.add_argument("--manifiesto", default=str(MANIFIESTO), help="catálogo YAML (por defecto, el de música)")
+    ap.add_argument("--release", default=None, help="release destino (por defecto, la clave `release` del catálogo)")
     ap.add_argument("--subir", action="store_true", help="sube los assets al release (gh)")
     a = ap.parse_args(argv)
     salida = Path(a.salida)
     salida.mkdir(parents=True, exist_ok=True)
-    datos = yaml.safe_load(MANIFIESTO.read_text(encoding="utf-8"))
+    datos = yaml.safe_load(Path(a.manifiesto).read_text(encoding="utf-8"))
     permitidas = set(datos["licencias_permitidas"])
-    lecturas, rechazos = [], []
-    for p in datos["pistas"]:
+    dur_min = float(datos.get("duracion_min_s", DURACION_MIN_S))
+    dur_max = datos.get("duracion_max_s", DURACION_MAX_S)
+    dur_max = float(dur_max) if dur_max is not None else None
+    minimo = int(datos.get("minimo", MINIMO))
+    lista = datos.get("pistas") if datos.get("pistas") is not None else datos.get("efectos") or []
+    release = a.release or datos["release"]
+    lecturas, rechazos, cache = [], [], {}
+    for p in lista:
         if p.get("estado") == "descartada":
             continue
         try:
-            lecturas.append(procesar(p, permitidas, salida))
+            lecturas.append(procesar(p, permitidas, salida, dur_min, dur_max, cache))
             print(f"OK    {p['id']}: {lecturas[-1]['licencias_leidas']} {lecturas[-1]['duracion_s']} s "
                   f"sha256={lecturas[-1]['sha256']}", flush=True)
         except Exception as e:      # una pista mala no tumba las demás
@@ -161,14 +196,15 @@ def main(argv: list[str] | None = None) -> int:
     informe = {"generado": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                "verificadas": lecturas, "rechazadas": rechazos}
     (salida / "lecturas.json").write_text(json.dumps(informe, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"{len(lecturas)} verificadas, {len(rechazos)} rechazadas (mínimo {MINIMO})")
-    if len(lecturas) < MINIMO:
+    print(f"{len(lecturas)} verificadas, {len(rechazos)} rechazadas (mínimo {minimo})")
+    if len(lecturas) < minimo:
         return 1
     if a.subir:
-        rel = datos["release"]
+        rel = release
         if subprocess.run(["gh", "release", "view", rel], capture_output=True).returncode != 0:
-            subprocess.run(["gh", "release", "create", rel, "--title", "Música CC0 de Guion Vivo",
-                            "--notes", "Pistas CC0 verificadas por musica.yml. Licencias: marca/musica/<id>/LICENCIA.md.",
+            titulo = "Música CC0 de Guion Vivo" if rel == "musica" else f"{rel} CC0 de Guion Vivo"
+            subprocess.run(["gh", "release", "create", rel, "--title", titulo,
+                            "--notes", f"Audio CC0 verificado por el workflow {rel}.yml. Licencias: LICENCIA.md de cada id en marca/.",
                             "--prerelease"], check=True)
         archivos = [str(salida / x["asset"]) for x in lecturas] + [str(salida / "lecturas.json")]
         subprocess.run(["gh", "release", "upload", rel, *archivos, "--clobber"], check=True, timeout=600)

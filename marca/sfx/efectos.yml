@@ -1,0 +1,126 @@
+# Efectos de sonido CC0 de Guion Vivo (tarea #20 «historia»). Sólo como efecto corto sobre clips sin
+# `sin_musica` y fuera de campañas mientras `sfx_en_campanas: false`.
+#
+# El audio NO vive en el repo: lo sube el workflow `sfx.yml` al release privado `sfx` tras leer la página de
+# origen y comprobar «License(s): CC0». Varios efectos salen del mismo zip (se baja una vez por URL).
+# La fábrica sólo usa un efecto `verificada` con su LICENCIA.md y el sha256 del archivo bajado igual al de aquí.
+#
+# Campos: id (carpeta marca/sfx/<id>/), titulo, autor, pagina, archivo (zip guardado en "File(s):"),
+# zip_miembro (audio de dentro), licencia (sólo CC0), tipo, asset, sha256 (null hasta la corrida verde),
+# estado (candidata | verificada | descartada).
+licencias_permitidas: [CC0]
+release: sfx
+duracion_min_s: 0.1
+duracion_max_s: 4.0
+minimo: 6
+efectos:
+  - id: golpe-metal
+    titulo: "Golpe de metal"
+    autor: "Kenney"
+    pagina: "https://opengameart.org/content/sci-fi-sounds"
+    archivo: "sci-fi_sounds.zip"
+    zip_miembro: "impactMetal_000.ogg"
+    licencia: CC0
+    tipo: golpe
+    asset: "golpe-metal.ogg"
+    sha256: null
+    estado: candidata
+  - id: golpe-sordo
+    titulo: "Golpe sordo"
+    autor: "Kenney"
+    pagina: "https://opengameart.org/node/21999"
+    archivo: "RPGsounds_Kenney.zip"
+    zip_miembro: "chop.ogg"
+    licencia: CC0
+    tipo: golpe
+    asset: "golpe-sordo.ogg"
+    sha256: null
+    estado: candidata
+  - id: whoosh-cuchillo
+    titulo: "Latigazo de cuchillo"
+    autor: "Kenney"
+    pagina: "https://opengameart.org/node/21999"
+    archivo: "RPGsounds_Kenney.zip"
+    zip_miembro: "knifeSlice.ogg"
+    licencia: CC0
+    tipo: whoosh
+    asset: "whoosh-cuchillo.ogg"
+    sha256: null
+    estado: candidata
+  - id: whoosh-propulsor
+    titulo: "Whoosh de propulsor"
+    autor: "Kenney"
+    pagina: "https://opengameart.org/content/sci-fi-sounds"
+    archivo: "sci-fi_sounds.zip"
+    zip_miembro: "thrusterFire_000.ogg"
+    licencia: CC0
+    tipo: whoosh
+    asset: "whoosh-propulsor.ogg"
+    sha256: null
+    estado: candidata
+  - id: boom-grave
+    titulo: "Boom grave"
+    autor: "Kenney"
+    pagina: "https://opengameart.org/content/sci-fi-sounds"
+    archivo: "sci-fi_sounds.zip"
+    zip_miembro: "lowFrequency_explosion_000.ogg"
+    licencia: CC0
+    tipo: boom
+    asset: "boom-grave.ogg"
+    sha256: null
+    estado: candidata
+  - id: explosion-seca
+    titulo: "Explosión seca"
+    autor: "Kenney"
+    pagina: "https://opengameart.org/content/sci-fi-sounds"
+    archivo: "sci-fi_sounds.zip"
+    zip_miembro: "explosionCrunch_000.ogg"
+    licencia: CC0
+    tipo: boom
+    asset: "explosion-seca.ogg"
+    sha256: null
+    estado: candidata
+  - id: tic-metal
+    titulo: "Tic de metal"
+    autor: "Kenney"
+    pagina: "https://opengameart.org/node/21999"
+    archivo: "RPGsounds_Kenney.zip"
+    zip_miembro: "metalClick.ogg"
+    licencia: CC0
+    tipo: tic
+    asset: "tic-metal.ogg"
+    sha256: null
+    estado: candidata
+  - id: crujido-madera
+    titulo: "Crujido de madera"
+    autor: "Kenney"
+    pagina: "https://opengameart.org/node/21999"
+    archivo: "RPGsounds_Kenney.zip"
+    zip_miembro: "creak1.ogg"
+    licencia: CC0
+    tipo: crujido
+    asset: "crujido-madera.ogg"
+    sha256: null
+    estado: candidata
+  - id: moneda-ding
+    titulo: "Moneda ding"
+    autor: "Kenney"
+    pagina: "https://opengameart.org/node/21999"
+    archivo: "RPGsounds_Kenney.zip"
+    zip_miembro: "handleCoins.ogg"
+    licencia: CC0
+    tipo: moneda
+    asset: "moneda-ding.ogg"
+    sha256: null
+    estado: candidata
+  - id: laser-corto
+    titulo: "Láser corto"
+    autor: "Kenney"
+    pagina: "https://opengameart.org/content/sci-fi-sounds"
+    archivo: "sci-fi_sounds.zip"
+    zip_miembro: "laserSmall_000.ogg"
+    licencia: CC0
+    tipo: ding
+    asset: "laser-corto.ogg"
+    sha256: null
+    estado: candidata

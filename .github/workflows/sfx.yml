@@ -1,0 +1,53 @@
+name: sfx
+
+# Efectos de sonido CC0 de Guion Vivo (tarea #20 «historia»).
+# Dentro de Actions: lee la página de cada efecto de marca/sfx/efectos.yml, comprueba que su licencia
+# sea CC0, baja el zip (una vez), extrae el efecto, anota el sha256 y lo sube al release privado `sfx`.
+# El audio nunca entra al repo ni a la PC de Kevin.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main", "claude/clips-historia*"]
+    paths:
+      - "marca/sfx/**"
+      - "fabrica/musica_release.py"
+      - ".github/workflows/sfx.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sfx
+  cancel-in-progress: false
+
+jobs:
+  sfx:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalar ffmpeg
+        timeout-minutes: 12
+        uses: ./.github/actions/ffmpeg
+      - run: pip install -r requirements.txt
+      - name: Leer licencias, bajar y subir al release sfx
+        timeout-minutes: 10
+        run: python -m fabrica.musica_release --manifiesto marca/sfx/efectos.yml --release sfx --salida "$RUNNER_TEMP/sfx" --subir
+      - name: Resumen
+        if: always()
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY" || true
+          import json, os
+          d = json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "sfx", "lecturas.json"), encoding="utf-8"))
+          print("### Efectos CC0\n\n| efecto | licencia leída | autor leído | s | sha256 |\n|---|---|---|---|---|")
+          for x in d["verificadas"]:
+              print(f"| {x['id']} | {', '.join(x['licencias_leidas'])} | {x['autor_leido']} | {x['duracion_s']} | `{x['sha256']}` |")
+          for x in d["rechazadas"]:
+              print(f"| {x['id']} | RECHAZADA | {x['motivo']} | | |")
+          PY
