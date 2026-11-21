@@ -306,10 +306,11 @@ def test_el_cupo_con_suplentes(r):
 
 # ---------------------------------------------------------------- 6. tope de Actions
 
-def test_el_tope_de_90_deja_pasar_un_dia_de_6_producir_de_8_minutos(r):
-    assert ciclo.tope_minutos(r) == 90
-    # A las 21:23 ya hubo 5 producir (40 min) y 22 decidir: 62 usados, y 62 + 20 <= 90 admite el sexto.
-    minutos(r, **{"2026-11-25": 40})
+def test_el_tope_de_300_deja_pasar_un_dia_de_6_producir_de_40_minutos(r):
+    # Repo público desde el 20 nov 2026: el tope ya no cuida el cupo de GitHub Pro, sólo frena un bucle.
+    assert ciclo.tope_minutos(r) == 300
+    # A las 21:23 ya hubo 5 producir (200 min) y 22 decidir: 222 usados, y 222 + 20 <= 300 admite el sexto.
+    minutos(r, **{"2026-11-25": 200})
     assert ciclo.admite_producir(r, gt(25, 21, 23)) is True
     poner_tope(r, 60)
     assert ciclo.admite_producir(r, gt(25, 21, 23)) is False
@@ -357,7 +358,7 @@ def editar(repo, editar_yaml, **cambios):
     ({"relleno": {"max_intentos_por_hueco": 0}}, "max_intentos_por_hueco"),
     ({"relleno": {"ultima_hora": "25:99"}}, "ultima_hora"),
     ({"actions": {"tope_minutos_dia": 29}}, "tope_minutos_dia"),
-    ({"actions": {"tope_minutos_dia": 101}}, "tope_minutos_dia"),
+    ({"actions": {"tope_minutos_dia": 601}}, "tope_minutos_dia"),
     ({"actions": {"tope_minutos_dia": "90"}}, "tope_minutos_dia"),
 ])
 def test_validar_rechaza_horarios_malos(repo, editar_yaml, cambios, fragmento):

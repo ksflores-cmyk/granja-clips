@@ -12,4 +12,4 @@ relleno:                    # un hueco de hoy que se perdió se rellena sin amon
 cola_buffer_max: 10         # plan gratis de Buffer: 10 programados por canal
 no_repetir_horas: 24
 actions:
-  tope_minutos_dia: 90      # 6 producir + decidir; Pro = 3000 min/mes
+  tope_minutos_dia: 300     # repo público desde el 20 nov 2026 (minutos sin tope): alcanza para 6 tomas al día; freno ante un bucle
