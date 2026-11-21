@@ -472,6 +472,17 @@ def test_segundo_proveedor_200_valido_gana():
     assert "historia" in cuerpo["messages"][0]["content"]                              # la sección 9 del prompt
 
 
+@pytest.mark.slow
+def test_segundo_proveedor_recibe_las_senales_del_video_si_no_se_las_dieron(video20):
+    h.reiniciar_contador()
+    t = FalsoHTTP((200, sobre_chat(plan_base())))
+    r = h.planificar(raiz=RAIZ_REAL, ficha=None, recorte=(2.0, 14.0), rango_duracion=RANGO, cfg=CFG_SEGUNDO,
+                     ruta_video=video20, transporte=t, entorno={"SEGUNDO_CLAVE": CLAVE_SEGUNDO}, fotogramas=FOTOS)
+    texto = next(p["text"] for p in t.llamadas[0][2]["messages"][1]["content"] if p["type"] == "text")
+    assert '"rms"' in texto and len(json.loads(texto.split(": ", 1)[1])["senales"]["rms"]) == 24
+    assert r.proveedor in ("segundo", "sin-ia")
+
+
 def test_segundo_proveedor_200_invalido_cae_al_sin_ia():
     h.reiniciar_contador()
     r = con_segundo(FalsoHTTP((200, sobre_chat(plan_base(extra="x")))))

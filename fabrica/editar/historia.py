@@ -852,6 +852,11 @@ def planificar(*, raiz=None, ficha: dict | None, recorte: tuple[float, float], r
     else:
         intentos.append("gemini: sin plan de historia en la respuesta")
 
+    if sen is None and ruta_video is not None and cfg["segundo"].get("activo") is True:
+        try:          # el segundo proveedor recibe también las señales de audio y escena (y el sin IA las reutiliza)
+            sen = senales(Path(ruta_video), recorte[0], recorte[1])
+        except (subprocess.SubprocessError, OSError, ValueError) as e:
+            intentos.append(f"señales del video no disponibles ({type(e).__name__})")
     plan_s = llamar_segundo(cfg, recorte=recorte, ids_sfx=ids, prohibe_sfx=prohibe, ruta_video=ruta_video,
                             lineas=lineas, sen=sen, entorno=entorno, transporte=transporte, fotogramas=fotogramas,
                             intentos=intentos)
