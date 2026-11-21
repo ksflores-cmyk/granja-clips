@@ -774,7 +774,7 @@ class Publicador:
             "campana": toma.get("campana") or "",
             "gancho": toma.get("gancho", ""), "duracion_s": toma.get("duracion_s", ""),
             "credito": textos.get("credito", ""), "url": "", "estado_campana": "",
-            "notas": f"origen:{fuente_id} buffer:{post['id']}"})
+            "notas": f"origen:{fuente_id} buffer:{post['id']}", "historia": toma.get("historia") or ""})
         previos = _leer_json(_ruta_estado(self.raiz, "buffer-textos.json"), [])
         previos.append({"fecha": self.ahora().astimezone(ZONA).date().isoformat(),
                         "plataforma": plataforma,

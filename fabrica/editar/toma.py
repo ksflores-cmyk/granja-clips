@@ -22,7 +22,7 @@ from .. import descargar as mod_descargar
 from .. import fuentes, ojos, plazo, puertas
 from ..config import cargar_yaml, raiz_repo
 from ..registro import ZONA, contador_toma
-from . import estilo, musica as mod_musica, sin_ia
+from . import estilo, historia as mod_historia, musica as mod_musica, sfx as mod_sfx, sin_ia
 from .componer import Linea, componer, sondear_video
 from .lienzo import Toma
 from .marca import Marca
@@ -147,6 +147,22 @@ def hacer_toma(raiz, candidato, ficha: dict | None, ahora: datetime, *, salida: 
     return r
 
 
+def _planificar_historia(raiz, ficha, datos, inicio: float, dur: float, cfg_h: dict, sfx_d: dict, video_ojos,
+                         lineas) -> "mod_historia.Planificacion":
+    """El plan de historia de la cadena Gemini → segundo → sin IA. Nunca lanza (salvo el plazo): un fallo es «sin plan»."""
+    try:
+        with plazo.etapa("historia"):
+            return mod_historia.planificar(
+                raiz=raiz, ficha=ficha, recorte=(inicio, round(inicio + dur, 3)),
+                rango_duracion=estilo.rango_duracion({}, ficha), sfx=sfx_d, datos_gemini=datos,
+                ruta_video=video_ojos, lineas=lineas, cfg=cfg_h)
+    except plazo.SinTiempo:
+        raise
+    except Exception as e:  # noqa: BLE001 (la historia nunca descarta una fuente)
+        return mod_historia.Planificacion(None, None, [f"historia: error inesperado {type(e).__name__}"],
+                                          f"error inesperado: {type(e).__name__}")
+
+
 def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, transporte, espera, entorno,
                 transporte_lista=None) -> Resultado:
     raiz = raiz_repo(raiz)
@@ -163,38 +179,45 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             juego = ojos.juego_de(ficha, temporada)          # el de la ficha si lo declara (FM27, no GTA 6)
             recorte = ojos.rango_recorte(ficha)              # reglas.duracion_s de la ficha
             cfg_sin = (cargar_yaml("config/ojos.yml", raiz).get("sin_ia") or {})
+            cfg_h = mod_historia.cargar_config(raiz)
+            con_historia = cfg_h.get("activo") is True
+            sfx_d = mod_sfx.disponibles(raiz) if con_historia else {}
+            prohibe_sfx = mod_historia.sfx_prohibido(ficha, cfg_h)
+            pide_historia = ({"cfg": cfg_h, "sfx": [] if prohibe_sfx else sorted(sfx_d), "prohibe_sfx": prohibe_sfx}
+                             if con_historia else None)
             intentos_gemini: list[str] = []
             por_sin_ia = None                  # por qué no hubo Gemini, si el corte es sin IA
-            with tempfile.TemporaryDirectory(prefix="ojos-toma-") as carpeta_ojos:
-                try:
-                    with plazo.etapa("copia ligera"):
-                        video_ojos = copia_para_ojos(d.ruta, raiz, Path(carpeta_ojos))
-                except subprocess.CalledProcessError as e:     # ffmpeg rechazó el archivo: es del material
-                    return Resultado(False, [f"copia ligera: ffmpeg no pudo leer el archivo ({type(e).__name__})"],
-                                     gastar=True)
-                with plazo.etapa("ojos (Gemini)"):
-                    mirada = ojos.mirar(video_ojos, marca, temporada, raiz=raiz, duracion=d.duracion,
-                                        transporte=transporte, espera=espera, entorno=entorno, juego=juego,
-                                        nota=ojos.nota_de_ficha(ficha) or None, recorte=recorte,
-                                        transporte_lista=transporte_lista)
-                # Sin clave o con clave mala (401/403) es un error de configuración, no una caída de Gemini:
-                # ahí no hay corte sin IA.
-                if (mirada.datos is None and mirada.sin_gemini and not mirada.clave_mala
-                        and cfg_sin.get("activo") is True
-                        and mirada.motivo != ojos.MOTIVO_SIN_CLAVE):
-                    if not sin_ia.reservar(cfg_sin.get("max_por_ciclo", sin_ia.MAX_POR_CICLO)):
-                        return Resultado(False, [f"ojos: {mirada.motivo}; tope de tomas sin IA del ciclo "
-                                                 "(pasajero: se reintenta)"])
-                    por_sin_ia = mirada.motivo
-                    intentos_gemini = list(mirada.intentos)
-                    with plazo.etapa("corte sin IA"):
-                        obj = cfg_sin.get("duracion_objetivo_s", sin_ia.OBJETIVO_S)
-                        c = sin_ia.construir(video_ojos, candidato, ficha, marca, temporada, duracion=d.duracion,
-                                             rango=recorte, objetivo_s=obj if isinstance(obj, (int, float)) else sin_ia.OBJETIVO_S)
-                    if c.datos is None:
-                        return Resultado(False, [f"ojos: {mirada.motivo}; {c.motivo}"], gastar=c.gastar)
-                    mirada = ojos.Mirada(c.datos, modelo=SIN_IA)
-                    plazo.log(f"ojos: {por_sin_ia}; corte sin IA (picos de volumen y cambios de escena)")
+            carpeta_ojos = pila.enter_context(tempfile.TemporaryDirectory(prefix="ojos-toma-"))
+            try:
+                with plazo.etapa("copia ligera"):
+                    video_ojos = copia_para_ojos(d.ruta, raiz, Path(carpeta_ojos))
+            except subprocess.CalledProcessError as e:     # ffmpeg rechazó el archivo: es del material
+                return Resultado(False, [f"copia ligera: ffmpeg no pudo leer el archivo ({type(e).__name__})"],
+                                 gastar=True)
+            with plazo.etapa("ojos (Gemini)"):
+                mirada = ojos.mirar(video_ojos, marca, temporada, raiz=raiz, duracion=d.duracion,
+                                    transporte=transporte, espera=espera, entorno=entorno, juego=juego,
+                                    nota=ojos.nota_de_ficha(ficha) or None, recorte=recorte,
+                                    transporte_lista=transporte_lista,
+                                    **({"historia": pide_historia} if pide_historia else {}))
+            # Sin clave o con clave mala (401/403) es un error de configuración, no una caída de Gemini:
+            # ahí no hay corte sin IA.
+            if (mirada.datos is None and mirada.sin_gemini and not mirada.clave_mala
+                    and cfg_sin.get("activo") is True
+                    and mirada.motivo != ojos.MOTIVO_SIN_CLAVE):
+                if not sin_ia.reservar(cfg_sin.get("max_por_ciclo", sin_ia.MAX_POR_CICLO)):
+                    return Resultado(False, [f"ojos: {mirada.motivo}; tope de tomas sin IA del ciclo "
+                                             "(pasajero: se reintenta)"])
+                por_sin_ia = mirada.motivo
+                intentos_gemini = list(mirada.intentos)
+                with plazo.etapa("corte sin IA"):
+                    obj = cfg_sin.get("duracion_objetivo_s", sin_ia.OBJETIVO_S)
+                    c = sin_ia.construir(video_ojos, candidato, ficha, marca, temporada, duracion=d.duracion,
+                                         rango=recorte, objetivo_s=obj if isinstance(obj, (int, float)) else sin_ia.OBJETIVO_S)
+                if c.datos is None:
+                    return Resultado(False, [f"ojos: {mirada.motivo}; {c.motivo}"], gastar=c.gastar)
+                mirada = ojos.Mirada(c.datos, modelo=SIN_IA)
+                plazo.log(f"ojos: {por_sin_ia}; corte sin IA (picos de volumen y cambios de escena)")
             if mirada.datos is None:
                 if mirada.pasajero:          # Gemini caído o sin tiempo: la fuente no se gasta
                     return Resultado(False, [f"ojos: {mirada.motivo} (pasajero: se reintenta)"],
@@ -222,13 +245,38 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                         aviso_musica = ("la fuente no trae audio y no hay pista de música CC0 disponible "
                                         f"(GRANJA_MUSICA_DIR={mod_musica.carpeta() or ''}): sigue en silencio")
                         print(f"AVISO: {aviso_musica}")
-                with tempfile.TemporaryDirectory(prefix="trabajo-toma-") as trabajo:
-                    with plazo.etapa("componer"):
-                        plan = componer(marca, toma, lineas, mp4, duracion=dur, trabajo=Path(trabajo),
-                                        fuente_video=d.ruta, inicio=inicio, plan_salida=plan_ruta, ficha=ficha,
-                                        musica=pista)
-                with plazo.etapa("puerta de estilo"):
-                    puntos = estilo.revisar(mp4, plan, marca, ficha=ficha)
+
+                def renderizar(h):
+                    with tempfile.TemporaryDirectory(prefix="trabajo-toma-") as trabajo:
+                        with plazo.etapa("componer"):
+                            plan_ = componer(marca, toma, lineas, mp4, duracion=dur, trabajo=Path(trabajo),
+                                             fuente_video=d.ruta, inicio=inicio, plan_salida=plan_ruta, ficha=ficha,
+                                             musica=pista, historia=h, sfx=sfx_d, config_historia=cfg_h)
+                    with plazo.etapa("puerta de estilo"):
+                        return plan_, estilo.revisar(mp4, plan_, marca, ficha=ficha)
+
+                # La historia nunca descarta ni gasta una fuente: si no hay plan, o el render o la puerta fallan con
+                # ella, la toma se renderiza como siempre y el plan dice por qué.
+                plan_h, plan, puntos = None, None, None
+                if con_historia:
+                    plan_h = _planificar_historia(raiz, ficha, mirada.datos, inicio, dur, cfg_h, sfx_d,
+                                                  video_ojos, lineas)
+                if plan_h is not None and plan_h.plan is not None:
+                    try:
+                        plan, puntos = renderizar(plan_h)
+                        malos_h = [n for n, ok_p, _ in puntos if not ok_p]
+                        if malos_h:
+                            raise ValueError("la puerta de estilo salió en rojo con historia: " + "; ".join(malos_h[:3]))
+                    except plazo.SinTiempo:
+                        raise
+                    except (ValueError, subprocess.SubprocessError, OSError) as e:
+                        mp4.unlink(missing_ok=True)
+                        motivo_h = f"el render con historia falló ({type(e).__name__}): {e}"
+                        plazo.log(f"historia: {motivo_h}; la toma se renderiza sin ella")
+                        plan_h = mod_historia.Planificacion(None, None, [*plan_h.intentos, motivo_h], motivo_h)
+                        plan, puntos = None, None
+                if plan is None:
+                    plan, puntos = renderizar(plan_h)
             except (ValueError, subprocess.SubprocessError, OSError) as e:
                 mp4.unlink(missing_ok=True)
                 # Sólo es del material si el editor corrió y falló (ffmpeg con código ≠ 0) o dio datos inválidos
@@ -251,7 +299,11 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             else:
                 plan["gemini"] = {"modelo": mirada.modelo, "idioma_original": mirada.datos["idioma_original"]}
             plan_ruta.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
-            return Resultado(True, [], mp4, plan, mirada.datos, mirada.modelo, puntos,
-                             fila_marcador(candidato, ficha, toma, dur, ahora))
+            fila = fila_marcador(candidato, ficha, toma, dur, ahora)
+            if isinstance(plan.get("historia"), dict):
+                fila["historia"] = plan["historia"].get("proveedor") or ""
+                if plan["historia"].get("plan") is not None:
+                    fila["duracion_s"] = round(float(plan["duracion"]), 2)
+            return Resultado(True, [], mp4, plan, mirada.datos, mirada.modelo, puntos, fila)
     except mod_descargar.ErrorDescarga as e:
         return Resultado(False, [f"descarga: {e}"], gastar=bool(getattr(e, "del_material", False)))

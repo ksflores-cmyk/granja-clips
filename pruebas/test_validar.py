@@ -194,7 +194,7 @@ def test_sin_pausa_pasa(repo):
 
 
 def test_cabecera_marcador_exacta():
-    assert len(CABECERA_MARCADOR) == 25
+    assert len(CABECERA_MARCADOR) == 26
     # Sólo la primera línea: en vivo la fábrica añade filas.
     assert (RAIZ_REAL / "marcador.csv").read_text(encoding="utf-8").splitlines()[0] == ",".join(CABECERA_MARCADOR)
     assert (RAIZ_REAL / "envios-pendientes.csv").read_text(encoding="utf-8").splitlines()[0] \

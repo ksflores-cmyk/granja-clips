@@ -23,6 +23,8 @@ from . import agua as mod_agua
 from . import cierre as mod_cierre
 from . import dialogo as mod_dialogo
 from . import encuadre, lienzo, placas
+from . import historia as mod_historia
+from . import sfx as mod_sfx
 from .lienzo import Toma
 from .marca import Marca
 
@@ -304,7 +306,9 @@ def _audio_plan(marca: Marca, musica: dict | None, audio_fuente: bool) -> dict:
 def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duracion: float,
              trabajo: Path, fuente_video: Path | None = None, inicio: float = 0.0,
              plan_salida: Path | None = None, ficha: dict | None = None,
-             musica: dict | None = None, movimiento: bool = False) -> dict:
+             musica: dict | None = None, movimiento: bool = False,
+             historia: "mod_historia.Planificacion | None" = None, sfx: dict | None = None,
+             config_historia: dict | None = None) -> dict:
     """Renderiza la toma. Devuelve el plan. Lanza ValueError si algún texto no cabe.
 
     Con `fuente_video`: plantilla v2 (pantalla completa, audio original). Sin él: página de guion tipográfica.
@@ -313,6 +317,10 @@ def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duraci
     `musica`: pista CC0 ({id, ruta, sha256, inicio_s, ...}, de `editar.musica`) para piezas sin audio propio;
     ValueError si el video trae audio o la ficha tiene `sin_musica`. `movimiento`: entrada de texto sobria
     (sólo piezas sin video).
+    `historia` (`editar.historia.Planificacion`): sólo en tomas v2 con video y con audio en la fuente; el plan se vuelve
+    la apertura en frío y los momentos con su tratamiento, en una sola orden de ffmpeg (`duracion` sigue siendo la del
+    recorte; la del MP4 es la del mapa). Sin plan, sin audio o con un plan que no valida, la toma sale como siempre y
+    `plan["historia"]` dice por qué. `sfx`: {id: {ruta, sha256, ...}} de `editar.sfx.disponibles` (por defecto, esos).
     """
     trabajo = Path(trabajo)
     trabajo.mkdir(parents=True, exist_ok=True)
@@ -323,7 +331,8 @@ def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duraci
     if fuente_video is not None:
         return _componer_pantalla_completa(marca, t, lineas, Path(salida), duracion=duracion, trabajo=trabajo,
                                            fuente_video=Path(fuente_video), inicio=inicio,
-                                           plan_salida=plan_salida, ficha=ficha, musica=musica)
+                                           plan_salida=plan_salida, ficha=ficha, musica=musica,
+                                           historia=historia, sfx=sfx, config_historia=config_historia)
     # Toma sin video: validar todo antes de pintar o correr ffmpeg
     lienzo.preparar_gancho(marca, t.gancho, t.palabra_lapiz)
     for ln in lineas:
@@ -359,6 +368,9 @@ def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duraci
     plan = plan_json(marca, t, lineas, duracion, geometria=geo, origen=None, campana=campana,
                      audio=_audio_plan(marca, musica, False),
                      movimiento="entrada_texto" if movimiento else None)
+    if historia is not None:
+        plan["historia"] = {"proveedor": None, "motivo": "toma sin video: la historia sólo va en tomas v2 con video",
+                            "intentos": list(historia.intentos)}
     if plan_salida is not None:
         Path(plan_salida).write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
     return plan
@@ -366,7 +378,9 @@ def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duraci
 
 def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duracion: float,
                                 trabajo: Path, fuente_video: Path, inicio: float, plan_salida: Path | None,
-                                ficha: dict | None, musica: dict | None = None) -> dict:
+                                ficha: dict | None, musica: dict | None = None,
+                                historia: "mod_historia.Planificacion | None" = None, sfx: dict | None = None,
+                                config_historia: dict | None = None) -> dict:
     for ln in lineas:
         if not 0 <= ln.t0 < ln.t1 <= duracion:
             raise ValueError(f"ventana de tiempo inválida {ln.t0}-{ln.t1} (duración {duracion})")
@@ -383,7 +397,27 @@ def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], sali
         logo = marca.raiz / ficha["marca_agua"]
         if not logo.is_file():
             raise ValueError(f"marca de agua ausente: {ficha['marca_agua']}")
-    todas = placas.construir(marca, t, lineas, duracion, logo)
+    tramos, motivo_h, cfg_h, sfx_d = None, None, None, {}
+    if historia is not None:
+        if historia.plan is None:
+            motivo_h = historia.motivo or "sin plan de historia"
+        elif not info["audio"]:
+            motivo_h = "la fuente no trae audio: historia apagada"
+        else:
+            from . import estilo
+            cfg_h = config_historia or mod_historia.cargar_config(marca.raiz)
+            sfx_d = sfx if sfx is not None else mod_sfx.disponibles(marca.raiz)
+            ok_h, motivos_h = mod_historia.validar_plan(
+                historia.plan, (inicio, inicio + duracion), estilo.rango_duracion({}, ficha), sfx_d, ficha, cfg_h)
+            if ok_h:
+                tramos = mod_historia.mapa(historia.plan, inicio, inicio + duracion, zoom_max=cfg_h["zoom_max"],
+                                           pausa_s=cfg_h["pausa_s"])
+            else:
+                motivo_h = "el plan no valida: " + "; ".join(motivos_h)
+    dur_sal = mod_historia.duracion_salida(tramos) if tramos else duracion
+    lineas_p = (mod_historia.remapear_lineas(lineas, tramos, tope=dur_sal - float(marca.m("cierre_s")))
+                if tramos else lineas)
+    todas = placas.construir(marca, t, lineas_p, dur_sal, logo)
     capas = [p.capa() for p in todas]
     problemas = placas.problemas_capas(capas, marca)
     if problemas:
@@ -402,15 +436,31 @@ def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], sali
         p.imagen.save(ruta)
         rutas.append((str(ruta), p.x, p.y, p.t0, p.t1))
     video = {"ruta": str(fuente_video), "inicio": inicio, "recorte": recorte, "audio": info["audio"]}
-    cmd = orden_ffmpeg_pantalla_completa(salida=str(salida), duracion=duracion, ancho=marca.ancho,
-                                         alto=marca.alto, video=video, placas=rutas, musica=musica_ff)
+    efectos = []
+    if tramos:
+        usados = {tr.sfx for tr in tramos if tr.sfx}
+        cmd = mod_historia.orden_ffmpeg(
+            salida=str(salida), ancho=marca.ancho, alto=marca.alto, video=video, tramos=tramos, placas=rutas,
+            sfx={i: sfx_d[i]["ruta"] for i in usados}, ganancia_sfx_db=float(cfg_h["ganancia_sfx_db"]),
+            pausa_s=float(cfg_h["pausa_s"]))
+        efectos = [{"id": tr.sfx, "sha256": sfx_d[tr.sfx]["sha256"], "t": tr.s0,
+                    "ganancia_db": float(cfg_h["ganancia_sfx_db"])} for tr in tramos if tr.sfx]
+    else:
+        cmd = orden_ffmpeg_pantalla_completa(salida=str(salida), duracion=duracion, ancho=marca.ancho,
+                                             alto=marca.alto, video=video, placas=rutas, musica=musica_ff)
     salida.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(cmd, check=True, timeout=plazo.tiempo_para(300))
     origen = {"archivo": str(fuente_video), "sha256": sha256_archivo(fuente_video),
               "inicio": inicio, "duracion": duracion, "audio": "original" if info["audio"] else "silencio"}
     geo = {"cuerpo": cuerpo, "recorte": recorte, "capas": capas}
-    plan = plan_json(marca, t, lineas, duracion, geometria=geo, origen=origen, campana=campana,
-                     plantilla=PLANTILLA_V2, audio=_audio_plan(marca, musica, info["audio"]))
+    audio_plan = _audio_plan(marca, musica, info["audio"])
+    if efectos:
+        audio_plan = {**audio_plan, "efectos": efectos}
+    plan = plan_json(marca, t, lineas_p, dur_sal, geometria=geo, origen=origen, campana=campana,
+                     plantilla=PLANTILLA_V2, audio=audio_plan)
+    if historia is not None:
+        plan["historia"] = (historia.resumen(tramos) if tramos else
+                            {"proveedor": None, "motivo": motivo_h, "intentos": list(historia.intentos)})
     if plan_salida is not None:
         Path(plan_salida).write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
     return plan

@@ -23,6 +23,7 @@ from .. import plazo
 from . import agua as mod_agua
 from . import cierre as mod_cierre
 from . import dialogo as mod_dialogo
+from . import historia as mod_historia
 from . import lienzo, placas
 from .lienzo import Toma, _limpia, partir
 from .marca import Marca
@@ -63,6 +64,10 @@ TOL_BORDE = 6.0
 # El MP4 sale a 30 fps y la fuente puede traer 24 o 25: el fotograma del MP4 en `t` puede ser el de la fuente un paso antes
 # o después. En las comparaciones con la fuente se acepta el mejor de estos desfases (en segundos).
 DESFASES_FUENTE_S = (0.0, -1 / 24, 1 / 24)
+
+# Historia (#20): con `plan.historia.plan` el MP4 no es la fuente en el mismo instante; los puntos que comparan contra la
+# fuente usan el mapa (`fuente_en`) y miden en tramos planos (velocidad 1, sin zoom ni efecto).
+TOL_APERTURA = 0.25      # la apertura debe parecerse a la fuente en `apertura` al menos tanto como a la fuente en `inicio`
 
 RE_EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿⬀-⯿️‍⃣\U0001F1E6-\U0001F1FF]")
 
@@ -112,6 +117,36 @@ def _textos(plan: dict) -> list[str]:
     for ln in plan.get("lineas", []):
         textos += [str(ln.get(k) or "") for k in ("nombre", "frase", "acotacion")]
     return [x for x in textos if x]
+
+
+def _historia(plan: dict) -> dict | None:
+    """`plan.historia` si la toma se editó con un plan de historia; None si no (la puerta queda como siempre)."""
+    h = plan.get("historia")
+    return h if isinstance(h, dict) and isinstance(h.get("plan"), dict) else None
+
+
+def _tramos(plan: dict, marca: Marca) -> list[mod_historia.Tramo] | None:
+    """El mapa de la historia, recalculado desde el plan guardado y `origen` (no se confía en el mapa guardado)."""
+    h, o = _historia(plan), plan.get("origen") or {}
+    if h is None or not o:
+        return None
+    cfg = mod_historia.cargar_config(getattr(marca, "raiz", None))
+    try:
+        ini = float(o["inicio"])
+        return mod_historia.mapa(h["plan"], ini, ini + float(o["duracion"]), zoom_max=cfg["zoom_max"],
+                                 pausa_s=cfg["pausa_s"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _t_plano(plan: dict, marca: Marca, t: float, desde: float | None = None) -> float:
+    """Con historia, el instante de un tramo plano más cercano a `t`; sin historia, `t` tal cual."""
+    tramos = _tramos(plan, marca)
+    if tramos is None:
+        return t
+    tope = float(plan.get("duracion") or 0) - float(marca.m("cierre_s")) - 0.2
+    c = mod_historia.instante_plano(tramos, t, tope, desde=desde)
+    return t if c is None else c
 
 
 def _toma(plan: dict) -> Toma:
@@ -265,6 +300,9 @@ def _fuente_esperada(plan: dict, marca: Marca, t: float) -> Image.Image | None:
     """Fotograma de la fuente en el instante `t` de la toma, tal como el plan dice que se ve (sin placas)."""
     origen, geo = plan.get("origen") or {}, plan.get("geometria") or {}
     ruta, t_fuente = Path(origen["archivo"]), float(origen["inicio"]) + t
+    tramos = _tramos(plan, marca)
+    if tramos is not None:
+        t_fuente = mod_historia.fuente_en(tramos, t)[0]
     if es_v2(plan):
         return _fuente_encuadrada(ruta, t_fuente, geo.get("recorte") or {}, marca)
     return _fuente_en_cuerpo(ruta, t_fuente, geo["cuerpo"])
@@ -366,7 +404,7 @@ def bordes_coinciden(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
                "izquierda": (slice(0, h), slice(0, BORDE_PX)), "derecha": (slice(0, h), slice(w - BORDE_PX, w))}
     peor, donde = 0.0, ""
     for frac in (0.3, 0.7):
-        t = _instante_medio(plan, marca, frac)
+        t = _t_plano(plan, marca, _instante_medio(plan, marca, frac))
         real = _fotograma(Path(video), t)
         if real is None:
             return False, f"no se pudo leer el fotograma en {t:.2f} s"
@@ -429,6 +467,12 @@ def _gancho_se_va(video: Path, plan: dict, marca: Marca, cabecera: list[placas.P
     if not cabecera or t > dur - float(marca.m("cierre_s")) - 0.1:
         return True, ""
     p = cabecera[0]
+    if _historia(plan) is not None:           # con historia se mide en un tramo plano, ya pasado el gancho
+        plano = _t_plano(plan, marca, t, desde=t)
+        tramos = _tramos(plan, marca) or []
+        if not any(tr.s0 <= plano < tr.s1 and tr.plano for tr in tramos) or plano < t:
+            return True, "no aplica con historia (sin tramo plano tras el gancho)"
+        t = plano
     real = _fotograma(Path(video), t)
     if real is None:
         return False, f"no se pudo leer el fotograma en {t:.2f} s"
@@ -657,7 +701,7 @@ def marca_agua_visible(video: Path, plan: dict, marca: Marca, ficha: dict | None
     tope = dur - float(marca.m("cierre_s")) - 0.2
     detalle = []
     for frac in (0.3, 0.7):
-        t = min(dur * frac, tope)
+        t = _t_plano(plan, marca, min(dur * frac, tope))
         real = _fotograma(Path(video), t)
         if real is None:
             return False, f"no se pudo leer el fotograma en {t:.2f} s"
@@ -701,7 +745,7 @@ def logo_extra_en_esquina(video: Path, plan: dict, marca: Marca, cuerpo_ok: bool
     except ValueError:
         return True, "no aplica (el cuerpo es más chico que el logo)"
     dur = float(plan.get("duracion") or 0)
-    t = min(dur * 0.5, dur - float(marca.m("cierre_s")) - 0.2)
+    t = _t_plano(plan, marca, min(dur * 0.5, dur - float(marca.m("cierre_s")) - 0.2))
     real = _fotograma(Path(video), t)
     if real is None:
         return False, f"no se pudo leer el fotograma en {t:.2f} s"
@@ -742,7 +786,7 @@ def tipo_audio(plan: dict) -> str | None:
     return a.get("tipo") if isinstance(a, dict) else a
 
 
-def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
+def audio_original(video: Path, plan: dict, marca: Marca | None = None) -> tuple[bool, str]:
     """El audio del MP4 es el de la fuente (correlación alta), sin audio añadido; sin audio de origen, silencio.
 
     En la plantilla v2 se comprueba siempre. El plan declara `audio` ("original", "silencio" o, sólo con fuente muda,
@@ -779,14 +823,20 @@ def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
         return False, f"el plan declara audio {declarado!r}, no el original de la fuente"
     dur = float(plan.get("duracion") or 0)
     inicio = float(origen.get("inicio", 0))
+    ss_video, ss_fuente, largo = 0.0, inicio, max(1.0, dur - float(0.5))
+    if _historia(plan) is not None:
+        # con historia el audio se compara en el tramo plano más largo sin efecto (2 s o más), sin sus bordes
+        largo_tr = mod_historia.tramo_plano_largo(_tramos(plan, marca) or [])
+        if largo_tr is None:
+            return False, f"no queda un tramo plano de {mod_historia.PLANO_MIN_S:g} s o más para comparar el audio"
+        ss_video, ss_fuente, largo = largo_tr.s0 + 0.1, largo_tr.f0 + 0.1, largo_tr.dur - 0.2
 
     def pcm(ruta: Path, ss: float, t: float) -> np.ndarray:
         r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{ss:.3f}", "-t", f"{t:.3f}", "-i", str(ruta),
                             "-vn", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"], capture_output=True,
                            timeout=plazo.tiempo_para(120))
         return np.frombuffer(r.stdout, dtype=np.int16).astype(np.float32)
-    largo = max(1.0, dur - float(0.5))
-    a, b = pcm(Path(video), 0.0, largo), pcm(Path(origen["archivo"]), inicio, largo)
+    a, b = pcm(Path(video), ss_video, largo), pcm(Path(origen["archivo"]), ss_fuente, largo)
     n = min(len(a), len(b))
     if n < 800:
         return False, "no se pudo leer el audio"
@@ -795,7 +845,8 @@ def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
         return not a.any(), "la fuente es muda y el MP4 también" if not a.any() else "el MP4 trae audio y la fuente es muda"
     # el códec AAC corre la señal unas decenas de milisegundos: se busca el mejor desfase de ±100 ms
     mejor = 0.0
-    for lag in range(-800, 801, 40):
+    paso_lag = 40 if _historia(plan) is None else 1      # con historia, una rejilla más fina (el mapa pone el audio a la muestra)
+    for lag in range(-800, 801, paso_lag):
         x, y = (a[lag:], b[:n - lag]) if lag >= 0 else (a[:n + lag], b[-lag:])
         den = float(np.linalg.norm(x) * np.linalg.norm(y))
         if den > 0:
@@ -928,6 +979,8 @@ def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     if faltan:
         return False, "el plan declara cuerpo de video pero el origen no trae: " + ", ".join(faltan)
     dur_o, ini_o, dur_p = origen["duracion"], origen["inicio"], plan.get("duracion")
+    if _historia(plan) is not None:      # con historia `duracion` es la de salida; el recorte es origen.duracion
+        dur_p = dur_o                    # (la duración de salida la prueba «Duración igual al mapa»)
     for nombre, v in (("duracion", dur_o), ("inicio", ini_o)):
         if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
             return False, f"origen.{nombre} debe ser un número finito (trae {v!r})"
@@ -972,22 +1025,27 @@ def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
         f"diferencias {', '.join(f'{d:.1f}' for d in difs)} (tolerancia {UMBRAL_CUERPO:.1f})"
 
 
+def _libre_miniatura(plan: dict, marca: Marca, t: float, alto_min: int) -> np.ndarray:
+    """Máscara de la miniatura (True donde no hay placa activa en `t`, con un píxel de margen)."""
+    tapado = Image.fromarray(np.where(_mascara_placas(plan, t, marca), 0, 255).astype(np.uint8))
+    tapado = np.asarray(tapado.resize((MINIATURA_ANCHO, alto_min), Image.BOX)) > 0      # toca alguna placa
+    for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):                                     # el reescalado se desborda
+        tapado = tapado | np.roll(tapado, (dy, dx), axis=(0, 1))
+    return ~tapado
+
+
 def _cuerpo_v2(video: Path, plan: dict, marca: Marca, tope: float) -> tuple[bool, str]:
     """Cuadro completo del MP4 contra la fuente recortada y escalada, fuera de las placas activas en ese instante."""
     dur = float(plan.get("duracion") or 0)
     alto_min = max(1, int(round(MINIATURA_ANCHO * marca.alto / marca.ancho)))
     difs = []
     for frac in (0.3, 0.7):
-        t = min(dur * frac, tope)
+        t = _t_plano(plan, marca, min(dur * frac, tope))
         real = _fotograma(Path(video), t)
         if real is None:
             return False, f"no se pudo leer el fotograma en {t:.2f} s"
         a = _miniatura_gris(real, MINIATURA_ANCHO, alto_min)
-        tapado = Image.fromarray(np.where(_mascara_placas(plan, t, marca), 0, 255).astype(np.uint8))
-        tapado = np.asarray(tapado.resize((MINIATURA_ANCHO, alto_min), Image.BOX)) > 0      # toca alguna placa
-        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):                                     # el reescalado se desborda
-            tapado = tapado | np.roll(tapado, (dy, dx), axis=(0, 1))
-        libre = ~tapado
+        libre = _libre_miniatura(plan, marca, t, alto_min)
         if not libre.any():
             return False, "las placas tapan todo el cuadro"
 
@@ -1001,6 +1059,100 @@ def _cuerpo_v2(video: Path, plan: dict, marca: Marca, tope: float) -> tuple[bool
         difs.append(d)
     return max(difs) < UMBRAL_CUERPO, \
         f"diferencias {', '.join(f'{d:.1f}' for d in difs)} (tolerancia {UMBRAL_CUERPO:.1f})"
+
+
+# --- Historia (#20) -----------------------------------------------------------------------------------------------
+
+def historia_valida(plan: dict, marca: Marca, ficha: dict | None) -> tuple[bool, str]:
+    """[plan] `validar_plan` otra vez sobre el plan guardado; el mapa y los efectos guardados son los que salen de él."""
+    h, o = _historia(plan), plan.get("origen") or {}
+    if h is None:
+        return False, "el plan no trae historia.plan"
+    cfg = mod_historia.cargar_config(marca.raiz)
+    try:
+        recorte = (float(o["inicio"]), float(o["inicio"]) + float(o["duracion"]))
+    except (KeyError, TypeError, ValueError):
+        return False, "el plan no trae origen.inicio y origen.duracion"
+    efectos = (plan.get("audio") or {}).get("efectos") if isinstance(plan.get("audio"), dict) else None
+    efectos = efectos or []
+    malos, verificados = [], []
+    for e in efectos:
+        ok_e, det_e = mod_historia.efecto_verificado(marca.raiz, str(e.get("id")), e.get("sha256"))
+        (verificados if ok_e else malos).append(str(e.get("id")) if ok_e else det_e)
+    ok, motivos = mod_historia.validar_plan(h["plan"], recorte, rango_duracion(plan, ficha), verificados, ficha, cfg)
+    tramos = _tramos(plan, marca)
+    if tramos is None:
+        return False, "no se pudo calcular el mapa del plan"
+    if h.get("mapa") is not None and h["mapa"] != [t.a_dict() for t in tramos]:
+        motivos.append("el mapa guardado no es el que sale del plan")
+    usados = sorted(tr.sfx for tr in tramos if tr.sfx)
+    if usados != sorted(str(e.get("id")) for e in efectos):
+        motivos.append("los efectos de audio del plan no son los de los tramos con sfx")
+    motivos += malos
+    if motivos:
+        return False, "; ".join(motivos)
+    return True, (f"{len(h['plan']['momentos'])} momentos, apertura {h['plan']['apertura']['t0']:g}-"
+                  f"{h['plan']['apertura']['t1']:g} s, proveedor {h.get('proveedor')}")
+
+
+def historia_sin_texto(plan: dict) -> tuple[bool, str]:
+    """[plan] La historia no trae claves ni textos fuera del esquema y su proveedor es uno de la cadena."""
+    h = _historia(plan)
+    if h is None:
+        return False, "el plan no trae historia.plan"
+    ok, det = mod_historia.sin_texto_propio(h["plan"])
+    if h.get("proveedor") not in mod_historia.PROVEEDORES:
+        return False, f"proveedor {h.get('proveedor')!r} fuera de la lista"
+    return ok, det
+
+
+def apertura_en_frio(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
+    """[fotograma] El cuadro de salida a mitad de la apertura es la fuente en `apertura` (el desenlace), mejor que la
+    fuente en `inicio` (lo que habría salido sin historia). En una escena casi quieta ambas se parecen y no estorba."""
+    tramos, o, geo = _tramos(plan, marca), plan.get("origen") or {}, plan.get("geometria") or {}
+    if not tramos or not geo.get("recorte"):
+        return False, "el plan no trae mapa ni recorte"
+    ruta = Path(str(o.get("archivo", "")))
+    if not ruta.is_file():
+        return False, f"el archivo de origen no está: {ruta}"
+    ap = tramos[0]
+    t = ap.dur / 2
+    real = _fotograma(Path(video), t)
+    if real is None:
+        return False, f"no se pudo leer el fotograma en {t:.2f} s"
+    alto_min = max(1, int(round(MINIATURA_ANCHO * marca.alto / marca.ancho)))
+    a = _miniatura_gris(real, MINIATURA_ANCHO, alto_min)
+    libre = _libre_miniatura(plan, marca, t, alto_min)
+    if not libre.any():
+        return False, "las placas tapan todo el cuadro"
+
+    def contra(t_fuente: float) -> float | None:
+        mejor = None
+        for desfase in DESFASES_FUENTE_S:
+            f = _fuente_encuadrada(ruta, max(0.0, t_fuente + desfase), geo["recorte"], marca)
+            if f is None or f.size != real.size:
+                continue
+            d = float(np.abs(a - _miniatura_gris(f, MINIATURA_ANCHO, alto_min))[libre].mean())
+            mejor = d if mejor is None else min(mejor, d)
+        return mejor
+    d_ap, d_ini = contra(ap.f0 + t), contra(float(o["inicio"]) + t)
+    if d_ap is None or d_ini is None:
+        return False, f"no se pudo leer la fuente en {ap.f0 + t:.2f} s"
+    ok = d_ap < UMBRAL_CUERPO and d_ap <= d_ini + TOL_APERTURA
+    return ok, (f"con la fuente en la apertura ({ap.f0 + t:.1f} s) {d_ap:.1f}; con la fuente en el inicio "
+                f"({float(o['inicio']) + t:.1f} s) {d_ini:.1f} (tolerancia {UMBRAL_CUERPO:.1f})")
+
+
+def duracion_igual_al_mapa(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
+    """[fotograma] El MP4 dura lo que dice el mapa de la historia."""
+    tramos = _tramos(plan, marca)
+    if not tramos:
+        return False, "no se pudo calcular el mapa del plan"
+    esperada = mod_historia.duracion_salida(tramos)
+    real = sondear(Path(video))["duracion"]
+    return (abs(real - esperada) <= TOL_DURACION_S and abs(float(plan.get("duracion") or 0) - esperada) <= 0.01,
+            f"MP4 {real:.2f} s, mapa {esperada:.2f} s, plan {float(plan.get('duracion') or 0):.2f} s "
+            f"(tolerancia {TOL_DURACION_S:.2f})")
 
 
 def textos_caben(plan: dict, marca: Marca) -> tuple[bool, str]:
@@ -1147,6 +1299,15 @@ def revisar(video: Path, plan: dict, marca: Marca, ficha: dict | None = None) ->
         punto("fotograma", "Mosca en el video", ok_mo, det_mo)
     ok_cue, det_cue = cuerpo_coincide(Path(video), plan, marca)
     punto("fotograma", "Cuerpo coincide con el origen", ok_cue, det_cue)
+    if _historia(plan) is not None:
+        ok_hv, det_hv = historia_valida(plan, marca, ficha)
+        punto("plan", "Historia válida", ok_hv, det_hv)
+        ok_hs, det_hs = historia_sin_texto(plan)
+        punto("plan", "Historia sin texto propio", ok_hs, det_hs)
+        ok_ha, det_ha = apertura_en_frio(Path(video), plan, marca)
+        punto("fotograma", "Apertura en frío = desenlace", ok_ha, det_ha)
+        ok_hd, det_hd = duracion_igual_al_mapa(Path(video), plan, marca)
+        punto("fotograma", "Duración igual al mapa", ok_hd, det_hd)
 
     if (ficha or {}).get("marca_agua") or (plan.get("campana") or {}).get("marca_agua"):
         ok_ma, det_ma = marca_agua_visible(Path(video), plan, marca, ficha)
@@ -1155,10 +1316,10 @@ def revisar(video: Path, plan: dict, marca: Marca, ficha: dict | None = None) ->
         ok_ex, det_ex = logo_extra_en_esquina(Path(video), plan, marca, ok_cue)
         punto("fotograma", "Sin logos extra no declarados", ok_ex, det_ex)
     if v2:
-        ok_au, det_au = audio_original(Path(video), plan)
+        ok_au, det_au = audio_original(Path(video), plan, marca)
         punto("fotograma", "Audio original del clip", ok_au, det_au)
     elif ((ficha or {}).get("reglas") or {}).get("sin_musica") or (plan.get("campana") or {}).get("sin_musica"):
-        ok_au, det_au = audio_original(Path(video), plan)
+        ok_au, det_au = audio_original(Path(video), plan, marca)
         punto("fotograma", "Audio sólo el original (sin música)", ok_au, det_au)
     ok_mu, det_mu = musica_en_plan(plan, marca, ficha)
     punto("plan", "Música CC0 en pieza sin audio propio", ok_mu, det_mu)

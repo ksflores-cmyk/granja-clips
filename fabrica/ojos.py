@@ -24,6 +24,7 @@ from pathlib import Path
 from . import plazo
 from .config import cargar_yaml
 from .editar import dialogo as mod_dialogo
+from .editar import historia as mod_historia
 from .editar.lienzo import PUNTUACION, partir
 from .editar.marca import Marca
 
@@ -99,7 +100,9 @@ def esquema_respuesta() -> dict:
         "recorte": {"type": "OBJECT", "properties": {"inicio": numero, "fin": numero},
                     "required": ["inicio", "fin"]},
     }
-    return {"type": "OBJECT", "properties": campos, "required": list(campos)}
+    # `historia` es opcional (no va en `required`): el plan de edición por momentos, sin texto propio (#20)
+    return {"type": "OBJECT", "properties": {**campos, "historia": mod_historia.esquema_gemini()},
+            "required": list(campos)}
 
 
 def _sin_acentos(t: str) -> str:
@@ -140,9 +143,17 @@ def nota_de_ficha(ficha: dict | None) -> str:
 
 
 def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: str | None = None,
-                nota: str | None = None, recorte: tuple[float, float] | None = None) -> str:
-    """Arma la instrucción desde `ojos_prompt.md` con la duración, el juego y las listas de marca y temporada."""
+                nota: str | None = None, recorte: tuple[float, float] | None = None,
+                historia: dict | None = None) -> str:
+    """Arma la instrucción desde `ojos_prompt.md` con la duración, el juego y las listas de marca y temporada.
+
+    `historia` ({cfg, sfx: [ids], prohibe_sfx}) activa la sección «9. historia»; sin él, el prompt sale sin ella."""
     texto = RUTA_PROMPT.read_text(encoding="utf-8")
+    if historia:
+        sec = mod_historia.instruccion(historia.get("cfg"), historia.get("sfx"), historia.get("prohibe_sfx"))
+        texto = mod_historia.RE_SECCION.sub(lambda _m: sec, texto)
+    else:
+        texto = mod_historia.quitar_seccion(texto)
     lo, hi = recorte or (RECORTE_MIN_S, RECORTE_MAX_S)
     cambios = {
         "{{RECORTE_MIN}}": f"{lo:g}", "{{RECORTE_MAX}}": f"{hi:g}",
@@ -306,8 +317,10 @@ def _modelos_a_probar(cfg: dict, clave: str, mirada: Mirada, transporte, transpo
 def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracion: float | None = None,
           transporte=None, espera=time.sleep, entorno=None, config: dict | None = None,
           juego: str | None = None, nota: str | None = None,
-          recorte: tuple[float, float] | None = None, transporte_lista=None) -> Mirada:
+          recorte: tuple[float, float] | None = None, transporte_lista=None,
+          historia: dict | None = None) -> Mirada:
     """Le pide a Gemini el análisis del clip. Reintenta una vez ante 429 o 5xx; ante 404 prueba el modelo siguiente.
+    `historia` ({cfg, sfx, prohibe_sfx}) pide además el plan por momentos en la MISMA llamada (no gasta otra petición).
 
     Antes consulta ListModels (si `listar_modelos`) y salta los modelos que no existen. Con un `transporte`
     inyectado sólo se consulta si también se da `transporte_lista`."""
@@ -322,7 +335,7 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
     if tam > tope:
         return Mirada(None, motivo=f"el video pesa {tam / 1048576:.1f} MB y el máximo en línea es "
                                    f"{cfg['max_mb_en_linea']} MB", del_material=True)
-    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego, nota, recorte), ruta_video.read_bytes(),
+    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego, nota, recorte, historia), ruta_video.read_bytes(),
                              float(cfg["temperatura"]))
     if len(cuerpo) > TOPE_PETICION_BYTES:     # el base64 infla un tercio: se mide lo que de verdad se envía
         return Mirada(None, motivo=f"la petición serializada pesa {len(cuerpo) / 1048576:.1f} MB y el tope es "
