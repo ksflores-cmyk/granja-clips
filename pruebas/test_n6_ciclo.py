@@ -318,8 +318,8 @@ def test_el_tope_exige_20_minutos_libres_del_tope_configurado(r):
 
 
 def test_el_tope_es_el_de_horarios_yml_y_por_defecto_60(r):
-    minutos(r, **{"2026-11-18": 30})                       # 41 usados: con el tope de 90 caben los 20
-    assert ciclo.tope_minutos(r) == 90 and ciclo.admite_producir(r, AHORA, "1") is True
+    minutos(r, **{"2026-11-18": 30})                       # 41 usados: con el tope de 300 caben los 20
+    assert ciclo.tope_minutos(r) == 300 and ciclo.admite_producir(r, AHORA, "1") is True
     poner_tope(r, 60)
     assert ciclo.tope_minutos(r) == 60 and ciclo.admite_producir(r, AHORA, "1") is False
     d = yaml.safe_load((r / "config" / "horarios.yml").read_text(encoding="utf-8"))

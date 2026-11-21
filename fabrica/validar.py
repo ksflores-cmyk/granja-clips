@@ -579,8 +579,8 @@ def validar_horarios(h, inf: Informe) -> None:
         a = h["actions"]
         if not isinstance(a, dict):
             inf.error(f"{rel}: actions debe ser un mapa")
-        elif "tope_minutos_dia" in a and not _entero(a["tope_minutos_dia"], 30, 100):
-            inf.error(f"{rel}: actions.tope_minutos_dia debe ser un entero de 30 a 100")
+        elif "tope_minutos_dia" in a and not _entero(a["tope_minutos_dia"], 30, 600):
+            inf.error(f"{rel}: actions.tope_minutos_dia debe ser un entero de 30 a 600")
 
 
 def validar_cupos_contra_huecos(t, h, inf: Informe) -> None:
