@@ -189,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             lecturas.append(procesar(p, permitidas, salida, dur_min, dur_max, cache))
             print(f"OK    {p['id']}: {lecturas[-1]['licencias_leidas']} {lecturas[-1]['duracion_s']} s "
-                  f"sha256={lecturas[-1]['sha256']}", flush=True)
+                  f"{lecturas[-1].get('zip_miembro', '')} sha256={lecturas[-1]['sha256']}", flush=True)
         except Exception as e:      # una pista mala no tumba las demás
             rechazos.append({"id": p["id"], "motivo": f"{type(e).__name__}: {e}"})
             print(f"NO    {p['id']}: {type(e).__name__}: {e}", flush=True)

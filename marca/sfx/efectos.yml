@@ -47,17 +47,6 @@ efectos:
     asset: "whoosh-cuchillo.ogg"
     sha256: null
     estado: candidata
-  - id: whoosh-propulsor
-    titulo: "Whoosh de propulsor"
-    autor: "Kenney"
-    pagina: "https://opengameart.org/content/sci-fi-sounds"
-    archivo: "sci-fi_sounds.zip"
-    zip_miembro: "thrusterFire_000.ogg"
-    licencia: CC0
-    tipo: whoosh
-    asset: "whoosh-propulsor.ogg"
-    sha256: null
-    estado: candidata
   - id: boom-grave
     titulo: "Boom grave"
     autor: "Kenney"
@@ -120,7 +109,7 @@ efectos:
     archivo: "sci-fi_sounds.zip"
     zip_miembro: "laserSmall_000.ogg"
     licencia: CC0
-    tipo: ding
+    tipo: laser
     asset: "laser-corto.ogg"
     sha256: null
     estado: candidata

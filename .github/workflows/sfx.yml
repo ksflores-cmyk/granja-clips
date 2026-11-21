@@ -45,9 +45,9 @@ jobs:
           python - <<'PY' >> "$GITHUB_STEP_SUMMARY" || true
           import json, os
           d = json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "sfx", "lecturas.json"), encoding="utf-8"))
-          print("### Efectos CC0\n\n| efecto | licencia leída | autor leído | s | sha256 |\n|---|---|---|---|---|")
+          print("### Efectos CC0\n\n| efecto | licencia leída | autor leído | s | miembro del zip | sha256 |\n|---|---|---|---|---|---|")
           for x in d["verificadas"]:
-              print(f"| {x['id']} | {', '.join(x['licencias_leidas'])} | {x['autor_leido']} | {x['duracion_s']} | `{x['sha256']}` |")
+              print(f"| {x['id']} | {', '.join(x['licencias_leidas'])} | {x['autor_leido']} | {x['duracion_s']} | {x.get('zip_miembro', '')} | `{x['sha256']}` |")
           for x in d["rechazadas"]:
-              print(f"| {x['id']} | RECHAZADA | {x['motivo']} | | |")
+              print(f"| {x['id']} | RECHAZADA | {x['motivo']} | | | |")
           PY
