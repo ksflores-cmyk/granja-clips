@@ -540,8 +540,8 @@ def anotar(raiz, fuente, ronda: int, v: Veredicto, ahora=None) -> None:
                  "proveedores": sorted(({c.proveedor for c in v.criticas} | {v.juez.get("proveedor", "")}) - {""})}
         previas.append(json.dumps(linea, ensure_ascii=False))
         ruta.write_text("\n".join(previas[-MAX_LINEAS_JSONL:]) + "\n", encoding="utf-8")
-    except OSError:
-        pass
+    except Exception as e:  # noqa: BLE001 (la anotación es medida, no decisión: nunca descarta una toma buena)
+        print(f"AVISO: críticos: no se pudo anotar en estado/criticos.jsonl ({type(e).__name__})")
 
 
 def nota_para_ojos(texto: str) -> str:
