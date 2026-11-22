@@ -390,6 +390,19 @@ def validar_musica(raiz: Path, datos, inf: Informe) -> None:
                     inf.error(f"{et}: la línea Licencia: de LICENCIA.md debe decir CC0")
 
 
+def validar_reglas_kevin(raiz: Path, inf: Informe) -> None:
+    """`reglas-kevin.yml` con el mismo `cargar` de la puerta; avisa cuántas reglas quedan como notas."""
+    from .editar import reglas_kevin
+    try:
+        reglas = reglas_kevin.cargar(raiz)
+    except ValueError as e:
+        inf.error(f"reglas-kevin.yml: {e}")
+        return
+    notas = [r for r in reglas if r["estado"] == "vigente" and not r["revision"]]
+    if notas:
+        inf.aviso(f"reglas-kevin.yml: {len(notas)} regla(s) vigente(s) sin revisión quedan como nota para los críticos")
+
+
 def validar_marca_agua(m, inf: Informe) -> None:
     """`marca_agua` de marca.yml: lugar fijo, ancho, margen, opacidad y placa del logo de campaña."""
     rel = "marca.yml: marca_agua"
@@ -899,6 +912,7 @@ def validar(raiz=None) -> Informe:
     musica = _cargar(raiz, "marca/musica/pistas.yml", inf)
     if musica is not None:
         validar_musica(raiz, musica, inf)
+    validar_reglas_kevin(raiz, inf)
     validar_pausa(raiz, inf)
     validar_pausa_t(raiz, inf)
     validar_csv(raiz, "marcador.csv", CABECERA_MARCADOR, inf)

@@ -386,7 +386,7 @@ DUR_SEG = 11.0
 
 
 def segmentos_sinteticos(carpeta, n=3, dur=DUR_SEG, fecha=HOY, formato=None, cfg=None, duraciones=None,
-                         patrones=("testsrc2", "mandelbrot", "smptebars")):
+                         patrones=("testsrc2", "mandelbrot", "testsrc")):
     segs = []
     for i, (creador, tono) in enumerate(zip(CREADORES[:n], (440, 660, 880))):
         dur = duraciones[i] if duraciones else dur
@@ -609,7 +609,7 @@ def segmento_falso_fn(carpeta, dur=DUR_SEG, duraciones=None, falla=()):
         i = int(candidato.id_origen[1:])
         d = (duraciones or {}).get(candidato.id_origen, dur)
         fuente = fuente_sintetica(carpeta / f"{candidato.id_origen}.mp4", d + 2.0, (440, 660, 880)[i],
-                                  patron=("testsrc2", "mandelbrot", "smptebars")[i])
+                                  patron=("testsrc2", "mandelbrot", "testsrc")[i])
         hechos[candidato.id_origen] = fuente
         propia = Toma(ctx.numero, f"Clip número {i} del día", "CLIP", escena=f"INT. STREAM {i + 1} — TARDE")
         return formatos.Segmento(fuente=fuente, inicio=1.0, duracion=d, toma=propia,

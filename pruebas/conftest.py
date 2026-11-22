@@ -81,6 +81,7 @@ def raiz_musica(tmp_path_factory):
     audio.mkdir()
     raiz.mkdir()
     shutil.copy(RAIZ_REAL / "marca.yml", raiz / "marca.yml")
+    shutil.copy(RAIZ_REAL / "reglas-kevin.yml", raiz / "reglas-kevin.yml")   # la puerta lee las reglas de Kevin
     shutil.copytree(RAIZ_REAL / "marca", raiz / "marca", ignore=shutil.ignore_patterns("musica"))
     pistas = []
     for i in range(3):

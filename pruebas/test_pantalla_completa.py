@@ -29,7 +29,8 @@ def marca():
 
 
 def malos(puntos):
-    return [n for n, ok, _ in puntos if not ok and "Duración de 7 a 30" not in n]
+    # las reglas de Kevin (tarea #18) las prueban test_reglas_kevin.py; aquí se miran los puntos de la puerta de siempre
+    return [n for n, ok, _ in puntos if not ok and "Duración de 7 a 30" not in n and not n.startswith("[regla-kevin] ")]
 
 
 def lavfi(ruta, entrada, seg, audio=True, ffmpeg_extra=()):
