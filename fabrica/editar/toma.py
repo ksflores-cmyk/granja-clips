@@ -508,12 +508,13 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                 plan["voces"] = info_voces
             if transcripcion is not None:
                 plan["transcripcion"] = transcripcion          # contrato de la tarea #17: palabras en tiempo de la toma
-            plan_ruta.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
             if el_brazo:
                 plan["prueba"] = {"nombre": cfg_ret["nombre"], "brazo": el_brazo, "duracion_s": round(float(dur), 2),
                                   **({"nota": nota_prueba} if nota_prueba else {})}
                 if nota_prueba:
                     plazo.log(f"prueba {cfg_ret['nombre']}: {nota_prueba}")
+            # Después de anotar la prueba (revisión de Codex, 22 nov): el plan guardado lleva el brazo.
+            plan_ruta.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
             fila = fila_marcador(candidato, ficha, toma, dur, ahora, etiqueta_prueba)
             if isinstance(plan.get("historia"), dict):
                 fila["historia"] = plan["historia"].get("proveedor") or ""
