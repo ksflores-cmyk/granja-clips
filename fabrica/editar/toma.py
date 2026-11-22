@@ -22,7 +22,7 @@ from .. import descargar as mod_descargar
 from .. import fuentes, ojos, plazo, puertas
 from ..config import cargar_yaml, raiz_repo
 from ..registro import ZONA, contador_toma
-from . import estilo, musica as mod_musica, sin_ia, tecnica
+from . import criticos as mod_criticos, estilo, musica as mod_musica, sin_ia, tecnica
 from .componer import Linea, componer, sondear_video
 from .lienzo import Toma
 from .marca import Marca
@@ -120,7 +120,7 @@ def fila_marcador(candidato, ficha: dict, toma: Toma, dur: float, ahora: datetim
 
 def hacer_toma(raiz, candidato, ficha: dict | None, ahora: datetime, *, salida: Path | None = None,
                abrir=None, ejecutor=None, transporte=None, espera=time.sleep, entorno=None,
-               transporte_lista=None) -> Resultado:
+               transporte_lista=None, transporte_criticos=None) -> Resultado:
     """Descarga → ojos → validar_respuesta → componer → puerta de estilo. Nunca publica.
 
     `salida`: carpeta del MP4. Si no se da, se crea una temporal que sólo se conserva cuando la toma sale ok
@@ -136,7 +136,7 @@ def hacer_toma(raiz, candidato, ficha: dict | None, ahora: datetime, *, salida: 
     try:
         carpeta = Path(salida) if salida is not None else Path(tempfile.mkdtemp(prefix="granja-toma-"))
         r = _hacer_toma(raiz, candidato, ficha, ahora, carpeta, abrir, ejecutor, transporte, espera, entorno,
-                        transporte_lista)
+                        transporte_lista, transporte_criticos)
     except plazo.SinTiempo:
         raise                # se acabó el plazo del ciclo: lo maneja el ciclo (la fuente no se gasta)
     except Exception as e:  # noqa: BLE001 (nada debe subir sin control: es un descarte; gastar=False)
@@ -148,7 +148,8 @@ def hacer_toma(raiz, candidato, ficha: dict | None, ahora: datetime, *, salida: 
 
 
 def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, transporte, espera, entorno,
-                transporte_lista=None) -> Resultado:
+                transporte_lista=None, transporte_criticos=None, nota_juez: str | None = None, ronda: int = 1,
+                descarga=None, llamadas_previas: dict | None = None) -> Resultado:
     raiz = raiz_repo(raiz)
     salida.mkdir(parents=True, exist_ok=True)
     marca = Marca.cargar(raiz)
@@ -157,7 +158,7 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
     try:
         with ExitStack() as pila:
             with plazo.etapa("descarga"):      # la descarga (y la medición) ocurre al entrar
-                d = pila.enter_context(
+                d = descarga or pila.enter_context(      # ronda 2 de los críticos: la misma descarga, sin repetirla
                     mod_descargar.descargar(raiz, candidato, ficha, hoy, abrir=abrir, ejecutor=ejecutor))
             temporada = ojos.temporada_de(ficha, temporada)
             juego = ojos.juego_de(ficha, temporada)          # el de la ficha si lo declara (FM27, no GTA 6)
@@ -175,8 +176,8 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                 with plazo.etapa("ojos (Gemini)"):
                     mirada = ojos.mirar(video_ojos, marca, temporada, raiz=raiz, duracion=d.duracion,
                                         transporte=transporte, espera=espera, entorno=entorno, juego=juego,
-                                        nota=ojos.nota_de_ficha(ficha) or None, recorte=recorte,
-                                        transporte_lista=transporte_lista)
+                                        nota=" ".join(x for x in (ojos.nota_de_ficha(ficha), nota_juez) if x) or None,
+                                        recorte=recorte, transporte_lista=transporte_lista, registrar_cupos=True)
                 # Sin clave o con clave mala (401/403) es un error de configuración, no una caída de Gemini:
                 # ahí no hay corte sin IA.
                 if (mirada.datos is None and mirada.sin_gemini and not mirada.clave_mala
@@ -260,6 +261,26 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                                  "intentos": intentos_gemini}
             else:
                 plan["gemini"] = {"modelo": mirada.modelo, "idioma_original": mirada.datos["idioma_original"]}
+            # Tarea #21: los críticos (que no ven el plan) miran el MP4 final. Sin transporte propio y con ojos
+            # falsos (pruebas) corren sin IA: nunca llaman a la red por su cuenta.
+            dec = mod_criticos.decidir(
+                raiz, mp4, plan, marca, ronda=ronda, con_corte_gemini=por_sin_ia is None, fuente=candidato.id_origen,
+                entorno=entorno, transporte=transporte_criticos, espera=espera, transporte_lista=transporte_lista,
+                modo="sin_ia" if transporte is not None and transporte_criticos is None else None,
+                llamadas_previas=llamadas_previas)
+            if dec.bloque is not None:
+                plan["criticos"] = dec.bloque
+            if dec.accion == "replantear":       # ronda 1 con corte de Gemini: una vuelta a los ojos con la nota del juez
+                mp4.unlink(missing_ok=True)
+                return _hacer_toma(raiz, candidato, ficha, ahora, salida, abrir, ejecutor, transporte, espera, entorno,
+                                   transporte_lista, transporte_criticos, nota_juez=dec.nota, ronda=2, descarga=d,
+                                   llamadas_previas=dec.bloque["llamadas"])
+            if dec.accion == "sin_tiempo":       # no cabe la ronda 2 junto con publicar: la fuente no se gasta
+                mp4.unlink(missing_ok=True)
+                return Resultado(False, dec.motivos, None, plan, mirada.datos, mirada.modelo, puntos, gastar=False)
+            if dec.accion == "descartar":        # el fallo es del material: la fuente se gasta
+                mp4.unlink(missing_ok=True)
+                return Resultado(False, dec.motivos, None, plan, mirada.datos, mirada.modelo, puntos, gastar=True)
             plan_ruta.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
             return Resultado(True, [], mp4, plan, mirada.datos, mirada.modelo, puntos,
                              fila_marcador(candidato, ficha, toma, dur, ahora))

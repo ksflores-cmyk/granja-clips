@@ -840,6 +840,78 @@ def validar_tecnica(t, inf: Informe) -> None:
         num(b, "alto", 16, 1920, entero=True)
 
 
+def _num(v, minimo=None, maximo=None) -> bool:
+    return (isinstance(v, (int, float)) and not isinstance(v, bool)
+            and (minimo is None or v >= minimo) and (maximo is None or v <= maximo))
+
+
+def validar_criticos(c, inf: Informe) -> None:
+    rel = "config/criticos.yml"
+    if not _claves(c, rel, ["activo", "modo", "tiempo_por_llamada_s", "tope_s", "juez", "cupos", "segundo", "sin_ia"], inf):
+        return
+    if not isinstance(c["activo"], bool):
+        inf.error(f"{rel}: activo debe ser true o false")
+    if c["modo"] not in ("cadena", "sin_ia"):
+        inf.error(f"{rel}: modo debe ser cadena o sin_ia")
+    for clave in ("tiempo_por_llamada_s", "tope_s"):
+        if not _num(c[clave], 1):
+            inf.error(f"{rel}: {clave} debe ser un número de 1 o más")
+    for clave in ("reserva_publicar_s", "minimo_ronda2_s"):
+        if not _num(c.get(clave), 0):
+            inf.error(f"{rel}: {clave} debe ser un número de 0 o más")
+    if "temperatura" in c and not _num(c["temperatura"], 0, 2):
+        inf.error(f"{rel}: temperatura debe ser un número de 0 a 2")
+    f = c.get("fotogramas") or {}
+    if not (isinstance(f, dict) and _es_int(f.get("n")) and 2 <= f["n"] <= 12 and _es_int(f.get("lado_max"))
+            and 64 <= f["lado_max"] <= 1024):
+        inf.error(f"{rel}: fotogramas debe traer n (2 a 12) y lado_max (64 a 1024)")
+    if not (isinstance(c["juez"], dict) and isinstance(c["juez"].get("con_modelo"), bool)):
+        inf.error(f"{rel}: juez.con_modelo debe ser true o false")
+    cu = c["cupos"]
+    g = cu.get("gemini") if isinstance(cu, dict) else None
+    if not (isinstance(g, dict) and all(_es_int(g.get(k)) and g[k] >= 0 for k in ("rpm", "rpd", "reserva_ojos", "pausa_429_s"))):
+        inf.error(f"{rel}: cupos.gemini debe traer rpm, rpd, reserva_ojos y pausa_429_s (enteros de 0 o más)")
+    elif g["reserva_ojos"] >= g["rpd"]:
+        inf.error(f"{rel}: cupos.gemini.reserva_ojos debe ser menor que rpd (si no, los críticos nunca tienen cupo)")
+    if not (isinstance(cu, dict) and _num(cu.get("espera_max_s"), 0)):
+        inf.error(f"{rel}: cupos.espera_max_s debe ser un número de 0 o más")
+    s = c["segundo"]
+    if not (isinstance(s, dict) and isinstance(s.get("activo"), bool)):
+        inf.error(f"{rel}: segundo.activo debe ser true o false")
+    else:
+        if s["activo"]:
+            for k in ("url", "modelo", "secreto"):
+                if not (isinstance(s.get(k), str) and s[k].strip()):
+                    inf.error(f"{rel}: segundo activo necesita {k} (texto)")
+            if isinstance(s.get("url"), str) and not s["url"].startswith("https://"):
+                inf.error(f"{rel}: segundo.url debe empezar con https://")
+        elif not (isinstance(s.get("motivo"), str) and s["motivo"].strip()):
+            inf.error(f"{rel}: segundo apagado necesita un motivo escrito")
+        if isinstance(s.get("secreto"), str) and not re.fullmatch(r"[A-Z][A-Z0-9_]*", s["secreto"]):
+            inf.error(f"{rel}: segundo.secreto es el NOMBRE de una variable de entorno (MAYÚSCULAS), nunca la clave")
+    u = c["sin_ia"]
+    esperados = {"historia": ("audio_inicio_s", "silencio_db", "cambio_min", "min_pares_con_cambio"),
+                 "subtitulos": ("max_cps", "tolerancia_papel", "max_papel_en_botones"),
+                 "tecnica": ("negro_max", "blanco_min", "min_nitidez", "min_cuadros_nitidos", "vol_min_db", "vol_max_db")}
+    if not isinstance(u, dict):
+        inf.error(f"{rel}: sin_ia debe ser un bloque con historia, subtitulos y tecnica")
+        return
+    for crit, claves in esperados.items():
+        bloque = u.get(crit)
+        if not isinstance(bloque, dict):
+            inf.error(f"{rel}: sin_ia.{crit} debe ser un bloque")
+            continue
+        for k in claves:
+            if not _num(bloque.get(k)):
+                inf.error(f"{rel}: sin_ia.{crit}.{k} debe ser un número")
+    t = u.get("tecnica") or {}
+    if _num(t.get("vol_min_db")) and _num(t.get("vol_max_db")) and t["vol_min_db"] >= t["vol_max_db"]:
+        inf.error(f"{rel}: sin_ia.tecnica.vol_min_db debe ser menor que vol_max_db")
+    p = (u.get("subtitulos") or {}).get("max_papel_en_botones")
+    if _num(p) and not 0 <= p <= 1:
+        inf.error(f"{rel}: sin_ia.subtitulos.max_papel_en_botones debe ser una fracción de 0 a 1")
+
+
 def validar_canales(c, inf: Informe) -> None:
     rel = "config/canales.yml"
     if not isinstance(c, dict):
@@ -1045,6 +1117,9 @@ def validar(raiz=None) -> Informe:
     tecnica = _cargar(raiz, "config/tecnica.yml", inf)
     if tecnica is not None:
         validar_tecnica(tecnica, inf)
+    criticos = _cargar(raiz, "config/criticos.yml", inf)
+    if criticos is not None:
+        validar_criticos(criticos, inf)
     almacen = _cargar(raiz, "config/almacen.yml", inf)
     if almacen is not None:
         validar_almacen(almacen, inf)
