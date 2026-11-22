@@ -127,7 +127,7 @@
   origen: twitch
   twitch_login: taisontv
   broadcaster_id: '115156753'
-  seguidores: 165541
+  seguidores: 165545
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -167,7 +167,7 @@
   origen: twitch
   twitch_login: zyrpesland
   broadcaster_id: '512025628'
-  seguidores: 159724
+  seguidores: 159770
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -327,7 +327,7 @@
   origen: twitch
   twitch_login: srserpiente
   broadcaster_id: '30805171'
-  seguidores: 169017
+  seguidores: 169018
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -527,7 +527,7 @@
   origen: twitch
   twitch_login: itsmoura
   broadcaster_id: '110286144'
-  seguidores: 58939
+  seguidores: 58940
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -1247,8 +1247,8 @@
   origen: twitch
   twitch_login: vicesat
   broadcaster_id: '110387651'
-  seguidores: 14796
-  seguidores_leidos: '2026-11-21'
+  seguidores: 15277
+  seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1274,7 +1274,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-23'
+  vence: '2026-11-24'
   estado: vigente
   uso: produccion
   publicable: true
