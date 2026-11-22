@@ -1,10 +1,13 @@
-# Las 3 muestras de la puerta de estilo (plantilla v2: las tres con video, a pantalla completa).
+# Las muestras de la puerta de estilo (plantilla v2, todas con video). Las 3 primeras no tienen facecam: salen a pantalla
+# completa. Las 3 últimas (tarea #16) son «streams» sintéticos armados en la carpeta temporal con las fuentes ya autorizadas
+# (Sintel como facecam, Big Buck Bunny como juego): salen en pantalla dividida. Cada una declara su `disposicion`.
 # Frases y datos de la especificación N2; la informativa tipográfica ya no es muestra (su prueba sigue en pytest).
 # Los tiempos de las líneas son segundos relativos al recorte. `original` sólo va al manifiesto.
 muestras:
   - id: dialogo-sintel
     pilar: primeras_veces          # demostración del diálogo traducido
     fuente_id: sintel-cc-by
+    disposicion: completa
     video:
       url: https://raw.githubusercontent.com/mdn/shared-assets/main/videos/sintel-short.mp4
       sha256: 358447f332663e6f3794816e32b8072526fcba8bf8744dc7fb3387afb5b2fceb
@@ -30,6 +33,7 @@ muestras:
   - id: momento-bbb
     pilar: momentos
     fuente_id: bbb-cc-by
+    disposicion: completa
     video:
       url: https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4
       sha256: 543a4ad9fef4c9e0004ec9482cb7225c2574b0f889291e8270b1c4d61dbc1ab8
@@ -49,6 +53,7 @@ muestras:
   - id: pajaro-bbb
     pilar: momentos
     fuente_id: bbb-cc-by
+    disposicion: completa
     video:
       url: https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4
       sha256: 543a4ad9fef4c9e0004ec9482cb7225c2574b0f889291e8270b1c4d61dbc1ab8
@@ -64,3 +69,87 @@ muestras:
       credito: "Con: Blender Foundation (CC BY 3.0)"
     lineas:
       - {t0: 3.6, t1: 7.0, acotacion: "(estira las alas)"}
+
+  - id: dividida-facecam-arriba-derecha
+    pilar: momentos
+    fuente_id: sintel-cc-by          # la «facecam»
+    disposicion: dividida
+    video:
+      url: https://raw.githubusercontent.com/mdn/shared-assets/main/videos/sintel-short.mp4
+      sha256: 358447f332663e6f3794816e32b8072526fcba8bf8744dc7fb3387afb5b2fceb
+    juego:                          # el «juego» del compuesto: otra fuente autorizada
+      fuente_id: bbb-cc-by
+      video:
+        url: https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4
+        sha256: 543a4ad9fef4c9e0004ec9482cb7225c2574b0f889291e8270b1c4d61dbc1ab8
+      inicio: 30.0
+    stream: {esquina_facecam: superior_derecha, esquina_logo: inferior_derecha, chat: izquierda, alerta_s: null, tramo_cara: [42.5, 2.2]}
+    licencia: "CC BY 3.0, © Blender Foundation (durian.blender.org y peach.blender.org); compuesto sintético, no se publica"
+    enlace_licencia: https://creativecommons.org/licenses/by/3.0/
+    recorte: {inicio: 0.0, duracion: 9.0}      # sobre el compuesto
+    toma:
+      numero: 5
+      gancho: "La cámara sigue a la vista"
+      palabra_lapiz: "CÁMARA"
+      lapiz: círculo
+      escena: "EXT. PRADERA — MAÑANA"
+      credito: "Con: Blender Foundation (CC BY 3.0)"
+    lineas:
+      - {t0: 1.0, t1: 4.5, nombre: "STREAMER", frase: "Miren esto, está cayendo."}
+      - {t0: 5.5, t1: 8.0, acotacion: "(se ríe)"}
+
+  - id: dividida-facecam-abajo-izquierda
+    pilar: momentos
+    fuente_id: sintel-cc-by          # la «facecam»
+    disposicion: dividida
+    video:
+      url: https://raw.githubusercontent.com/mdn/shared-assets/main/videos/sintel-short.mp4
+      sha256: 358447f332663e6f3794816e32b8072526fcba8bf8744dc7fb3387afb5b2fceb
+    juego:                          # el «juego» del compuesto: otra fuente autorizada
+      fuente_id: bbb-cc-by
+      video:
+        url: https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4
+        sha256: 543a4ad9fef4c9e0004ec9482cb7225c2574b0f889291e8270b1c4d61dbc1ab8
+      inicio: 42.0
+    stream: {esquina_facecam: inferior_izquierda, esquina_logo: superior_izquierda, chat: derecha, alerta_s: 3.0, tramo_cara: [41.5, 3.0]}
+    licencia: "CC BY 3.0, © Blender Foundation (durian.blender.org y peach.blender.org); compuesto sintético, no se publica"
+    enlace_licencia: https://creativecommons.org/licenses/by/3.0/
+    recorte: {inicio: 0.0, duracion: 9.0}      # sobre el compuesto
+    toma:
+      numero: 6
+      gancho: "La alerta no tapa el juego"
+      palabra_lapiz: "ALERTA"
+      lapiz: subrayado
+      escena: "EXT. CLARO — TARDE"
+      credito: "Con: Blender Foundation (CC BY 3.0)"
+    lineas:
+      - {t0: 1.0, t1: 4.0, nombre: "STREAMER", frase: "Gracias por el seguidor."}
+      - {t0: 5.0, t1: 8.0, acotacion: "(mira al frente)"}
+
+  - id: dividida-facecam-arriba-izquierda
+    pilar: momentos
+    fuente_id: sintel-cc-by          # la «facecam»
+    disposicion: dividida
+    video:
+      url: https://raw.githubusercontent.com/mdn/shared-assets/main/videos/sintel-short.mp4
+      sha256: 358447f332663e6f3794816e32b8072526fcba8bf8744dc7fb3387afb5b2fceb
+    juego:                          # el «juego» del compuesto: otra fuente autorizada
+      fuente_id: bbb-cc-by
+      video:
+        url: https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4
+        sha256: 543a4ad9fef4c9e0004ec9482cb7225c2574b0f889291e8270b1c4d61dbc1ab8
+      inicio: 40.0
+    stream: {esquina_facecam: superior_izquierda, esquina_logo: inferior_izquierda, chat: derecha, alerta_s: null, tramo_cara: [29.5, 3.0]}
+    licencia: "CC BY 3.0, © Blender Foundation (durian.blender.org y peach.blender.org); compuesto sintético, no se publica"
+    enlace_licencia: https://creativecommons.org/licenses/by/3.0/
+    recorte: {inicio: 0.0, duracion: 9.0}      # sobre el compuesto
+    toma:
+      numero: 7
+      gancho: "El chat queda fuera del cuadro"
+      palabra_lapiz: "CHAT"
+      lapiz: círculo
+      escena: "EXT. ARROYO — AMANECER"
+      credito: "Con: Blender Foundation (CC BY 3.0)"
+    lineas:
+      - {t0: 0.8, t1: 4.2, nombre: "STREAMER", frase: "Ahora sí, atentos."}
+      - {t0: 5.2, t1: 8.2, acotacion: "(señala la pantalla)"}
