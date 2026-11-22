@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 from dataclasses import replace
 from datetime import datetime
@@ -26,7 +27,9 @@ from ..registro import ZONA
 from . import criticos as mod_criticos
 from . import dividida as mod_dividida
 from . import estilo, tecnica
+from . import historia as mod_historia
 from . import musica as mod_musica
+from . import sfx as mod_sfx
 from . import stream_sintetico
 from .componer import Linea, componer, sondear_video
 from .config_ruta import RAIZ
@@ -63,6 +66,14 @@ def descargar(url: str, esperado: str, destino: Path) -> Path:
 
 def cargar_muestras(ruta: Path | None = None) -> list[dict]:
     ruta = ruta or RAIZ / "marca" / "muestras" / "muestras.yml"
+    return yaml.safe_load(ruta.read_text(encoding="utf-8"))["muestras"]
+
+
+def cargar_muestras_historia(ruta: Path | None = None) -> list[dict]:
+    """Las muestras de la historia (#20): `marca/muestras/historia.yml` (lista vacía si no existe)."""
+    ruta = ruta or RAIZ / "marca" / "muestras" / "historia.yml"
+    if not ruta.is_file():
+        return []
     return yaml.safe_load(ruta.read_text(encoding="utf-8"))["muestras"]
 
 
@@ -212,13 +223,97 @@ def _voces_de_muestra(marca: Marca, m: dict, ruta_video: Path, inicio: float, du
     return nuevas, dur, (res.tramos if res.hay_cortes else None), resumen, detalle
 
 
+def resolver_sfx(plan: dict, sfx: dict) -> tuple[dict, list[str]]:
+    """El plan fijo de una muestra con `sfx: {tipo: ...}` resuelto contra los efectos disponibles. Sin efecto de ese
+    tipo, el momento pasa a zoom_suave (si el plan aún admite otro zoom) o a ninguno. Devuelve (plan, avisos)."""
+    avisos, momentos = [], []
+    for i, mo in enumerate(plan["momentos"], 1):
+        mo = dict(mo)
+        if isinstance(mo.get("sfx"), dict):
+            tipo = mo["sfx"].get("tipo")
+            e = next((sfx[k] for k in sorted(sfx) if sfx[k].get("tipo") == tipo), None)
+            if e is not None:
+                mo["sfx"] = e["id"]
+            else:
+                mo["sfx"], mo["tratamiento"] = None, "zoom_suave"
+                avisos.append(f"momento {i}: sin efecto de tipo {tipo!r} disponible; el tratamiento sfx pasa a zoom_suave")
+        momentos.append(mo)
+    return {**plan, "momentos": momentos}, avisos
+
+
+def memoria_hijos_mb() -> float:
+    """Memoria máxima (MB) de cualquier proceso hijo ya terminado (ffmpeg incluido); es un máximo acumulado del
+    proceso. En Linux `ru_maxrss` viene en KB; 0.0 donde no hay `resource`."""
+    try:
+        import resource
+        return round(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024, 1)
+    except (ImportError, OSError):
+        return 0.0
+
+
+def _muestras_historia(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, registrar, fichas: list[dict],
+                       descargador, sfx: dict) -> None:
+    """Muestras con historia: el plan sale del eslabón sin IA (`eslabon: sin-ia`) o es el JSON fijo del YAML."""
+    cfg = {**mod_historia.cargar_config(marca.raiz), "activo": True}
+    for m in muestras:
+        mid, vid = m["id"], m["video"]
+        ruta_video = descargador(vid["url"], vid["sha256"], descargas / Path(vid["url"]).name)
+        inicio, duracion = float(m["recorte"]["inicio"]), float(m["recorte"]["duracion"])
+        fin = round(inicio + duracion, 3)
+        ficha = next((f for f in fichas if f.get("id") == m["fuente_id"]), None)
+        t = Toma(**m["toma"])
+        lineas = [Linea(**ln) for ln in m["lineas"]]
+        eslabon = (m.get("historia") or {}).get("eslabon", "sin-ia")
+        avisos: list[str] = []
+        if eslabon == "fijo":
+            plan_h, avisos = resolver_sfx(m["historia"]["plan"], sfx)
+            ids = sorted(sfx)
+            ok, motivos = mod_historia.validar_plan(plan_h, (inicio, fin), estilo.rango_duracion({}, ficha), ids, ficha, cfg)
+            if not ok:
+                raise RuntimeError(f"el plan fijo de {mid} no valida: " + "; ".join(motivos))
+            hist = mod_historia.Planificacion(plan_h, "gemini", ["plan fijo del YAML, como si lo devolviera el modelo"]
+                                              + avisos)
+        else:
+            hist = mod_historia.planificar(raiz=marca.raiz, ficha=ficha, recorte=(inicio, fin),
+                                           rango_duracion=estilo.rango_duracion({}, ficha), sfx=sfx,
+                                           ruta_video=ruta_video, lineas=[], cfg=cfg)
+            if hist.plan is None:
+                raise RuntimeError(f"el eslabón sin IA no dio plan para {mid}: {hist.motivo}; {hist.intentos}")
+        mp4 = salida / f"{mid}.mp4"
+        plan_ruta = salida / f"{mid}.plan.json"
+        t0 = time.monotonic()
+        with tempfile.TemporaryDirectory(prefix=f"trabajo-{mid}-") as tmp:
+            plan = componer(marca, t, lineas, mp4, duracion=duracion, trabajo=Path(tmp), fuente_video=ruta_video,
+                            inicio=inicio, plan_salida=plan_ruta, ficha=ficha, historia=hist, sfx=sfx,
+                            config_historia=cfg)
+        t_render = time.monotonic() - t0
+        puntos = (tecnica.revisar(mp4, tecnica.con_originales(plan, lineas), tecnica.cargar(marca.raiz))
+                  + estilo.revisar(mp4, plan, marca, ficha))
+        t_total = time.monotonic() - t0
+        memoria = memoria_hijos_mb()
+        h = plan.get("historia") or {}
+        registrar(mid, mp4, plan_ruta, float(plan["duracion"]), puntos,
+                  [Linea(**{k: v for k, v in ln.items() if k in ("t0", "t1", "nombre", "frase", "acotacion")})
+                   for ln in plan["lineas"]], {
+            "pilar": m["pilar"], "fuente_id": m["fuente_id"], "fuente": {"url": vid["url"], "sha256": vid["sha256"]},
+            "recorte": m.get("recorte"), "licencia": m["licencia"], "enlace": m.get("enlace_licencia"),
+            "historia": {"proveedor": h.get("proveedor"), "plan": h.get("plan"), "mapa": h.get("mapa"),
+                         "intentos": h.get("intentos"), "motivo": h.get("motivo"), "avisos": avisos,
+                         "duracion_salida_s": plan["duracion"], "detector": hist.detector,
+                         "memoria_max_hijos_mb": memoria,
+                         "efectos": (plan.get("audio") or {}).get("efectos") or []},
+            "tiempos_s": {"render": round(t_render, 1), "puerta_de_estilo": round(t_total - t_render, 1),
+                          "render_y_puerta": round(t_total, 1)}}, plan)
+
+
 def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *,
-            fichas: list[dict] | None = None, hoy=None, descargador=descargar, transcriptor_voces=None) -> dict:
+            fichas: list[dict] | None = None, hoy=None, descargador=descargar, transcriptor_voces=None,
+            historia: list[dict] | None = None, sfx: dict | None = None) -> dict:
     if fichas is None:
         fichas = mod_fuentes.cargar_fuentes()
     if hoy is None:
         hoy = datetime.now(ZONA).date()
-    for m in muestras:          # todo se autoriza antes de la primera conexión
+    for m in [*muestras, *(historia or [])]:          # todo se autoriza antes de la primera conexión
         autorizar(m, fichas, hoy)
     manifiesto = {"muestras": [], "omitidas": []}
     informe = ["# Puerta de estilo automática", "",
@@ -322,6 +417,9 @@ def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *
             "recorte": m.get("recorte"), "licencia": m["licencia"], "enlace": m.get("enlace_licencia"),
             "disposicion": (plan.get("geometria") or {}).get("disposicion"), **extra}, plan)
     _muestra_con_musica(salida, marca, registrar, omitir, hoy)
+    if historia:
+        _muestras_historia(salida, marca, historia, descargas, registrar, fichas, descargador,
+                           sfx if sfx is not None else mod_sfx.disponibles(marca.raiz))
     # Una muestra omitida (p. ej. sin pista de música del release) no cuenta como verde.
     todas = (all(x["puerta_estilo"]["en_verde"] for x in manifiesto["muestras"])
              and not manifiesto["omitidas"])
@@ -344,19 +442,25 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     salida.mkdir(parents=True, exist_ok=True)
     marca = Marca.cargar()
-    muestras = cargar_muestras()
+    muestras, historia = cargar_muestras(), cargar_muestras_historia()
     with tempfile.TemporaryDirectory(prefix="descargas-") as tmp:
         descargas = Path(args.descargas) if args.descargas else Path(tmp)
         if _dentro_del_repo(descargas):
             print("ERROR: las descargas no pueden estar dentro del repo.", file=sys.stderr)
             return 2
         try:
-            manifiesto = generar(salida, marca, muestras, descargas)
+            manifiesto = generar(salida, marca, muestras, descargas, historia=historia)
         except RuntimeError as e:
             print(f"ERROR: {e}", file=sys.stderr)
             return 2
     for m in manifiesto["muestras"]:
-        print(f"{m['id']}: {m['archivo']} {m['duracion_s']} s, puerta {'EN VERDE' if m['puerta_estilo']['en_verde'] else 'EN ROJO'}")
+        extra = ""
+        if m.get("historia"):       # #20: qué eslabón armó el plan, con qué detector y cuánto tardó (render + puerta)
+            extra = (f"; historia {m['historia']['proveedor']} ({m['historia']['detector']}), render "
+                     f"{m['tiempos_s']['render']} s + puerta {m['tiempos_s']['puerta_de_estilo']} s"
+                      f"; memoria máx. de ffmpeg (acumulada) {m['historia'].get('memoria_max_hijos_mb')} MB")
+            extra += "".join(f"; {a}" for a in m["historia"].get("avisos") or [])
+        print(f"{m['id']}: {m['archivo']} {m['duracion_s']} s, puerta {'EN VERDE' if m['puerta_estilo']['en_verde'] else 'EN ROJO'}{extra}")
     return 0 if manifiesto["puerta_estilo_en_verde"] else 1
 
 

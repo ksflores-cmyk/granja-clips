@@ -1,6 +1,6 @@
 name: muestras
 
-# Renderiza las 3 muestras de estilo en la nube y las deja como artefacto (3 días).
+# Renderiza las muestras de estilo (3 + 1 de música + 2 de historia, #20) en la nube y las deja como artefacto (3 días).
 # No escribe en ninguna rama: el video nunca entra al repo ni a la PC de Kevin.
 on:
   workflow_dispatch:
@@ -12,6 +12,7 @@ on:
       - "marca.yml"
       - "config/voces.yml"
       - "fuentes.yml"
+      - "config/historia.yml"
       - "requirements.txt"
       - "requirements-voces.txt"
       - ".github/workflows/muestras.yml"
@@ -22,6 +23,7 @@ on:
       - "marca.yml"
       - "config/voces.yml"
       - "fuentes.yml"
+      - "config/historia.yml"
       - "requirements.txt"
       - "requirements-voces.txt"
       - ".github/workflows/muestras.yml"
@@ -59,9 +61,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release download musica -D "$RUNNER_TEMP/musica" --clobber || echo "::warning::sin música del release"
+      - name: Bajar efectos de sonido del release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download sfx -D "$RUNNER_TEMP/sfx" --clobber || echo "::warning::sin efectos del release"
       - name: Renderizar muestras fuera del repo
         env:
           GRANJA_MUSICA_DIR: ${{ runner.temp }}/musica
+          GRANJA_SFX_DIR: ${{ runner.temp }}/sfx
         run: python -m fabrica.editar.muestras --salida "$RUNNER_TEMP/muestras"
       - name: Medir voces sobre material de campaña (fm27-daro, sólo medición)
         timeout-minutes: 6

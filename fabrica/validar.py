@@ -981,6 +981,81 @@ def validar_voces(v, inf: Informe) -> None:
         inf.error(f"{rel}: nombre_otra debe ser texto")
 
 
+def validar_historia(h, inf: Informe) -> None:
+    """config/historia.yml: límites de la historia (#20) y el bloque `segundo` (apagado: GitHub Models retirado)."""
+    rel = "config/historia.yml"
+    if h is None:
+        return
+    claves = ["activo", "apertura_min_s", "apertura_max_s", "apertura_final_pct", "momentos_min", "momentos_max",
+              "momento_min_s", "camara_lenta_max", "camara_lenta_momento_max_s", "pausa_max", "pausa_s", "zoom_max_n",
+              "zoom_max", "zoom_momento_max_s", "sfx_max", "sfx_en_campanas", "ganancia_sfx_db", "segundo"]
+    if not _claves(h, rel, claves, inf):
+        return
+
+    def num(clave, minimo=None, maximo=None, entero=False, estricto_min=False):
+        v = h[clave]
+        if isinstance(v, bool) or not isinstance(v, int if entero else (int, float)):
+            inf.error(f"{rel}: {clave} debe ser un {'entero' if entero else 'número'}")
+            return None
+        if minimo is not None and (v <= minimo if estricto_min else v < minimo):
+            inf.error(f"{rel}: {clave} debe ser {'mayor que' if estricto_min else 'de'} {minimo}{'' if estricto_min else ' o más'}")
+        if maximo is not None and v > maximo:
+            inf.error(f"{rel}: {clave} debe ser de {maximo} o menos")
+        return v
+    for b in ("activo", "sfx_en_campanas"):
+        if not isinstance(h[b], bool):
+            inf.error(f"{rel}: {b} debe ser true o false")
+    a0, a1 = num("apertura_min_s", 0, estricto_min=True), num("apertura_max_s", 0, 10, estricto_min=True)
+    if a0 is not None and a1 is not None and a0 > a1:
+        inf.error(f"{rel}: apertura_min_s no puede pasar de apertura_max_s")
+    num("apertura_final_pct", 0, 100, estricto_min=True)
+    m0, m1 = num("momentos_min", 1, entero=True), num("momentos_max", 1, 10, entero=True)
+    if m0 is not None and m1 is not None and m0 > m1:
+        inf.error(f"{rel}: momentos_min no puede pasar de momentos_max")
+    num("momento_min_s", 0, estricto_min=True)
+    num("camara_lenta_max", 0, entero=True)
+    num("camara_lenta_momento_max_s", 0, 10, estricto_min=True)
+    num("pausa_max", 0, entero=True)
+    pausa = num("pausa_s", 0, estricto_min=True)
+    if pausa is not None and pausa >= 0.5:
+        inf.error(f"{rel}: pausa_s debe quedar por debajo del tope de congelado de 0.5 s")
+    num("zoom_max_n", 0, entero=True)
+    zm = num("zoom_max")
+    if zm is not None and not 1.0 < zm <= 1.5:
+        inf.error(f"{rel}: zoom_max debe estar entre 1 (sin incluir) y 1.5")
+    num("zoom_momento_max_s", 0, 10, estricto_min=True)
+    num("sfx_max", 0, entero=True)
+    g = num("ganancia_sfx_db", -40, 0)
+    s = h["segundo"]
+    if not isinstance(s, dict):
+        inf.error(f"{rel}: segundo debe ser un bloque")
+        return
+    if not _claves(s, f"{rel} (segundo)", ["activo", "nombre", "motivo", "url", "modelo", "secreto", "tiempo_s",
+                                          "max_por_ciclo"], inf):
+        return
+    if not isinstance(s["activo"], bool):
+        inf.error(f"{rel}: segundo.activo debe ser true o false")
+    for k in ("nombre", "motivo", "url", "modelo", "secreto"):
+        if not isinstance(s[k], str):
+            inf.error(f"{rel}: segundo.{k} debe ser texto")
+    if s["activo"] is False and s.get("motivo") != "GitHub Models retirado el 30 jul 2026":
+        inf.error(f"{rel}: segundo.motivo debe decir «GitHub Models retirado el 30 jul 2026» mientras esté apagado")
+    if s["activo"] is True:
+        if not (isinstance(s["url"], str) and s["url"].startswith("https://")):
+            inf.error(f"{rel}: segundo.url debe ser https://... cuando segundo está activo")
+        for k in ("modelo", "secreto", "nombre"):
+            if not (isinstance(s[k], str) and s[k].strip()):
+                inf.error(f"{rel}: segundo.{k} no puede ir vacío cuando segundo está activo")
+        if isinstance(s["secreto"], str) and not re.fullmatch(r"[A-Z][A-Z0-9_]{2,63}", s["secreto"]):
+            inf.error(f"{rel}: segundo.secreto debe ser el NOMBRE de una variable de entorno (nunca la clave)")
+    t = s["tiempo_s"]
+    if isinstance(t, bool) or not isinstance(t, (int, float)) or not 1 <= t <= 300:
+        inf.error(f"{rel}: segundo.tiempo_s debe ser un número de 1 a 300")
+    mp = s["max_por_ciclo"]
+    if isinstance(mp, bool) or not isinstance(mp, int) or mp < 0:
+        inf.error(f"{rel}: segundo.max_por_ciclo debe ser un entero de 0 o más")
+
+
 def validar_canales(c, inf: Informe) -> None:
     rel = "config/canales.yml"
     if not isinstance(c, dict):
@@ -1195,6 +1270,7 @@ def validar(raiz=None) -> Informe:
             validar_voces(voces, inf)
     else:
         inf.aviso("config/voces.yml: no existe: la fábrica no transcribe ni corta silencios")
+    validar_historia(_cargar(raiz, "config/historia.yml", inf), inf)
     almacen = _cargar(raiz, "config/almacen.yml", inf)
     if almacen is not None:
         validar_almacen(almacen, inf)
@@ -1205,6 +1281,7 @@ def validar(raiz=None) -> Informe:
     if musica is not None:
         validar_musica(raiz, musica, inf)
     validar_reglas_kevin(raiz, inf)
+    validar_sfx(raiz, inf)
     validar_pausa(raiz, inf)
     validar_pausa_t(raiz, inf)
     validar_csv(raiz, "marcador.csv", CABECERA_MARCADOR, inf)
@@ -1212,6 +1289,80 @@ def validar(raiz=None) -> Informe:
     validar_sin_media(raiz, inf)
     validar_sin_claves(raiz, inf)
     return inf
+
+
+def validar_sfx(raiz: Path, inf: Informe) -> None:
+    """`marca/sfx/efectos.yml` (si existe): sólo CC0, duraciones coherentes y LICENCIA.md si está verificada."""
+    rel = "marca/sfx/efectos.yml"
+    ruta = Path(raiz) / rel
+    if not ruta.is_file():
+        return
+    try:
+        datos = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        inf.error(f"{rel}: YAML inválido: {e}")
+        return
+    if not isinstance(datos, dict):
+        inf.error(f"{rel}: debe ser un diccionario")
+        return
+    permitidas = datos.get("licencias_permitidas")
+    if not (isinstance(permitidas, list) and permitidas and set(permitidas) <= {"CC0"}):
+        inf.error(f"{rel}: licencias_permitidas debe ser una lista que sólo contenga CC0")
+        permitidas = []
+    if not (isinstance(datos.get("release"), str) and datos["release"]):
+        inf.error(f"{rel}: falta release")
+    num = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)  # noqa: E731
+    dmin, dmax = datos.get("duracion_min_s"), datos.get("duracion_max_s")
+    if not (num(dmin) and dmin > 0):
+        inf.error(f"{rel}: duracion_min_s debe ser un número positivo")
+    if not (num(dmax) and dmax > 0 and (not num(dmin) or dmax > dmin)):
+        inf.error(f"{rel}: duracion_max_s debe ser un número mayor que duracion_min_s")
+    minimo = datos.get("minimo")
+    if not (isinstance(minimo, int) and not isinstance(minimo, bool) and minimo >= 1):
+        inf.error(f"{rel}: minimo debe ser un entero de 1 o más")
+    efectos = datos.get("efectos")
+    if not isinstance(efectos, list):
+        inf.error(f"{rel}: efectos debe ser una lista")
+        return
+    vistos: set[str] = set()
+    for i, e in enumerate(efectos):
+        if not isinstance(e, dict):
+            inf.error(f"{rel}: efectos[{i}] debe ser un diccionario")
+            continue
+        eid = e.get("id")
+        et = f"{rel}: efecto {eid if isinstance(eid, str) else i}"
+        if not (isinstance(eid, str) and RE_ID.match(eid)):
+            inf.error(f"{et}: id inválido (minúsculas, números y guiones)")
+        elif eid in vistos:
+            inf.error(f"{et}: id repetido")
+        else:
+            vistos.add(eid)
+        if e.get("licencia") not in permitidas:
+            inf.error(f"{et}: licencia {e.get('licencia')!r} fuera de licencias_permitidas (sólo CC0)")
+        if not _es_https(e.get("pagina")):
+            inf.error(f"{et}: pagina debe ser un enlace https")
+        if not (isinstance(e.get("tipo"), str) and e["tipo"]):
+            inf.error(f"{et}: falta tipo")
+        asset = e.get("asset")
+        if not (isinstance(asset, str) and asset and "/" not in asset and "\\" not in asset
+                and not asset.startswith(".")):
+            inf.error(f"{et}: asset debe ser un nombre de archivo sin barras")
+        if e.get("estado") not in ("candidata", "verificada", "descartada"):
+            inf.error(f"{et}: estado debe ser candidata, verificada o descartada")
+        if e.get("estado") == "verificada":
+            if not (isinstance(e.get("sha256"), str) and RE_SHA256.match(e["sha256"])):
+                inf.error(f"{et}: verificada exige sha256 hexadecimal de 64 caracteres")
+            lic = Path(raiz) / "marca" / "sfx" / str(eid) / "LICENCIA.md"
+            if not lic.is_file():
+                inf.error(f"{et}: verificada exige marca/sfx/{eid}/LICENCIA.md")
+            else:
+                texto = lic.read_text(encoding="utf-8", errors="ignore")
+                faltan = [c for c in CAMPOS_LICENCIA
+                          if not re.search(rf"(?m)^\s*[-*]?\s*\**{re.escape(c[:-1])}(?::\**|\**:)[ \t]*\S", texto)]
+                if faltan:
+                    inf.error(f"{et}: LICENCIA.md sin las líneas {', '.join(faltan)}")
+                elif not re.search(r"(?m)^\s*[-*]?\s*\**Licencia(?::\**|\**:)[^\n]*\bCC0\b", texto):
+                    inf.error(f"{et}: la línea Licencia: de LICENCIA.md debe decir CC0")
 
 
 def main(argv: list[str] | None = None) -> int:

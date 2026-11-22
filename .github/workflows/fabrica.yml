@@ -104,10 +104,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release download musica -D "$RUNNER_TEMP/musica" --clobber || echo "::warning::sin música del release"
+      - name: Bajar efectos de sonido del release
+        timeout-minutes: 3       # sin efectos la historia no usa sfx (zoom y cámara lenta siguen); no debe comerse el ciclo
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download sfx -D "$RUNNER_TEMP/sfx" --clobber || echo "::warning::sin efectos del release"
       - name: Ciclo
         timeout-minutes: 15      # el ciclo se corta solo a los 13 (plazo) y 14 min (alarma); el job tiene 20 para cerrar
         env:
           GRANJA_MUSICA_DIR: ${{ runner.temp }}/musica
+          GRANJA_SFX_DIR: ${{ runner.temp }}/sfx
         run: |
           # Fuera de main (un dispatch desde otra rama) sólo se hace ensayo y no se guarda nada.
           extra=""
