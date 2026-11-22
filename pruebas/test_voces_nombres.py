@@ -48,3 +48,17 @@ def test_el_rotulo_recortado_a_la_columna_sigue_siendo_el_del_creador():
     rotulo = voces.nombre_visible(largo, marca)
     toma = Toma(numero=1, gancho="Gol", palabra_lapiz="Gol", lapiz="círculo", escena="EXT. CALLE", credito="Con: x")
     assert nombres.revisar_nombres(toma, [Linea(t0=0, t1=2, nombre=rotulo, frase="hola")], largo, RAIZ_REAL, marca) == []
+
+
+def test_las_frases_de_whisper_pasan_el_filtro_de_spoilers_de_la_temporada():
+    # Revisión de Codex (22 nov): la transcripción de Whisper reemplaza las líneas de Gemini después de
+    # validar_respuesta; sin esto, un spoiler que Gemini había omitido podía publicarse en los subtítulos.
+    from types import SimpleNamespace as L
+    from fabrica.editar import toma as mod_toma
+    temporada = {"palabras_evitar": ["final", "Lucía muere"]}
+    limpias = [L(nombre="TAISONTV", frase="qué locura de persecución", acotacion="")]
+    sucias = [L(nombre="TAISONTV", frase="no me digas el FINAL del juego", acotacion=""),
+              L(nombre="OTRA VOZ", frase="ya vi que Lucia muere", acotacion="")]
+    assert mod_toma._spoilers_en_lineas(limpias, temporada) == []
+    motivos = mod_toma._spoilers_en_lineas(sucias, temporada)
+    assert len(motivos) == 2 and "spoiler" in motivos[0] and "línea 2" in motivos[1]
