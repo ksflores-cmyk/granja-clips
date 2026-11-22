@@ -591,7 +591,9 @@ def test_rojo_casos_de_la_5_una_letra_y_audio_en_silencio(div, marca, tmp_path):
     subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(div["mp4"]), "-f", "lavfi", "-t", "4",
                     "-i", "anullsrc=r=48000:cl=stereo", "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac",
                     "-movflags", "+faststart", str(mudo)], check=True)
-    assert malos(estilo.revisar(mudo, div["plan"], marca)) == ["[fotograma] Audio original del clip"]
+    rojos = malos(estilo.revisar(mudo, div["plan"], marca))
+    # además de la puerta de audio, la regla de Kevin «toda toma se mueve y se oye» (#17) lo marca
+    assert rojos[0] == "[fotograma] Audio original del clip" and len(rojos) == 2 and rojos[1].startswith("[regla-kevin] muy-simple")
 
 
 # ---------------------------------------------------------------- marca.yml, validar y muestras
@@ -622,7 +624,7 @@ def test_las_muestras_son_las_3_de_siempre_mas_3_divididas(marca):
     todas = muestras.cargar_muestras()
     assert [m["id"] for m in todas][:3] == ["dialogo-sintel", "momento-bbb", "pajaro-bbb"]
     divididas = [m for m in todas if m.get("disposicion") == "dividida"]
-    assert len(todas) == 6 and len(divididas) == 3 and all(m["disposicion"] == "completa" for m in todas[:3])
+    assert len(todas) == 7 and len(divididas) == 3 and todas[-1]["id"] == "voces-sintel" and all(m["disposicion"] == "completa" for m in todas[:3])
     assert len({m["stream"]["esquina_facecam"] for m in divididas}) == 3          # una esquina distinta en cada una
     assert sum(1 for m in divididas if m["stream"]["alerta_s"] is not None) == 1  # y una sola con alerta
     for m in divididas:
