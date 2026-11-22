@@ -830,7 +830,7 @@ def wf():
 
 def test_workflow_cron_y_disparo_manual(wf):
     on = wf[True]
-    assert on["schedule"] == [{"cron": "23 * * * *"}]   # cada hora, minuto 23 (impar)
+    assert on["schedule"] == [{"cron": "23 14,16,18,21,0,3 * * *"}]   # sólo respaldo, minuto 23 (impar); ver test_ahorro_actions
     entrada = on["workflow_dispatch"]["inputs"]["ensayo_forzado"]
     assert entrada["type"] == "boolean" and entrada["default"] is False
 
@@ -840,19 +840,28 @@ def test_workflow_concurrencia_y_permisos(wf):
     assert wf["permissions"] == {"contents": "write", "issues": "write"}
 
 
-def test_workflow_tiempos_maximos_y_dependencia(wf):
-    assert wf["jobs"]["decidir"]["timeout-minutes"] == 3
-    p = wf["jobs"]["producir"]
-    assert p["timeout-minutes"] == 20 and p["needs"] == "decidir"
-    assert "needs.decidir.outputs.trabajo == 'si'" in p["if"] and "inputs.ensayo_forzado" in p["if"]
-    assert wf["jobs"]["decidir"]["outputs"]["trabajo"]
+def test_workflow_un_solo_job_con_decidir_y_producir_y_enviar_cr_despues(wf):
+    assert set(wf["jobs"]) == {"fabrica", "enviar_cr"}
+    f = wf["jobs"]["fabrica"]
+    assert f["timeout-minutes"] == 23 and "needs" not in f
+    assert f["outputs"]["cr"]
+    cr = wf["jobs"]["enviar_cr"]
+    assert cr["needs"] == "fabrica" and "needs.fabrica.outputs.cr == 'si'" in cr["if"] and "always()" in cr["if"]
 
 
-def test_workflow_decidir_el_ultimo_paso_tras_checkout_y_setup_es_el_de_decidir(wf):
-    pasos = wf["jobs"]["decidir"]["steps"]
-    assert "checkout" in pasos[0]["uses"] and "setup-python" in pasos[1]["uses"]
-    assert pasos[2]["run"].startswith("pip install")
-    assert len(pasos) == 4 and pasos[3]["run"].strip() == "python -m fabrica.ciclo --decidir" and pasos[3]["id"] == "decidir"
+def test_workflow_la_compuerta_bash_va_antes_de_instalar_nada_y_decidir_manda(wf):
+    pasos = wf["jobs"]["fabrica"]["steps"]
+    assert "checkout" in pasos[0]["uses"]
+    comp = pasos[2]            # pasos[1] es «Partir de main al día»
+    assert comp["id"] == "compuerta" and "run" in comp and "PAUSA" in comp["run"] and "fabrica.fuentes" in comp["run"]
+    assert "setup-python" in pasos[3]["uses"] and "compuerta.outputs.activo == 'si'" in pasos[3]["if"]
+    assert pasos[4]["run"].startswith("pip install") and "compuerta.outputs.activo == 'si'" in pasos[4]["if"]
+    dec = pasos[5]
+    assert dec["run"].strip() == "python -m fabrica.ciclo --decidir" and dec["id"] == "decidir"
+    for p in pasos[6:]:
+        if p.get("name", "").startswith("Subir el ensayo"):
+            continue
+        assert "decidir.outputs.trabajo == 'si'" in p["if"], p.get("name")
 
 
 def test_workflow_los_secretos_entran_por_env_nunca_dentro_de_run(wf):
@@ -860,7 +869,7 @@ def test_workflow_los_secretos_entran_por_env_nunca_dentro_de_run(wf):
     for job in wf["jobs"].values():
         for paso in job["steps"]:
             assert "secrets." not in paso.get("run", "")
-    env = wf["jobs"]["producir"]["env"]
+    env = wf["jobs"]["fabrica"]["env"]
     for k in ("BUFFER_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY", "TWITCH_CLIENT_ID",
               "TWITCH_CLIENT_SECRET", "GEMINI_API_KEY"):
         assert env[k] == "${{ secrets." + k + " }}"
@@ -868,7 +877,7 @@ def test_workflow_los_secretos_entran_por_env_nunca_dentro_de_run(wf):
 
 
 def test_workflow_commit_skip_ci_y_reintentos(wf):
-    cierre = next(p for p in wf["jobs"]["producir"]["steps"] if "Cerrar el ciclo" in p.get("name", ""))
+    cierre = next(p for p in wf["jobs"]["fabrica"]["steps"] if "Cerrar el ciclo" in p.get("name", ""))
     run = cierre["run"]
     assert "[skip ci] ciclo" in run and "git pull --rebase" in run and "for intento in 1 2 3" in run
     for ruta in ("marcador.csv", "registro.md", "estado", "config/canales.yml", "informativas.yml"):
@@ -877,7 +886,7 @@ def test_workflow_commit_skip_ci_y_reintentos(wf):
 
 
 def cierre_run(wf):
-    return next(p for p in wf["jobs"]["producir"]["steps"] if "Cerrar el ciclo" in p.get("name", ""))["run"]
+    return next(p for p in wf["jobs"]["fabrica"]["steps"] if "Cerrar el ciclo" in p.get("name", ""))["run"]
 
 
 def test_workflow_alerta_abre_issue_y_hace_commit_de_pausa(wf):
@@ -912,15 +921,15 @@ def test_workflow_el_commit_sólo_admite_los_archivos_permitidos(wf):
 
 
 def test_workflow_ensayo_forzado_sube_artefacto_de_3_dias(wf):
-    pasos = wf["jobs"]["producir"]["steps"]
+    pasos = wf["jobs"]["fabrica"]["steps"]
     subir = next(p for p in pasos if p.get("uses", "").startswith("actions/upload-artifact"))
-    assert subir["with"]["retention-days"] == 3 and "inputs.ensayo_forzado" in subir["if"]
+    assert subir["with"]["retention-days"] == 1 and "inputs.ensayo_forzado" in subir["if"]
     ciclo_paso = next(p for p in pasos if p.get("name") == "Ciclo")
     assert "--ensayo-forzado --salida" in ciclo_paso["run"]
 
 
 def test_workflow_instala_ffmpeg_con_reintentos_y_tope(wf):
-    paso = next(p for p in wf["jobs"]["producir"]["steps"] if "ffmpeg" in p.get("name", ""))
+    paso = next(p for p in wf["jobs"]["fabrica"]["steps"] if "ffmpeg" in p.get("name", ""))
     assert paso["uses"] == "./.github/actions/ffmpeg" and paso["timeout-minutes"] == 12
     accion = (RAIZ_REAL / ".github/actions/ffmpeg/action.yml").read_text(encoding="utf-8")
     # apt con tope propio, segundo espejo firmado y verificación de los dos binarios
@@ -1074,7 +1083,7 @@ def test_ensayo_forzado_sin_toma_falla(r, tmp_path):
 
 
 def test_workflow_cada_corrida_parte_de_main_al_dia_y_fuera_de_main_solo_ensayo(wf):
-    pasos = wf["jobs"]["producir"]["steps"]
+    pasos = wf["jobs"]["fabrica"]["steps"]
     nombres = [p.get("name", p.get("uses", "")) for p in pasos]
     reset = next(p for p in pasos if p.get("name") == "Partir de main al día")
     assert reset["run"] == "git fetch origin main && git reset --hard origin/main"
@@ -1088,7 +1097,7 @@ def test_workflow_cada_corrida_parte_de_main_al_dia_y_fuera_de_main_solo_ensayo(
 
 
 def test_workflow_la_marca_de_inicio_se_escribe_al_empezar_y_el_cierre_la_cierra(wf):
-    pasos = wf["jobs"]["producir"]["steps"]
+    pasos = wf["jobs"]["fabrica"]["steps"]
     marca = next(p for p in pasos if "por si la corrida muere" in p.get("name", ""))
     assert "--marcar-inicio" in marca["run"] and "git push" in marca["run"] and "refs/heads/main" in marca["run"]
     assert pasos.index(marca) < pasos.index(next(p for p in pasos if p.get("name") == "Ciclo"))
@@ -1096,5 +1105,5 @@ def test_workflow_la_marca_de_inicio_se_escribe_al_empezar_y_el_cierre_la_cierra
 
 
 def test_workflow_el_artefacto_falla_si_no_hay_archivos(wf):
-    subir = next(p for p in wf["jobs"]["producir"]["steps"] if p.get("uses", "").startswith("actions/upload-artifact"))
+    subir = next(p for p in wf["jobs"]["fabrica"]["steps"] if p.get("uses", "").startswith("actions/upload-artifact"))
     assert subir["with"]["if-no-files-found"] == "error"

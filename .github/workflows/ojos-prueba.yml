@@ -61,5 +61,5 @@ jobs:
         with:
           name: ojos
           path: ${{ runner.temp }}/ojos
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: error

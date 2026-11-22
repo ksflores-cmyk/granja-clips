@@ -337,7 +337,7 @@ def test_mirar_clasifica_si_el_fallo_es_del_material(tmp_path):
     assert _mirar(tmp_path, Transporte((200, "{}"))).del_material is True            # sin candidatos
     pas = _mirar(tmp_path, Transporte((503, ""), (503, ""), (503, ""), (503, "")))
     assert pas.pasajero and pas.del_material is False
-    assert _mirar(tmp_path, Transporte((404, ""), (404, ""), (404, ""), (404, ""))).del_material is False
+    assert _mirar(tmp_path, Transporte(*[(404, "")] * 5)).del_material is False
 
 
 # ---------------------------------------------------------------- 5. regla de gasto
@@ -510,11 +510,11 @@ def _workflow():
 
 def test_workflow_sin_bufer_y_con_tope_en_el_paso_del_ciclo():
     wf = _workflow()
-    for job in ("decidir", "producir"):
+    for job in ("fabrica",):
         assert wf["jobs"][job]["env"]["PYTHONUNBUFFERED"] == "1"
-    paso = next(p for p in wf["jobs"]["producir"]["steps"] if p.get("name") == "Ciclo")
+    paso = next(p for p in wf["jobs"]["fabrica"]["steps"] if p.get("name") == "Ciclo")
     assert paso["timeout-minutes"] <= 15
-    assert wf["jobs"]["producir"]["timeout-minutes"] > paso["timeout-minutes"]      # margen para «Cerrar el ciclo»
+    assert wf["jobs"]["fabrica"]["timeout-minutes"] > paso["timeout-minutes"]      # margen para «Cerrar el ciclo»
 
 
 def test_el_ciclo_usa_el_inicio_del_job_y_no_pone_plazo_a_las_otras_ordenes(monkeypatch):
@@ -946,7 +946,7 @@ def test_el_respaldo_no_corre_si_no_queda_tiempo(rb, monkeypatch):
 # -- workflow
 
 def test_el_paso_del_ciclo_envuelve_el_python_con_timeout_k_desde_el_inicio_del_job():
-    paso = next(p for p in _workflow()["jobs"]["producir"]["steps"] if p.get("name") == "Ciclo")
+    paso = next(p for p in _workflow()["jobs"]["fabrica"]["steps"] if p.get("name") == "Ciclo")
     run = paso["run"]
     assert "INICIO_S" in run and "870" in run and "-lt 30" in run
     ordenes = [l for l in run.splitlines() if "python -m fabrica.ciclo" in l]

@@ -58,7 +58,7 @@ class Lista:
 
 def test_la_config_real_pone_primero_el_modelo_que_respondio_en_4_s():
     assert CFG_REAL["modelo"] == "gemini-3-flash-preview"
-    assert CFG_REAL["modelos_respaldo"] == ["gemini-3.8-flash", "gemini-3.7-flash"]
+    assert CFG_REAL["modelos_respaldo"] == ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
     assert (CFG_REAL["tiempo_por_intento_s"], CFG_REAL["tope_ojos_s"], CFG_REAL["respaldos_por_falla"]) == (90, 300, 2)
     assert CFG_REAL["listar_modelos"] is True and CFG_REAL["sin_ia"] == {"activo": True, "max_por_ciclo": 1, "duracion_objetivo_s": 20}
 
@@ -199,7 +199,7 @@ def test_respaldos_por_falla_sale_de_la_config(tmp_path):
 def test_sin_gemini_se_distingue_de_un_veto(tmp_path):
     assert mirar(tmp_path, Transporte(), clave=None).sin_gemini
     assert mirar(tmp_path, Transporte(*[(503, "x")] * 6), config=cfg()).sin_gemini
-    assert mirar(tmp_path, Transporte(*[(404, "{}")] * 3), config=cfg()).sin_gemini
+    assert mirar(tmp_path, Transporte(*[(404, "{}")] * 5), config=cfg()).sin_gemini
     assert not mirar(tmp_path, Transporte((400, "mal")), config=cfg()).sin_gemini
     assert not mirar(tmp_path, Transporte(OK), config=cfg()).sin_gemini
 
@@ -382,7 +382,7 @@ def caida():
 @pytest.mark.parametrize("caso", ["pasajero", "404"])
 def test_sin_ia_se_activa_si_gemini_no_esta_disponible(repo, tmp_path, video20, sin_render, caso):
     t, env = {"pasajero": (Transporte(*[(503, "x")] * 6), CLAVE),
-              "404": (Transporte(*[(404, "{}")] * 3), CLAVE),
+              "404": (Transporte(*[(404, "{}")] * 5), CLAVE),
               "sin_clave": (caida(), CLAVE)}[caso]
     r = hacer(repo, tmp_path, video20, t, env)
     assert sin_render.llamadas, r.motivos                 # llegó a componer: no se descartó antes

@@ -1,11 +1,17 @@
 name: fabrica
 
-# El ciclo de la fábrica: cada hora, minuto 23 (impar, respaldo del disparador de cron-job.org). La cadencia y el
-# hueco los decide el código (fabrica.ciclo), no el cron: cada corrida programa a lo sumo un hueco de horarios.yml.
-# Con PAUSA, `decidir` dice trabajo=no en menos de un minuto y `producir` se salta.
+# El ciclo de la fábrica. El disparador principal es externo (cron-job.org, cada hora en punto, workflow_dispatch):
+# el cron de GitHub casi no llega (3 de 24 el 21 nov), así que `schedule` queda SÓLO como respaldo de los huecos.
+# Cálculo del respaldo: config/horarios.yml tiene huecos GT 09, 11, 13, 16, 19 y 22, y cada corrida programa el hueco
+# que cae de ahora+15 a ahora+75 min. Una corrida a las H:23 GT ve la ventana H:38 a (H+1):38, o sea el hueco de las
+# (H+1):00. Respaldo = las :23 de la hora anterior a cada hueco: 08, 10, 12, 15, 18 y 21 GT. GT = UTC-6, así que
+# en UTC: 14, 16, 18, 21, 00 y 03. (pruebas/test_ahorro_actions.py lo comprueba contra horarios.yml.)
+# La cadencia y el hueco los decide el código (fabrica.ciclo), no el cron.
+# UN solo job (no se pagan dos redondeos de minuto): el primer paso lee PAUSA y, si hay, termina en verde sin
+# instalar nada; si no, `decidir` dice trabajo=si|no y sólo con `si` corren los pasos de producir.
 on:
   schedule:
-    - cron: "23 * * * *"
+    - cron: "23 14,16,18,21,0,3 * * *"
   workflow_dispatch:
     inputs:
       ensayo_forzado:
@@ -22,29 +28,9 @@ permissions:
   issues: write
 
 jobs:
-  decidir:
+  fabrica:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
-    env:
-      PYTHONUNBUFFERED: "1"
-    outputs:
-      trabajo: ${{ steps.decidir.outputs.trabajo }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: pip install -r requirements.txt
-      - name: Decidir (PAUSA, validar, cadencia, tope y hueco)
-        id: decidir
-        run: python -m fabrica.ciclo --decidir
-
-  producir:
-    needs: decidir
-    if: ${{ needs.decidir.outputs.trabajo == 'si' || inputs.ensayo_forzado }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 23          # 3 de decidir + 20 de producir; cada paso largo conserva su tope propio
     env:
       PYTHONUNBUFFERED: "1"      # sin búfer: si GitHub cancela la corrida, el log ya escrito se conserva
       ENSAYO_FORZADO: ${{ inputs.ensayo_forzado }}
@@ -55,24 +41,50 @@ jobs:
       TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GH_TOKEN: ${{ github.token }}
+    outputs:
+      cr: ${{ steps.compuerta.outputs.cr }}
     steps:
       - uses: actions/checkout@v4
       # Cada corrida parte del estado MÁS NUEVO de main, no del SHA que la disparó: si quedó en cola detrás de
-      # otra que guardó un envío, el marcador y el libro de envíos de su checkout estarían viejos.
+      # otra que guardó un envío, el marcador, el libro de envíos y PAUSA de su checkout estarían viejos.
       - name: Partir de main al día
         if: ${{ github.ref == 'refs/heads/main' }}
         run: git fetch origin main && git reset --hard origin/main
-      - name: Marcar el inicio (reloj)
-        run: echo "INICIO_S=$(date +%s)" >> "$GITHUB_ENV"
+      # Paso 1, sólo bash: PAUSA (sin ensayo forzado = termina aquí) y si hay campaña de Content Rewards.
+      # `cr` se calcula siempre (también con PAUSA): el robot de envío no depende de la pausa. Con el python3 del
+      # runner; si no puede leer fuentes.yml, `cr=si` (el robot decide por sí solo y termina en 1 minuto).
+      - name: Compuerta (PAUSA y campañas CR)
+        id: compuerta
+        run: |
+          if [ -f PAUSA ] && [ "$ENSAYO_FORZADO" != "true" ]; then
+            echo "activo=no" >> "$GITHUB_OUTPUT"
+            echo "PAUSA: $(grep -m1 '^motivo:' PAUSA || echo 'sin motivo'). No se instala nada."
+          else
+            echo "activo=si" >> "$GITHUB_OUTPUT"
+          fi
+          cr=$(python3 -m fabrica.fuentes 2>/dev/null | grep -m1 '^cr=') || cr="cr=si"
+          echo "$cr" >> "$GITHUB_OUTPUT"
+          echo "$cr"
       - uses: actions/setup-python@v5
+        if: ${{ steps.compuerta.outputs.activo == 'si' }}
         with:
           python-version: "3.12"
           cache: pip
+      - run: pip install -r requirements.txt
+        if: ${{ steps.compuerta.outputs.activo == 'si' }}
+      - name: Decidir (validar, cadencia, tope y hueco)
+        id: decidir
+        if: ${{ steps.compuerta.outputs.activo == 'si' && !inputs.ensayo_forzado }}
+        run: python -m fabrica.ciclo --decidir
+      - name: Marcar el inicio (reloj)
+        if: ${{ steps.decidir.outputs.trabajo == 'si' || inputs.ensayo_forzado }}
+        run: echo "INICIO_S=$(date +%s)" >> "$GITHUB_ENV"
       - name: Instalar ffmpeg
+        if: ${{ steps.decidir.outputs.trabajo == 'si' || inputs.ensayo_forzado }}
         timeout-minutes: 12
         uses: ./.github/actions/ffmpeg
-      - run: pip install -r requirements.txt
       - name: Marcar el inicio (en el repo, por si la corrida muere)
+        if: ${{ steps.decidir.outputs.trabajo == 'si' || inputs.ensayo_forzado }}
         run: |
           if [ "$GITHUB_REF" = "refs/heads/main" ] && [ "$ENSAYO_FORZADO" != "true" ]; then
             python -m fabrica.ciclo --marcar-inicio --run-id "$GITHUB_RUN_ID" || true
@@ -88,12 +100,14 @@ jobs:
             fi
           fi
       - name: Bajar música del release
+        if: ${{ steps.decidir.outputs.trabajo == 'si' || inputs.ensayo_forzado }}
         timeout-minutes: 3       # sin música la pieza muda sale en rojo sin gastar la fuente; no debe comerse el ciclo
         continue-on-error: true  # si se cancela por tiempo o falla, el job sigue y corre el Ciclo igual
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release download musica -D "$RUNNER_TEMP/musica" --clobber || echo "::warning::sin música del release"
       - name: Ciclo
+        if: ${{ steps.decidir.outputs.trabajo == 'si' || inputs.ensayo_forzado }}
         timeout-minutes: 15      # el ciclo se corta solo a los 13 (plazo) y 14 min (alarma); el job tiene 20 para cerrar
         env:
           GRANJA_MUSICA_DIR: ${{ runner.temp }}/musica
@@ -116,7 +130,7 @@ jobs:
         with:
           name: ensayo-forzado
           path: ${{ runner.temp }}/ensayo
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: error
       # El cron corre en `main` y la fábrica guarda su estado con un push directo (decisión del director):
       # es el repo de la fábrica. Por eso el commit sólo puede incluir los archivos de PERMITIDOS; cualquier
@@ -124,12 +138,14 @@ jobs:
       # sólo después de que el push haya quedado confirmado; si el push falla 3 veces, el paso falla sin
       # abrir el issue (la corrida en rojo ya avisa por correo de GitHub).
       - name: Cerrar el ciclo (minutos, avisos, alerta roja, commit)
-        if: ${{ always() && !inputs.ensayo_forzado && github.ref == 'refs/heads/main' }}
+        if: ${{ always() && steps.decidir.outputs.trabajo == 'si' && !inputs.ensayo_forzado && github.ref == 'refs/heads/main' }}
         run: |
           set -u
           PERMITIDOS='^(marcador\.csv|registro\.md|estado/.*|config/canales\.yml|informativas\.yml|marca\.yml|retiros\.md|config/vetados\.yml|PAUSA)$'
           minutos=$(( ( $(date +%s) - INICIO_S + 59 ) / 60 ))
           python -m fabrica.ciclo --sumar-minutos "$minutos" --run-id "$GITHUB_RUN_ID"
+          # Una vez al día (el primer ciclo con trabajo): minutos de ayer por workflow; si el mes pasa de 2400, PAUSA.
+          python -m fabrica.ciclo --contar-minutos || true
           python -m fabrica.ciclo --abrir-avisos || true
           python -m fabrica.retiros --abrir-avisos || true
           alerta=no
@@ -174,10 +190,12 @@ jobs:
           fi
 
   # Robot de envío a Content Rewards: el enlace vale sólo si se envía en los 30 min siguientes a publicar.
-  # Corre en paralelo a `producir` (no depende de él) y escribe su propio archivo (estado/envios-cr.json), así
-  # los dos commits no chocan. Sin nada pendiente termina en menos de un minuto, sin instalar el navegador.
+  # Corre DESPUÉS del job `fabrica` (always(): aunque falle) y sólo si fuentes.yml tiene una ficha vigente,
+  # publicable y con cr_campaign_id (output `cr` de la compuerta): sin campaña no se paga ni un minuto.
+  # Escribe su propio archivo (estado/envios-cr.json). Sin nada pendiente termina en menos de un minuto.
   enviar_cr:
-    if: ${{ github.ref == 'refs/heads/main' && !inputs.ensayo_forzado }}
+    needs: fabrica
+    if: ${{ always() && needs.fabrica.outputs.cr == 'si' && github.ref == 'refs/heads/main' && !inputs.ensayo_forzado }}
     runs-on: ubuntu-latest
     timeout-minutes: 24
     env:
@@ -214,7 +232,7 @@ jobs:
         with:
           name: capturas-cr
           path: ${{ runner.temp }}/cr
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: ignore
       - name: Guardar resultado (y alerta si la sesión venció)
         if: ${{ always() && steps.hay.outputs.hay == 'si' }}

@@ -1123,6 +1123,27 @@ def _respaldo(raiz, ahora, carpeta: Path, fichas, out) -> Toma | None:
     return Toma(r, toma, ficha, None, entrada)
 
 
+def contar_minutos(raiz, ahora: datetime, repo: str | None = None, gh=None, imprimir=print) -> int:
+    """Contador diario (fabrica.minutos). Nunca rompe el ciclo: ante cualquier fallo avisa y sale en verde."""
+    from . import minutos as mod_minutos
+    repo = repo or os.environ.get("GITHUB_REPOSITORY", "")
+    if not repo:
+        imprimir("contar-minutos: falta GITHUB_REPOSITORY; nada que hacer")
+        return COD_OK
+    try:
+        r = mod_minutos.contar_ayer(raiz, ahora, repo, gh or mod_minutos.gh_api)
+    except Exception as e:      # noqa: BLE001 - red, permisos o JSON raro: el contador es accesorio
+        imprimir(f"contar-minutos: no se pudo ({type(e).__name__}); se reintenta en el próximo ciclo")
+        return COD_OK
+    if r is None:
+        imprimir("contar-minutos: el día anterior ya estaba contado")
+        return COD_OK
+    imprimir(f"contar-minutos: {r['dia']} = {r['total']} min; mes = {r['mes']} min")
+    if r["mes"] > mod_minutos.TOPE_MES:
+        alerta_roja(raiz, f"Actions pasó de {mod_minutos.TOPE_MES} minutos en el mes ({r['mes']} al {r['dia']})", ahora)
+    return COD_OK
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m fabrica.ciclo", description="Un ciclo de la fábrica.")
     ap.add_argument("--decidir", action="store_true", help="sólo decide si hay trabajo (escribe trabajo=si|no)")
@@ -1136,6 +1157,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--run-id", default=None, help="id de la corrida de Actions (para la marca de inicio)")
     ap.add_argument("--modo-ensayo", action="store_true",
                     help="trata config/modo.yml como ensayo (ramas que no son main: nunca publica)")
+    ap.add_argument("--contar-minutos", action="store_true",
+                    help="una vez al día cuenta los minutos de Actions de ayer (gh api) y pausa si el mes pasa de 2400")
     ap.add_argument("--abrir-avisos", action="store_true",
                     help="abre un issue por cada envío incierto o abandonado nuevo y sale")
     a = ap.parse_args(argv)
@@ -1148,6 +1171,8 @@ def main(argv: list[str] | None = None) -> int:
         marcar_inicio(a.raiz, _ahora(ahora), a.run_id)
         print("marca de inicio escrita")
         return COD_OK
+    if a.contar_minutos:
+        return contar_minutos(a.raiz, _ahora(ahora))
     if a.abrir_avisos:
         for clave in abrir_avisos(a.raiz):
             print(f"issue abierto: {clave}")

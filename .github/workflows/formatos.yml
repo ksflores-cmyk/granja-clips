@@ -1,26 +1,10 @@
 name: formatos
 
 # Renderiza los compilados de muestra («Mejores momentos» y «Mejores reacciones») en la nube y los deja como
-# artefacto (3 días). No escribe en ninguna rama: el video nunca entra al repo ni a la PC de Kevin.
+# artefacto (1 día). No escribe en ninguna rama: el video nunca entra al repo ni a la PC de Kevin.
+# Sólo a mano (workflow_dispatch) desde la tarea #24: ya no corre solo en push ni en PR (ahorro de minutos).
 on:
   workflow_dispatch:
-  push:
-    branches: ["main"]   # ahorro de minutos (20 nov): las ramas corren en su PR
-    paths:
-      - "fabrica/**"
-      - "config/formatos.yml"
-      - "marca/**"
-      - "marca.yml"
-      - "temporada.yml"
-      - ".github/workflows/formatos.yml"
-  pull_request:
-    paths:
-      - "fabrica/**"
-      - "config/formatos.yml"
-      - "marca/**"
-      - "marca.yml"
-      - "temporada.yml"
-      - ".github/workflows/formatos.yml"
 
 permissions:
   contents: read
@@ -56,5 +40,5 @@ jobs:
         with:
           name: formatos
           path: ${{ runner.temp }}/formatos
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: error

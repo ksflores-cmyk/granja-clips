@@ -45,5 +45,5 @@ jobs:
         with:
           name: capturas-cr-prueba
           path: ${{ runner.temp }}/cr
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: ignore
