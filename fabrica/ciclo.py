@@ -1139,7 +1139,11 @@ def contar_minutos(raiz, ahora: datetime, repo: str | None = None, gh=None, impr
         imprimir("contar-minutos: el día anterior ya estaba contado")
         return COD_OK
     imprimir(f"contar-minutos: {r['dia']} = {r['total']} min; mes = {r['mes']} min")
-    if r["mes"] > mod_minutos.TOPE_MES:
+    # Repo público (desde el 20 nov 2026): los minutos no se cobran y una PAUSA sólo frenaría la fábrica.
+    # El tope sólo pausa si el workflow dice que el repo es privado (REPO_PRIVADO=true).
+    if r["mes"] > mod_minutos.TOPE_MES and os.environ.get("REPO_PRIVADO", "").lower() != "true":
+        imprimir(f"contar-minutos: el mes pasa de {mod_minutos.TOPE_MES} min, pero el repo es público: no se pausa")
+    elif r["mes"] > mod_minutos.TOPE_MES:
         alerta_roja(raiz, f"Actions pasó de {mod_minutos.TOPE_MES} minutos en el mes ({r['mes']} al {r['dia']})", ahora)
     return COD_OK
 

@@ -143,7 +143,8 @@ def test_contar_ayer_suma_por_workflow_y_no_rompe_el_formato(tmp_path):
     assert minutos.contar_ayer(raiz, AHORA, "o/r", gh) is None and len(gh.llamadas) == n   # una vez al día
 
 
-def test_el_mes_se_suma_y_pasar_de_2400_escribe_pausa(tmp_path):
+def test_el_mes_se_suma_y_pasar_de_2400_escribe_pausa(tmp_path, monkeypatch):
+    monkeypatch.setenv("REPO_PRIVADO", "true")
     previos = {f"2026-11-{d:02d}": {"total": 120, "por_workflow": {}} for d in range(1, 21)}   # 2400
     raiz = _raiz_con_minutos(tmp_path, {"total_por_dia": previos})
     (tmp_path / "config").mkdir()
@@ -165,3 +166,13 @@ def test_bajo_el_tope_no_pausa_y_un_fallo_de_gh_no_rompe(tmp_path):
     raiz2 = _raiz_con_minutos(tmp_path / "b" if (tmp_path / "b").mkdir() is None else tmp_path, {})
     assert ciclo.contar_minutos(raiz2, AHORA, "o/r", roto, sal.append) == 0
     assert "no se pudo (OSError)" in sal[-1]
+
+
+def test_repo_publico_no_pausa_aunque_pase_el_tope(tmp_path, monkeypatch):
+    monkeypatch.setenv("REPO_PRIVADO", "false")
+    previos = {f"2026-11-{d:02d}": {"total": 120, "por_workflow": {}} for d in range(1, 21)}
+    raiz = _raiz_con_minutos(tmp_path, {"total_por_dia": previos})
+    (tmp_path / "config").mkdir()
+    sal = []
+    assert ciclo.contar_minutos(raiz, AHORA, "o/r", GhFalso(), sal.append) == 0
+    assert not (raiz / "PAUSA").exists() and any("repo es público" in x for x in sal)

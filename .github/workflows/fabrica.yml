@@ -32,6 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 23          # 3 de decidir + 20 de producir; cada paso largo conserva su tope propio
     env:
+      REPO_PRIVADO: ${{ github.event.repository.private }}
       PYTHONUNBUFFERED: "1"      # sin búfer: si GitHub cancela la corrida, el log ya escrito se conserva
       ENSAYO_FORZADO: ${{ inputs.ensayo_forzado }}
       BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
