@@ -5,7 +5,7 @@ sigue con los demás. Dos reclamos en 7 días pausan sólo la ficha T (estado/pa
 suspendida lanza `publicar.AlertaRoja` (PAUSA global). Buffer no se entera de lo que la red borra después:
 esos retiros entran a mano en retiros.md. Sin LLM, sin dependencias nuevas, sin claves en nada de lo escrito.
 
-`python -m fabrica.retiros --revisar [--seco]` o `--abrir-avisos`.
+`python -m fabrica.retiros --revisar [--seco]`, `--diagnostico` (sólo lectura) o `--abrir-avisos`.
 """
 from __future__ import annotations
 
@@ -181,11 +181,16 @@ def _esquema(raiz, cliente, canal, hoy: date, escribir: bool) -> tuple[str, bool
 
 
 def _posts_en_error(cliente, canales: dict, org_id: str, raiz=None, hoy: date | None = None,
-                    escribir: bool = False) -> list[dict]:
-    """Posts con status error de esos canales, paginados (hasta PAGINAS_MAX de TAM_PAGINA). Sólo lecturas."""
+                    escribir: bool = False, selector: tuple[str, bool] | None = None) -> list[dict]:
+    """Posts con status error de esos canales, paginados (hasta PAGINAS_MAX de TAM_PAGINA). Sólo lecturas.
+
+    `selector` = (selección de `error`, `Post` trae `channelId`) ya conocido (el diagnóstico): no toca la caché."""
     ids = [c for c in canales.values() if c]
     canal = ids[0]
-    sel_error, con_canal, de_cache = _esquema(raiz, cliente, canal, hoy or date.today(), escribir)
+    if selector is not None:
+        (sel_error, con_canal), de_cache = selector, False
+    else:
+        sel_error, con_canal, de_cache = _esquema(raiz, cliente, canal, hoy or date.today(), escribir)
     sel = " ".join(["id", "status", "dueAt", "text"] + (["channelId"] if con_canal else []) + [sel_error]).strip()
     lista = ", ".join(publicar._lit(c) for c in ids)
     posts, cursor = [], None
@@ -475,6 +480,64 @@ def revisar(raiz, cliente, canales: dict, org_id, ahora: datetime, out=print, es
     return inf
 
 
+# ---------------------------------------------------------------- diagnóstico (sólo lectura)
+
+PRESUPUESTO_DIAGNOSTICO_S = 120
+
+
+def _canales_del_diagnostico(cfg: dict, vistos: list[dict]) -> tuple[dict, dict]:
+    """({plataforma: id de canal}, {plataforma: id de organización}) del config; si falta el id guardado, por
+    servicio y nombre esperado (sin alertas ni escrituras: aquí sólo se mira)."""
+    ids, orgs = {}, {}
+    for plat in publicar.PLATAFORMAS:
+        ficha = cfg.get(plat) or {}
+        canal = ficha.get("buffer_channel_id")
+        visto = next((c for c in vistos if c.get("id") == canal), None) if canal else next(
+            (c for c in vistos if str(c.get("service", "")).lower() == str(ficha.get("servicio", "")).lower()
+             and publicar._norm(c.get("name")) == publicar._norm(ficha.get("nombre_esperado"))), None)
+        if visto:
+            ids[plat], orgs[plat] = visto["id"], ficha.get("buffer_org_id") or visto.get("_org")
+    return ids, orgs
+
+
+def diagnostico(raiz, cliente, cfg: dict, out=print, secretos=()) -> int:
+    """Lee de Buffer real lo que `revisar` necesita y lo imprime. SÓLO lectura: no escribe retiros.md, vetados,
+    PAUSA, alertas ni issues. Por cada publicación en error: id, canal, fecha y el error (120 caracteres)."""
+    secretos = [x for x in [getattr(cliente, "_clave", ""), *secretos] if x]
+    try:
+        with _Acotado(cliente, PRESUPUESTO_DIAGNOSTICO_S):
+            vistos = cliente.todos_los_canales()
+            out(f"diagnóstico: {len(vistos)} canal(es) visto(s) en Buffer")
+            for c in vistos:
+                out(f"  canal {c.get('id')} · {c.get('service')} · {c.get('name')}"
+                    + (" · cola pausada" if c.get("isQueuePaused") else ""))
+            ids, orgs = _canales_del_diagnostico(cfg, vistos)
+            for plat in publicar.PLATAFORMAS:
+                if plat not in ids:
+                    out(f"diagnóstico: no se encontró el canal de {plat}; se omite")
+            if not ids:
+                out("diagnóstico: ningún canal configurado coincide; nada que leer")
+                return 1
+            canal0 = next(iter(ids.values()))
+            sel, con_canal = _selector_error(cliente, canal0)
+            out(f"diagnóstico: selector de error elegido: {sel or '(Post no tiene campo error; no se pide)'}"
+                f" · Post con channelId: {'sí' if con_canal else 'no'}")
+            total = 0
+            for plat, canal in ids.items():
+                org = orgs.get(plat) or cliente.organizaciones()[0]["id"]
+                posts = _posts_en_error(cliente, {plat: canal}, org, raiz, selector=(sel, con_canal))
+                total += len(posts)
+                out(f"diagnóstico: {plat}: {len(posts)} publicación(es) en error")
+                for p in posts:
+                    out(f"  {_corto(p.get('id'), secretos, 60)} | {plat} | {_corto(p.get('dueAt'), secretos, 40)}"
+                        f" | {_corto(_texto_error(p.get('error')), secretos) or 'sin mensaje'}")
+    except (publicar.ErrorBuffer, red.ErrorRed, OSError) as e:
+        out(f"diagnóstico: falló la consulta a Buffer: {_corto(e, secretos, 300)}")
+        return 1
+    out(f"diagnóstico: listo, {total} publicación(es) en error en total (sólo lectura, nada escrito)")
+    return 0
+
+
 # ---------------------------------------------------------------- avisos (issues)
 
 def abrir_avisos(raiz, ejecutor=subprocess.run) -> list[str]:
@@ -513,6 +576,8 @@ def main(argv: list[str] | None = None, env=None, transporte=None, ahora=None, s
     ap = argparse.ArgumentParser(prog="python -m fabrica.retiros", description="Reclamos y retiros de Buffer.")
     ap.add_argument("--revisar", action="store_true", help="lee los posts en error y actúa")
     ap.add_argument("--seco", action="store_true", help="con --revisar: sólo lee e imprime, no escribe nada")
+    ap.add_argument("--diagnostico", action="store_true",
+                    help="sólo lectura: canales, selector de error y publicaciones en error de Buffer real")
     ap.add_argument("--abrir-avisos", action="store_true", help="abre un issue por cada alerta pendiente")
     ap.add_argument("--raiz", default=None)
     a = ap.parse_args(argv)
@@ -524,8 +589,15 @@ def main(argv: list[str] | None = None, env=None, transporte=None, ahora=None, s
         for c in abrir_avisos(raiz, ejecutor):
             out(f"issue abierto: {c}")
         return 0
+    if a.diagnostico:
+        if not clave:
+            out("diagnóstico: falta BUFFER_API_KEY")
+            return 1
+        # Ni siquiera la cuota se escribe en el repo: el contador va a una carpeta temporal.
+        cliente = publicar.ClienteBuffer(clave, transporte, tempfile.mkdtemp(prefix="cuota-diagnostico-"))
+        return diagnostico(raiz, cliente, cargar_yaml("config/canales.yml", raiz), out)
     if not a.revisar:
-        ap.error("falta --revisar o --abrir-avisos")
+        ap.error("falta --revisar, --diagnostico o --abrir-avisos")
     if not clave:
         out("retiros: falta BUFFER_API_KEY, se omite")
         return 0

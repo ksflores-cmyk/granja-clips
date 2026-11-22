@@ -683,3 +683,75 @@ def test_si_la_etiqueta_no_existe_el_aviso_sale_igual_sin_ella(r, tmp_path):
 
     assert retiros.abrir_avisos(r, gh) == ["reclamo|p1"] and alertas(r)[0]["avisada"] is True
     assert "--label" not in llamadas[-1] and llamadas[-1][:3] == ["gh", "issue", "create"]
+
+
+# ---------------------------------------------------------------- --diagnostico (sólo lectura)
+
+class BufferDiag(BufferFalso):
+    """BufferFalso más organizaciones y canales, y posts en error por canal."""
+
+    def __init__(self, por_canal=None, **kw):
+        super().__init__(**kw)
+        self.por_canal = por_canal or {}
+
+    def __call__(self, metodo, url, encabezados, cuerpo=None, tiempo=60):
+        q = json.loads(cuerpo.decode("utf-8"))["query"]
+        if self.estado == 200 and "organizations" in q:
+            self.consultas.append(q)
+            return F.resp(200, {"data": {"account": {"organizations": [{"id": ORG, "name": "Org"}]}}})
+        if self.estado == 200 and "channels(" in q:
+            self.consultas.append(q)
+            return F.resp(200, {"data": {"channels": [
+                {"id": CANALES["shorts"], "name": "guionvivo", "displayName": "G", "service": "youtube",
+                 "isQueuePaused": False},
+                {"id": CANALES["tiktok"], "name": "guionvivo", "displayName": "G", "service": "tiktok",
+                 "isQueuePaused": False},
+                {"id": CANALES["reels"], "name": "guionvivo", "displayName": "G", "service": "instagram",
+                 "isQueuePaused": False}]}})
+        if self.estado == 200 and "posts(" in q:
+            self.consultas.append(q)
+            for canal, posts in self.por_canal.items():
+                if f'"{canal}"' in q:
+                    return F.resp(200, {"data": {"posts": {"edges": [{"node": p} for p in posts],
+                                                           "pageInfo": {"hasNextPage": False, "endCursor": None}}}})
+            return F.resp(200, {"data": {"posts": {"edges": [], "pageInfo": {"hasNextPage": False}}}})
+        return super().__call__(metodo, url, encabezados, cuerpo, tiempo)
+
+
+def diag(r, buf):
+    sal = []
+    cod = retiros.main(["--diagnostico", "--raiz", str(r)], env={"BUFFER_API_KEY": CLAVE}, transporte=buf,
+                       ahora=AHORA, salida=sal.append)
+    return cod, "\n".join(sal)
+
+
+def test_diagnostico_lista_vacia(r):
+    antes = arbol(r)
+    cod, texto = diag(r, BufferDiag())
+    assert cod == 0 and arbol(r) == antes
+    assert "3 canal(es) visto(s)" in texto and "selector de error elegido: error" in texto
+    assert texto.count("0 publicación(es) en error") >= 3
+
+
+def test_diagnostico_una_en_error_recorta_a_120_y_oculta_la_clave(r):
+    antes = arbol(r)
+    largo = f"copyright claim por {CLAVE} " + "x" * 300
+    buf = BufferDiag({CANALES["shorts"]: [error_post("p1", largo)]})
+    cod, texto = diag(r, buf)
+    assert cod == 0 and arbol(r) == antes          # no escribe retiros.md, vetados, PAUSA, cuota ni vistos
+    assert CLAVE not in texto and "shorts: 1 publicación(es) en error" in texto
+    linea = next(l for l in texto.splitlines() if l.strip().startswith("p1 |"))
+    assert linea.split(" | ")[1] == "shorts" and "2026-11-19" in linea
+    assert len(linea.split(" | ")[3]) <= 120 and "copyright claim" in linea
+
+
+def test_diagnostico_fallo_de_la_api_da_1_sin_secretos(r):
+    antes = arbol(r)
+    cod, texto = diag(r, BufferDiag(estado=500))
+    assert cod == 1 and arbol(r) == antes
+    assert "falló la consulta a Buffer" in texto and CLAVE not in texto
+
+
+def test_diagnostico_sin_clave_da_1(r):
+    sal = []
+    assert retiros.main(["--diagnostico", "--raiz", str(r)], env={}, salida=sal.append) == 1

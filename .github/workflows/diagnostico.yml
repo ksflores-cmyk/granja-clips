@@ -86,3 +86,6 @@ jobs:
       - name: "Buffer, retiros (seco)"
         shell: bash
         run: python -m fabrica.retiros --revisar --seco
+      - name: "Buffer, retiros (diagnóstico de sólo lectura)"
+        shell: bash
+        run: python -m fabrica.retiros --diagnostico || true
