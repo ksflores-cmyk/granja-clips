@@ -439,8 +439,36 @@ def _cabe_en_lineas(marca: Marca, frase: str) -> bool:
         return False
 
 
+MAX_TROZOS_FRASE = 4        # una frase larga se parte en tantos tiempos como haga falta, hasta este tope
+
+
+def _unidades_frase(marca: Marca, frase: str) -> list[str]:
+    """La frase en unidades que caben solas: oraciones, luego cláusulas (, ; : —) y por último palabras."""
+    unidades: list[str] = []
+    for oracion in re.split(r"(?<=[.!?…])\s+", frase):
+        if _cabe_en_lineas(marca, oracion):
+            unidades.append(oracion)
+            continue
+        for clausula in re.split(r"(?<=[,;:—])\s+", oracion):
+            if _cabe_en_lineas(marca, clausula):
+                unidades.append(clausula)
+                continue
+            actual = ""
+            for palabra in clausula.split():
+                prueba = f"{actual} {palabra}".strip()
+                if actual and not _cabe_en_lineas(marca, prueba):
+                    unidades.append(actual)
+                    actual = palabra
+                else:
+                    actual = prueba
+            if actual:
+                unidades.append(actual)
+    return unidades
+
+
 def dividir_frase(marca: Marca, frase: str) -> list[str] | None:
-    """La frase entera si cabe en 2 líneas; si no, dos mitades por oraciones que quepan; si no, None."""
+    """La frase entera si cabe en 2 líneas; si no, dos mitades por oraciones que quepan; si no, la frase partida en
+    más tiempos (por oraciones, cláusulas o palabras, hasta MAX_TROZOS_FRASE); si ni así cabe, None."""
     frase = " ".join(str(frase).split())
     if _cabe_en_lineas(marca, frase):
         return [frase]
@@ -452,7 +480,53 @@ def dividir_frase(marca: Marca, frase: str) -> list[str] | None:
             dif = abs(len(izq) - len(der))
             if mejor is None or dif < mejor[0]:
                 mejor = (dif, [izq, der])
-    return mejor[1] if mejor else None
+    if mejor:
+        return mejor[1]
+    trozos: list[str] = []
+    for u in _unidades_frase(marca, frase):
+        if not _cabe_en_lineas(marca, u):
+            return None                     # una sola palabra que no cabe
+        if trozos and _cabe_en_lineas(marca, f"{trozos[-1]} {u}"):
+            trozos[-1] = f"{trozos[-1]} {u}"
+        else:
+            trozos.append(u)
+    return trozos if 2 <= len(trozos) <= MAX_TROZOS_FRASE else None
+
+
+_PALABRAS_COLGANTES = {"a", "al", "con", "de", "del", "el", "en", "la", "las", "lo", "los", "mientras", "o", "para",
+                       "por", "que", "se", "su", "sus", "un", "una", "y"}
+
+
+def ajustar_acotacion(datos: dict, marca: Marca, salida=print) -> None:
+    """Si la acotación no cabe en una línea, la recorta por palabras (con «…») o, si quedan menos de dos palabras,
+    la quita; deja constancia con `salida`. Cambia `datos["acotacion"]`: sólo una acotación válida llega a componer."""
+    acot = datos.get("acotacion")
+    if not isinstance(acot, str) or not acot.strip():
+        return
+    try:
+        mod_dialogo.validar_bloque(marca, None, None, acot.strip())
+        return
+    except ValueError:
+        pass
+    palabras = acot.strip().strip("()").strip().split()
+    while len(palabras) >= 2:
+        palabras.pop()
+        if len(palabras) < 2:
+            break
+        while len(palabras) >= 2 and palabras[-1].lower().strip(",;:.") in _PALABRAS_COLGANTES:
+            palabras.pop()                  # no dejar «…ve la…»
+        if len(palabras) < 2:
+            break
+        cand = " ".join(palabras).rstrip(",;:.") + "…"
+        try:
+            mod_dialogo.validar_bloque(marca, None, None, cand)
+        except ValueError:
+            continue
+        salida(f"ojos: acotación no cabía, se recortó: {acot.strip()!r} -> {cand!r}")
+        datos["acotacion"] = cand
+        return
+    salida(f"ojos: acotación no cabía, se quitó: {acot.strip()!r}")
+    datos["acotacion"] = ""
 
 
 def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float | None = None,
@@ -560,6 +634,8 @@ def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float |
         m.append(f"escena {escena!r}: debe empezar con INT. o EXT.")
     elif marca.fuente("regular", marca.m("tam_escena")).getlength(escena.upper()) > marca.ancho - 2 * marca.m("margen"):
         m.append("la escena no cabe en una línea")
+    if isinstance(datos.get("acotacion"), str):
+        ajustar_acotacion(datos, marca)
     acot = datos["acotacion"].strip()
     if acot:
         try:
@@ -577,9 +653,9 @@ def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float |
 
 
 def partir_lineas(datos: dict, marca: Marca) -> list[dict]:
-    """Líneas listas para componer (t0, t1, hablante, original, es), con las frases largas partidas en dos tiempos.
+    """Líneas listas para componer (t0, t1, hablante, original, es), con las frases largas partidas en varios tiempos.
 
-    Supone que `validar_respuesta` ya dio ok. La división de tiempo es proporcional al texto de cada mitad.
+    Supone que `validar_respuesta` ya dio ok. La división de tiempo es proporcional al texto de cada trozo.
     """
     salida: list[dict] = []
     for ln in sorted(datos["lineas"], key=lambda x: x["t0"]):
@@ -590,7 +666,12 @@ def partir_lineas(datos: dict, marca: Marca) -> list[dict]:
             salida.append({**ln, "es": trozos[0]})
             continue
         t0, t1 = float(ln["t0"]), float(ln["t1"])
-        medio = t0 + (t1 - t0) * len(trozos[0]) / (len(trozos[0]) + len(trozos[1]))
-        salida.append({**ln, "t0": t0, "t1": medio, "es": trozos[0]})
-        salida.append({**ln, "t0": medio, "t1": t1, "es": trozos[1]})
+        total = sum(len(t) for t in trozos)
+        ini = t0
+        acumulado = 0
+        for i, t in enumerate(trozos):
+            acumulado += len(t)
+            fin = t1 if i == len(trozos) - 1 else t0 + (t1 - t0) * acumulado / total
+            salida.append({**ln, "t0": ini, "t1": fin, "es": t})
+            ini = fin
     return salida
