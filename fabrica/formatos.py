@@ -26,6 +26,7 @@ from .config import cargar_yaml, raiz_repo
 from .detectar import Candidato
 from .editar.lienzo import Toma, _limpia
 from .editar.marca import Marca
+from .editar import nombres as mod_nombres
 from .editar.toma import Resultado, armar, copia_para_ojos, lapiz_de
 from . import textos as mod_textos   # la tarea #8: límites por red, título, hashtags y comprobaciones finales
 from .publicar import Descartada, _comprobar_repetido, _limpio
@@ -455,7 +456,11 @@ def preparar_segmento(candidato: Candidato, ficha: dict, ctx: Contexto) -> Segme
         raise ErrorSegmento("; ".join(f"ojos: {m}" for m in motivos))
     entrada = fuentes.entrada_material(ficha, url=candidato.url)
     creador = (entrada or {}).get("creador") or candidato.creador or ficha.get("creador") or ""
-    toma, lineas, inicio, dur = armar(mirada.datos, ctx.marca, ficha, ctx.numero, creador)
+    creador = mod_nombres.creador_de(creador, ficha)
+    toma, lineas, inicio, dur = armar(mirada.datos, ctx.marca, ficha, ctx.numero, creador, temporada, ctx.raiz)
+    motivos_nombres = mod_nombres.revisar_nombres(toma, lineas, creador, ctx.raiz)
+    if motivos_nombres:
+        raise ErrorSegmento("; ".join(f"puerta de nombres: {m}" for m in motivos_nombres))
     return Segmento(fuente=d.ruta, inicio=inicio, duracion=dur, toma=toma, lineas=lineas, ficha=ficha,
                     creador=str(creador), fecha=hora_local(candidato.creado_en).date(),
                     id_origen=candidato.id_origen)

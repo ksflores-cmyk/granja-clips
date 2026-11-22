@@ -22,7 +22,7 @@ from .. import descargar as mod_descargar
 from .. import fuentes, ojos, plazo, puertas
 from ..config import cargar_yaml, raiz_repo
 from ..registro import ZONA, contador_toma
-from . import estilo, musica as mod_musica, sin_ia
+from . import estilo, musica as mod_musica, nombres, sin_ia
 from .componer import Linea, componer, sondear_video
 from .lienzo import Toma
 from .marca import Marca
@@ -83,22 +83,26 @@ def lapiz_de(numero: int) -> str:
 
 
 def armar(datos: dict, marca: Marca, ficha: dict, numero: int,
-          creador: str | None = None) -> tuple[Toma, list[Linea], float, float]:
+          creador: str | None = None, temporada: dict | None = None, raiz=None) -> tuple[Toma, list[Linea], float, float]:
     """(Toma, líneas relativas al recorte, inicio, duración) a partir de una respuesta ya validada.
 
-    `creador`: el creador recortado cuando la ficha lo trae por archivo (campañas); si no, el de la ficha."""
+    `creador`: el creador recortado cuando la ficha lo trae por archivo (campañas); si no, el de la ficha.
+    Los nombres salen de la ficha, no del modelo: `STREAMER` o el creador -> su nombre; otro hablante ->
+    `OTRA VOZ`; una escena `INT. STREAM` o con un nombre vetado -> `sin_ia.escena_de`."""
+    creador = nombres.creador_de(creador, ficha)
     ini, fin = float(datos["recorte"]["inicio"]), float(datos["recorte"]["fin"])
     dur = round(fin - ini, 3)
     toma = Toma(numero=numero, gancho=datos["gancho"].strip(), palabra_lapiz=datos["palabra_lapiz"].strip(),
-                lapiz=lapiz_de(numero), escena=datos["escena"].strip().upper(),
-                credito=f"Con: {creador or ficha['creador']}")
+                lapiz=lapiz_de(numero),
+                escena=nombres.escena_segura(datos["escena"], creador, marca, temporada, raiz),
+                credito=f"Con: {creador}")
     tope = dur - float(marca.m("cierre_s"))      # el último medio segundo es el cierre
     lineas: list[Linea] = []
     for ln in ojos.partir_lineas(datos, marca):
         t0, t1 = max(0.0, round(ln["t0"] - ini, 3)), min(tope, round(ln["t1"] - ini, 3))
         if t1 - t0 < MIN_LINEA_S:
             continue
-        lineas.append(Linea(t0=t0, t1=t1, nombre=ln["hablante"].strip().upper(), frase=ln["es"].strip(),
+        lineas.append(Linea(t0=t0, t1=t1, nombre=nombres.etiqueta_hablante(ln["hablante"], creador), frase=ln["es"].strip(),
                             original=ln["original"]))
     acot = datos["acotacion"].strip()
     if acot:
@@ -208,8 +212,12 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                                  gastar=True)
             numero = contador_toma(raiz)
             entrada = fuentes.entrada_material(ficha, url=candidato.url)
-            toma, lineas, inicio, dur = armar(mirada.datos, marca, ficha, numero,
-                                              entrada["creador"] if entrada else None)
+            creador = nombres.creador_de(entrada["creador"] if entrada else None, ficha)
+            toma, lineas, inicio, dur = armar(mirada.datos, marca, ficha, numero, creador, temporada, raiz)
+            motivos_nombres = nombres.revisar_nombres(toma, lineas, creador, raiz)
+            if motivos_nombres:
+                return Resultado(False, [f"puerta de nombres: {m}" for m in motivos_nombres],
+                                 gemini=mirada.datos, modelo=mirada.modelo, gastar=True)
             mp4 = salida / f"toma-{numero:03d}-{_nombre_seguro(candidato.id_origen)}.mp4"
             plan_ruta = mp4.with_suffix(".plan.json")
             pista, aviso_musica = None, None

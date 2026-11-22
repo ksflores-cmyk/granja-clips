@@ -89,7 +89,7 @@ def correr(salida: Path, *, entorno=None, transporte=None, transporte_lista=None
             (salida / "informe.md").write_text("\n".join(informe) + "\n", encoding="utf-8")
             print("DESCARTE: " + "; ".join(motivos), file=sys.stderr)
             return 1
-        t, lineas, inicio, dur = toma.armar(mirada.datos, marca, ficha, contador_toma())
+        t, lineas, inicio, dur = toma.armar(mirada.datos, marca, ficha, contador_toma(), temporada=temporada)
         mp4 = salida / "ojos-sintel.mp4"
         plan_ruta = salida / "ojos-sintel.plan.json"
         with tempfile.TemporaryDirectory(prefix="trabajo-ojos-") as trabajo:
