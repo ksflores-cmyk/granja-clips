@@ -121,6 +121,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release download musica -D "$RUNNER_TEMP/musica" --clobber || echo "::warning::sin música del release"
       - name: Bajar efectos de sonido del release
+        if: ${{ steps.decidir.outputs.trabajo == 'si' || inputs.ensayo_forzado }}
         timeout-minutes: 3       # sin efectos la historia no usa sfx (zoom y cámara lenta siguen); no debe comerse el ciclo
         continue-on-error: true
         env:
