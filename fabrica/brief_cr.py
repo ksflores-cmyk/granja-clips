@@ -69,8 +69,8 @@ def leer(page, campaign_id: str, salida: Path, abrir=urllib.request.urlopen) -> 
     # «Join to unlock» puede quedar en una parte (p. ej. un requisito) aun estando unido: se anota y se sigue.
     bloqueada = bool(re.search(r"Join to unlock|Visible once you join", cuerpo, re.I))
     hrefs = page.eval_on_selector_all("a[href]", "els => els.map(e => e.href)")
-    page.screenshot(path=str(salida / f"{campaign_id}.png"))      # sólo la parte visible: menos datos de la cuenta
-    (salida / f"{campaign_id}.txt").write_text(cuerpo, encoding="utf-8")
+    # Repo público (21 nov): ni captura ni texto completo de la página (pueden traer datos de la cuenta de Kevin).
+    # Al artefacto sólo van los enlaces útiles y el texto de los Google Docs públicos del brief.
     enlaces = enlaces_utiles(hrefs)
     docs = {}
     for u in enlaces:
@@ -83,7 +83,7 @@ def leer(page, campaign_id: str, salida: Path, abrir=urllib.request.urlopen) -> 
             docs[u] = nombre
         except Exception as e:  # noqa: BLE001
             docs[u] = f"error: {type(e).__name__}: {str(e)[:120]}"
-    titulo = next((ln.strip() for ln in cuerpo.splitlines() if ln.strip()), "")
+    titulo = (page.title() or "").strip()     # el título de la pestaña, no la primera línea (puede ser la cuenta)
     return {"cr_campaign_id": campaign_id, "titulo": titulo, "bloqueada": bloqueada, "pausada": bool(
         re.search(r"Pausada por la marca|Paused by the brand", cuerpo, re.I)), "enlaces": enlaces, "docs": docs}
 
