@@ -163,9 +163,13 @@ def _leer_cuadros(cmd, tope, errores, a, h, *, d, c, fps) -> dict:
     finally:
         reloj.cancel()
         proc.stdout.close()
-        if proc.poll() is None:
+        # Tras el último cuadro ffmpeg aún puede estar cerrando (revisión de Codex, 22 nov): matarlo de inmediato
+        # daba un código de salida distinto de 0 y rechazaba una toma válida. Se le dan unos segundos.
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
             proc.kill()
-        proc.wait()
+            proc.wait()
     if vencio.is_set():
         raise subprocess.TimeoutExpired(cmd, tope)
     if proc.returncode != 0:

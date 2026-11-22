@@ -70,26 +70,12 @@ jobs:
           GRANJA_MUSICA_DIR: ${{ runner.temp }}/musica
           GRANJA_SFX_DIR: ${{ runner.temp }}/sfx
         run: python -m fabrica.editar.muestras --salida "$RUNNER_TEMP/muestras"
-      - name: Medir voces sobre material de campaña (fm27-daro, sólo medición)
-        timeout-minutes: 6
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Material autorizado de la campaña FM27 (release privado): sólo se mide aquí. Ni se publica ni se sube
-          # como artefacto: el video queda en RUNNER_TEMP, fuera de la carpeta del artefacto.
-          mkdir -p "$RUNNER_TEMP/fm27" "$RUNNER_TEMP/medicion"
-          if gh release download fuentes-fm27 -p fm27-daro.mp4 -D "$RUNNER_TEMP/fm27" --clobber; then
-            python -m fabrica.voces --medir "$RUNNER_TEMP/fm27/fm27-daro.mp4" --inicio 0 --duracion 60 \
-              --modelos base small --salida "$RUNNER_TEMP/medicion/voces-fm27.json" \
-              || echo "::warning::la medición sobre fm27-daro falló"
-          else
-            echo "::warning::sin fm27-daro.mp4 del release fuentes-fm27: no se mide material de campaña"
-          fi
-      - name: Resumen de voces (muestra y material de campaña)
+      # Sin medición de voces sobre material de campaña (revisión de Codex, 22 nov): el resumen del paso es
+      # público en este repo y llevaría la transcripción de un video de la marca (FM27, pausada).
+      - name: Resumen de voces (muestra sintética)
         if: always()
         run: |
-          python -m fabrica.voces --resumen "$RUNNER_TEMP/muestras/voces.json" "$RUNNER_TEMP/medicion/voces-fm27.json" \
+          python -m fabrica.voces --resumen "$RUNNER_TEMP/muestras/voces.json" \
             | tee -a "$GITHUB_STEP_SUMMARY" || true
       - name: Resumen de la puerta de estilo
         if: always()

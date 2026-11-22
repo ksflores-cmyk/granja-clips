@@ -266,6 +266,18 @@ def _planificar_historia(raiz, ficha, datos, inicio: float, dur: float, cfg_h: d
                                           f"error inesperado: {type(e).__name__}")
 
 
+def _spoilers_en_lineas(lineas, temporada: dict) -> list[str]:
+    """Las líneas que ponen las voces (#19, transcripción de Whisper) no pasaron por `ojos.validar_respuesta`:
+    se les aplica el mismo filtro de palabras a evitar de la temporada (revisión de Codex, 22 nov)."""
+    motivos = []
+    for i, ln in enumerate(lineas or [], 1):
+        for p in temporada.get("palabras_evitar", []) or []:
+            for donde, texto in (("frase", getattr(ln, "frase", "") or ""), ("acotación", getattr(ln, "acotacion", "") or "")):
+                if ojos._contiene(texto, str(p)):
+                    motivos.append(f"línea {i}: palabra a evitar {p!r} en la {donde} (posible spoiler)")
+    return motivos
+
+
 def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, transporte, espera, entorno,
                 transporte_lista=None, transporte_criticos=None, nota_juez: str | None = None, ronda: int = 1,
                 descarga=None, llamadas_previas: dict | None = None) -> Resultado:
@@ -379,13 +391,15 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             # Puerta de nombres (#24) también para lo que ponen las voces (#19): el hablante sólo sale de la ficha
             # (el creador) o es OTRA VOZ, y ni las frases transcritas ni el rótulo llevan un nombre vetado. Si las
             # voces no pasan, se vuelve a las líneas de Gemini (ya limpias, sin cortes); si tampoco, se descarta.
-            motivos_voces = nombres.revisar_nombres(toma, ev.lineas, creador, raiz, marca)
+            motivos_voces = (nombres.revisar_nombres(toma, ev.lineas, creador, raiz, marca)
+                             + _spoilers_en_lineas(ev.lineas, temporada))
             if motivos_voces and ev.alterno is not None:
                 ev.lineas, ev.dur, ev.transcripcion = ev.alterno[0], ev.alterno[1], None
                 ev.tramos = None
                 ev.info = {**(ev.info or {}), "fuente_lineas": "gemini", "cortes": [],
                            "reintento": "líneas de Gemini sin cortes por la puerta de nombres: " + "; ".join(motivos_voces)[:300]}
-                motivos_voces = nombres.revisar_nombres(toma, ev.lineas, creador, raiz, marca)
+                motivos_voces = (nombres.revisar_nombres(toma, ev.lineas, creador, raiz, marca)
+                                 + _spoilers_en_lineas(ev.lineas, temporada))
             if motivos_voces:
                 return Resultado(False, [f"puerta de nombres (voces): {m}" for m in motivos_voces],
                                  gemini=mirada.datos, modelo=mirada.modelo, gastar=True)
