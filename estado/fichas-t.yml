@@ -127,7 +127,7 @@
   origen: twitch
   twitch_login: taisontv
   broadcaster_id: '115156753'
-  seguidores: 165538
+  seguidores: 165542
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -167,8 +167,8 @@
   origen: twitch
   twitch_login: zyrpesland
   broadcaster_id: '512025628'
-  seguidores: 159562
-  seguidores_leidos: '2026-11-20'
+  seguidores: 159724
+  seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -194,7 +194,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-22'
+  vence: '2026-11-24'
   estado: vigente
   uso: produccion
   publicable: true
@@ -247,7 +247,7 @@
   origen: twitch
   twitch_login: lamejorclase
   broadcaster_id: '598808171'
-  seguidores: 66627
+  seguidores: 66652
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -287,7 +287,7 @@
   origen: twitch
   twitch_login: mada
   broadcaster_id: '59667627'
-  seguidores: 72077
+  seguidores: 72080
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -887,7 +887,7 @@
   origen: twitch
   twitch_login: l0k0hgaming
   broadcaster_id: '52642922'
-  seguidores: 28380
+  seguidores: 28382
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -927,7 +927,7 @@
   origen: twitch
   twitch_login: joseebernaai
   broadcaster_id: '748931353'
-  seguidores: 5680
+  seguidores: 5688
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -1007,7 +1007,7 @@
   origen: twitch
   twitch_login: sergioramosgg
   broadcaster_id: '203844380'
-  seguidores: 146490
+  seguidores: 146489
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -1127,7 +1127,7 @@
   origen: twitch
   twitch_login: ishika
   broadcaster_id: '157248383'
-  seguidores: 30201
+  seguidores: 30208
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -2007,7 +2007,7 @@
   origen: twitch
   twitch_login: angelysaras
   broadcaster_id: '21646144'
-  seguidores: 125033
+  seguidores: 125052
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
