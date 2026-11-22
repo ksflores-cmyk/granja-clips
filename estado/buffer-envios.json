@@ -613,7 +613,8 @@
     "largo": 105
    },
    "ficha_id": "t-cahos-gaming"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|5|2026-11-22T04:30:00.000Z",
@@ -659,7 +660,8 @@
     "largo": 105
    },
    "ficha_id": "t-cahos-gaming"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|5|2026-11-22T04:30:00.000Z",
@@ -705,6 +707,7 @@
     "largo": 108
    },
    "ficha_id": "t-cahos-gaming"
-  }
+  },
+  "ruta_borrada": true
  }
 ]
