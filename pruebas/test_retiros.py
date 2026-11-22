@@ -751,7 +751,7 @@ def test_diagnostico_fallo_de_la_api_da_1_sin_secretos(r):
     antes = arbol(r)
     cod, texto = diag(r, BufferDiag(estado=500))
     assert cod == 1 and arbol(r) == antes
-    assert "falló la consulta a Buffer" in texto and CLAVE not in texto
+    assert "falló la consulta a Buffer (" in texto and CLAVE not in texto and "500" not in texto
 
 
 def test_diagnostico_sin_clave_da_1(r):

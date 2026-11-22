@@ -533,7 +533,8 @@ def diagnostico(raiz, cliente, cfg: dict, out=print, secretos=()) -> int:
                     txt = _texto_error(p.get("error"))
                     out(f"  {plat} | {_corto(p.get('dueAt'), secretos, 40)} | {clasificar(txt) if txt else 'sin mensaje'}")
     except (publicar.ErrorBuffer, red.ErrorRed, OSError) as e:
-        out(f"diagnóstico: falló la consulta a Buffer: {_corto(e, secretos, 300)}")
+        # Sólo la clase del error: su texto puede traer datos de la cuenta y el registro es público (Codex, ronda 2).
+        out(f"diagnóstico: falló la consulta a Buffer ({type(e).__name__})")
         return 1
     out(f"diagnóstico: listo, {total} publicación(es) en error en total (sólo lectura, nada escrito)")
     return 0
