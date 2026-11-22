@@ -733,16 +733,18 @@ def test_diagnostico_lista_vacia(r):
     assert texto.count("0 publicación(es) en error") >= 3
 
 
-def test_diagnostico_una_en_error_recorta_a_120_y_oculta_la_clave(r):
+def test_diagnostico_una_en_error_sólo_dice_red_fecha_y_clase(r):
     antes = arbol(r)
     largo = f"copyright claim por {CLAVE} " + "x" * 300
     buf = BufferDiag({CANALES["shorts"]: [error_post("p1", largo)]})
     cod, texto = diag(r, buf)
     assert cod == 0 and arbol(r) == antes          # no escribe retiros.md, vetados, PAUSA, cuota ni vistos
     assert CLAVE not in texto and "shorts: 1 publicación(es) en error" in texto
-    linea = next(l for l in texto.splitlines() if l.strip().startswith("p1 |"))
-    assert linea.split(" | ")[1] == "shorts" and "2026-11-19" in linea
-    assert len(linea.split(" | ")[3]) <= 120 and "copyright claim" in linea
+    # Registros públicos: ni el texto del error, ni el id de la publicación, ni nombres o ids de canales.
+    assert "copyright claim" not in texto and "p1" not in texto
+    assert not any(c in texto for c in CANALES.values())
+    linea = next(l for l in texto.splitlines() if l.strip().startswith("shorts |"))
+    assert "2026-11-19" in linea and linea.split(" | ")[2] == retiros.clasificar(largo)
 
 
 def test_diagnostico_fallo_de_la_api_da_1_sin_secretos(r):

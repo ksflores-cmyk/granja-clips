@@ -502,15 +502,16 @@ def _canales_del_diagnostico(cfg: dict, vistos: list[dict]) -> tuple[dict, dict]
 
 def diagnostico(raiz, cliente, cfg: dict, out=print, secretos=()) -> int:
     """Lee de Buffer real lo que `revisar` necesita y lo imprime. SÓLO lectura: no escribe retiros.md, vetados,
-    PAUSA, alertas ni issues. Por cada publicación en error: id, canal, fecha y el error (120 caracteres)."""
+    PAUSA, alertas ni issues. Los registros de Actions son públicos (revisión de Codex, 22 nov): de los canales sólo
+    se imprime la red y, de cada publicación en error, la red, la fecha y la clase del error (`clasificar`), nunca su
+    texto, su id ni el nombre o id de un canal."""
     secretos = [x for x in [getattr(cliente, "_clave", ""), *secretos] if x]
     try:
         with _Acotado(cliente, PRESUPUESTO_DIAGNOSTICO_S):
             vistos = cliente.todos_los_canales()
             out(f"diagnóstico: {len(vistos)} canal(es) visto(s) en Buffer")
             for c in vistos:
-                out(f"  canal {c.get('id')} · {c.get('service')} · {c.get('name')}"
-                    + (" · cola pausada" if c.get("isQueuePaused") else ""))
+                out(f"  canal · {c.get('service')}" + (" · cola pausada" if c.get("isQueuePaused") else ""))
             ids, orgs = _canales_del_diagnostico(cfg, vistos)
             for plat in publicar.PLATAFORMAS:
                 if plat not in ids:
@@ -529,8 +530,8 @@ def diagnostico(raiz, cliente, cfg: dict, out=print, secretos=()) -> int:
                 total += len(posts)
                 out(f"diagnóstico: {plat}: {len(posts)} publicación(es) en error")
                 for p in posts:
-                    out(f"  {_corto(p.get('id'), secretos, 60)} | {plat} | {_corto(p.get('dueAt'), secretos, 40)}"
-                        f" | {_corto(_texto_error(p.get('error')), secretos) or 'sin mensaje'}")
+                    txt = _texto_error(p.get("error"))
+                    out(f"  {plat} | {_corto(p.get('dueAt'), secretos, 40)} | {clasificar(txt) if txt else 'sin mensaje'}")
     except (publicar.ErrorBuffer, red.ErrorRed, OSError) as e:
         out(f"diagnóstico: falló la consulta a Buffer: {_corto(e, secretos, 300)}")
         return 1
