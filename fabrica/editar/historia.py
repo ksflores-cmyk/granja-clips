@@ -993,9 +993,9 @@ def orden_ffmpeg(*, salida: str, ancho: int, alto: int, video: dict, tramos: lis
             ss, t_in = max(inicio, tr.f0 - 0.034), 0.2          # sólo el cuadro de justo antes del congelado
         else:
             ss, t_in = tr.f0, tr.f1 - tr.f0
-        # `-threads 2` por entrada: cada decodificador retiene cuadros por hilo; sin tope, la memoria crece con los
-        # núcleos del runner (1,25 GB en el de 4 núcleos con ffmpeg 8, 0,6 GB con 2)
-        entradas += ["-threads", "2", "-ss", _g(ss), "-t", _g(t_in), "-i", video["ruta"]]
+        # `-threads 1` por entrada (con 2, ffmpeg 8 de CI llegó a 1036 MB): cada decodificador retiene cuadros por
+        # hilo; sin tope, la memoria crece con los núcleos del runner (1,25 GB en el de 4 núcleos con ffmpeg 8)
+        entradas += ["-threads", "1", "-ss", _g(ss), "-t", _g(t_in), "-i", video["ruta"]]
     filtros: list[str] = []
     etiquetas: list[str] = []
     for i, tr in enumerate(tramos):
