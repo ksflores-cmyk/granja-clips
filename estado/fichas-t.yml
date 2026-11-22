@@ -287,7 +287,7 @@
   origen: twitch
   twitch_login: mada
   broadcaster_id: '59667627'
-  seguidores: 72077
+  seguidores: 72073
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -327,8 +327,8 @@
   origen: twitch
   twitch_login: srserpiente
   broadcaster_id: '30805171'
-  seguidores: 169016
-  seguidores_leidos: '2026-11-21'
+  seguidores: 169017
+  seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -354,7 +354,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-23'
+  vence: '2026-11-24'
   estado: vigente
   uso: produccion
   publicable: true
@@ -527,7 +527,7 @@
   origen: twitch
   twitch_login: itsmoura
   broadcaster_id: '110286144'
-  seguidores: 58936
+  seguidores: 58939
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
