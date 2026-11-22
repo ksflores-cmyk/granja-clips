@@ -35,10 +35,6 @@ jobs:
           printf '| campaña | título | enlaces | documentos | pausada | bloqueada |\n|---|---|---|---|---|---|\n' >> "$GITHUB_STEP_SUMMARY"
           args=""; for c in $CAMPANAS; do args="$args --campana $c"; done
           python -m fabrica.brief_cr $args --salida "$RUNNER_TEMP/briefs"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: briefs-cr
-          path: ${{ runner.temp }}/briefs
-          retention-days: 1
-          if-no-files-found: ignore
+      # Sin artefacto (revisión de Codex, 22 nov): el repo es público y los enlaces de una página abierta con la
+      # sesión de Kevin pueden llevar parámetros de acceso o materiales sólo para miembros. Aquí sólo queda el
+      # resumen con conteos; leer el material del brief se hace desde la PC de Kevin (herramientas/).

@@ -275,3 +275,9 @@ def test_workflow_brief_cr_pasa_el_secreto_por_env_y_lee_las_tres():
     assert wf["permissions"] == {"contents": "read"}
     defecto = wf[True]["workflow_dispatch"]["inputs"]["campanas"]["default"].split()
     assert sorted(defecto) == sorted(c for c, _ in CAMPANAS.values())
+
+
+def test_brief_cr_no_sube_nada_publico():
+    # Repo público (revisión de Codex, 22 nov): una página abierta con la sesión de Kevin no deja artefactos.
+    texto = (RAIZ_REAL / ".github" / "workflows" / "brief-cr.yml").read_text(encoding="utf-8")
+    assert "upload-artifact" not in texto
