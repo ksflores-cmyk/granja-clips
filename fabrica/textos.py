@@ -357,12 +357,14 @@ def _campana(toma: dict, ficha: dict, plataforma: str, cfg: dict) -> dict:
 
 
 def _construir(primera: str, valor: list[str], datos: list[str], credito: str, aviso: list[str],
-               etiquetas: list[str]) -> str:
+               etiquetas: list[str], fuente: str = "") -> str:
     bloques = [primera]
     if datos:
         bloques.append("\n".join("- " + d for d in datos))
     if valor:
         bloques.append(" ".join(valor))
+    if fuente:              # informativa: la fuente del dato, la misma que sale en el video (nunca se recorta)
+        bloques.append(fuente)
     cola = [credito, *aviso] + ([" ".join(etiquetas)] if etiquetas else [])
     return "\n\n".join(bloques) + "\n\n" + "\n".join(cola)
 
@@ -407,8 +409,9 @@ def armar(toma: dict, ficha: dict, plataforma: str, cfg: dict | None = None) -> 
     if n_hash + sum(1 for a in aviso if es_hashtag(a)) < lim["min_hashtags"]:
         raise Descartada(f"{plataforma} necesita de {lim['min_hashtags']} a {lim['max_hashtags']} "
                          "etiquetas y no hay suficientes")
-    valor, datos = [], []
+    valor, datos, fuente = [], [], ""
     if informativa:
+        fuente = _limpio(_sin_hashtags(str(toma.get("fuente") or "")))
         titular = _preparar_gancho(toma.get("titular") or toma.get("gancho"), toma, ficha, cfg, plataforma) \
             if (toma.get("titular") or toma.get("gancho")) else ""
         if not titular:
@@ -422,7 +425,7 @@ def armar(toma: dict, ficha: dict, plataforma: str, cfg: dict | None = None) -> 
             valor = [v for v in (_limpio(_sin_hashtags(str(v))) for v in toma.get("valor") or []) if v][:2]
     # Si no cabe: primero se recorta el valor (Reels) o los datos (informativa), frase por frase.
     while True:
-        texto = _construir(primera, valor, datos, credito, aviso, etiquetas)
+        texto = _construir(primera, valor, datos, credito, aviso, etiquetas, fuente)
         if largo(texto, plataforma, cfg) <= lim["max_texto"] or not (valor or datos):
             break
         (datos if datos else valor).pop()

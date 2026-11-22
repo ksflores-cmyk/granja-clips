@@ -138,7 +138,7 @@ def _muestra_con_musica(salida: Path, marca: Marca, registrar, omitir, hoy) -> N
                               f"(GRANJA_MUSICA_DIR={mod_musica.carpeta() or ''})")
         return
     entrada, origen = _entrada_de_prueba(marca.raiz, hoy)
-    credito = informativa.CREDITO if origen.startswith("informativas.yml") else TEXTOS_NEUTROS["credito"]
+    credito = str(entrada.get("credito") or informativa.CREDITO) if origen.startswith("informativas.yml") else TEXTOS_NEUTROS["credito"]
     t = Toma(numero=numero, gancho=entrada["gancho"].strip(), palabra_lapiz=entrada["palabra_lapiz"].strip(),
              lapiz="subrayado", escena=str(entrada.get("escena") or informativa.ESCENA).upper(), credito=credito)
     lineas = informativa._lineas(entrada)
