@@ -427,5 +427,143 @@
    "ficha_id": "t-taisontv"
   },
   "ruta_borrada": true
+ },
+ {
+  "id": "shorts|4|2026-11-22T01:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 4,
+  "dueAt": "2026-11-22T01:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-21/toma-004-86f712f0.mp4",
+  "estado": "creado",
+  "post_id": "6b0231fed5eabfb8cc6dd7b1",
+  "intento": "3f87c1acaeb545638bc499fe85ba2582",
+  "registrado": true,
+  "texto": "Toma 004. Sentadillas al ritmo del perreo\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 4,
+    "gancho": "Sentadillas al ritmo del perreo",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-miriam-petricor",
+    "campana": "",
+    "duracion_s": 13.5,
+    "creador": "twitch.tv/miriam_petricor",
+    "id_origen": "TrappedNaivePorpoiseDxCat-N7wxPaMTK52JacR_",
+    "claves": [
+     "TrappedNaivePorpoiseDxCat-N7wxPaMTK52JacR_"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 004. Sentadillas al ritmo del perreo\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 004. Sentadillas al ritmo del perreo",
+    "credito": "🎥 twitch.tv/miriam_petricor",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 004. Sentadillas al ritmo del perreo\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 102
+   },
+   "ficha_id": "t-miriam-petricor"
+  }
+ },
+ {
+  "id": "tiktok|4|2026-11-22T01:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 4,
+  "dueAt": "2026-11-22T01:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-21/toma-004-86f712f0.mp4",
+  "estado": "creado",
+  "post_id": "6b0231ff846b0ee90749464f",
+  "intento": "286b131b7b234144826c01caf0052297",
+  "registrado": true,
+  "texto": "Toma 004. Sentadillas al ritmo del perreo\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 4,
+    "gancho": "Sentadillas al ritmo del perreo",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-miriam-petricor",
+    "campana": "",
+    "duracion_s": 13.5,
+    "creador": "twitch.tv/miriam_petricor",
+    "id_origen": "TrappedNaivePorpoiseDxCat-N7wxPaMTK52JacR_",
+    "claves": [
+     "TrappedNaivePorpoiseDxCat-N7wxPaMTK52JacR_"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 004. Sentadillas al ritmo del perreo\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/miriam_petricor",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 004. Sentadillas al ritmo del perreo\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 102
+   },
+   "ficha_id": "t-miriam-petricor"
+  }
+ },
+ {
+  "id": "reels|4|2026-11-22T01:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 4,
+  "dueAt": "2026-11-22T01:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-21/toma-004-86f712f0.mp4",
+  "estado": "creado",
+  "post_id": "6b0231ffd5eabfb8cc6dd85b",
+  "intento": "063185fd9d0941099f7327931890442f",
+  "registrado": true,
+  "texto": "Toma 004. Sentadillas al ritmo del perreo\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 4,
+    "gancho": "Sentadillas al ritmo del perreo",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-miriam-petricor",
+    "campana": "",
+    "duracion_s": 13.5,
+    "creador": "twitch.tv/miriam_petricor",
+    "id_origen": "TrappedNaivePorpoiseDxCat-N7wxPaMTK52JacR_",
+    "claves": [
+     "TrappedNaivePorpoiseDxCat-N7wxPaMTK52JacR_"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 004. Sentadillas al ritmo del perreo\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/miriam_petricor",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 004. Sentadillas al ritmo del perreo\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 105
+   },
+   "ficha_id": "t-miriam-petricor"
+  }
  }
 ]

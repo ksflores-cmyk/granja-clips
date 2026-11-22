@@ -127,7 +127,7 @@
   origen: twitch
   twitch_login: taisontv
   broadcaster_id: '115156753'
-  seguidores: 165515
+  seguidores: 165526
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -687,8 +687,8 @@
   origen: twitch
   twitch_login: alvarosapoo
   broadcaster_id: '232062189'
-  seguidores: 22836
-  seguidores_leidos: '2026-11-20'
+  seguidores: 23992
+  seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -714,7 +714,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-22'
+  vence: '2026-11-23'
   estado: vigente
   uso: produccion
   publicable: true
@@ -727,7 +727,7 @@
   origen: twitch
   twitch_login: miriam_petricor
   broadcaster_id: '577594813'
-  seguidores: 87045
+  seguidores: 87153
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -1287,7 +1287,7 @@
   origen: twitch
   twitch_login: elmeap
   broadcaster_id: '648164647'
-  seguidores: 94855
+  seguidores: 94958
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -1327,7 +1327,7 @@
   origen: twitch
   twitch_login: jucaviapri
   broadcaster_id: '186736829'
-  seguidores: 250667
+  seguidores: 250672
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
@@ -1488,6 +1488,126 @@
   twitch_login: superblazing_
   broadcaster_id: '573251394'
   seguidores: 27661
+  seguidores_leidos: '2026-11-21'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-23'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+- id: t-tibsonm
+  tipo: T
+  creador: twitch.tv/tibsonm
+  credito: twitch.tv/tibsonm
+  origen: twitch
+  twitch_login: tibsonm
+  broadcaster_id: '513203568'
+  seguidores: 35651
+  seguidores_leidos: '2026-11-21'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-23'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+- id: t-oskar1up
+  tipo: T
+  creador: twitch.tv/oskar1up
+  credito: twitch.tv/oskar1up
+  origen: twitch
+  twitch_login: oskar1up
+  broadcaster_id: '46034964'
+  seguidores: 63954
+  seguidores_leidos: '2026-11-21'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-23'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+- id: t-vela
+  tipo: T
+  creador: twitch.tv/vela
+  credito: twitch.tv/vela
+  origen: twitch
+  twitch_login: vela
+  broadcaster_id: '31950874'
+  seguidores: 100577
   seguidores_leidos: '2026-11-21'
   juego: GTA 6
   reglas:
