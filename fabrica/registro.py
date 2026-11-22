@@ -19,7 +19,7 @@ CABECERA_MARCADOR = [
     "id_clip", "toma", "fecha", "hora", "plataforma", "pilar", "fuente_id", "campana",
     "gancho", "duracion_s", "credito", "url", "vistas_12h", "vistas_24h", "vistas_72h",
     "likes", "compartidos", "comentarios", "guardados", "seguidores", "prueba",
-    "estado_campana", "motivo_rechazo", "pago_usd", "notas", "historia",
+    "estado_campana", "motivo_rechazo", "pago_usd", "notas", "historia", "visto_medio_s",
 ]
 
 CABECERA_ENVIOS = ["fecha", "toma", "plataforma", "url", "campana", "estado", "notas"]

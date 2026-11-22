@@ -756,6 +756,38 @@ def validar_ojos(o, inf: Informe) -> None:
                 inf.error(f"{rel}: sin_ia.duracion_objetivo_s debe ser un número de 7 a 30")
 
 
+def validar_prueba_retencion(p, inf: Informe) -> None:
+    rel = "config/prueba-retencion.yml"
+    if not _claves(p, rel, ["activa", "nombre", "inicio", "brazos", "asignacion", "min_tomas_por_brazo"], inf):
+        return
+    if not isinstance(p["activa"], bool):
+        inf.error(f"{rel}: activa debe ser true o false")
+    if not (isinstance(p["nombre"], str) and re.fullmatch(r"[a-z0-9][a-z0-9-]*", p["nombre"])):
+        inf.error(f"{rel}: nombre debe ser texto en minúsculas, números y guiones")
+    if not isinstance(p["inicio"], date) or isinstance(p["inicio"], datetime):
+        inf.error(f"{rel}: inicio debe ser una fecha AAAA-MM-DD")
+    if not (isinstance(p["asignacion"], str) and p["asignacion"].strip()):
+        inf.error(f"{rel}: asignacion debe ser texto")
+    m = p["min_tomas_por_brazo"]
+    if not _es_int(m) or m < 1:
+        inf.error(f"{rel}: min_tomas_por_brazo debe ser un entero de 1 o más")
+    b = p["brazos"]
+    if not isinstance(b, dict) or set(b) != {"corta", "control"}:
+        inf.error(f"{rel}: brazos debe tener exactamente corta y control")
+        return
+    c = b["corta"]
+    if not isinstance(c, dict):
+        inf.error(f"{rel}: brazos.corta debe ser un bloque")
+        return
+    d = c.get("duracion_s")
+    if not (isinstance(d, list) and len(d) == 2 and all(_numero(x, 7, 30) for x in d) and d[0] <= d[1]):
+        inf.error(f"{rel}: brazos.corta.duracion_s debe ser [mínimo, máximo] entre 7 y 30")
+    if not _numero(c.get("gancho_max_s"), 0.1, 5):
+        inf.error(f"{rel}: brazos.corta.gancho_max_s debe ser un número de 0.1 a 5")
+    if not isinstance(b["control"], dict):
+        inf.error(f"{rel}: brazos.control debe ser un bloque (puede ir vacío)")
+
+
 def validar_tecnica(t, inf: Informe) -> None:
     """`config/tecnica.yml`: umbrales de la puerta técnica (todos numéricos, con su rango)."""
     rel = "config/tecnica.yml"
@@ -1258,6 +1290,9 @@ def validar(raiz=None) -> Informe:
     ojos = _cargar(raiz, "config/ojos.yml", inf)
     if ojos is not None:
         validar_ojos(ojos, inf)
+    prueba_ret = _cargar(raiz, "config/prueba-retencion.yml", inf)
+    if prueba_ret is not None:
+        validar_prueba_retencion(prueba_ret, inf)
     tecnica = _cargar(raiz, "config/tecnica.yml", inf)
     if tecnica is not None:
         validar_tecnica(tecnica, inf)

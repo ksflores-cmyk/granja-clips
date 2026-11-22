@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .. import descargar as mod_descargar
-from .. import fuentes, ojos, plazo, puertas
+from .. import fuentes, ojos, plazo, puertas, retencion
 from .. import voces as mod_voces
 from ..config import cargar_yaml, raiz_repo
 from ..registro import ZONA, contador_toma
@@ -212,10 +212,11 @@ def _etapa_voces(raiz, marca: Marca, video, inicio: float, dur: float, lineas: l
                       _transcripcion_plan(res), alterno)
 
 
-def fila_marcador(candidato, ficha: dict, toma: Toma, dur: float, ahora: datetime) -> dict:
-    """Fila futura del marcador (sin id_clip ni notas: `registro.anotar_clip` los pone)."""
+def fila_marcador(candidato, ficha: dict, toma: Toma, dur: float, ahora: datetime, prueba: str = "") -> dict:
+    """Fila futura del marcador (sin id_clip ni notas: `registro.anotar_clip` los pone).
+    `prueba`: brazo de la prueba de retención (`corta-10-14:corta`); vacío si no aplica."""
     local = ahora.astimezone(ZONA)
-    return {"toma": toma.numero, "fecha": local.date().isoformat(), "hora": local.strftime("%H:%M"),
+    return {"prueba": prueba, "toma": toma.numero, "fecha": local.date().isoformat(), "hora": local.strftime("%H:%M"),
             "pilar": candidato.pilar or "", "fuente_id": ficha.get("id"), "campana": ficha.get("campana"),
             "gancho": toma.gancho, "duracion_s": round(dur, 2), "credito": toma.credito}
 
@@ -281,9 +282,26 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             temporada = ojos.temporada_de(ficha, temporada)
             juego = ojos.juego_de(ficha, temporada)          # el de la ficha si lo declara (FM27, no GTA 6)
             recorte = ojos.rango_recorte(ficha)              # reglas.duracion_s de la ficha
+            recorte_ficha = recorte                          # contra éste se valida lo que devuelva Gemini
+            # Prueba de retención: el brazo sale del número de toma que tocará (el contador sólo sube al programar).
+            cfg_ret = retencion.cargar(raiz)
+            el_brazo = retencion.brazo(contador_toma(raiz), cfg_ret, hoy)
+            nota_prueba = None
+            if el_brazo == retencion.CORTA:
+                rango_c = retencion.rango_corta(cfg_ret, recorte_ficha)
+                if rango_c is None:
+                    el_brazo, nota_prueba = retencion.CONTROL, "pasó a control: la ficha pide una duración fuera de 10-14 s"
+                elif d.duracion is not None and d.duracion < rango_c[0] - 1e-6:
+                    el_brazo, nota_prueba = retencion.CONTROL, (f"pasó a control: la fuente dura {d.duracion:.1f} s, "
+                                                               f"menos de {rango_c[0]:g} s")
+                else:
+                    recorte = rango_c
+            etiqueta_prueba = retencion.etiqueta(cfg_ret, el_brazo) if el_brazo else ""
+            gancho_ini = float(cfg_ret["brazos"]["corta"]["gancho_max_s"]) if el_brazo == retencion.CORTA else None
             cfg_sin = (cargar_yaml("config/ojos.yml", raiz).get("sin_ia") or {})
             cfg_h = mod_historia.cargar_config(raiz)
-            con_historia = cfg_h.get("activo") is True
+            # La historia añade la apertura (2-3 s) y sacaría la toma del 10-14: en el brazo corta va apagada.
+            con_historia = cfg_h.get("activo") is True and el_brazo != retencion.CORTA
             sfx_d = mod_sfx.disponibles(raiz) if con_historia else {}
             prohibe_sfx = mod_historia.sfx_prohibido(ficha, cfg_h)
             pide_historia = ({"cfg": cfg_h, "sfx": [] if prohibe_sfx else sorted(sfx_d), "prohibe_sfx": prohibe_sfx}
@@ -302,6 +320,7 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                                     transporte=transporte, espera=espera, entorno=entorno, juego=juego,
                                     nota=" ".join(x for x in (ojos.nota_de_ficha(ficha), nota_juez) if x) or None,
                                     recorte=recorte, transporte_lista=transporte_lista, registrar_cupos=True,
+                                    gancho_inicio_s=gancho_ini,
                                     **({"historia": pide_historia} if pide_historia else {}))
             # Sin clave o con clave mala (401/403) es un error de configuración, no una caída de Gemini:
             # ahí no hay corte sin IA.
@@ -315,6 +334,8 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                 intentos_gemini = list(mirada.intentos)
                 with plazo.etapa("corte sin IA"):
                     obj = cfg_sin.get("duracion_objetivo_s", sin_ia.OBJETIVO_S)
+                    if el_brazo == retencion.CORTA:          # el objetivo es la mitad del rango 10-14
+                        obj = (recorte[0] + recorte[1]) / 2
                     c = sin_ia.construir(video_ojos, candidato, ficha, marca, temporada, duracion=d.duracion,
                                          rango=recorte, objetivo_s=obj if isinstance(obj, (int, float)) else sin_ia.OBJETIVO_S)
                 if c.datos is None:
@@ -328,10 +349,22 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                 return Resultado(False, [f"ojos: {mirada.motivo}"], modelo=mirada.modelo,
                                  gastar=bool(mirada.del_material))
             ok, motivos = ojos.validar_respuesta(mirada.datos, marca, temporada, duracion=d.duracion,
-                                              juego=juego, recorte=recorte)
+                                              juego=juego, recorte=recorte_ficha)
             if not ok:
                 return Resultado(False, [f"ojos: {x}" for x in motivos], gemini=mirada.datos, modelo=mirada.modelo,
                                  gastar=True)
+            if el_brazo == retencion.CORTA:
+                # Gemini no siempre respeta 10-14: se recorta el final (nunca se estira); si no cabe, a control.
+                rec = mirada.datos["recorte"]
+                aj = retencion.ajustar_recorte(float(rec["inicio"]), float(rec["fin"]), d.duracion or float(rec["fin"]), recorte)
+                if aj is None:
+                    el_brazo, etiqueta_prueba = retencion.CONTROL, retencion.etiqueta(cfg_ret, retencion.CONTROL)
+                    nota_prueba = "pasó a control: no cabe un recorte de 10-14 s en la fuente"
+                    recorte = recorte_ficha
+                elif aj != (float(rec["inicio"]), float(rec["fin"])):
+                    nota_prueba = (f"recorte ajustado de {float(rec['fin']) - float(rec['inicio']):.1f} s a "
+                                   f"{aj[1] - aj[0]:.1f} s (sin estirar)")
+                    mirada = replace(mirada, datos={**mirada.datos, "recorte": {"inicio": aj[0], "fin": aj[1]}})
             numero = contador_toma(raiz)
             entrada = fuentes.entrada_material(ficha, url=candidato.url)
             creador = nombres.creador_de(entrada["creador"] if entrada else None, ficha)
@@ -476,7 +509,12 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             if transcripcion is not None:
                 plan["transcripcion"] = transcripcion          # contrato de la tarea #17: palabras en tiempo de la toma
             plan_ruta.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
-            fila = fila_marcador(candidato, ficha, toma, dur, ahora)
+            if el_brazo:
+                plan["prueba"] = {"nombre": cfg_ret["nombre"], "brazo": el_brazo, "duracion_s": round(float(dur), 2),
+                                  **({"nota": nota_prueba} if nota_prueba else {})}
+                if nota_prueba:
+                    plazo.log(f"prueba {cfg_ret['nombre']}: {nota_prueba}")
+            fila = fila_marcador(candidato, ficha, toma, dur, ahora, etiqueta_prueba)
             if isinstance(plan.get("historia"), dict):
                 fila["historia"] = plan["historia"].get("proveedor") or ""
                 if plan["historia"].get("plan") is not None:
