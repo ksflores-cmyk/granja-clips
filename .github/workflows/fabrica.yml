@@ -216,8 +216,9 @@ jobs:
   # publicable y con cr_campaign_id (output `cr` de la compuerta): sin campaña no se paga ni un minuto.
   # Escribe su propio archivo (estado/envios-cr.json). Sin nada pendiente termina en menos de un minuto.
   enviar_cr:
-    needs: fabrica
-    if: ${{ always() && needs.fabrica.outputs.cr == 'si' && github.ref == 'refs/heads/main' && !inputs.ensayo_forzado }}
+    # En paralelo a `fabrica` (revisión de Codex, 22 nov): esperar a que termine (hasta 23 min) podía pasar el
+    # plazo de 30 min de Content Rewards. Comprueba por su cuenta si hay campaña vigente y, si no, termina en 1 min.
+    if: ${{ github.ref == 'refs/heads/main' && !inputs.ensayo_forzado }}
     runs-on: ubuntu-latest
     timeout-minutes: 24
     env:
@@ -229,13 +230,21 @@ jobs:
       - uses: actions/checkout@v4
       - name: Partir de main al día
         run: git fetch origin main && git reset --hard origin/main
+      - name: ¿Hay campaña vigente con Content Rewards?
+        id: cr
+        run: |
+          cr=$(python3 -m fabrica.fuentes 2>/dev/null | grep -m1 '^cr=') || cr="cr=si"
+          echo "$cr" >> "$GITHUB_OUTPUT"; echo "$cr"
       - uses: actions/setup-python@v5
+        if: ${{ steps.cr.outputs.cr == 'si' }}
         with:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
+        if: ${{ steps.cr.outputs.cr == 'si' }}
       - name: ¿Hay envíos pendientes?
         id: hay
+        if: ${{ steps.cr.outputs.cr == 'si' }}
         run: |
           if python -m fabrica.enviar_cr --hay; then echo "hay=si" >> "$GITHUB_OUTPUT"; else echo "hay=no" >> "$GITHUB_OUTPUT"; fi
       - name: Instalar el navegador (Playwright + Chromium)

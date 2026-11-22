@@ -846,7 +846,14 @@ def test_workflow_un_solo_job_con_decidir_y_producir_y_enviar_cr_despues(wf):
     assert f["timeout-minutes"] == 23 and "needs" not in f
     assert f["outputs"]["cr"]
     cr = wf["jobs"]["enviar_cr"]
-    assert cr["needs"] == "fabrica" and "needs.fabrica.outputs.cr == 'si'" in cr["if"] and "always()" in cr["if"]
+    # En paralelo (no espera a fabrica: el plazo de 30 min de Content Rewards) y con su propia compuerta de campaña.
+    assert "needs" not in cr and "refs/heads/main" in cr["if"]
+    pasos = cr["steps"]
+    comp = next(p for p in pasos if p.get("id") == "cr")
+    assert "fabrica.fuentes" in comp["run"] and pasos.index(comp) < next(i for i, p in enumerate(pasos) if "setup-python" in p.get("uses", ""))
+    # Tras la compuerta, cada paso depende de ella (directo, o por «hay», que sólo corre si cr=si).
+    assert all("steps.cr.outputs.cr == 'si'" in p["if"] or "steps.hay.outputs.hay == 'si'" in p["if"]
+               for p in pasos[pasos.index(comp) + 1:])
 
 
 def test_workflow_la_compuerta_bash_va_antes_de_instalar_nada_y_decidir_manda(wf):
