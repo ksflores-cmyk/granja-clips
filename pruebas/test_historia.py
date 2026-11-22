@@ -560,7 +560,7 @@ def test_las_muestras_de_historia_son_las_dos_pedidas_y_estan_autorizadas():
     for m in ms:
         muestras.autorizar(m, fuentes.cargar_fuentes(), date(2026, 11, 21))      # lista blanca de fuentes.yml
         assert m["fuente_id"] in ("sintel-cc-by", "bbb-cc-by") and m["video"]["sha256"]
-    assert [m["id"] for m in muestras.cargar_muestras()] == ["dialogo-sintel", "momento-bbb", "pajaro-bbb"]
+    assert [m["id"] for m in muestras.cargar_muestras()][:3] == ["dialogo-sintel", "momento-bbb", "pajaro-bbb"]   # + divididas (#16) y voces (#19)
 
 
 def test_la_muestra_sintel_lleva_camara_lenta_pausa_zoom_suave_y_un_efecto():

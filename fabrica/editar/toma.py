@@ -401,7 +401,7 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                         plan, puntos = compuesta(lineas, dur, tramos, plan_h)
                         malos_h = [n for n, ok_p, _ in puntos if not ok_p]
                         if malos_h:
-                            raise ValueError("la puerta salió en rojo con historia: " + "; ".join(malos_h[:3]))
+                            raise ValueError("la puerta de estilo salió en rojo con historia: " + "; ".join(malos_h[:3]))
                     except plazo.SinTiempo:
                         raise
                     except Exception as e:  # noqa: BLE001 (la historia nunca descarta una fuente; el plazo ya subió arriba)
