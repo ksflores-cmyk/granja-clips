@@ -25,6 +25,7 @@ from . import fuentes, ojos, puertas
 from .config import cargar_yaml, raiz_repo
 from .detectar import Candidato
 from .editar.lienzo import Toma, _limpia
+from .editar import tecnica
 from .editar.marca import Marca
 from .editar.toma import Resultado, armar, copia_para_ojos, lapiz_de
 from . import textos as mod_textos   # la tarea #8: límites por red, título, hashtags y comprobaciones finales
@@ -545,7 +546,8 @@ def _hacer_compilado(raiz, formato_id, candidatos, fichas, ahora, carpeta: Path,
         except (ValueError, subprocess.SubprocessError, OSError) as e:
             mp4.unlink(missing_ok=True)
             return Resultado(False, [*omitidos, f"editor: {type(e).__name__}: {e}"])
-        rojos = [f"puerta del compilado: {n}" + (f" ({det})" if det else "") for n, ok_p, det in puntos if not ok_p]
+        rojos = [tecnica.rojos([p])[0] if p[0].startswith("[técnica]") else
+                 f"puerta del compilado: {p[0]}" + (f" ({p[2]})" if p[2] else "") for p in puntos if not p[1]]
         if rojos:
             mp4.unlink(missing_ok=True)
             plan_json.unlink(missing_ok=True)

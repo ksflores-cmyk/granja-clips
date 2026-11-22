@@ -22,7 +22,7 @@ import yaml
 from .. import fuentes as mod_fuentes
 from ..registro import ZONA
 from . import dividida as mod_dividida
-from . import estilo
+from . import estilo, tecnica
 from . import musica as mod_musica
 from . import stream_sintetico
 from .componer import Linea, componer, sondear_video
@@ -147,7 +147,7 @@ def _muestra_con_musica(salida: Path, marca: Marca, registrar, omitir, hoy) -> N
     with tempfile.TemporaryDirectory(prefix=f"trabajo-{ID_CON_MUSICA}-") as tmp:
         plan = componer(marca, t, lineas, mp4, duracion=informativa.DURACION_S, trabajo=Path(tmp),
                         fuente_video=None, plan_salida=plan_ruta, musica=pista, movimiento=True)
-    puntos = estilo.revisar(mp4, plan, marca)
+    puntos = tecnica.revisar(mp4, tecnica.con_originales(plan, lineas), tecnica.cargar(marca.raiz)) + estilo.revisar(mp4, plan, marca)
     registrar(ID_CON_MUSICA, mp4, plan_ruta, informativa.DURACION_S, puntos, lineas, {
         "pilar": "informativa", "fuente_id": informativa.FICHA_ID, "fuente": {"propio": f"tipográfico: {origen}"},
         "recorte": None, "licencia": f"propio (tipográfico); música CC0: {pista['id']} ({pista['autor']})",
@@ -230,7 +230,8 @@ def generar(salida: Path, marca: Marca, muestras: list[dict], descargas: Path, *
             plan = componer(marca, t, lineas, mp4, duracion=duracion, trabajo=Path(tmp),
                             fuente_video=ruta_video, inicio=inicio, plan_salida=plan_ruta,
                             musica=pista, movimiento=ruta_video is None)
-        puntos = estilo.revisar(mp4, plan, marca)
+        puntos = (tecnica.revisar(mp4, tecnica.con_originales(plan, lineas), tecnica.cargar(marca.raiz))
+                  + estilo.revisar(mp4, plan, marca))
         esperada = m.get("disposicion", "completa" if ruta_video else None)
         extra = {}
         if esperada:      # cada muestra declara su disposición: las de siempre, completa; las nuevas, dividida

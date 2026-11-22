@@ -18,7 +18,7 @@ from pathlib import Path
 import yaml
 
 from .config import raiz_repo
-from .editar import estilo, musica as mod_musica
+from .editar import estilo, musica as mod_musica, tecnica
 from .editar.componer import Linea, componer
 from .editar.lienzo import Toma
 from .editar.marca import Marca
@@ -143,10 +143,12 @@ def armar(raiz, entrada: dict, ahora: datetime, salida: Path) -> Resultado:
             plan = componer(marca, toma, _lineas(entrada), mp4, duracion=DURACION_S, trabajo=Path(trabajo),
                             fuente_video=None, inicio=0.0, plan_salida=plan_ruta,
                             musica=pista, movimiento=True)
-        puntos = estilo.revisar(mp4, plan, marca)
+        puntos = tecnica.revisar(mp4, plan, tecnica.cargar(raiz))
+        if all(ok for _, ok, _ in puntos):            # la técnica va primero: si falla no se corre la de estilo
+            puntos += estilo.revisar(mp4, plan, marca)
     except (ValueError, KeyError, subprocess.SubprocessError, OSError) as e:
         return Resultado(False, [f"informativa: {type(e).__name__}: {e}"])
-    rojos = [f"puerta de estilo: {n}" + (f" ({det})" if det else "") for n, ok, det in puntos if not ok]
+    rojos = tecnica.rojos(puntos)
     if rojos:
         mp4.unlink(missing_ok=True)
         return Resultado(False, rojos, None, plan, None, None, puntos)
