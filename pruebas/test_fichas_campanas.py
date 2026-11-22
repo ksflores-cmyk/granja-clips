@@ -197,8 +197,12 @@ class _Resp:
 
 
 class _Pagina:
-    def __init__(self, cuerpo, hrefs, url="https://contentrewards.com/c/campaigns/x"):
+    def __init__(self, cuerpo, hrefs, url="https://contentrewards.com/c/campaigns/x", titulo=None):
         self.cuerpo, self.hrefs, self.url, self.fotos = cuerpo, hrefs, url, []
+        self.titulo = titulo if titulo is not None else cuerpo.splitlines()[0]
+
+    def title(self):
+        return self.titulo
 
     def goto(self, url, **k):
         self.visitada = url
@@ -225,7 +229,14 @@ def test_leer_guarda_texto_enlaces_y_documento(tmp_path):
     assert p.visitada == enviar_cr.BASE + ID
     assert r["titulo"] == "SEGA - Steam Black Friday Sale Clipping" and r["enlaces"] == [DOC] and not r["pausada"]
     assert (tmp_path / r["docs"][DOC]).read_text(encoding="utf-8") == "Brief\nUse #Ad"
-    assert (tmp_path / f"{ID}.txt").exists() and (tmp_path / f"{ID}.png").exists()
+    # Repo público: ni captura ni texto completo de la página en el artefacto.
+    assert not (tmp_path / f"{ID}.txt").exists() and not (tmp_path / f"{ID}.png").exists()
+
+
+def test_titulo_sale_de_la_pestana_no_de_la_cuenta(tmp_path):
+    p = _Pagina("Kevin Flores · Saldo $12\nSEGA Black Friday", [DOC], titulo="SEGA Black Friday | Content Rewards")
+    r = brief_cr.leer(p, ID, tmp_path, abrir=lambda req, timeout: _Resp())
+    assert r["titulo"] == "SEGA Black Friday | Content Rewards" and "Saldo" not in r["titulo"]
 
 
 def test_leer_documento_privado_queda_como_error_sin_romper(tmp_path):
@@ -244,7 +255,7 @@ def test_leer_con_parte_bloqueada_la_anota_y_sigue(tmp_path, monkeypatch):
     monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(resumen))
     r = brief_cr.leer(_Pagina("Expedia\nJoin to unlock 1 requirement", [DOC]), ID, tmp_path,
                       abrir=lambda req, timeout: _Resp())
-    assert r["bloqueada"] and r["enlaces"] == [DOC] and (tmp_path / f"{ID}.png").exists()
+    assert r["bloqueada"] and r["enlaces"] == [DOC] and not (tmp_path / f"{ID}.png").exists()
     brief_cr._resumen_paso(r)
     assert f"| {ID} | Expedia | 1 | 1 | no | sí |" in resumen.read_text(encoding="utf-8")
 

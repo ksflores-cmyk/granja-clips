@@ -144,7 +144,7 @@
   creador: "SEGA (venta Black Friday en Steam)"
   origen: drive              # el «1 file» del brief (bloqueado hasta unirse); por confirmar si es Drive o YouTube
   canal_id: null
-  permiso_url: "https://contentrewards.com/c/campaigns/1391fb95-e8a3-4f0b-b146-d0d786e6aee0"   # Kevin está unido (20 nov 2026)
+  permiso_url: "https://contentrewards.com/c/campaigns/1391fb95-e8a3-4f0b-b146-d0d786e6aee0"
   cr_campaign_id: 1391fb95-e8a3-4f0b-b146-d0d786e6aee0
   permiso_leido: 2026-11-21
   juego: "SEGA Steam Black Friday Sale"
@@ -167,7 +167,7 @@
   presupuesto_restante: 11933   # 21 nov 2026, 3:40 GMT
   vence: 2026-12-31          # sin fecha de cierre publicada; la venta es por tiempo limitado: revisar cada semana
   estado: pausada
-  motivo_pausa: "El único material permitido (el video oficial, «1 file» del brief) está bloqueado tras la sesión de Kevin y no se pudo leer ni copiar: la página pública no trae enlaces y GitHub Actions no arranca jobs (pago de la cuenta fallido, 20-21 nov). Para reanudar: correr el workflow brief-cr, copiar el video del enlace oficial al release fuentes-sega-black-friday, añadir material y poner estado vigente y publicable true."
+  motivo_pausa: "El único material permitido (el video oficial, «1 file» del brief) está bloqueado tras la sesión de Kevin y no se pudo leer ni copiar: la página pública no trae enlaces y Para reanudar: correr el workflow brief-cr, copiar el video del enlace oficial al release fuentes-sega-black-friday, añadir material y poner estado vigente y publicable true."
   uso: produccion
   publicable: false
   envio: manual
@@ -178,7 +178,7 @@
   creador: "Activision (Call of Duty: Modern Warfare 4)"
   origen: drive              # «official content folder» del brief (bloqueado hasta unirse)
   canal_id: null
-  permiso_url: "https://contentrewards.com/c/campaigns/a1cefc3b-4533-438f-8e70-a7299550f1cf"   # Kevin está unido (20 nov 2026)
+  permiso_url: "https://contentrewards.com/c/campaigns/a1cefc3b-4533-438f-8e70-a7299550f1cf"
   cr_campaign_id: a1cefc3b-4533-438f-8e70-a7299550f1cf
   permiso_leido: 2026-11-21
   juego: "Call of Duty: Modern Warfare 4"
@@ -200,7 +200,7 @@
   presupuesto_restante: 13866   # 21 nov 2026, 3:40 GMT
   vence: 2026-12-31          # sin fecha de cierre publicada: revisar cada semana
   estado: pausada
-  motivo_pausa: "El material (video «DMZ Intel Briefing» de la carpeta oficial, «1 file» del brief) está bloqueado tras la sesión de Kevin y no se pudo leer ni copiar; faltan también las reglas de texto del documento. GitHub Actions no arranca jobs (pago de la cuenta fallido, 20-21 nov). Para reanudar: correr brief-cr, leer el documento, copiar el video al release fuentes-cod-dmz, completar divulgación y etiquetas, estado vigente y publicable true."
+  motivo_pausa: "El material (video «DMZ Intel Briefing» de la carpeta oficial, «1 file» del brief) está bloqueado tras la sesión de Kevin y no se pudo leer ni copiar; faltan también las reglas de texto del documento. Para reanudar: correr brief-cr, leer el documento, copiar el video al release fuentes-cod-dmz, completar divulgación y etiquetas, estado vigente y publicable true."
   uso: produccion
   publicable: false
   envio: manual
@@ -211,7 +211,7 @@
   creador: "IShowSpeed x Expedia (Reach)"
   origen: youtube
   canal_id: null
-  permiso_url: "https://contentrewards.com/c/campaigns/03bda4fd-3474-4b1e-a914-88aaf3ac8372"   # Kevin está unido (20 nov 2026)
+  permiso_url: "https://contentrewards.com/c/campaigns/03bda4fd-3474-4b1e-a914-88aaf3ac8372"
   cr_campaign_id: 03bda4fd-3474-4b1e-a914-88aaf3ac8372
   brief_url: "https://reachclipping.com/Expedia-IShowSpeed"
   permiso_leido: 2026-11-21

@@ -1,8 +1,8 @@
 name: brief-cr
 
 # Lee con la sesión de Kevin (secreto CR_SESION) el brief completo de campañas de Content Rewards a las que
-# ya está unido: texto, captura, enlaces de material y texto de los Google Docs públicos. No envía nada ni se
-# une a campañas. El resultado va al artefacto «briefs-cr» (privado, 3 días) para completar fuentes.yml.
+# ya está unido: enlaces de material y texto de los Google Docs públicos (sin captura ni texto de la página: repo público). No envía nada ni se
+# une a campañas. El resultado va al artefacto «briefs-cr» (1 día; el repo es público: nada de la cuenta) para completar fuentes.yml.
 on:
   workflow_dispatch:
     inputs:
@@ -40,5 +40,5 @@ jobs:
         with:
           name: briefs-cr
           path: ${{ runner.temp }}/briefs
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: ignore
