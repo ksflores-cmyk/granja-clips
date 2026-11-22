@@ -132,11 +132,112 @@
   tope_por_clip_usd: 600
   presupuesto_restante: 5000
   vence: 2026-12-31            # revisar cada semana: la campaña cierra al agotar el presupuesto (sin fecha de cierre); presupuesto_restante: 0 cierra la ficha
-  estado: vigente             # OJO 20 nov 2026: la marca pausó la campaña desde el 19 nov; el robot lo detecta y no envía (pendiente: pausar la ficha con sus pruebas)
+  estado: pausada             # la marca pausó la campaña el 19 nov 2026 («Pausada por la marca» en Content Rewards)
+  motivo_pausa: "Content Rewards muestra «Pausada por la marca» desde el 19 nov 2026 (visto por el robot de envío el 20 nov). Se reanuda sólo si la campaña vuelve a aceptar clips: estado vigente y publicable true."
   uso: produccion
-  publicable: true
+  publicable: false
   envio: manual
   notas: "Brief leído el 18 nov 2026. Paga hasta US$2 por mil vistas de México y Argentina. Sólo metraje de la carpeta oficial; sin música de fondo, sin voces IA, sin datos inventados, sin llamar gameplay a un tráiler. Marca de agua: logo FM. Post publicado 30 días, likes visibles. Texto: español, @footballmanager, etiqueta del creador, #Publicidad en su línea y primer hashtag. Material copiado una vez de la carpeta oficial (Drive) al release privado fuentes-fm27 por el workflow release-fm27 (20 nov 2026); la fábrica no toca Drive."
+
+- id: sega-black-friday
+  tipo: A
+  creador: "SEGA (venta Black Friday en Steam)"
+  origen: drive              # el «1 file» del brief (bloqueado hasta unirse); por confirmar si es Drive o YouTube
+  canal_id: null
+  permiso_url: "https://contentrewards.com/c/campaigns/1391fb95-e8a3-4f0b-b146-d0d786e6aee0"   # Kevin está unido (20 nov 2026)
+  cr_campaign_id: 1391fb95-e8a3-4f0b-b146-d0d786e6aee0
+  permiso_leido: 2026-11-21
+  juego: "SEGA Steam Black Friday Sale"
+  reglas:
+    duracion_s: [10, 60]     # la página pública no da duración; confirmar en el documento del brief
+    plataformas: [shorts, tiktok, reels]
+    etiquetas_obligatorias: []
+    etiquetas_por_red: {tiktok: ["@sega_west"], shorts: ["@sega_west"], reels: ["@sega"]}
+    divulgacion: "#Ad"       # el brief acepta #Ad, #Advertisement o #Sponsored
+    idioma: en               # inglés vale dentro de la misma marca Guion Vivo
+    audiencia: "TikTok y YouTube: no pagan vistas de Pakistán, India, Bangladesh ni sin dato de país; Instagram sin regla de país"
+    contenido: "Clip del video oficial «SEGA Black Friday Sale»: mostrar los juegos prioritarios y dejar claro que la venta es en Steam y por tiempo limitado"
+  pilares: [momentos]
+  campana: "SEGA - Steam Black Friday Sale Clipping"
+  tarifa_usd_por_mil: 2.0
+  tarifa_por_red: {reels: 3.5, tiktok: 2.0, shorts: 2.0}   # TikTok y YouTube «hasta» US$2 según país
+  minimo_por_clip_usd: 4     # Instagram US$3,50
+  tope_por_clip_usd: 800
+  presupuesto_total: 12000
+  presupuesto_restante: 11933   # 21 nov 2026, 3:40 GMT
+  vence: 2026-12-31          # sin fecha de cierre publicada; la venta es por tiempo limitado: revisar cada semana
+  estado: pausada
+  motivo_pausa: "El único material permitido (el video oficial, «1 file» del brief) está bloqueado tras la sesión de Kevin y no se pudo leer ni copiar: la página pública no trae enlaces y GitHub Actions no arranca jobs (pago de la cuenta fallido, 20-21 nov). Para reanudar: correr el workflow brief-cr, copiar el video del enlace oficial al release fuentes-sega-black-friday, añadir material y poner estado vigente y publicable true."
+  uso: produccion
+  publicable: false
+  envio: manual
+  notas: "Clipping Culture. Página pública leída el 21 nov 2026: «Accepting clips», 8 creadores, US$67 de US$12,000 usados. Brief: «Clip the official SEGA Black Friday Sale video. Show the priority games. Make it clear the sale is on Steam for a limited time.» Caption con #Ad/#Advertisement/#Sponsored; @sega_west en TikTok y YouTube, @sega en Instagram (reglas de texto que el jefe vio con la sesión de Kevin el 20 nov; el enlace del video no quedó anotado)."
+
+- id: cod-mw4-dmz-intel
+  tipo: A
+  creador: "Activision (Call of Duty: Modern Warfare 4)"
+  origen: drive              # «official content folder» del brief (bloqueado hasta unirse)
+  canal_id: null
+  permiso_url: "https://contentrewards.com/c/campaigns/a1cefc3b-4533-438f-8e70-a7299550f1cf"   # Kevin está unido (20 nov 2026)
+  cr_campaign_id: a1cefc3b-4533-438f-8e70-a7299550f1cf
+  permiso_leido: 2026-11-21
+  juego: "Call of Duty: Modern Warfare 4"
+  reglas:
+    duracion_s: [10, 60]     # la página pública no da duración; confirmar en el documento del brief
+    plataformas: [tiktok, reels]   # la campaña no paga YouTube
+    etiquetas_obligatorias: []
+    divulgacion: "#Ad"       # por confirmar en el documento del brief (no está en la página pública)
+    idioma: en
+    audiencia: "«COD Specific»: no pagan vistas de Pakistán, India, Bangladesh y 8 países más ni sin dato de país; resto US$2/1K"
+    contenido: "Clip del video «DMZ Intel Briefing» de la carpeta oficial: mostrar el contenido nuevo de DMZ en la Temporada 1 de Modern Warfare 4"
+  pilares: [momentos]
+  campana: "Call of Duty - MW4 DMZ Intel Briefing Clipping"
+  tarifa_usd_por_mil: 1.5
+  tarifa_por_red: {tiktok: 2.0, reels: 1.5}   # TikTok «hasta» US$2 según país
+  minimo_por_clip_usd: 4.5   # TikTok US$6
+  tope_por_clip_usd: 1200
+  presupuesto_total: 30000
+  presupuesto_restante: 13866   # 21 nov 2026, 3:40 GMT
+  vence: 2026-12-31          # sin fecha de cierre publicada: revisar cada semana
+  estado: pausada
+  motivo_pausa: "El material (video «DMZ Intel Briefing» de la carpeta oficial, «1 file» del brief) está bloqueado tras la sesión de Kevin y no se pudo leer ni copiar; faltan también las reglas de texto del documento. GitHub Actions no arranca jobs (pago de la cuenta fallido, 20-21 nov). Para reanudar: correr brief-cr, leer el documento, copiar el video al release fuentes-cod-dmz, completar divulgación y etiquetas, estado vigente y publicable true."
+  uso: produccion
+  publicable: false
+  envio: manual
+  notas: "Clipping Culture. Página pública leída el 21 nov 2026: «Accepting clips», 163 creadores, US$16,134 de US$30,000 usados. Brief: «Clip the DMZ Intel Briefing video from the official content folder. Show the new DMZ content in Modern Warfare 4 Season 1. Post to TikTok and Instagram Reels.» No confundir con «Modern Warfare 4 - DMZ Live Clipping» (78bd78e4-…), que es otra campaña."
+
+- id: reach-expedia-speed
+  tipo: A
+  creador: "IShowSpeed x Expedia (Reach)"
+  origen: youtube
+  canal_id: null
+  permiso_url: "https://contentrewards.com/c/campaigns/03bda4fd-3474-4b1e-a914-88aaf3ac8372"   # Kevin está unido (20 nov 2026)
+  cr_campaign_id: 03bda4fd-3474-4b1e-a914-88aaf3ac8372
+  brief_url: "https://reachclipping.com/Expedia-IShowSpeed"
+  permiso_leido: 2026-11-21
+  juego: "IShowSpeed (stream con Expedia)"
+  reglas:
+    duracion_s: [10, 60]     # ni Content Rewards ni Reach dan duración
+    plataformas: [shorts, tiktok, reels]
+    etiquetas_obligatorias: ["#IShowSpeed"]
+    divulgacion: "ninguna"   # el brief de Reach no pide #ad; exige mencionar «Expedia» como foco del clip
+    idioma: en
+    audiencia: "al menos 50 % de la audiencia de países angloparlantes nativos (EE. UU., Canadá, Australia, Reino Unido, Nueva Zelanda); cuentas sólo del nicho streamer o viajes; pago desde 10,000 vistas"
+    contenido: "Sólo el segmento de Expedia del stream de IShowSpeed (Reach: stream del 6 nov 2026, desde 2:46:29 hasta el final; Content Rewards dice «Expedia Unpack Segment… 10.14.26»). Nombrar bien el destino en el texto o en pantalla; nada negativo sobre Speed ni Expedia; ningún logo de otra marca; prohibido el contenido generado con IA (expulsión de todas las campañas de Reach)."
+  pilares: [momentos]
+  campana: "$8,000 IShowSpeed x Expedia Clipping Campaign"
+  tarifa_usd_por_mil: 1.0
+  minimo_por_clip_usd: 10
+  tope_por_clip_usd: 500
+  presupuesto_total: 8000
+  presupuesto_restante: 25      # 21 nov 2026, 3:45 GMT: «Almost full»
+  vence: 2026-12-31          # sin fecha de cierre publicada; con US$25 restantes cierra en cualquier momento
+  estado: pausada
+  motivo_pausa: "Presupuesto casi agotado (US$25 de US$8,000). Además el brief choca con la marca: exige audiencia al menos 50 % angloparlante nativa y cuenta del nicho streamer o viajes (Guion Vivo es en español y de videojuegos), prohíbe el contenido generado con IA bajo pena de expulsión de todas las campañas de Reach (la fábrica usa Gemini para elegir cortes) y la fecha del stream no coincide entre Content Rewards (14 oct) y Reach (6 nov). Material: VOD de YouTube https://www.youtube.com/live/Kyv61l2vF6M (desde 2:46:29); no se copió a un release."
+  uso: produccion
+  publicable: false
+  envio: manual
+  notas: "Reach. Content Rewards (21 nov 2026): «Accepting clips», US$7,975 de US$8,000 usados, 3 archivos y 1 requisito bloqueados. Logos de Expedia (opcionales): https://drive.google.com/drive/folders/1vpwA5_0wbOPfBIOHfeCFwp87Eq4eMQ7Z. El enlace del VOD de Reach lleva t=10589 (2:56:29), 10 min después del 2:46:29 que dice su texto."
 
 # Ejemplo de ficha tipo A (no es una fuente real; no descomentar sin brief leído):
 # - id: ejemplo-campana-001
