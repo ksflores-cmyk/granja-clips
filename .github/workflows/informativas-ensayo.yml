@@ -1,0 +1,49 @@
+name: informativas-ensayo
+
+# Ensaya las informativas vigentes en la nube: compone, corre la puerta de estilo y deja el informe.
+# No marca nada como usada ni escribe en ninguna rama; el video nunca entra al repo.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "informativas.yml"
+      - "hechos.md"
+      - "fabrica/informativa.py"
+      - ".github/workflows/informativas-ensayo.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ensayo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalar ffmpeg
+        timeout-minutes: 12
+        uses: ./.github/actions/ffmpeg
+      - run: pip install -r requirements.txt
+      - name: Bajar música del release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download musica -D "$RUNNER_TEMP/musica" --clobber || echo "::warning::sin música del release"
+      - name: Ensayar informativas fuera del repo
+        env:
+          GRANJA_MUSICA_DIR: ${{ runner.temp }}/musica
+        run: python -m fabrica.informativa --ensayo --salida "$RUNNER_TEMP/informativas" --vacio-ok
+      - name: Resumen del ensayo
+        if: always()
+        run: tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/informativas/informe.md" || true
+      - name: Subir informe y videos como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: informativas
+          path: ${{ runner.temp }}/informativas
+          retention-days: 1
+          if-no-files-found: error

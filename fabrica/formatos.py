@@ -25,7 +25,9 @@ from . import fuentes, ojos, puertas
 from .config import cargar_yaml, raiz_repo
 from .detectar import Candidato
 from .editar.lienzo import Toma, _limpia
+from .editar import tecnica
 from .editar.marca import Marca
+from .editar import nombres as mod_nombres
 from .editar.toma import Resultado, armar, copia_para_ojos, lapiz_de
 from . import textos as mod_textos   # la tarea #8: límites por red, título, hashtags y comprobaciones finales
 from .publicar import Descartada, _comprobar_repetido, _limpio
@@ -455,7 +457,11 @@ def preparar_segmento(candidato: Candidato, ficha: dict, ctx: Contexto) -> Segme
         raise ErrorSegmento("; ".join(f"ojos: {m}" for m in motivos))
     entrada = fuentes.entrada_material(ficha, url=candidato.url)
     creador = (entrada or {}).get("creador") or candidato.creador or ficha.get("creador") or ""
-    toma, lineas, inicio, dur = armar(mirada.datos, ctx.marca, ficha, ctx.numero, creador)
+    creador = mod_nombres.creador_de(creador, ficha)
+    toma, lineas, inicio, dur = armar(mirada.datos, ctx.marca, ficha, ctx.numero, creador, temporada, ctx.raiz)
+    motivos_nombres = mod_nombres.revisar_nombres(toma, lineas, creador, ctx.raiz)
+    if motivos_nombres:
+        raise ErrorSegmento("; ".join(f"puerta de nombres: {m}" for m in motivos_nombres))
     return Segmento(fuente=d.ruta, inicio=inicio, duracion=dur, toma=toma, lineas=lineas, ficha=ficha,
                     creador=str(creador), fecha=hora_local(candidato.creado_en).date(),
                     id_origen=candidato.id_origen)
@@ -545,7 +551,8 @@ def _hacer_compilado(raiz, formato_id, candidatos, fichas, ahora, carpeta: Path,
         except (ValueError, subprocess.SubprocessError, OSError) as e:
             mp4.unlink(missing_ok=True)
             return Resultado(False, [*omitidos, f"editor: {type(e).__name__}: {e}"])
-        rojos = [f"puerta del compilado: {n}" + (f" ({det})" if det else "") for n, ok_p, det in puntos if not ok_p]
+        rojos = [tecnica.rojos([p])[0] if p[0].startswith("[técnica]") else
+                 f"puerta del compilado: {p[0]}" + (f" ({p[2]})" if p[2] else "") for p in puntos if not p[1]]
         if rojos:
             mp4.unlink(missing_ok=True)
             plan_json.unlink(missing_ok=True)

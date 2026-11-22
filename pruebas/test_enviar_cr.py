@@ -86,3 +86,54 @@ def test_hay_sale_10_sin_pendientes(tmp_path, monkeypatch):
     (tmp_path / "fuentes.yml").write_text("[]\n", encoding="utf-8")
     monkeypatch.setattr(cr, "cargar_yaml", lambda nombre, raiz=None: [])
     assert cr.principal(["--hay"], raiz=tmp_path) == cr.SALIDA_NADA
+
+
+# ---------------------------------------------------------------- motivo de rechazo (#23)
+
+DIALOGO_VIEJO = """Enviar clip
+Pega el enlace de tu publicación
+3 publicaciones antiguas no se pueden enviar
+https://www.tiktok.com/@guionvivo/video/123
+Publicado hace 2 h · sólo se aceptan publicaciones de hasta 30 minutos
+He leído y acepto las reglas
+Enviar clip"""
+
+
+def test_motivo_prefiere_la_linea_del_post_sobre_el_resumen_de_antiguas():
+    assert cr.motivo_rechazo(DIALOGO_VIEJO) == "Publicado hace 2 h · sólo se aceptan publicaciones de hasta 30 minutos"
+
+
+def test_motivo_hasta_30_minutos_sin_publicado_hace_tambien_gana():
+    texto = "2 publicaciones antiguas no se pueden enviar\nSólo se aceptan posts de hasta 30 minutos"
+    assert cr.motivo_rechazo(texto) == "Sólo se aceptan posts de hasta 30 minutos"
+
+
+def test_motivo_en_ingles():
+    texto = "2 old posts cannot be submitted\nPosted 3 hours ago - only posts within 30 minutes"
+    assert cr.motivo_rechazo(texto) == "Posted 3 hours ago - only posts within 30 minutes"
+
+
+def test_motivo_cuenta_no_vinculada_antes_que_el_generico():
+    texto = "1 publicación antigua no se puede enviar\nEsta cuenta no está vinculada a tu perfil"
+    assert cr.motivo_rechazo(texto) == "Esta cuenta no está vinculada a tu perfil"
+
+
+def test_motivo_solo_resumen_de_antiguas_se_usa_si_no_hay_otro():
+    assert cr.motivo_rechazo("Enviar clip\n3 publicaciones antiguas no se pueden enviar") \
+        == "3 publicaciones antiguas no se pueden enviar"
+
+
+@pytest.mark.parametrize("texto", ["", None, "Enviar clip\nPega el enlace"])
+def test_motivo_sin_pista_da_boton_desactivado(texto):
+    assert cr.motivo_rechazo(texto) == "botón Enviar desactivado"
+
+
+def test_motivo_se_recorta_a_200():
+    assert len(cr.motivo_rechazo("Publicado hace " + "x" * 400)) == 200
+
+
+def test_motivo_no_confunde_cuentas_conectadas_con_el_rechazo():
+    texto = "Connected accounts: TikTok, YouTube\n2 publicaciones antiguas no se pueden enviar"
+    assert cr.motivo_rechazo(texto) == "2 publicaciones antiguas no se pueden enviar"
+    assert cr.motivo_rechazo("Connected accounts\nThis account is not linked to your profile") \
+        == "This account is not linked to your profile"

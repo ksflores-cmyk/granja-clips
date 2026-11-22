@@ -1,6 +1,6 @@
 name: muestras
 
-# Renderiza las 3 muestras de estilo en la nube y las deja como artefacto (1 día).
+# Renderiza las muestras de estilo (3 + 1 de música + 2 de historia, #20) en la nube y las deja como artefacto (1 día).
 # No escribe en ninguna rama: el video nunca entra al repo ni a la PC de Kevin.
 # Sólo a mano (workflow_dispatch) desde la tarea #24: ya no corre solo en push ni en PR (ahorro de minutos).
 on:
@@ -16,7 +16,7 @@ concurrency:
 jobs:
   muestras:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -27,14 +27,48 @@ jobs:
         timeout-minutes: 12
         uses: ./.github/actions/ffmpeg
       - run: pip install -r requirements.txt
+      - name: Instalar faster-whisper (voces, tarea #19)
+        run: pip install -r requirements-voces.txt
+      - name: Caché de modelos de transcripción (base y small)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-muestras-base-small-v1
+          restore-keys: whisper-muestras-
       - name: Bajar música del release
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release download musica -D "$RUNNER_TEMP/musica" --clobber || echo "::warning::sin música del release"
+      - name: Bajar efectos de sonido del release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download sfx -D "$RUNNER_TEMP/sfx" --clobber || echo "::warning::sin efectos del release"
       - name: Renderizar muestras fuera del repo
         env:
           GRANJA_MUSICA_DIR: ${{ runner.temp }}/musica
+          GRANJA_SFX_DIR: ${{ runner.temp }}/sfx
         run: python -m fabrica.editar.muestras --salida "$RUNNER_TEMP/muestras"
+      - name: Medir voces sobre material de campaña (fm27-daro, sólo medición)
+        timeout-minutes: 6
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Material autorizado de la campaña FM27 (release privado): sólo se mide aquí. Ni se publica ni se sube
+          # como artefacto: el video queda en RUNNER_TEMP, fuera de la carpeta del artefacto.
+          mkdir -p "$RUNNER_TEMP/fm27" "$RUNNER_TEMP/medicion"
+          if gh release download fuentes-fm27 -p fm27-daro.mp4 -D "$RUNNER_TEMP/fm27" --clobber; then
+            python -m fabrica.voces --medir "$RUNNER_TEMP/fm27/fm27-daro.mp4" --inicio 0 --duracion 60 \
+              --modelos base small --salida "$RUNNER_TEMP/medicion/voces-fm27.json" \
+              || echo "::warning::la medición sobre fm27-daro falló"
+          else
+            echo "::warning::sin fm27-daro.mp4 del release fuentes-fm27: no se mide material de campaña"
+          fi
+      - name: Resumen de voces (muestra y material de campaña)
+        if: always()
+        run: |
+          python -m fabrica.voces --resumen "$RUNNER_TEMP/muestras/voces.json" "$RUNNER_TEMP/medicion/voces-fm27.json" \
+            | tee -a "$GITHUB_STEP_SUMMARY" || true
       - name: Resumen de la puerta de estilo
         if: always()
         run: tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/muestras/puerta-estilo-auto.md" || true

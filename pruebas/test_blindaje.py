@@ -866,6 +866,7 @@ def _con_editor_roto(monkeypatch, exc):
     (subprocess.TimeoutExpired("ffmpeg", 1), False)])
 def test_error_del_editor_gasta_solo_si_es_del_material(repo, tmp_path, video8, monkeypatch, exc, gasta):
     monkeypatch.setattr(toma, "armar", lambda *a, **k: (None, None, 0.0, 1.0))
+    monkeypatch.setattr(toma.nombres, "revisar_nombres", lambda *a, **k: [])     # armar está simulado
     monkeypatch.setattr(toma.ojos, "validar_respuesta", lambda *a, **k: (True, []))
     monkeypatch.setattr(toma, "fuentes", type("F", (), {"entrada_material": staticmethod(lambda *a, **k: None)}))
     _con_editor_roto(monkeypatch, exc)

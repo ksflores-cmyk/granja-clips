@@ -84,6 +84,19 @@ jobs:
         if: ${{ steps.decidir.outputs.trabajo == 'si' || inputs.ensayo_forzado }}
         timeout-minutes: 12
         uses: ./.github/actions/ffmpeg
+      - name: Instalar faster-whisper (voces, tarea #19)
+        if: ${{ steps.decidir.outputs.trabajo == 'si' || inputs.ensayo_forzado }}
+        timeout-minutes: 4
+        continue-on-error: true   # las voces son opcionales: sin la biblioteca la toma sigue como antes
+        run: |
+          pip install -r requirements-voces.txt || echo "::warning::sin faster-whisper: el ciclo sigue sin voces"
+      - name: Caché del modelo de transcripción
+        if: ${{ steps.decidir.outputs.trabajo == 'si' || inputs.ensayo_forzado }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-fabrica-small-v1
+          restore-keys: whisper-fabrica-
       - name: Marcar el inicio (en el repo, por si la corrida muere)
         if: ${{ steps.decidir.outputs.trabajo == 'si' || inputs.ensayo_forzado }}
         run: |
@@ -107,11 +120,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release download musica -D "$RUNNER_TEMP/musica" --clobber || echo "::warning::sin música del release"
+      - name: Bajar efectos de sonido del release
+        timeout-minutes: 3       # sin efectos la historia no usa sfx (zoom y cámara lenta siguen); no debe comerse el ciclo
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download sfx -D "$RUNNER_TEMP/sfx" --clobber || echo "::warning::sin efectos del release"
       - name: Ciclo
         if: ${{ steps.decidir.outputs.trabajo == 'si' || inputs.ensayo_forzado }}
         timeout-minutes: 15      # el ciclo se corta solo a los 13 (plazo) y 14 min (alarma); el job tiene 20 para cerrar
         env:
           GRANJA_MUSICA_DIR: ${{ runner.temp }}/musica
+          GRANJA_SFX_DIR: ${{ runner.temp }}/sfx
         run: |
           # Fuera de main (un dispatch desde otra rama) sólo se hace ensayo y no se guarda nada.
           extra=""
