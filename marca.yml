@@ -127,7 +127,7 @@ dividida:                       # tarea #16: pantalla dividida (facecam arriba, 
   placas_alterna: {y_fila: 690}  # posición de la fila (y de la cabecera tras ella) si la de siempre toca la cara
   deteccion:                    # sin red ni modelos descargados: Haar del paquete opencv-python-headless
     fotogramas: 24              # fotogramas en gris que se leen del recorte de tiempo
-    fotogramas_cara: 12         # de esos, en cuántos se busca la cara
+    fotogramas_cara: 24         # de esos, en cuántos se busca la cara (todos: con 12, ffmpeg 8 de CI dejaba la muestra a 1 fotograma del umbral)
     ancho_analisis: 640         # ancho en píxeles de esos fotogramas
     haar: {escala: 1.1, vecinos: 5, min_lado: 0.035}   # min_lado: fracción del ancho de análisis
     min_fraccion_cara: 0.5      # la cara debe verse en al menos esta fracción de los fotogramas mirados

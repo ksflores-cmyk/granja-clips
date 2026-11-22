@@ -627,10 +627,10 @@ def test_la_orden_es_una_sola_llamada_de_ffmpeg_con_la_apertura_aparte():
     cmd = orden()
     assert cmd[0] == "ffmpeg" and cmd.count("ffmpeg") == 1 and cmd.count("-filter_complex") == 1
     txt = " ".join(cmd)
-    assert txt.startswith("ffmpeg -y -hide_banner -loglevel error -threads 2 -ss 12 -t 2 -i v.mp4 "
-                          "-threads 2 -ss 0 -t 2 -i v.mp4")
+    assert txt.startswith("ffmpeg -y -hide_banner -loglevel error -threads 1 -ss 12 -t 2 -i v.mp4 "
+                          "-threads 1 -ss 0 -t 2 -i v.mp4")
     assert txt.count("-i v.mp4") == len(h.mapa(plan_base(), 0.0, 18.0))      # una entrada por tramo: nada se retiene de más
-    assert txt.count("-threads 2 -ss") == txt.count("-i v.mp4")            # la memoria no crece con los núcleos del runner
+    assert txt.count("-threads 1 -ss") == txt.count("-i v.mp4")            # la memoria no crece con los núcleos del runner
     assert cmd[-1] == "s.mp4" and "-t 21.6" in txt and "-r 30" in txt and "libx264" in txt and "-movflags +faststart" in txt
     assert "-map [out] -map [ac]" in txt
 
