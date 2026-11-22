@@ -288,15 +288,25 @@ def _fuente_dividida(ruta: Path, t_fuente: float, paneles: list[dict], marca: Ma
     return lienzo_
 
 
+def t_fuente(origen: dict, t: float) -> float:
+    """Instante de la fuente que corresponde al instante `t` de la toma. Con `origen.tramos` (silencios cortados) se
+    pasa por el mapa de tramos; sin ellos, `inicio + t`."""
+    tramos = origen.get("tramos")
+    if tramos:
+        from ..voces import a_fuente
+        return float(origen["inicio"]) + a_fuente(t, [(float(a), float(b)) for a, b in tramos])
+    return float(origen["inicio"]) + t
+
+
 def _fuente_esperada(plan: dict, marca: Marca, t: float) -> Image.Image | None:
     """Fotograma de la fuente en el instante `t` de la toma, tal como el plan dice que se ve (sin placas)."""
     origen, geo = plan.get("origen") or {}, plan.get("geometria") or {}
-    ruta, t_fuente = Path(origen["archivo"]), float(origen["inicio"]) + t
+    ruta, t_f = Path(origen["archivo"]), t_fuente(origen, t)
     if es_dividida(plan):
-        return _fuente_dividida(ruta, t_fuente, geo.get("paneles") or [], marca)
+        return _fuente_dividida(ruta, t_f, geo.get("paneles") or [], marca)
     if es_v2(plan):
-        return _fuente_encuadrada(ruta, t_fuente, geo.get("recorte") or {}, marca)
-    return _fuente_en_cuerpo(ruta, t_fuente, geo["cuerpo"])
+        return _fuente_encuadrada(ruta, t_f, geo.get("recorte") or {}, marca)
+    return _fuente_en_cuerpo(ruta, t_f, geo["cuerpo"])
 
 
 def _mejor_contra_fuente(plan: dict, marca: Marca, t: float, medir, tope: float) -> float | None:
@@ -783,6 +793,30 @@ def tipo_audio(plan: dict) -> str | None:
     return a.get("tipo") if isinstance(a, dict) else a
 
 
+def _audio_por_tramos(a: np.ndarray, b: np.ndarray, tramos: list) -> tuple[bool, str]:
+    """Con cortes, cada tramo tiene su propio desfase de unas muestras (redondeo de cada corte): se compara tramo por
+    tramo, con el mejor desfase de ±10 ms de cada uno (muestra a muestra: lo agudo es sensible a una sola muestra), y se promedia ponderado por duración."""
+    total, suma, peor, off = 0.0, 0.0, 1.0, 0
+    for t0, t1 in tramos:
+        largo = int(round((float(t1) - float(t0)) * 8000))
+        x0, y0 = a[off:off + largo], b[off:off + largo]
+        off += largo
+        m = min(len(x0), len(y0))
+        if m < 800:                                  # un tramo de menos de 0,1 s no da correlación fiable
+            continue
+        mejor = 0.0
+        for lag in range(-80, 81):
+            x, y = (x0[lag:m], y0[:m - lag]) if lag >= 0 else (x0[:m + lag], y0[-lag:m])
+            den = float(np.linalg.norm(x) * np.linalg.norm(y))
+            if den > 0:
+                mejor = max(mejor, float(np.dot(x, y)) / den)
+        suma, total, peor = suma + mejor * m, total + m, min(peor, mejor)
+    if total == 0:
+        return False, "no se pudo comparar el audio por tramos"
+    c = suma / total
+    return c > 0.9, f"correlación con el audio de la fuente {c:.2f} (mínimo 0.90; tramo más flojo {peor:.2f}, {len(tramos)} tramos)"
+
+
 def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
     """El audio del MP4 es el de la fuente (correlación alta), sin audio añadido; sin audio de origen, silencio.
 
@@ -827,13 +861,23 @@ def audio_original(video: Path, plan: dict) -> tuple[bool, str]:
                            timeout=plazo.tiempo_para(120))
         return np.frombuffer(r.stdout, dtype=np.int16).astype(np.float32)
     largo = max(1.0, dur - float(0.5))
-    a, b = pcm(Path(video), 0.0, largo), pcm(Path(origen["archivo"]), inicio, largo)
+    a = pcm(Path(video), 0.0, largo)
+    tramos = origen.get("tramos")
+    if tramos:      # con silencios cortados, el audio esperado es el de la fuente con esos tramos pegados
+        # Se decodifica la fuente una sola vez y se cortan las muestras: decodificar cada tramo por separado redondea
+        # al cuadro de AAC y deriva unos milisegundos por corte.
+        todo = pcm(Path(origen["archivo"]), inicio, float(tramos[-1][1]))
+        b = np.concatenate([todo[int(round(float(t0) * 8000)):int(round(float(t1) * 8000))] for t0, t1 in tramos])
+    else:
+        b = pcm(Path(origen["archivo"]), inicio, largo)
     n = min(len(a), len(b))
     if n < 800:
         return False, "no se pudo leer el audio"
     a, b = a[:n], b[:n]
     if not b.any():
         return not a.any(), "la fuente es muda y el MP4 también" if not a.any() else "el MP4 trae audio y la fuente es muda"
+    if tramos:
+        return _audio_por_tramos(a, b, tramos)
     # el códec AAC corre la señal unas decenas de milisegundos: se busca el mejor desfase de ±100 ms
     mejor = 0.0
     for lag in range(-800, 801, 40):
@@ -985,7 +1029,6 @@ def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     if sha256_archivo(ruta) != origen["sha256"]:
         return False, "el archivo de origen no coincide con el sha256 del plan"
     dur = float(plan.get("duracion") or 0)
-    inicio = float(origen.get("inicio", 0))
     tope = dur - float(marca.m("cierre_s")) - 0.2
     if es_v2(plan):
         return _cuerpo_v2(video, plan, marca, tope)
@@ -1000,7 +1043,7 @@ def cuerpo_coincide(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     for frac in (0.3, 0.7):
         t = min(dur * frac, tope)
         real = _fotograma(Path(video), t)
-        fuente = _fotograma(ruta, inicio + t)
+        fuente = _fotograma(ruta, t_fuente(origen, t))
         if real is None or fuente is None:
             return False, f"no se pudo leer el fotograma en {t:.2f} s"
         a = _miniatura_gris(real.crop(caja), MINIATURA_ANCHO, alto_min)

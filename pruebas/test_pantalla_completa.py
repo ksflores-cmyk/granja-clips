@@ -424,10 +424,11 @@ def test_validar_zona_de_accion_dentro_de_la_segura(repo, editar_yaml):
     assert any("falta la clave 'gancho_s'" in e for e in validar.validar(repo).errores)
 
 
-def test_las_3_muestras_son_de_video_y_caben_en_la_plantilla(marca):
+def test_las_4_muestras_son_de_video_y_caben_en_la_plantilla(marca):
     from fabrica.editar import muestras
     todas = muestras.cargar_muestras()
-    assert [m["id"] for m in todas][:3] == ["dialogo-sintel", "momento-bbb", "pajaro-bbb"]    # + 3 divididas (#16)
+    assert [m["id"] for m in todas][:3] == ["dialogo-sintel", "momento-bbb", "pajaro-bbb"]    # + 3 divididas (#16) + voces-sintel (#19)
+    assert "voces-sintel" in [m["id"] for m in todas]
     for m in todas:
         assert m["video"]["sha256"] and m["fuente_id"] in ("sintel-cc-by", "bbb-cc-by")
         lineas = [componer.Linea(**ln) for ln in m["lineas"]]

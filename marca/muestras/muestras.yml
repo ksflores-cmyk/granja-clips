@@ -153,3 +153,33 @@ muestras:
     lineas:
       - {t0: 0.8, t1: 4.2, nombre: "STREAMER", frase: "Ahora sí, atentos."}
       - {t0: 5.2, t1: 8.2, acotacion: "(señala la pantalla)"}
+
+  # 4.ª muestra (tarea #19 `voces`): la misma escena de Sintel con transcripción, voces por color, silencios cortados y
+  # golpes. El audio está en inglés: se conservan las frases en español de arriba y se toma de la transcripción la voz
+  # de cada línea y los silencios. Corre faster-whisper (modelos de config/voces.yml) y escribe voces.json con los
+  # tiempos de carga y de transcripción medidos; sin faster-whisper o sin modelo se renderiza sin voces y lo dice.
+  - id: voces-sintel
+    voces: true
+    pilar: primeras_veces
+    fuente_id: sintel-cc-by
+    video:
+      url: https://raw.githubusercontent.com/mdn/shared-assets/main/videos/sintel-short.mp4
+      sha256: 358447f332663e6f3794816e32b8072526fcba8bf8744dc7fb3387afb5b2fceb
+    subtitulos:
+      url: https://raw.githubusercontent.com/mdn/shared-assets/main/misc/sintel-en.vtt
+      sha256: 82da8127b0620ec080d99b99f1954783389482add071a896c3251bb88a42c600
+    licencia: "CC BY 3.0, © Blender Foundation (durian.blender.org)"
+    enlace_licencia: https://creativecommons.org/licenses/by/3.0/
+    recorte: {inicio: 39.6, duracion: 17.0}
+    toma:
+      numero: 4
+      gancho: "Ella busca a un dragón"
+      palabra_lapiz: "DRAGÓN"
+      lapiz: subrayado
+      escena: "INT. CABAÑA DEL CHAMÁN — NOCHE"
+      credito: "Con: Blender Foundation (CC BY 3.0)"
+    lineas:
+      - {t0: 0.8, t1: 5.2, nombre: "CHAMÁN", frase: "¿Qué te trae a la tierra de los guardianes?", original: "What brings you to the land of the gatekeepers?"}
+      - {t0: 6.4, t1: 8.9, nombre: "SINTEL", frase: "Busco a alguien.", original: "I'm searching for someone."}
+      - {t0: 9.4, t1: 13.6, nombre: "CHAMÁN", frase: "¿Alguien muy querido? ¿Un alma gemela?", original: "Someone very dear? A kindred spirit?"}
+      - {t0: 14.8, t1: 16.4, nombre: "SINTEL", frase: "Un dragón.", original: "A dragon."}

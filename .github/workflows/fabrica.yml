@@ -72,6 +72,17 @@ jobs:
         timeout-minutes: 12
         uses: ./.github/actions/ffmpeg
       - run: pip install -r requirements.txt
+      - name: Instalar faster-whisper (voces, tarea #19)
+        timeout-minutes: 4
+        continue-on-error: true   # las voces son opcionales: sin la biblioteca la toma sigue como antes
+        run: |
+          pip install -r requirements-voces.txt || echo "::warning::sin faster-whisper: el ciclo sigue sin voces"
+      - name: Caché del modelo de transcripción
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-fabrica-small-v1
+          restore-keys: whisper-fabrica-
       - name: Marcar el inicio (en el repo, por si la corrida muere)
         run: |
           if [ "$GITHUB_REF" = "refs/heads/main" ] && [ "$ENSAYO_FORZADO" != "true" ]; then

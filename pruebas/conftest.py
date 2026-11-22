@@ -48,6 +48,12 @@ def repo(tmp_path):
     (destino / "PAUSA").write_text(PAUSA_DE_ARRANQUE, encoding="utf-8")
     (destino / "config" / "modo.yml").write_text(MODO_DE_ARRANQUE, encoding="utf-8")
     _estado_de_arranque(destino)
+    # Sin voces por omisión: ninguna prueba ajena a `test_voces.py` carga whisper ni corta silencios de sus videos.
+    voces = destino / "config" / "voces.yml"
+    if voces.exists():
+        import re
+        voces.write_text(re.sub(r"(?m)^activo: true", "activo: false", voces.read_text(encoding="utf-8")),
+                         encoding="utf-8")
     return destino
 
 

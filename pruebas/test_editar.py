@@ -408,15 +408,15 @@ def test_fuentes_de_marca_con_sumas_esperadas():
         assert h.startswith(prefijo), nombre
 
 
-def test_muestras_yml_tiene_las_3_muestras_exactas():
+def test_muestras_yml_tiene_las_4_muestras_exactas():
     m = {x["id"]: x for x in muestras.cargar_muestras()}
-    assert list(m)[:3] == ["dialogo-sintel", "momento-bbb", "pajaro-bbb"]       # las 3 de siempre; la #16 suma 3 divididas
-    assert len(m) == 6 and sum(1 for x in m.values() if x.get("disposicion") == "dividida") == 3
+    assert list(m)[:3] == ["dialogo-sintel", "momento-bbb", "pajaro-bbb"]       # las 3 de siempre; la #16 suma 3 divididas; la #19, voces-sintel
+    assert len(m) == 7 and "voces-sintel" in m and m["voces-sintel"].get("voces") is True and sum(1 for x in m.values() if x.get("disposicion") == "dividida") == 3
     assert m["dialogo-sintel"]["recorte"] == {"inicio": 39.6, "duracion": 17.0}
     assert m["dialogo-sintel"]["toma"]["gancho"] == "Ella busca a un dragón"
     assert len(m["dialogo-sintel"]["lineas"]) == 4
     assert m["momento-bbb"]["lineas"][0]["acotacion"] == "(sale sin prisa)"
-    assert all(x["video"] for x in m.values())                  # las 3 con video: plantilla v2
+    assert all(x["video"] for x in m.values())                  # las 4 con video: plantilla v2
     assert m["pajaro-bbb"]["recorte"]["duracion"] >= 7.0
     marca = Marca.cargar(RAIZ_REAL)
     for x in m.values():  # todas caben en la plantilla de pantalla completa

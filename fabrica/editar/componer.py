@@ -39,6 +39,7 @@ class Linea:
     frase: str | None = None
     acotacion: str | None = None
     original: str | None = None      # texto original (sólo para el manifiesto)
+    voz: str | None = None           # "streamer" | "otra": el color del texto (`marca.yml` voces); None = tinta
 
 
 def _duracion_pista_video(ruta: Path, v: dict, formato: dict) -> float:
@@ -187,9 +188,36 @@ def orden_ffmpeg(*, salida: str, duracion: float, ancho: int, cierre_s: float,
     return _orden(entradas, filtros, f"{idx_cierre + 1}:a", d, salida)
 
 
+MEDIO_CUADRO_S = 0.016           # un poco menos de medio fotograma (1/60 s)
+
+
+def _n(x: float) -> str:
+    """Segundo con 6 decimales sin ceros de sobra (los bordes de tramo son múltiplos de 1/30: 14.666667)."""
+    return f"{float(x):.6f}".rstrip("0").rstrip(".") or "0"
+
+
+def _expresion_tramos(tramos: list) -> str:
+    """Expresión de select: verdadera en los fotogramas que caen dentro de alguno de los tramos [a, b) (segundos del
+    recorte). Los bordes se corren medio cuadro para que un fotograma exactamente en el borde (a o b) no dependa del
+    redondeo del decimal: el cuadro en `a` entra y el cuadro en `b` no."""
+    return "+".join(f"gte(t,{_n(a - MEDIO_CUADRO_S)})*lt(t,{_n(b - MEDIO_CUADRO_S)})" for a, b in tramos)
+
+
+def _filtro_audio_tramos(tramos: list) -> str:
+    """Audio de los tramos pegados, al muestreo exacto (atrim + concat). `aselect` corta por cuadros de audio (~23 ms)
+    y cada corte desfasaba el sonido; medido: correlación 0.41 con aselect contra 0.99999 con atrim."""
+    n = len(tramos)
+    if n == 1:
+        return f"[0:a]atrim=start={_n(tramos[0][0])}:end={_n(tramos[0][1])},asetpts=PTS-STARTPTS[a0]"
+    partes = [f"[0:a]asplit={n}" + "".join(f"[s{i}]" for i in range(n))]
+    partes += [f"[s{i}]atrim=start={_n(a)}:end={_n(b)},asetpts=PTS-STARTPTS[x{i}]" for i, (a, b) in enumerate(tramos)]
+    partes.append("".join(f"[x{i}]" for i in range(n)) + f"concat=n={n}:v=0:a=1[a0]")
+    return ";".join(partes)
+
+
 def orden_ffmpeg_pantalla_completa(*, salida: str, duracion: float, ancho: int, alto: int, video: dict,
                                    placas: list[tuple[str, int, int, float, float]],
-                                   musica: dict | None = None) -> list[str]:
+                                   musica: dict | None = None, tramos: list | None = None) -> list[str]:
     """Orden de ffmpeg de una toma CON video en la plantilla v2 (función pura).
 
     `video`: {ruta, inicio, recorte {x, y, ancho, alto}, audio (bool)}. El clip se recorta (fijo) y se escala para
@@ -198,16 +226,22 @@ def orden_ffmpeg_pantalla_completa(*, salida: str, duracion: float, ancho: int, 
     se apilan sin huecos; si no, `overlay` sobre un fondo negro); encima van las placas `[(ruta PNG, x, y, t0, t1)]`. Si el video trae audio, es el de
     origen, tal cual (nunca música ni voz añadidas: ValueError si llega `musica`). Video mudo: la pista `musica`
     (mismo formato que en `orden_ffmpeg`) o, sin ella, silencio.
+
+    `tramos`: [(a, b)] segundos del recorte (relativos a `video["inicio"]`) que se conservan; el resto (silencios) se
+    quita con select (video) y atrim + concat (audio), corte seco. `duracion` es entonces la de la salida (la suma de los tramos) y la entrada
+    se lee hasta el final del último tramo. Sin `tramos`, la orden es la de siempre.
     """
     if musica is not None and video.get("audio", True):
         raise ValueError("el video trae audio propio: no se le añade música")
     d = f"{duracion:g}"
-    entradas = ["-ss", f"{video['inicio']:g}", "-t", d, "-i", video["ruta"]]
+    d_in = _n(tramos[-1][1]) if tramos else d
+    entradas = ["-ss", f"{video['inicio']:g}", "-t", d_in, "-i", video["ruta"]]
+    quitar = (f"select='{_expresion_tramos(tramos)}',setpts=N/FRAME_RATE/TB," if tramos else "")
     if video.get("paneles"):
-        filtros = _filtros_paneles(video["paneles"], ancho, alto)
+        filtros = _filtros_paneles(video["paneles"], ancho, alto, quitar)
     else:
         r = video["recorte"]
-        filtros = [f"[0:v]fps=30,crop={r['ancho']}:{r['alto']}:{r['x']}:{r['y']},scale={ancho}:{alto}:flags=lanczos,"
+        filtros = [f"[0:v]fps=30,{quitar}crop={r['ancho']}:{r['alto']}:{r['x']}:{r['y']},scale={ancho}:{alto}:flags=lanczos,"
                    f"setsar=1[c0]"]
     actual = "c0"
     for i, (ruta, x, y, t0, t1) in enumerate(placas):
@@ -217,7 +251,11 @@ def orden_ffmpeg_pantalla_completa(*, salida: str, duracion: float, ancho: int, 
         actual = sig
     filtros.append(f"[{actual}]format=yuv420p[out]")
     if video.get("audio", True):
-        mapa_audio = "0:a:0"
+        if tramos:
+            filtros.append(_filtro_audio_tramos(tramos))
+            mapa_audio = "[a0]"
+        else:
+            mapa_audio = "0:a:0"
     elif musica is not None:
         entradas += _entrada_musica(musica, d)
         filtros.append(f"[{1 + len(placas)}:a]{_filtro_musica(musica, duracion)}[aud]")
@@ -228,13 +266,13 @@ def orden_ffmpeg_pantalla_completa(*, salida: str, duracion: float, ancho: int, 
     return _orden(entradas, filtros, mapa_audio, d, salida)
 
 
-def _filtros_paneles(paneles: list[dict], ancho: int, alto: int) -> list[str]:
+def _filtros_paneles(paneles: list[dict], ancho: int, alto: int, quitar: str = "") -> list[str]:
     """Cadena de filtros de los paneles (función pura): `split`, un `crop`+`scale` por panel y `vstack` u `overlay`."""
     n = len(paneles)
     if n < 2:
         raise ValueError("la pantalla dividida necesita al menos 2 paneles")
     ps = sorted(paneles, key=lambda p: p["destino"]["y"])
-    filtros = ["[0:v]fps=30,split=%d%s" % (n, "".join(f"[s{i}]" for i in range(n)))]
+    filtros = [f"[0:v]fps=30,{quitar}" + "split=%d%s" % (n, "".join(f"[s{i}]" for i in range(n)))]
     for i, p in enumerate(ps):
         r, d = p["recorte"], p["destino"]
         filtros.append(f"[s{i}]crop={r['ancho']}:{r['alto']}:{r['x']}:{r['y']},"
@@ -269,6 +307,23 @@ def duracion_audio(ruta: Path) -> float:
     out = subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                                    "-of", "json", str(ruta)], timeout=plazo.tiempo_para(60))
     return float(json.loads(out)["format"]["duration"])
+
+
+def _tramos_validos(tramos: list | None, duracion: float) -> list[tuple[float, float]] | None:
+    """Tramos normalizados, o None si no hay cortes (sin tramos, o un solo tramo que cubre todo). ValueError si no valen."""
+    if not tramos:
+        return None
+    t = [(float(a), float(b)) for a, b in tramos]
+    previo = 0.0
+    for a, b in t:
+        if not (math.isfinite(a) and math.isfinite(b)) or a < previo - 1e-9 or b <= a:
+            raise ValueError(f"tramos inválidos (deben crecer y no solaparse): {tramos}")
+        previo = b
+    if abs(sum(b - a for a, b in t) - duracion) > 0.05:
+        raise ValueError(f"los tramos suman {sum(b - a for a, b in t):.3f} s y la duración de la toma es {duracion:g} s")
+    if len(t) == 1 and t[0][0] <= 1e-9:
+        return None
+    return t
 
 
 def plan_json(marca: Marca, t: Toma, lineas: list[Linea], duracion: float, *,
@@ -337,7 +392,7 @@ def _audio_plan(marca: Marca, musica: dict | None, audio_fuente: bool) -> dict:
 def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duracion: float,
              trabajo: Path, fuente_video: Path | None = None, inicio: float = 0.0,
              plan_salida: Path | None = None, ficha: dict | None = None,
-             musica: dict | None = None, movimiento: bool = False) -> dict:
+             musica: dict | None = None, movimiento: bool = False, tramos: list | None = None) -> dict:
     """Renderiza la toma. Devuelve el plan. Lanza ValueError si algún texto no cabe.
 
     Con `fuente_video`: plantilla v2 (pantalla completa, audio original). Sin él: página de guion tipográfica.
@@ -345,7 +400,8 @@ def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duraci
     `plan["campana"]`; `reglas.sin_musica` deja el audio original de la fuente tal cual (nunca se añade audio).
     `musica`: pista CC0 ({id, ruta, sha256, inicio_s, ...}, de `editar.musica`) para piezas sin audio propio;
     ValueError si el video trae audio o la ficha tiene `sin_musica`. `movimiento`: entrada de texto sobria
-    (sólo piezas sin video).
+    (sólo piezas sin video). `tramos`: [(a, b)] del recorte (relativos a `inicio`) que se conservan; `duracion` es la de
+    la salida (suma de los tramos). Sólo con video.
     """
     trabajo = Path(trabajo)
     trabajo.mkdir(parents=True, exist_ok=True)
@@ -353,10 +409,12 @@ def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duraci
         raise ValueError("la ficha tiene sin_musica: no se añade música")
     if movimiento and fuente_video is not None:
         raise ValueError("el movimiento de entrada de texto es sólo para piezas sin video")
+    if tramos and fuente_video is None:
+        raise ValueError("los tramos (silencios cortados) son sólo para piezas con video")
     if fuente_video is not None:
         return _componer_pantalla_completa(marca, t, lineas, Path(salida), duracion=duracion, trabajo=trabajo,
                                            fuente_video=Path(fuente_video), inicio=inicio,
-                                           plan_salida=plan_salida, ficha=ficha, musica=musica)
+                                           plan_salida=plan_salida, ficha=ficha, musica=musica, tramos=tramos)
     # Toma sin video: validar todo antes de pintar o correr ffmpeg
     lienzo.preparar_gancho(marca, t.gancho, t.palabra_lapiz)
     for ln in lineas:
@@ -398,13 +456,13 @@ def componer(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duraci
 
 
 def _disposicion_dividida(marca: Marca, t: Toma, lineas: list[Linea], duracion: float, logo, ficha, fuente_video: Path,
-                          inicio: float, info: dict) -> dict | None:
+                          inicio: float, info: dict, lectura: float | None = None) -> dict | None:
     """None si la pantalla dividida está apagada (marca.yml o ficha). Si no, la decisión de la toma: o bien
     {modo: "dividida", placas, capas, paneles, cara, deteccion, posicion} o {modo: "completa", deteccion} con el motivo
     en `deteccion["motivo"]` (sin facecam, sin sitio para el juego o sin posición libre para las placas)."""
     if not mod_dividida.activa(marca, ficha):
         return None
-    det = mod_dividida.detectar(fuente_video, inicio, duracion, info["ancho"], info["alto"],
+    det = mod_dividida.detectar(fuente_video, inicio, lectura or duracion, info["ancho"], info["alto"],
                                 ajustes=mod_dividida.ajustes_de(marca))
     if det["modo"] != mod_dividida.DIVIDIDA:
         return {"modo": mod_dividida.COMPLETA, "deteccion": det}
@@ -428,15 +486,17 @@ def _disposicion_dividida(marca: Marca, t: Toma, lineas: list[Linea], duracion: 
 
 def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], salida: Path, *, duracion: float,
                                 trabajo: Path, fuente_video: Path, inicio: float, plan_salida: Path | None,
-                                ficha: dict | None, musica: dict | None = None) -> dict:
+                                ficha: dict | None, musica: dict | None = None, tramos: list | None = None) -> dict:
+    tramos = _tramos_validos(tramos, duracion)
+    fin_fuente = tramos[-1][1] if tramos else duracion          # hasta dónde se lee de la fuente (relativo al inicio)
     for ln in lineas:
         if not 0 <= ln.t0 < ln.t1 <= duracion:
             raise ValueError(f"ventana de tiempo inválida {ln.t0}-{ln.t1} (duración {duracion})")
     info = sondear_video(fuente_video)
-    if info["duracion"] + 0.05 < inicio + duracion:
+    if info["duracion"] + 0.05 < inicio + fin_fuente:
         raise ValueError(
-            f"la fuente dura {info['duracion']:.2f} s y el recorte pide {inicio:g} + {duracion:g} = "
-            f"{inicio + duracion:g} s: el MP4 terminaría antes del cierre")
+            f"la fuente dura {info['duracion']:.2f} s y el recorte pide {inicio:g} + {fin_fuente:g} = "
+            f"{inicio + fin_fuente:g} s: el MP4 terminaría antes del cierre")
     if musica is not None and info["audio"]:
         raise ValueError("el video trae audio propio: no se le añade música")
     musica_ff = _musica_ffmpeg(marca, musica, duracion)
@@ -445,7 +505,7 @@ def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], sali
         logo = marca.raiz / ficha["marca_agua"]
         if not logo.is_file():
             raise ValueError(f"marca de agua ausente: {ficha['marca_agua']}")
-    div = _disposicion_dividida(marca, t, lineas, duracion, logo, ficha, fuente_video, inicio, info)
+    div = _disposicion_dividida(marca, t, lineas, duracion, logo, ficha, fuente_video, inicio, info, fin_fuente)
     if div is not None and div["modo"] == mod_dividida.DIVIDIDA:
         todas, capas, paneles = div["placas"], div["capas"], div["paneles"]
         recorte = None
@@ -455,7 +515,7 @@ def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], sali
         problemas = placas.problemas_capas(capas, marca)
         if problemas:
             raise ValueError("las placas no cumplen la pantalla completa: " + "; ".join(problemas))
-        recorte = encuadre.elegir_recorte(fuente_video, inicio, duracion, info["ancho"], info["alto"],
+        recorte = encuadre.elegir_recorte(fuente_video, inicio, fin_fuente, info["ancho"], info["alto"],
                                           marca.ancho, marca.alto, ajustes=marca.pc["recorte"])
         paneles = None
     cuerpo = {"x": 0, "y": 0, "ancho": marca.ancho, "alto": marca.alto}
@@ -473,11 +533,14 @@ def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], sali
     if paneles is not None:
         video["paneles"] = [{"recorte": p["recorte"], "destino": p["destino"]} for p in paneles]
     cmd = orden_ffmpeg_pantalla_completa(salida=str(salida), duracion=duracion, ancho=marca.ancho,
-                                         alto=marca.alto, video=video, placas=rutas, musica=musica_ff)
+                                         alto=marca.alto, video=video, placas=rutas, musica=musica_ff,
+                                         tramos=tramos)
     salida.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(cmd, check=True, timeout=plazo.tiempo_para(300))
     origen = {"archivo": str(fuente_video), "sha256": sha256_archivo(fuente_video),
               "inicio": inicio, "duracion": duracion, "audio": "original" if info["audio"] else "silencio"}
+    if tramos:
+        origen["tramos"] = [[round(a, 3), round(b, 3)] for a, b in tramos]       # sólo si hay silencios cortados
     if paneles is not None:
         geo = {"cuerpo": cuerpo, "disposicion": mod_dividida.DIVIDIDA, "paneles": paneles, "cara": div["cara"],
                "deteccion": div["deteccion"], "posicion_placas": div["posicion"], "capas": capas}
