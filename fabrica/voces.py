@@ -38,6 +38,7 @@ import numpy as np
 from . import plazo
 from .config import cargar_yaml, raiz_repo
 from .editar import dialogo as mod_dialogo
+from .editar import nombres as mod_nombres
 from .editar.marca import Marca
 
 SR = 16000                       # audio de trabajo: WAV mono de 16 kHz (lo que espera whisper)
@@ -690,8 +691,7 @@ def clasificar_hablantes(muestras: np.ndarray, sr: int, turnos: list, cfg: Cfg) 
 
 def nombre_visible(creador: str | None, marca: Marca) -> str:
     """El rótulo del streamer: el creador de la ficha sin `twitch.tv/` ni `@`, en mayúsculas y recortado a la columna."""
-    s = re.sub(r"^\s*(https?://)?(www\.)?twitch\.tv/", "", str(creador or ""), flags=re.I).strip().lstrip("@").strip()
-    s = s.upper() or "STREAMER"
+    s = mod_nombres.nombre_corto(creador) or "STREAMER"      # misma regla que la puerta de nombres: sólo el de la ficha
     cfg = marca.pc["dialogo"]
     ancho = (cfg["columna_dialogo"][1] - cfg["columna_dialogo"][0]) - 2 * int(cfg["relleno_x"])
     f = marca.fuente("regular", cfg["tam_nombre"])
@@ -743,7 +743,7 @@ def lineas_desde_transcripcion(tr: Transcripcion, voces_turnos: list, marca: Mar
         except ValueError:                        # una palabra suelta más ancha que la columna
             return False
     pausa, tope = float(cfg.lineas["pausa_s"]), float(cfg.lineas["max_s"])
-    nombres = {STREAMER: nombre_visible(nombre_streamer, marca), OTRA: cfg.nombre_otra}
+    nombres = {STREAMER: nombre_visible(nombre_streamer, marca), OTRA: mod_nombres.OTRA_VOZ}   # #24: sólo OTRA VOZ
     grupos: list[list[dict]] = []
     voz_g = None
     for p in _palabras_planas(tr.segmentos):
