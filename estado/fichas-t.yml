@@ -331,7 +331,7 @@
   origen: twitch
   twitch_login: srserpiente
   broadcaster_id: '30805171'
-  seguidores: 169036
+  seguidores: 169035
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -532,7 +532,7 @@
   origen: twitch
   twitch_login: itsmoura
   broadcaster_id: '110286144'
-  seguidores: 58994
+  seguidores: 59004
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -573,7 +573,7 @@
   origen: twitch
   twitch_login: aaronjaureguii
   broadcaster_id: '1382351624'
-  seguidores: 38104
+  seguidores: 38118
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -654,7 +654,7 @@
   origen: twitch
   twitch_login: darcfalcon13
   broadcaster_id: '803417396'
-  seguidores: 8976
+  seguidores: 8978
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -1260,7 +1260,7 @@
   origen: twitch
   twitch_login: vicesat
   broadcaster_id: '110387651'
-  seguidores: 16339
+  seguidores: 16404
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -1461,7 +1461,7 @@
   origen: twitch
   twitch_login: victoriarodrgzz
   broadcaster_id: '73577459'
-  seguidores: 45558
+  seguidores: 45564
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -1502,7 +1502,7 @@
   origen: twitch
   twitch_login: superblazing_
   broadcaster_id: '573251394'
-  seguidores: 28427
+  seguidores: 28434
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -1543,8 +1543,8 @@
   origen: twitch
   twitch_login: tibsonm
   broadcaster_id: '513203568'
-  seguidores: 35785
-  seguidores_leidos: '2026-11-21'
+  seguidores: 35981
+  seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1570,12 +1570,13 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-23'
+  vence: '2026-11-25'
   estado: vigente
   uso: produccion
   publicable: true
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
+  nombre_visible: TibsonM
 - id: t-oskar1up
   tipo: T
   creador: twitch.tv/oskar1up
@@ -1743,8 +1744,8 @@
   origen: twitch
   twitch_login: josefattv
   broadcaster_id: '488087884'
-  seguidores: 44950
-  seguidores_leidos: '2026-11-22'
+  seguidores: 44966
+  seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1770,12 +1771,13 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-24'
+  vence: '2026-11-25'
   estado: vigente
   uso: produccion
   publicable: true
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
+  nombre_visible: JosefaTTV
 - id: t-safiro01
   tipo: T
   creador: twitch.tv/safiro01
@@ -2063,7 +2065,7 @@
   origen: twitch
   twitch_login: elvisayomastercard
   broadcaster_id: '21565409'
-  seguidores: 233117
+  seguidores: 233116
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -3522,7 +3524,7 @@
   origen: twitch
   twitch_login: lechu
   broadcaster_id: '105216837'
-  seguidores: 122224
+  seguidores: 122233
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -3645,7 +3647,7 @@
   origen: twitch
   twitch_login: sofig
   broadcaster_id: '500081308'
-  seguidores: 107073
+  seguidores: 107076
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -3727,7 +3729,7 @@
   origen: twitch
   twitch_login: viperr97
   broadcaster_id: '106675547'
-  seguidores: 29279
+  seguidores: 29281
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -3768,7 +3770,7 @@
   origen: twitch
   twitch_login: lapoblet
   broadcaster_id: '893413218'
-  seguidores: 13344
+  seguidores: 13347
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -3809,7 +3811,7 @@
   origen: twitch
   twitch_login: matuzcl
   broadcaster_id: '200998377'
-  seguidores: 43120
+  seguidores: 43123
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:

@@ -1061,7 +1061,8 @@
     "largo": 147
    },
    "ficha_id": "t-mjlabanda-unosiete"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|8|2026-11-23T19:00:00.000Z",
@@ -1114,7 +1115,8 @@
     "largo": 147
    },
    "ficha_id": "t-mjlabanda-unosiete"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|8|2026-11-23T19:00:00.000Z",
@@ -1167,6 +1169,166 @@
     "largo": 150
    },
    "ficha_id": "t-mjlabanda-unosiete"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "shorts|9|2026-11-23T22:30:00.000Z",
+  "plataforma": "shorts",
+  "toma": 9,
+  "dueAt": "2026-11-23T22:30:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-23/toma-009-f4b6328f.mp4",
+  "estado": "rechazado",
+  "post_id": null,
+  "intento": "d60c65d70d254d9189af0675ae78c184",
+  "registrado": false,
+  "texto": "Toma 009. VictoriaRodrgzz se lleva un buen susto bajo el agua\n\n🎥 twitch.tv/victoriarodrgzz\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 9,
+    "gancho": "Tiburón al acecho bajo el agua",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-victoriarodrgzz",
+    "caption": "VictoriaRodrgzz se lleva un buen susto bajo el agua",
+    "frase": "¡Bua! ¡Bua!",
+    "hablante": "VICTORIARODRGZZ",
+    "campana": "",
+    "duracion_s": 25.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/victoriarodrgzz",
+    "id_origen": "PlainTsundereEggplantBudStar-lfMpYfAKiZtz8uP3",
+    "claves": [
+     "PlainTsundereEggplantBudStar-lfMpYfAKiZtz8uP3"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 009. VictoriaRodrgzz se lleva un buen susto bajo el agua\n\n🎥 twitch.tv/victoriarodrgzz\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 009. VictoriaRodrgzz se lleva un buen susto bajo el agua",
+    "credito": "🎥 twitch.tv/victoriarodrgzz",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 009. VictoriaRodrgzz se lleva un buen susto bajo el agua\n\n🎥 twitch.tv/victoriarodrgzz\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 122
+   },
+   "ficha_id": "t-victoriarodrgzz"
+  }
+ },
+ {
+  "id": "tiktok|9|2026-11-23T22:30:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 9,
+  "dueAt": "2026-11-23T22:30:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-23/toma-009-f4b6328f.mp4",
+  "estado": "creado",
+  "post_id": "6b04b83318db0405bda9c575",
+  "intento": "8a7f7748655f4c37aef25755f18890ff",
+  "registrado": true,
+  "texto": "Toma 009. VictoriaRodrgzz se lleva un buen susto bajo el agua\n\n🎥 twitch.tv/victoriarodrgzz\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 9,
+    "gancho": "Tiburón al acecho bajo el agua",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-victoriarodrgzz",
+    "caption": "VictoriaRodrgzz se lleva un buen susto bajo el agua",
+    "frase": "¡Bua! ¡Bua!",
+    "hablante": "VICTORIARODRGZZ",
+    "campana": "",
+    "duracion_s": 25.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/victoriarodrgzz",
+    "id_origen": "PlainTsundereEggplantBudStar-lfMpYfAKiZtz8uP3",
+    "claves": [
+     "PlainTsundereEggplantBudStar-lfMpYfAKiZtz8uP3"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 009. VictoriaRodrgzz se lleva un buen susto bajo el agua\n\n🎥 twitch.tv/victoriarodrgzz\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/victoriarodrgzz",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 009. VictoriaRodrgzz se lleva un buen susto bajo el agua\n\n🎥 twitch.tv/victoriarodrgzz\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 122
+   },
+   "ficha_id": "t-victoriarodrgzz"
+  }
+ },
+ {
+  "id": "reels|9|2026-11-23T22:30:00.000Z",
+  "plataforma": "reels",
+  "toma": 9,
+  "dueAt": "2026-11-23T22:30:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-23/toma-009-f4b6328f.mp4",
+  "estado": "creado",
+  "post_id": "6b04b834f72f10e18837aa78",
+  "intento": "f1f37524c5c24e56af9c6ae84c1cb2a0",
+  "registrado": true,
+  "texto": "Toma 009. VictoriaRodrgzz se lleva un buen susto bajo el agua\n\n🎥 twitch.tv/victoriarodrgzz\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 9,
+    "gancho": "Tiburón al acecho bajo el agua",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-victoriarodrgzz",
+    "caption": "VictoriaRodrgzz se lleva un buen susto bajo el agua",
+    "frase": "¡Bua! ¡Bua!",
+    "hablante": "VICTORIARODRGZZ",
+    "campana": "",
+    "duracion_s": 25.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/victoriarodrgzz",
+    "id_origen": "PlainTsundereEggplantBudStar-lfMpYfAKiZtz8uP3",
+    "claves": [
+     "PlainTsundereEggplantBudStar-lfMpYfAKiZtz8uP3"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 009. VictoriaRodrgzz se lleva un buen susto bajo el agua\n\n🎥 twitch.tv/victoriarodrgzz\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/victoriarodrgzz",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 009. VictoriaRodrgzz se lleva un buen susto bajo el agua\n\n🎥 twitch.tv/victoriarodrgzz\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 125
+   },
+   "ficha_id": "t-victoriarodrgzz"
   }
  }
 ]
