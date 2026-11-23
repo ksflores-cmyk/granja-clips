@@ -68,10 +68,11 @@ def test_ffmpeg_cachea_los_deb_con_apt_de_respaldo():
     assert "apt-get" in (RAIZ_REAL / ".github/actions/ffmpeg/action.yml").read_text(encoding="utf-8")
 
 
-def test_los_modelos_lite_van_al_final_del_respaldo():
+def test_los_lite_van_antes_del_flash_que_da_503_en_el_respaldo():
     o = yaml.safe_load((RAIZ_REAL / "config" / "ojos.yml").read_text(encoding="utf-8"))
     assert o["modelo"] == "gemini-3-flash-preview"
-    assert o["modelos_respaldo"][-2:] == ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
+    assert o["modelos_respaldo"] == ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.7-flash"]
+    assert o["respaldos_por_falla"] >= len(o["modelos_respaldo"])      # el ciclo llega a todos, también a los -lite
 
 
 # ---------------------------------------------------------------- robot CR: salida cr
