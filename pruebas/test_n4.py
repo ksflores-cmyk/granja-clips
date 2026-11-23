@@ -993,3 +993,41 @@ def test_un_descarte_por_contenido_si_gasta_la_fuente(repo, tmp_path, video20):
     assert not r.ok
     # Regla de gasto: hacer_toma no anota; marca gastar=True (HTTP 400 de Gemini es del material) y el ciclo anota.
     assert r.gastar is True
+
+
+def test_acotacion_que_no_cabe_se_recorta_en_vez_de_descartar(marca, temporada, capsys):
+    datos = cargar_dato("valida")
+    datos["acotacion"] = "(Suzumex ríe mientras ve la televisión y comenta todo lo que pasa en pantalla)"
+    ok, motivos = ojos.validar_respuesta(datos, marca, temporada, duracion=20.0)
+    assert ok, motivos
+    assert datos["acotacion"].endswith("…") and datos["acotacion"][-2] != " "
+    assert not datos["acotacion"].split("…")[0].split()[-1].lower() in {"la", "el", "de", "y", "que"}
+    assert "se recortó" in capsys.readouterr().out
+
+
+def test_acotacion_imposible_se_quita_y_queda_en_el_registro(marca, temporada, capsys):
+    datos = cargar_dato("valida")
+    datos["acotacion"] = "(" + "Supercalifragilisticoespialidoso" * 4 + ")"
+    ok, motivos = ojos.validar_respuesta(datos, marca, temporada, duracion=20.0)
+    assert ok, motivos
+    assert datos["acotacion"] == "" and "se quitó" in capsys.readouterr().out
+
+
+def test_acotacion_que_cabe_no_se_toca(marca, temporada, capsys):
+    datos = cargar_dato("valida")
+    assert ojos.validar_respuesta(datos, marca, temporada, duracion=20.0)[0]
+    assert datos["acotacion"] == "(se ríe)" and capsys.readouterr().out == ""
+
+
+def test_frase_que_no_cabe_en_dos_tiempos_se_parte_en_tres(marca, temporada):
+    datos = cargar_dato("valida")
+    datos["lineas"][0]["es"] = ("Esta ciudad es tan enorme y tan rara que cuando llegué por primera vez no supe "
+                                "qué decir ni hacia dónde caminar sin perderme")
+    ok, motivos = ojos.validar_respuesta(datos, marca, temporada, duracion=20.0)
+    assert ok, motivos
+    lineas = ojos.partir_lineas(datos, marca)
+    primeras = [x for x in lineas if x["hablante"] == datos["lineas"][0]["hablante"] and x["t0"] < 6.5]
+    assert len(primeras) == 3
+    assert primeras[0]["t0"] == 2.5 and primeras[-1]["t1"] == 6.0
+    assert all(a["t1"] == b["t0"] for a, b in zip(primeras, primeras[1:]))
+    assert " ".join(x["es"] for x in primeras) == datos["lineas"][0]["es"]

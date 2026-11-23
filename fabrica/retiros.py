@@ -21,7 +21,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from . import plazo, publicar, red
 from .config import cargar_yaml, raiz_repo
-from .fuentes import RE_ID_T, cargar_fuentes
+from .fuentes import RE_ID_T, cargar_fuentes, id_ficha_t
 from .pausa import ZONA, crear_pausa_t, pausa_t_activa  # noqa: F401 (pausa_t_activa se re-exporta)
 from .registro import anotar_registro
 from .vetados import RE_CANAL, filas_retiros
@@ -281,7 +281,7 @@ def _origen(raiz, post: dict, canales: dict) -> dict:
     if m:
         login = m.group(1).lower()
         ficha = next((i for i, f in fichas.items() if str(f.get("twitch_login", "")).lower() == login), None)
-        return {"plataforma": plataforma, "fuente": ficha or "t-" + login.replace("_", "-"), "login": login}
+        return {"plataforma": plataforma, "fuente": ficha or id_ficha_t(login), "login": login}
     return {"plataforma": plataforma, "fuente": "desconocida", "login": None}
 
 
