@@ -55,8 +55,9 @@ def lado_izquierdo(marca: Marca) -> bool:
 
 def _lineas_dialogo(linea) -> tuple:
     if isinstance(linea, dict):
-        return linea.get("nombre"), linea.get("frase"), linea.get("acotacion"), float(linea["t0"]), float(linea["t1"])
-    return linea.nombre, linea.frase, linea.acotacion, float(linea.t0), float(linea.t1)
+        return (linea.get("nombre"), linea.get("frase"), linea.get("acotacion"), float(linea["t0"]), float(linea["t1"]),
+                linea.get("voz"))
+    return linea.nombre, linea.frase, linea.acotacion, float(linea.t0), float(linea.t1), getattr(linea, "voz", None)
 
 
 def _par(n: float) -> int:
@@ -83,7 +84,7 @@ def _x_placa(marca: Marca, ancho: int) -> int:
 
 # ---------------------------------------------------------------- fila mínima: TOMA nnn y crédito
 
-def placa_fila(marca: Marca, t: Toma, duracion: float) -> Placa:
+def placa_fila(marca: Marca, t: Toma, duracion: float, y: int | None = None) -> Placa:
     cfg, rel = marca.pc["fila"], int(marca.pc["relleno_placa"])
     f1, f2 = marca.fuente("bold", cfg["tam_toma"]), marca.fuente("regular", cfg["tam_credito"])
     txt1, txt2 = f"TOMA {t.numero:03d}", t.credito.strip()
@@ -93,7 +94,8 @@ def placa_fila(marca: Marca, t: Toma, duracion: float) -> Placa:
     w, h = _par(ancho + 2 * rel), _par(max(a1, a2) + max(d1, d2) + 2 * rel)
     if w > marca.pc["ancho_max_encabezado"]:
         raise ValueError(f"la fila de crédito mide {w} px y caben {marca.pc['ancho_max_encabezado']}: {txt2!r}")
-    x, y = _x_placa(marca, w), int(marca.pc["zona_segura"]["y0"])
+    x = _x_placa(marca, w)
+    y = int(marca.pc["zona_segura"]["y0"]) if y is None else int(y)
     img = lienzo.papel_region(marca, x, y, w, h)
     d = ImageDraw.Draw(img)
     base = rel + max(a1, a2)
@@ -201,7 +203,7 @@ def placa_mosca(marca: Marca, duracion: float) -> Placa:
 # ---------------------------------------------------------------- diálogo
 
 def placa_dialogo(marca: Marca, indice: int, linea) -> Placa:
-    nombre, frase, acotacion, t0, t1 = _lineas_dialogo(linea)
+    nombre, frase, acotacion, t0, t1, voz = _lineas_dialogo(linea)
     cfg = marca.pc["dialogo"]
     lineas = mod_dialogo.validar_bloque(marca, nombre, frase, acotacion, cfg)
     rx, ry = int(cfg["relleno_x"]), int(cfg["relleno_y"])
@@ -219,7 +221,7 @@ def placa_dialogo(marca: Marca, indice: int, linea) -> Placa:
     x, y = _par_abajo(centro - w / 2), _par_abajo(cfg["borde_inferior"]) - h
     img = lienzo.papel_region(marca, x, y, w, h)
     d = ImageDraw.Draw(img)
-    tinta, yy = marca.color("tinta"), ry
+    tinta, yy = marca.color_voz(voz), ry          # sin voz: tinta, como siempre
     for txt, f, alto in filas:
         d.text((w / 2 - f.getlength(txt) / 2, yy), txt, font=f, fill=tinta)
         yy += alto
@@ -262,9 +264,17 @@ def placa_agua(marca: Marca, ruta_logo: Path, duracion: float) -> Placa:
 
 # ---------------------------------------------------------------- todo junto
 
-def construir(marca: Marca, t: Toma, lineas: list, duracion: float, logo: Path | None = None) -> list[Placa]:
-    """Todas las placas de una toma, en el orden en que se pintan. ValueError con el motivo si algo no cabe."""
-    fila = placa_fila(marca, t, duracion)
+def construir(marca: Marca, t: Toma, lineas: list, duracion: float, logo: Path | None = None,
+              posicion: str = "estandar") -> list[Placa]:
+    """Todas las placas de una toma, en el orden en que se pintan. ValueError con el motivo si algo no cabe.
+
+    `posicion`: "estandar" (la de siempre) o "alterna" (pantalla dividida: la fila, y con ella la cabecera, bajan a
+    `dividida.placas_alterna.y_fila` de marca.yml, sobre la costura entre los paneles).
+    """
+    if posicion not in ("estandar", "alterna"):
+        raise ValueError(f"posición de placas desconocida: {posicion!r}")
+    y_fila = int(marca.datos["dividida"]["placas_alterna"]["y_fila"]) if posicion == "alterna" else None
+    fila = placa_fila(marca, t, duracion, y_fila)
     t1_cab = max(0.0, min(float(marca.pc["gancho_s"]), float(duracion) - float(marca.m("cierre_s"))))
     placas = [fila, placa_cabecera(marca, t, fila.y + fila.alto, t1_cab), placa_mosca(marca, duracion)]
     if logo is not None:
@@ -280,9 +290,12 @@ def construir(marca: Marca, t: Toma, lineas: list, duracion: float, logo: Path |
     return placas
 
 
-def problemas_capas(capas: list[dict], marca: Marca) -> list[str]:
-    """Reglas de pantalla completa sobre `geometria.capas`: zona segura, zona de acción y tope de área."""
-    seg, acc = marca.pc["zona_segura"], marca.pc["zona_accion"]
+def problemas_capas(capas: list[dict], marca: Marca, accion: dict | None = None) -> list[str]:
+    """Reglas de pantalla completa sobre `geometria.capas`: zona segura, zona de acción y tope de área.
+
+    `accion`: otra zona de acción (la de la pantalla dividida, `dividida.zona_accion`); por omisión, la de siempre.
+    """
+    seg, acc = marca.pc["zona_segura"], accion or marca.pc["zona_accion"]
     malas: list[str] = []
     for c in capas:
         try:

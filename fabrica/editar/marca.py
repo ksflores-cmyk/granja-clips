@@ -39,6 +39,12 @@ class Marca:
     def color(self, nombre: str) -> tuple[int, int, int]:
         return hex_a_rgb(self.datos["colores"][nombre])
 
+    def color_voz(self, voz: str | None) -> tuple[int, int, int]:
+        """Color del texto del diálogo según la voz (`marca.yml`, sección `voces`). Sin voz (o sin sección): tinta."""
+        voces = self.datos.get("voces") or {}
+        nombre = voces.get(voz if voz in ("streamer", "otra") else "streamer") or "tinta"
+        return self.color(nombre)
+
     # -- medidas
     @property
     def maqueta(self) -> dict:

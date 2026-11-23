@@ -132,6 +132,7 @@ def validar_fuentes(f, inf: Informe) -> None:
         inf.aviso(f"{rel}: sin fuentes: la fábrica no tendrá qué publicar")
         return
     vistos: set = set()
+    vistos_cr: dict = {}
     for i, ficha in enumerate(f):
         if not isinstance(ficha, dict):
             inf.error(f"{rel}[{i}]: la ficha debe ser un diccionario")
@@ -198,6 +199,7 @@ def validar_fuentes(f, inf: Informe) -> None:
             inf.aviso(f"{et}: marcada publicable pero no lo es ({motivo}); "
                       "la puerta de N3 exigirá estado vigente para descargar o publicar")
         _validar_campos_n3(ficha, et, inf)
+        _validar_campana(ficha, et, inf, vistos_cr)
         vence = ficha.get("vence")
         if vence is not None:
             f_vence = _a_fecha(vence)
@@ -205,6 +207,48 @@ def validar_fuentes(f, inf: Informe) -> None:
                 inf.error(f"{et}: vence ilegible ({vence!r}); use una fecha AAAA-MM-DD")
             elif ficha.get("estado") == "vigente" and f_vence < _hoy():
                 inf.aviso(f"{et}: ficha vigente con vence {f_vence} ya pasado; debe pasar a vencida")
+
+
+RE_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+def _validar_campana(ficha: dict, et: str, inf: Informe, vistos_cr: dict) -> None:
+    """Campos de las fichas de Content Rewards (#23): cr_campaign_id, motivo_pausa, *_por_red, presupuesto_total."""
+    cr = ficha.get("cr_campaign_id")
+    if cr is not None:
+        if not (isinstance(cr, str) and RE_UUID.match(cr)):
+            inf.error(f"{et}: cr_campaign_id debe ser el uuid de la campaña en minúsculas")
+        else:
+            if cr in vistos_cr:
+                inf.error(f"{et}: cr_campaign_id repetido (ya está en {vistos_cr[cr]})")
+            vistos_cr.setdefault(cr, ficha.get("id"))
+            if not (isinstance(ficha.get("campana"), str) and ficha["campana"].strip()):
+                inf.error(f"{et}: cr_campaign_id exige campana (nombre exacto de la campaña)")
+            if isinstance(ficha.get("permiso_url"), str) and cr not in ficha["permiso_url"]:
+                inf.error(f"{et}: permiso_url no es la página de la campaña {cr}")
+    if ficha.get("estado") == "pausada" and ficha.get("tipo") == "A":
+        mp = ficha.get("motivo_pausa")
+        if not (isinstance(mp, str) and len(mp.strip()) >= 20):
+            inf.error(f"{et}: ficha A pausada exige motivo_pausa (por qué y cómo se reanuda)")
+    reglas = ficha.get("reglas") if isinstance(ficha.get("reglas"), dict) else {}
+    plats = set(reglas.get("plataformas") or []) if isinstance(reglas.get("plataformas"), list) else set()
+    epr = reglas.get("etiquetas_por_red")
+    if epr is not None:
+        if not (isinstance(epr, dict) and epr and all(
+                isinstance(v, list) and v and all(isinstance(x, str) and x.strip() for x in v) for v in epr.values())):
+            inf.error(f"{et}: reglas.etiquetas_por_red debe ser {{red: [etiquetas]}}")
+        elif not set(epr) <= PLATAFORMAS or (plats and not set(epr) <= plats):
+            inf.error(f"{et}: reglas.etiquetas_por_red con una red fuera de reglas.plataformas")
+    tpr = ficha.get("tarifa_por_red")
+    if tpr is not None:
+        if not (isinstance(tpr, dict) and tpr and all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                                                      and v > 0 for v in tpr.values())):
+            inf.error(f"{et}: tarifa_por_red debe ser {{red: US$ por mil > 0}}")
+        elif not set(tpr) <= PLATAFORMAS or (plats and set(tpr) != plats):
+            inf.error(f"{et}: tarifa_por_red debe cubrir exactamente reglas.plataformas")
+    pt, pr = ficha.get("presupuesto_total"), ficha.get("presupuesto_restante")
+    if pt is not None and isinstance(pr, (int, float)) and isinstance(pt, (int, float)) and pr > pt:
+        inf.error(f"{et}: presupuesto_restante mayor que presupuesto_total")
 
 
 def _validar_campos_n3(ficha: dict, et: str, inf: Informe) -> None:
@@ -330,6 +374,8 @@ def validar_marca(m, inf: Informe) -> None:
     validar_maqueta(m, inf)
     validar_marca_agua(m, inf)
     validar_pantalla_completa(m, inf)
+    validar_dividida(m, inf)
+    validar_voces_marca(m, inf)
 
 
 RE_SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -389,6 +435,19 @@ def validar_musica(raiz: Path, datos, inf: Informe) -> None:
                     inf.error(f"{et}: la línea Licencia: de LICENCIA.md debe decir CC0")
 
 
+def validar_reglas_kevin(raiz: Path, inf: Informe) -> None:
+    """`reglas-kevin.yml` con el mismo `cargar` de la puerta; avisa cuántas reglas quedan como notas."""
+    from .editar import reglas_kevin
+    try:
+        reglas = reglas_kevin.cargar(raiz)
+    except ValueError as e:
+        inf.error(f"reglas-kevin.yml: {e}")
+        return
+    notas = [r for r in reglas if r["estado"] == "vigente" and not r["revision"]]
+    if notas:
+        inf.aviso(f"reglas-kevin.yml: {len(notas)} regla(s) vigente(s) sin revisión quedan como nota para los críticos")
+
+
 def validar_marca_agua(m, inf: Informe) -> None:
     """`marca_agua` de marca.yml: lugar fijo, ancho, margen, opacidad y placa del logo de campaña."""
     rel = "marca.yml: marca_agua"
@@ -441,6 +500,58 @@ def validar_pantalla_completa(m, inf: Informe) -> None:
     tope = pc.get("tope_capas")
     if isinstance(tope, (int, float)) and not isinstance(tope, bool) and tope > 1:
         inf.error(f"{rel}.tope_capas debe estar entre 0 y 1")
+
+
+CLAVES_DIVIDIDA = ["activa", "alto_facecam", "tolerancia_alto", "cara_centro_y", "holgura_cara", "max_cara_panel",
+                   "margen_cara", "max_escala_facecam", "zona_accion", "placas_alterna", "deteccion"]
+CLAVES_DETECCION = ["fotogramas", "fotogramas_cara", "ancho_analisis", "haar", "min_fraccion_cara", "max_dispersion",
+                    "max_area_cara", "centro_excluido", "expansion", "borde_persistente", "umbral_borde", "rejilla",
+                    "banda", "banda_chat", "densidad_logo", "variacion_estatica", "densidad_chat", "min_celdas_chat",
+                    "densidad_base_alerta", "salto_alerta", "min_celdas_alerta", "max_fraccion_alerta", "min_movimiento", "peso_bordes",
+                    "min_alto_juego", "plazo_min_s", "plazo_min_cara_s", "min_lado_px", "tamanos_juego", "paso_juego", "peso_centro", "margen_facecam", "peso_estorbo", "peso_tamano"]
+
+
+def validar_dividida(m, inf: Informe) -> None:
+    """`dividida` de marca.yml (tarea #16): medidas de la pantalla dividida y de la detección de la facecam."""
+    rel = "marca.yml: dividida"
+    d = m.get("dividida")
+    if not isinstance(d, dict):
+        inf.error("marca.yml: falta la sección dividida")
+        return
+    for c in CLAVES_DIVIDIDA:
+        if c not in d:
+            inf.error(f"{rel}: falta la clave '{c}'")
+    if not isinstance(d.get("activa"), bool):
+        inf.error(f"{rel}.activa debe ser true o false")
+    det = d.get("deteccion")
+    if isinstance(det, dict):
+        for c in CLAVES_DETECCION:
+            if c not in det:
+                inf.error(f"{rel}.deteccion: falta la clave '{c}'")
+    elif "deteccion" in d:
+        inf.error(f"{rel}.deteccion debe ser un diccionario")
+    _positivos({k: v for k, v in d.items() if k != "activa"}, "dividida", inf)
+    res = m.get("resolucion")
+    alto_f = d.get("alto_facecam")
+    if isinstance(res, list) and len(res) == 2 and isinstance(alto_f, (int, float)) and not isinstance(alto_f, bool):
+        if not 0 < alto_f < res[1]:
+            inf.error(f"{rel}.alto_facecam {alto_f}: debe ser menor que el alto del cuadro ({res[1]})")
+        za = d.get("zona_accion")
+        pc = m.get("pantalla_completa") or {}
+        seg = pc.get("zona_segura") if isinstance(pc, dict) else None
+        if isinstance(za, dict) and all(isinstance(za.get(k), (int, float)) for k in ("x0", "y0", "x1", "y1")):
+            if not (za["x0"] < za["x1"] and za["y0"] < za["y1"]):
+                inf.error(f"{rel}.zona_accion: x0 e y0 deben ser menores que x1 e y1")
+            if za["y0"] < alto_f:
+                inf.error(f"{rel}.zona_accion debe quedar dentro del panel del juego (y0 >= {alto_f})")
+            if isinstance(seg, dict) and all(isinstance(seg.get(k), (int, float)) for k in ("x0", "y0", "x1", "y1")) \
+                    and not (seg["x0"] <= za["x0"] and za["x1"] <= seg["x1"] and seg["y0"] <= za["y0"]
+                             and za["y1"] <= seg["y1"]):
+                inf.error(f"{rel}.zona_accion debe quedar dentro de la zona segura")
+    for k in ("cara_centro_y", "max_cara_panel", "tolerancia_alto"):
+        v = d.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 1:
+            inf.error(f"{rel}.{k} debe estar entre 0 y 1")
 
 
 CLAVES_MAQUETA = [
@@ -645,6 +756,306 @@ def validar_ojos(o, inf: Informe) -> None:
                 inf.error(f"{rel}: sin_ia.duracion_objetivo_s debe ser un número de 7 a 30")
 
 
+def validar_tecnica(t, inf: Informe) -> None:
+    """`config/tecnica.yml`: umbrales de la puerta técnica (todos numéricos, con su rango)."""
+    rel = "config/tecnica.yml"
+    if not isinstance(t, dict):
+        inf.error(f"{rel}: debe ser un diccionario")
+        return
+
+    def num(bloque, clave, minimo, maximo=None, entero=False, estricto=False):
+        v = bloque.get(clave)
+        tipo = int if entero else (int, float)
+        bien = (isinstance(v, tipo) and not isinstance(v, bool)
+                and (v > minimo if estricto else v >= minimo) and (maximo is None or v <= maximo))
+        if not bien:
+            rango = f"{'mayor que' if estricto else 'de'} {minimo:g}{' o más' if not estricto else ''}"
+            if maximo is not None:
+                rango = (f"mayor que {minimo:g} y de {maximo:g} como máximo" if estricto
+                         else f"entre {minimo:g} y {maximo:g}")
+            inf.error(f"{rel}: {bloque['_nombre']}.{clave} debe ser {'un entero' if entero else 'un número'} {rango}")
+
+    def bloque(nombre, claves):
+        b = t.get(nombre)
+        if not isinstance(b, dict):
+            inf.error(f"{rel}: falta el bloque {nombre}")
+            return None
+        for c in claves:
+            if c not in b:
+                inf.error(f"{rel}: {nombre} sin la clave {c}")
+        return dict(b, _nombre=nombre) if all(c in b for c in claves) else None
+
+    b = bloque("subtitulos", ["tolerancia_s", "ventana_s", "parecido_min", "exigir_transcripcion"])
+    if b:
+        num(b, "tolerancia_s", 0, 5, estricto=True)
+        num(b, "ventana_s", 0, 10, estricto=True)
+        num(b, "parecido_min", 0, 1)
+        if not isinstance(b["exigir_transcripcion"], bool):
+            inf.error(f"{rel}: subtitulos.exigir_transcripcion debe ser true o false")
+    b = bloque("destellos", ["negro_max", "blanco_min", "fraccion_min", "salto_min", "cuadros_max"])
+    if b:
+        num(b, "negro_max", 0, 255, entero=True)
+        num(b, "blanco_min", 0, 255, entero=True)
+        num(b, "fraccion_min", 0, 1, estricto=True)
+        num(b, "salto_min", 0, 1, estricto=True)
+        num(b, "cuadros_max", 1, 10, entero=True)
+        if isinstance(b["negro_max"], int) and isinstance(b["blanco_min"], int) and b["negro_max"] >= b["blanco_min"]:
+            inf.error(f"{rel}: destellos.negro_max debe ser menor que blanco_min")
+    b = bloque("congelados", ["max_s", "dif_percentil", "dif_max"])
+    if b:
+        num(b, "max_s", 0, 60, estricto=True)
+        num(b, "dif_percentil", 50, 100)
+        num(b, "dif_max", 0, 255)
+    b = bloque("ducking", ["margen_db", "ventana_s", "voz_activa_db", "tolerancia_fraccion", "max_seguidas",
+                           "musica_base_db", "sidechain"])
+    if b:
+        num(b, "margen_db", 0, 60)
+        num(b, "ventana_s", 0.01, 2)
+        num(b, "voz_activa_db", -100, 0)
+        num(b, "tolerancia_fraccion", 0, 1)
+        num(b, "max_seguidas", 1, 1000, entero=True)
+        num(b, "musica_base_db", -60, 0)
+        s = b["sidechain"]
+        if not isinstance(s, dict):
+            inf.error(f"{rel}: ducking.sidechain debe ser un bloque")
+        else:
+            for c in ("threshold", "ratio", "attack", "release", "makeup"):
+                if c not in s:
+                    inf.error(f"{rel}: ducking.sidechain sin la clave {c}")
+            s = dict(s, _nombre="ducking.sidechain")
+            if all(c in s for c in ("threshold", "ratio", "attack", "release", "makeup")):
+                # los límites son los de `sidechaincompress` de ffmpeg
+                num(s, "threshold", 0.000976563, 1)
+                num(s, "ratio", 1, 20)
+                num(s, "attack", 0.01, 2000)
+                num(s, "release", 0.01, 9000)
+                num(s, "makeup", 1, 64)
+    b = bloque("clipping", ["umbral", "muestras_seguidas", "plano_max"])
+    if b:
+        num(b, "plano_max", 0, 1, estricto=True)
+        num(b, "umbral", 0, 1, estricto=True)
+        num(b, "muestras_seguidas", 1, 1000, entero=True)
+    b = bloque("analisis", ["ancho", "alto"])
+    if b:
+        num(b, "ancho", 16, 1920, entero=True)
+        num(b, "alto", 16, 1920, entero=True)
+
+
+def _num(v, minimo=None, maximo=None) -> bool:
+    return (isinstance(v, (int, float)) and not isinstance(v, bool)
+            and (minimo is None or v >= minimo) and (maximo is None or v <= maximo))
+
+
+def validar_criticos(c, inf: Informe) -> None:
+    rel = "config/criticos.yml"
+    if not _claves(c, rel, ["activo", "modo", "tiempo_por_llamada_s", "tope_s", "juez", "cupos", "segundo", "sin_ia"], inf):
+        return
+    if not isinstance(c["activo"], bool):
+        inf.error(f"{rel}: activo debe ser true o false")
+    if c["modo"] not in ("cadena", "sin_ia"):
+        inf.error(f"{rel}: modo debe ser cadena o sin_ia")
+    for clave in ("tiempo_por_llamada_s", "tope_s"):
+        if not _num(c[clave], 1):
+            inf.error(f"{rel}: {clave} debe ser un número de 1 o más")
+    for clave in ("reserva_publicar_s", "minimo_ronda2_s"):
+        if not _num(c.get(clave), 0):
+            inf.error(f"{rel}: {clave} debe ser un número de 0 o más")
+    if "temperatura" in c and not _num(c["temperatura"], 0, 2):
+        inf.error(f"{rel}: temperatura debe ser un número de 0 a 2")
+    f = c.get("fotogramas") or {}
+    if not (isinstance(f, dict) and _es_int(f.get("n")) and 2 <= f["n"] <= 12 and _es_int(f.get("lado_max"))
+            and 64 <= f["lado_max"] <= 1024):
+        inf.error(f"{rel}: fotogramas debe traer n (2 a 12) y lado_max (64 a 1024)")
+    if not (isinstance(c["juez"], dict) and isinstance(c["juez"].get("con_modelo"), bool)):
+        inf.error(f"{rel}: juez.con_modelo debe ser true o false")
+    cu = c["cupos"]
+    g = cu.get("gemini") if isinstance(cu, dict) else None
+    if not (isinstance(g, dict) and all(_es_int(g.get(k)) and g[k] >= 0 for k in ("rpm", "rpd", "reserva_ojos", "pausa_429_s"))):
+        inf.error(f"{rel}: cupos.gemini debe traer rpm, rpd, reserva_ojos y pausa_429_s (enteros de 0 o más)")
+    elif g["reserva_ojos"] >= g["rpd"]:
+        inf.error(f"{rel}: cupos.gemini.reserva_ojos debe ser menor que rpd (si no, los críticos nunca tienen cupo)")
+    if not (isinstance(cu, dict) and _num(cu.get("espera_max_s"), 0)):
+        inf.error(f"{rel}: cupos.espera_max_s debe ser un número de 0 o más")
+    s = c["segundo"]
+    if not (isinstance(s, dict) and isinstance(s.get("activo"), bool)):
+        inf.error(f"{rel}: segundo.activo debe ser true o false")
+    else:
+        if s["activo"]:
+            for k in ("url", "modelo", "secreto"):
+                if not (isinstance(s.get(k), str) and s[k].strip()):
+                    inf.error(f"{rel}: segundo activo necesita {k} (texto)")
+            if isinstance(s.get("url"), str) and not s["url"].startswith("https://"):
+                inf.error(f"{rel}: segundo.url debe empezar con https://")
+        elif not (isinstance(s.get("motivo"), str) and s["motivo"].strip()):
+            inf.error(f"{rel}: segundo apagado necesita un motivo escrito")
+        if isinstance(s.get("secreto"), str) and not re.fullmatch(r"[A-Z][A-Z0-9_]*", s["secreto"]):
+            inf.error(f"{rel}: segundo.secreto es el NOMBRE de una variable de entorno (MAYÚSCULAS), nunca la clave")
+    u = c["sin_ia"]
+    esperados = {"historia": ("audio_inicio_s", "silencio_db", "cambio_min", "min_pares_con_cambio"),
+                 "subtitulos": ("max_cps", "tolerancia_papel", "max_papel_en_botones"),
+                 "tecnica": ("negro_max", "blanco_min", "min_nitidez", "min_cuadros_nitidos", "vol_min_db", "vol_max_db")}
+    if not isinstance(u, dict):
+        inf.error(f"{rel}: sin_ia debe ser un bloque con historia, subtitulos y tecnica")
+        return
+    for crit, claves in esperados.items():
+        bloque = u.get(crit)
+        if not isinstance(bloque, dict):
+            inf.error(f"{rel}: sin_ia.{crit} debe ser un bloque")
+            continue
+        for k in claves:
+            if not _num(bloque.get(k)):
+                inf.error(f"{rel}: sin_ia.{crit}.{k} debe ser un número")
+    t = u.get("tecnica") or {}
+    if _num(t.get("vol_min_db")) and _num(t.get("vol_max_db")) and t["vol_min_db"] >= t["vol_max_db"]:
+        inf.error(f"{rel}: sin_ia.tecnica.vol_min_db debe ser menor que vol_max_db")
+    p = (u.get("subtitulos") or {}).get("max_papel_en_botones")
+    if _num(p) and not 0 <= p <= 1:
+        inf.error(f"{rel}: sin_ia.subtitulos.max_papel_en_botones debe ser una fracción de 0 a 1")
+
+
+def validar_voces_marca(m, inf: Informe) -> None:
+    """`marca.yml` voces (opcional): cada valor es el nombre de un color de `colores`."""
+    if "voces" not in m:
+        return
+    rel = "marca.yml"
+    v, colores = m["voces"], m.get("colores")
+    if not isinstance(v, dict):
+        inf.error(f"{rel}: voces debe ser un diccionario (streamer, otra)")
+        return
+    for clave, valor in v.items():
+        if clave not in ("streamer", "otra"):
+            inf.error(f"{rel}: voces.{clave} no existe (sólo streamer y otra)")
+        elif not (isinstance(valor, str) and isinstance(colores, dict) and valor in colores):
+            inf.error(f"{rel}: voces.{clave} debe ser el nombre de un color de `colores`")
+
+
+def _numero(v, minimo=None, maximo=None) -> bool:
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return False
+    return (minimo is None or v >= minimo) and (maximo is None or v <= maximo)
+
+
+def validar_voces(v, inf: Informe) -> None:
+    rel = "config/voces.yml"
+    if not _claves(v, rel, ["activo", "modo", "modelo", "tope_s", "silencio_min_s", "margen_s", "umbral_db"], inf):
+        return
+    if not isinstance(v["activo"], bool):
+        inf.error(f"{rel}: activo debe ser true o false")
+    if v["modo"] not in ("principal", "respaldo"):
+        inf.error(f"{rel}: modo debe ser principal o respaldo")
+    if not (isinstance(v["modelo"], str) and v["modelo"].strip()):
+        inf.error(f"{rel}: modelo debe ser texto")
+    mm = v.get("modelos_medir", [])
+    if not (isinstance(mm, list) and all(isinstance(x, str) and x.strip() for x in mm)):
+        inf.error(f"{rel}: modelos_medir debe ser una lista de nombres de modelo")
+    if v.get("idioma") is not None and not (isinstance(v["idioma"], str) and re.fullmatch(r"[a-z]{2,3}", v["idioma"])):
+        inf.error(f"{rel}: idioma debe ser un código de 2 o 3 letras (es) o null")
+    if not _numero(v["tope_s"], 10, 600):
+        inf.error(f"{rel}: tope_s debe ser un número de 10 a 600")
+    for clave, lo, hi in (("reserva_s", 0, 600), ("idioma_prob_min", 0, 1), ("p_palabra_min", 0, 1)):     # opcionales
+        if clave in v and not _numero(v[clave], lo, hi):
+            inf.error(f"{rel}: {clave} debe ser un número de {lo} a {hi}")
+    if not _numero(v["silencio_min_s"], 0.1, 5):
+        inf.error(f"{rel}: silencio_min_s debe ser un número de 0.1 a 5")
+    if not _numero(v["margen_s"], 0, 1):
+        inf.error(f"{rel}: margen_s debe ser un número de 0 a 1")
+    elif _numero(v["silencio_min_s"]) and v["silencio_min_s"] <= 2 * v["margen_s"]:
+        inf.error(f"{rel}: silencio_min_s debe ser mayor que el doble de margen_s")
+    if not _numero(v["umbral_db"], -90, -10):
+        inf.error(f"{rel}: umbral_db debe ser un número de -90 a -10")
+    bloques = {"golpes": {"sobre_mediana_db": (1, 60), "piso_db": (-90, 0), "separacion_s": (0.1, 10), "max": (0, 50)},
+               "hablantes": {"max": (1, 2), "separacion_min": (0, 1), "minimo_s": (0, 60)},
+               "lineas": {"pausa_s": (0.1, 5), "max_s": (1, 10)}}
+    for nombre, campos in bloques.items():
+        b = v.get(nombre)
+        if not isinstance(b, dict):
+            inf.error(f"{rel}: falta el bloque {nombre}")
+            continue
+        for campo, (lo, hi) in campos.items():
+            if not _numero(b.get(campo), lo, hi):
+                inf.error(f"{rel}: {nombre}.{campo} debe ser un número de {lo} a {hi}")
+    al = v.get("alucinaciones", [])
+    if not (isinstance(al, list) and all(isinstance(x, str) and x.strip() for x in al)):
+        inf.error(f"{rel}: alucinaciones debe ser una lista de frases")
+    if not (isinstance(v.get("nombre_otra"), str) and v["nombre_otra"].strip()):
+        inf.error(f"{rel}: nombre_otra debe ser texto")
+
+
+def validar_historia(h, inf: Informe) -> None:
+    """config/historia.yml: límites de la historia (#20) y el bloque `segundo` (apagado: GitHub Models retirado)."""
+    rel = "config/historia.yml"
+    if h is None:
+        return
+    claves = ["activo", "apertura_min_s", "apertura_max_s", "apertura_final_pct", "momentos_min", "momentos_max",
+              "momento_min_s", "camara_lenta_max", "camara_lenta_momento_max_s", "pausa_max", "pausa_s", "zoom_max_n",
+              "zoom_max", "zoom_momento_max_s", "sfx_max", "sfx_en_campanas", "ganancia_sfx_db", "segundo"]
+    if not _claves(h, rel, claves, inf):
+        return
+
+    def num(clave, minimo=None, maximo=None, entero=False, estricto_min=False):
+        v = h[clave]
+        if isinstance(v, bool) or not isinstance(v, int if entero else (int, float)):
+            inf.error(f"{rel}: {clave} debe ser un {'entero' if entero else 'número'}")
+            return None
+        if minimo is not None and (v <= minimo if estricto_min else v < minimo):
+            inf.error(f"{rel}: {clave} debe ser {'mayor que' if estricto_min else 'de'} {minimo}{'' if estricto_min else ' o más'}")
+        if maximo is not None and v > maximo:
+            inf.error(f"{rel}: {clave} debe ser de {maximo} o menos")
+        return v
+    for b in ("activo", "sfx_en_campanas"):
+        if not isinstance(h[b], bool):
+            inf.error(f"{rel}: {b} debe ser true o false")
+    a0, a1 = num("apertura_min_s", 0, estricto_min=True), num("apertura_max_s", 0, 10, estricto_min=True)
+    if a0 is not None and a1 is not None and a0 > a1:
+        inf.error(f"{rel}: apertura_min_s no puede pasar de apertura_max_s")
+    num("apertura_final_pct", 0, 100, estricto_min=True)
+    m0, m1 = num("momentos_min", 1, entero=True), num("momentos_max", 1, 10, entero=True)
+    if m0 is not None and m1 is not None and m0 > m1:
+        inf.error(f"{rel}: momentos_min no puede pasar de momentos_max")
+    num("momento_min_s", 0, estricto_min=True)
+    num("camara_lenta_max", 0, entero=True)
+    num("camara_lenta_momento_max_s", 0, 10, estricto_min=True)
+    num("pausa_max", 0, entero=True)
+    pausa = num("pausa_s", 0, estricto_min=True)
+    if pausa is not None and pausa >= 0.5:
+        inf.error(f"{rel}: pausa_s debe quedar por debajo del tope de congelado de 0.5 s")
+    num("zoom_max_n", 0, entero=True)
+    zm = num("zoom_max")
+    if zm is not None and not 1.0 < zm <= 1.5:
+        inf.error(f"{rel}: zoom_max debe estar entre 1 (sin incluir) y 1.5")
+    num("zoom_momento_max_s", 0, 10, estricto_min=True)
+    num("sfx_max", 0, entero=True)
+    g = num("ganancia_sfx_db", -40, 0)
+    s = h["segundo"]
+    if not isinstance(s, dict):
+        inf.error(f"{rel}: segundo debe ser un bloque")
+        return
+    if not _claves(s, f"{rel} (segundo)", ["activo", "nombre", "motivo", "url", "modelo", "secreto", "tiempo_s",
+                                          "max_por_ciclo"], inf):
+        return
+    if not isinstance(s["activo"], bool):
+        inf.error(f"{rel}: segundo.activo debe ser true o false")
+    for k in ("nombre", "motivo", "url", "modelo", "secreto"):
+        if not isinstance(s[k], str):
+            inf.error(f"{rel}: segundo.{k} debe ser texto")
+    if s["activo"] is False and s.get("motivo") != "GitHub Models retirado el 30 jul 2026":
+        inf.error(f"{rel}: segundo.motivo debe decir «GitHub Models retirado el 30 jul 2026» mientras esté apagado")
+    if s["activo"] is True:
+        if not (isinstance(s["url"], str) and s["url"].startswith("https://")):
+            inf.error(f"{rel}: segundo.url debe ser https://... cuando segundo está activo")
+        for k in ("modelo", "secreto", "nombre"):
+            if not (isinstance(s[k], str) and s[k].strip()):
+                inf.error(f"{rel}: segundo.{k} no puede ir vacío cuando segundo está activo")
+        if isinstance(s["secreto"], str) and not re.fullmatch(r"[A-Z][A-Z0-9_]{2,63}", s["secreto"]):
+            inf.error(f"{rel}: segundo.secreto debe ser el NOMBRE de una variable de entorno (nunca la clave)")
+    t = s["tiempo_s"]
+    if isinstance(t, bool) or not isinstance(t, (int, float)) or not 1 <= t <= 300:
+        inf.error(f"{rel}: segundo.tiempo_s debe ser un número de 1 a 300")
+    mp = s["max_por_ciclo"]
+    if isinstance(mp, bool) or not isinstance(mp, int) or mp < 0:
+        inf.error(f"{rel}: segundo.max_por_ciclo debe ser un entero de 0 o más")
+
+
 def validar_canales(c, inf: Informe) -> None:
     rel = "config/canales.yml"
     if not isinstance(c, dict):
@@ -786,6 +1197,16 @@ def validar_informativas(datos, marca, inf: Informe) -> None:
             inf.error(f"{et}: vigente_desde debe ser anterior a vigente_hasta")
         if not isinstance(e["usada"], bool):
             inf.error(f"{et}: usada debe ser true o false")
+        for clave, tope, prefijo in (("credito", 40, "Fuente:"), ("acotacion", 40, ""), ("escena", 40, "")):
+            if clave not in e:
+                continue
+            v = e[clave]
+            if not (isinstance(v, str) and v.strip()):
+                inf.error(f"{et}: {clave} debe ser texto no vacío")
+            elif prefijo and not v.startswith(prefijo):
+                inf.error(f"{et}: {clave} debe empezar con \"{prefijo}\"")
+            elif len(v) > tope:
+                inf.error(f"{et}: {clave} pasa de {tope} caracteres")
 
 
 def validar_sin_media(raiz: Path, inf: Informe) -> None:
@@ -837,6 +1258,19 @@ def validar(raiz=None) -> Informe:
     ojos = _cargar(raiz, "config/ojos.yml", inf)
     if ojos is not None:
         validar_ojos(ojos, inf)
+    tecnica = _cargar(raiz, "config/tecnica.yml", inf)
+    if tecnica is not None:
+        validar_tecnica(tecnica, inf)
+    criticos = _cargar(raiz, "config/criticos.yml", inf)
+    if criticos is not None:
+        validar_criticos(criticos, inf)
+    if (raiz / "config/voces.yml").exists():
+        voces = _cargar(raiz, "config/voces.yml", inf)
+        if voces is not None:
+            validar_voces(voces, inf)
+    else:
+        inf.aviso("config/voces.yml: no existe: la fábrica no transcribe ni corta silencios")
+    validar_historia(_cargar(raiz, "config/historia.yml", inf), inf)
     almacen = _cargar(raiz, "config/almacen.yml", inf)
     if almacen is not None:
         validar_almacen(almacen, inf)
@@ -846,6 +1280,8 @@ def validar(raiz=None) -> Informe:
     musica = _cargar(raiz, "marca/musica/pistas.yml", inf)
     if musica is not None:
         validar_musica(raiz, musica, inf)
+    validar_reglas_kevin(raiz, inf)
+    validar_sfx(raiz, inf)
     validar_pausa(raiz, inf)
     validar_pausa_t(raiz, inf)
     validar_csv(raiz, "marcador.csv", CABECERA_MARCADOR, inf)
@@ -853,6 +1289,80 @@ def validar(raiz=None) -> Informe:
     validar_sin_media(raiz, inf)
     validar_sin_claves(raiz, inf)
     return inf
+
+
+def validar_sfx(raiz: Path, inf: Informe) -> None:
+    """`marca/sfx/efectos.yml` (si existe): sólo CC0, duraciones coherentes y LICENCIA.md si está verificada."""
+    rel = "marca/sfx/efectos.yml"
+    ruta = Path(raiz) / rel
+    if not ruta.is_file():
+        return
+    try:
+        datos = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        inf.error(f"{rel}: YAML inválido: {e}")
+        return
+    if not isinstance(datos, dict):
+        inf.error(f"{rel}: debe ser un diccionario")
+        return
+    permitidas = datos.get("licencias_permitidas")
+    if not (isinstance(permitidas, list) and permitidas and set(permitidas) <= {"CC0"}):
+        inf.error(f"{rel}: licencias_permitidas debe ser una lista que sólo contenga CC0")
+        permitidas = []
+    if not (isinstance(datos.get("release"), str) and datos["release"]):
+        inf.error(f"{rel}: falta release")
+    num = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)  # noqa: E731
+    dmin, dmax = datos.get("duracion_min_s"), datos.get("duracion_max_s")
+    if not (num(dmin) and dmin > 0):
+        inf.error(f"{rel}: duracion_min_s debe ser un número positivo")
+    if not (num(dmax) and dmax > 0 and (not num(dmin) or dmax > dmin)):
+        inf.error(f"{rel}: duracion_max_s debe ser un número mayor que duracion_min_s")
+    minimo = datos.get("minimo")
+    if not (isinstance(minimo, int) and not isinstance(minimo, bool) and minimo >= 1):
+        inf.error(f"{rel}: minimo debe ser un entero de 1 o más")
+    efectos = datos.get("efectos")
+    if not isinstance(efectos, list):
+        inf.error(f"{rel}: efectos debe ser una lista")
+        return
+    vistos: set[str] = set()
+    for i, e in enumerate(efectos):
+        if not isinstance(e, dict):
+            inf.error(f"{rel}: efectos[{i}] debe ser un diccionario")
+            continue
+        eid = e.get("id")
+        et = f"{rel}: efecto {eid if isinstance(eid, str) else i}"
+        if not (isinstance(eid, str) and RE_ID.match(eid)):
+            inf.error(f"{et}: id inválido (minúsculas, números y guiones)")
+        elif eid in vistos:
+            inf.error(f"{et}: id repetido")
+        else:
+            vistos.add(eid)
+        if e.get("licencia") not in permitidas:
+            inf.error(f"{et}: licencia {e.get('licencia')!r} fuera de licencias_permitidas (sólo CC0)")
+        if not _es_https(e.get("pagina")):
+            inf.error(f"{et}: pagina debe ser un enlace https")
+        if not (isinstance(e.get("tipo"), str) and e["tipo"]):
+            inf.error(f"{et}: falta tipo")
+        asset = e.get("asset")
+        if not (isinstance(asset, str) and asset and "/" not in asset and "\\" not in asset
+                and not asset.startswith(".")):
+            inf.error(f"{et}: asset debe ser un nombre de archivo sin barras")
+        if e.get("estado") not in ("candidata", "verificada", "descartada"):
+            inf.error(f"{et}: estado debe ser candidata, verificada o descartada")
+        if e.get("estado") == "verificada":
+            if not (isinstance(e.get("sha256"), str) and RE_SHA256.match(e["sha256"])):
+                inf.error(f"{et}: verificada exige sha256 hexadecimal de 64 caracteres")
+            lic = Path(raiz) / "marca" / "sfx" / str(eid) / "LICENCIA.md"
+            if not lic.is_file():
+                inf.error(f"{et}: verificada exige marca/sfx/{eid}/LICENCIA.md")
+            else:
+                texto = lic.read_text(encoding="utf-8", errors="ignore")
+                faltan = [c for c in CAMPOS_LICENCIA
+                          if not re.search(rf"(?m)^\s*[-*]?\s*\**{re.escape(c[:-1])}(?::\**|\**:)[ \t]*\S", texto)]
+                if faltan:
+                    inf.error(f"{et}: LICENCIA.md sin las líneas {', '.join(faltan)}")
+                elif not re.search(r"(?m)^\s*[-*]?\s*\**Licencia(?::\**|\**:)[^\n]*\bCC0\b", texto):
+                    inf.error(f"{et}: la línea Licencia: de LICENCIA.md debe decir CC0")
 
 
 def main(argv: list[str] | None = None) -> int:

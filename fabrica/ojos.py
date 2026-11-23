@@ -21,9 +21,11 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import cupos as mod_cupos
 from . import plazo
 from .config import cargar_yaml
 from .editar import dialogo as mod_dialogo
+from .editar import historia as mod_historia
 from .editar.lienzo import PUNTUACION, partir
 from .editar.marca import Marca
 
@@ -83,8 +85,10 @@ def _error_de_clave(texto) -> bool:
     return any(m in junto for m in ("API_KEY", "PERMISSION_DENIED", "FAILED_PRECONDITION", "UNAUTHENTICATED"))
 
 
-def esquema_respuesta() -> dict:
-    """`responseSchema` de Gemini (subconjunto de OpenAPI) con los campos que pide la especificación."""
+def esquema_respuesta(historia: bool = False) -> dict:
+    """`responseSchema` de Gemini (subconjunto de OpenAPI) con los campos que pide la especificación.
+
+    `historia` añade el plan por momentos (#20); sin él el esquema es el de siempre, campo por campo."""
     texto, booleano, numero = {"type": "STRING"}, {"type": "BOOLEAN"}, {"type": "NUMBER"}
     campos = {
         "apto": booleano,
@@ -99,6 +103,9 @@ def esquema_respuesta() -> dict:
         "recorte": {"type": "OBJECT", "properties": {"inicio": numero, "fin": numero},
                     "required": ["inicio", "fin"]},
     }
+    if historia:        # opcional (no va en `required`): el plan de edición por momentos, sin texto propio (#20)
+        return {"type": "OBJECT", "properties": {**campos, "historia": mod_historia.esquema_gemini()},
+                "required": list(campos)}
     return {"type": "OBJECT", "properties": campos, "required": list(campos)}
 
 
@@ -140,9 +147,17 @@ def nota_de_ficha(ficha: dict | None) -> str:
 
 
 def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: str | None = None,
-                nota: str | None = None, recorte: tuple[float, float] | None = None) -> str:
-    """Arma la instrucción desde `ojos_prompt.md` con la duración, el juego y las listas de marca y temporada."""
+                nota: str | None = None, recorte: tuple[float, float] | None = None,
+                historia: dict | None = None) -> str:
+    """Arma la instrucción desde `ojos_prompt.md` con la duración, el juego y las listas de marca y temporada.
+
+    `historia` ({cfg, sfx: [ids], prohibe_sfx}) activa la sección «9. historia»; sin él, el prompt sale sin ella."""
     texto = RUTA_PROMPT.read_text(encoding="utf-8")
+    if historia:
+        sec = mod_historia.instruccion(historia.get("cfg"), historia.get("sfx"), historia.get("prohibe_sfx"))
+        texto = mod_historia.RE_SECCION.sub(lambda _m: sec, texto)
+    else:
+        texto = mod_historia.quitar_seccion(texto)
     lo, hi = recorte or (RECORTE_MIN_S, RECORTE_MAX_S)
     cambios = {
         "{{RECORTE_MIN}}": f"{lo:g}", "{{RECORTE_MAX}}": f"{hi:g}",
@@ -157,13 +172,13 @@ def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: st
     return texto
 
 
-def cuerpo_peticion(instr: str, video: bytes, temperatura: float) -> bytes:
+def cuerpo_peticion(instr: str, video: bytes, temperatura: float, historia: bool = False) -> bytes:
     cuerpo = {
         "contents": [{"parts": [
             {"inline_data": {"mime_type": "video/mp4", "data": base64.b64encode(video).decode("ascii")}},
             {"text": instr}]}],
         "generationConfig": {"responseMimeType": "application/json", "temperature": temperatura,
-                             "responseSchema": esquema_respuesta()},
+                             "responseSchema": esquema_respuesta(historia)},
     }
     return json.dumps(cuerpo).encode("utf-8")
 
@@ -306,8 +321,10 @@ def _modelos_a_probar(cfg: dict, clave: str, mirada: Mirada, transporte, transpo
 def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracion: float | None = None,
           transporte=None, espera=time.sleep, entorno=None, config: dict | None = None,
           juego: str | None = None, nota: str | None = None,
-          recorte: tuple[float, float] | None = None, transporte_lista=None) -> Mirada:
+          recorte: tuple[float, float] | None = None, transporte_lista=None,
+          registrar_cupos: bool = False, historia: dict | None = None) -> Mirada:
     """Le pide a Gemini el análisis del clip. Reintenta una vez ante 429 o 5xx; ante 404 prueba el modelo siguiente.
+    `historia` ({cfg, sfx, prohibe_sfx}) pide además el plan por momentos en la MISMA llamada (no gasta otra petición).
 
     Antes consulta ListModels (si `listar_modelos`) y salta los modelos que no existen. Con un `transporte`
     inyectado sólo se consulta si también se da `transporte_lista`."""
@@ -322,8 +339,8 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
     if tam > tope:
         return Mirada(None, motivo=f"el video pesa {tam / 1048576:.1f} MB y el máximo en línea es "
                                    f"{cfg['max_mb_en_linea']} MB", del_material=True)
-    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego, nota, recorte), ruta_video.read_bytes(),
-                             float(cfg["temperatura"]))
+    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego, nota, recorte, historia), ruta_video.read_bytes(),
+                             float(cfg["temperatura"]), historia=bool(historia))
     if len(cuerpo) > TOPE_PETICION_BYTES:     # el base64 infla un tercio: se mide lo que de verdad se envía
         return Mirada(None, motivo=f"la petición serializada pesa {len(cuerpo) / 1048576:.1f} MB y el tope es "
                                    f"{TOPE_PETICION_BYTES // 1048576} MB", del_material=True)
@@ -335,12 +352,20 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
         """Segundos que quedan: lo que resta del tope de ojos y lo que resta del plazo del ciclo."""
         return min(tope_ojos - (time.monotonic() - inicio_ojos), plazo.restante() - plazo.MARGEN_S)
 
+    cuenta = mod_cupos.Cupos(raiz) if registrar_cupos else None    # #21: cada petición queda en la cuenta del día
+
     def llamar(url, encabezados, cuerpo, tiempo):
+        if cuenta is not None:
+            cuenta.registrar("gemini")
         if transporte is None:
-            return transporte_urllib(url, encabezados, cuerpo, tiempo=tiempo)
-        if _acepta_tiempo(transporte):
-            return transporte(url, encabezados, cuerpo, tiempo)
-        return transporte(url, encabezados, cuerpo)      # los transportes inyectados antiguos reciben 3 argumentos
+            estado_t, texto_t = transporte_urllib(url, encabezados, cuerpo, tiempo=tiempo)
+        elif _acepta_tiempo(transporte):
+            estado_t, texto_t = transporte(url, encabezados, cuerpo, tiempo)
+        else:
+            estado_t, texto_t = transporte(url, encabezados, cuerpo)    # los transportes antiguos reciben 3 argumentos
+        if cuenta is not None and estado_t == 200:
+            cuenta.sumar_tokens("gemini", mod_cupos.tokens_de_gemini(texto_t))
+        return estado_t, texto_t
     encabezados = {"Content-Type": "application/json", "x-goog-api-key": clave}
     mirada = Mirada(None)
     # ante 429/5xx/red persistentes se prueban hasta N modelos más (18 nov: 503 y timeouts)

@@ -1,0 +1,29 @@
+# La historia (#20): el edit como relato. Apertura en frío con el desenlace y 2 a 4 momentos, cada uno con un
+# sentimiento y un tratamiento (fabrica/editar/historia.py). El plan sólo trae números y valores de listas
+# cerradas; nada suyo se dibuja. Con `activo: false` la toma sale como siempre.
+activo: false                # apagada de fábrica hasta que el jefe mire las muestras `historia-*` y la encienda
+apertura_min_s: 1.0          # la apertura en frío dura de 1 a 3 s y cae en el último 40 % del recorte (el desenlace)
+apertura_max_s: 3.0
+apertura_final_pct: 40
+momentos_min: 2              # de 2 a 4 momentos, sin solaparse, de 0.8 s o más
+momentos_max: 4
+momento_min_s: 0.8
+camara_lenta_max: 1          # a mitad de velocidad; el momento dura 1.5 s o menos de fuente
+camara_lenta_momento_max_s: 1.5
+pausa_max: 1                 # congela el último cuadro del momento, en silencio, por debajo del tope de congelado (0.5 s)
+pausa_s: 0.4
+zoom_max_n: 2                # zoom suave centrado de 1.00 a zoom_max a lo largo del momento
+zoom_max: 1.12
+zoom_momento_max_s: 4.0      # un zoom dura 4 s o menos de fuente: así siempre queda cuerpo plano para que la puerta lo mida
+sfx_max: 2                   # efectos de sonido CC0 del catálogo verificado (marca/sfx/efectos.yml)
+sfx_en_campanas: false       # false: ni con reglas.sin_musica ni en campañas (tipo A con campaña) hay efectos
+ganancia_sfx_db: -6
+segundo:                     # segundo eslabón de la cadena: cliente chat/completions genérico, APAGADO
+  activo: false
+  nombre: segundo-proveedor
+  motivo: "GitHub Models retirado el 30 jul 2026"
+  url: ""                    # https://.../v1/chat/completions del proveedor que Kevin elija (decisión suya)
+  modelo: ""
+  secreto: ""                # nombre de la variable de entorno con la clave (nunca la clave)
+  tiempo_s: 60
+  max_por_ciclo: 1

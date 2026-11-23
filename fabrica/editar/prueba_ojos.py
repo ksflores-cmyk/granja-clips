@@ -19,7 +19,7 @@ from .. import fuentes as mod_fuentes
 from .. import ojos
 from ..config import cargar_yaml
 from ..registro import ZONA, contador_toma
-from . import estilo, muestras, toma
+from . import criticos, estilo, muestras, tecnica, toma
 from .componer import componer, sondear_video
 from .config_ruta import RAIZ
 from .marca import Marca
@@ -46,7 +46,22 @@ def _informe_modelos(clave: str, transporte, transporte_lista) -> list[str]:
     return [f"- ListModels: {len(nombres)} modelos gemini con generateContent", *[f"  - {n}" for n in nombres], ""]
 
 
-def correr(salida: Path, *, entorno=None, transporte=None, transporte_lista=None) -> int:
+def _informe_criticos(mp4: Path, plan: dict, marca: Marca, env, transporte, transporte_lista,
+                      sin_red: bool = False) -> list[str]:
+    """Tarea #21: los críticos con la cadena real (Gemini y, si falla, sin IA) sobre la toma de Sintel. Nunca
+    imprime la clave; deja las 3 críticas, el juez, el proveedor de cada una, las peticiones y el tiempo."""
+    cfg = criticos.cargar_config(RAIZ)
+    if not cfg or cfg.get("activo") is not True:
+        return ["## Críticos", "", "- apagados (`config/criticos.yml`: activo: false)"]
+    try:
+        v = criticos.revisar(mp4, plan, marca, raiz=RAIZ, entorno=env, transporte=transporte, config=cfg,
+                             transporte_lista=transporte_lista, modo="sin_ia" if sin_red else None)
+    except Exception as e:  # noqa: BLE001 (el informe nunca rompe la prueba de los ojos)
+        return ["## Críticos", "", f"- error: {type(e).__name__}: {e}"]
+    return ["## Críticos (cadena real)", "", criticos.informe_md("Sintel", v), *[f"- intento: {i}" for i in v.intentos], ""]
+
+
+def correr(salida: Path, *, entorno=None, transporte=None, transporte_lista=None, transporte_criticos=None) -> int:
     env = os.environ if entorno is None else entorno
     if not env.get("GEMINI_API_KEY"):
         print("sin GEMINI_API_KEY: la prueba de los ojos no hace nada (no se llamó a Gemini).")
@@ -74,7 +89,8 @@ def correr(salida: Path, *, entorno=None, transporte=None, transporte_lista=None
         mb = copia.stat().st_size / 1048576
         informe += [f"- Enviado a Gemini: copia ligera: {mb:.1f} MB" + (" (el original ya cabía)" if copia == ruta else ""), ""]
         mirada = ojos.mirar(copia, marca, temporada, duracion=dur_src, entorno=env, transporte=transporte,
-                            juego=JUEGO_MUESTRA, nota=NOTA_MUESTRA, transporte_lista=transporte_lista)
+                            juego=JUEGO_MUESTRA, nota=NOTA_MUESTRA, transporte_lista=transporte_lista,
+                            raiz=RAIZ, registrar_cupos=transporte is None)   # sólo en la corrida real
         informe += [f"- Modelo que respondió: {mirada.modelo}", *[f"- Intento: {i}" for i in mirada.intentos]]
         if mirada.datos is None:
             informe += ["", f"RESULTADO: sin datos de Gemini ({mirada.motivo})."]
@@ -89,18 +105,21 @@ def correr(salida: Path, *, entorno=None, transporte=None, transporte_lista=None
             (salida / "informe.md").write_text("\n".join(informe) + "\n", encoding="utf-8")
             print("DESCARTE: " + "; ".join(motivos), file=sys.stderr)
             return 1
-        t, lineas, inicio, dur = toma.armar(mirada.datos, marca, ficha, contador_toma())
+        t, lineas, inicio, dur = toma.armar(mirada.datos, marca, ficha, contador_toma(), temporada=temporada)
         mp4 = salida / "ojos-sintel.mp4"
         plan_ruta = salida / "ojos-sintel.plan.json"
         with tempfile.TemporaryDirectory(prefix="trabajo-ojos-") as trabajo:
             plan = componer(marca, t, lineas, mp4, duracion=dur, trabajo=Path(trabajo), fuente_video=ruta,
                             inicio=inicio, plan_salida=plan_ruta)
-        puntos = estilo.revisar(mp4, plan, marca)
+        puntos = (tecnica.revisar(mp4, tecnica.con_originales(plan, lineas), tecnica.cargar(marca.raiz))
+                  + estilo.revisar(mp4, plan, marca))
         muestras.fotogramas(mp4, dur, salida, "ojos-sintel")
         verde = all(p[1] for p in puntos)
         informe += ["", estilo.informe_md(f"Puerta de estilo ({'EN VERDE' if verde else 'EN ROJO'})", puntos),
                     "## Traducción de Gemini", ""]
         informe += [f"- {ln.t0:g}-{ln.t1:g} s {ln.nombre}: {ln.frase} (original: {ln.original})" for ln in lineas]
+        informe += ["", *_informe_criticos(mp4, plan, marca, env, transporte_criticos, transporte_lista,
+                                           sin_red=transporte is not None and transporte_criticos is None)]
     (salida / "informe.md").write_text("\n".join(informe) + "\n", encoding="utf-8")
     print(f"puerta de estilo {'EN VERDE' if verde else 'EN ROJO'}; modelo {mirada.modelo}")
     return 0 if verde else 1

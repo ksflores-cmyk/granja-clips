@@ -86,6 +86,26 @@ def pendientes(filas: list[dict], hechos: dict, mapa: dict, ahora: datetime) -> 
     return out
 
 
+# Motivos del diálogo con el botón «Enviar» apagado, del más útil al más genérico. La línea del post
+# («Publicado hace 2 h…», «sólo hasta 30 minutos…») dice por qué se rechaza ESTE enlace; el resumen
+# «N publicaciones antiguas no se pueden enviar» sólo cuenta otras y va después.
+MOTIVOS = (
+    re.compile(r"Publicado hace|Posted .* ago|hasta 30 minutos|within 30 minutes", re.I),
+    re.compile(r"vinculad|not (?:linked|connected)|connect your", re.I),
+    re.compile(r"no se puede|cannot|can't", re.I),
+)
+
+
+def motivo_rechazo(texto: str) -> str:
+    """La línea del diálogo que explica el rechazo, según la prioridad de MOTIVOS (máx. 200 caracteres)."""
+    lineas = [ln.strip() for ln in (texto or "").splitlines() if ln.strip()]
+    for patron in MOTIVOS:
+        for ln in lineas:
+            if patron.search(ln):
+                return ln[:200]
+    return "botón Enviar desactivado"
+
+
 def vencido(fila: dict, ahora: datetime) -> bool:
     h = _hora(fila)
     return h is None or ahora > h + timedelta(minutes=VENTANA_MIN)
@@ -221,11 +241,7 @@ class Robot:
             page.wait_for_timeout(1500)
             self._foto(page, f"{etiqueta}-listo")
             if not final.is_enabled():
-                texto = raiz_d.inner_text()
-                motivo = next((ln for ln in texto.splitlines()
-                               if re.search(r"hasta 30 minutos|Publicado hace|no se puede|cannot|vinculad", ln, re.I)),
-                              "botón Enviar desactivado")
-                return "rechazado", motivo.strip()[:200]
+                return "rechazado", motivo_rechazo(raiz_d.inner_text())
             if ensayo:
                 return "ensayo_ok", "todo listo; en ensayo no se pulsa Enviar"
             final.click()

@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from conftest import RAIZ_REAL
+from conftest import RAIZ_REAL, como_vigente
 from fabrica import descargar as d
 from fabrica import fuentes, release, validar
 from fabrica.descargar import ErrorDescarga
@@ -336,7 +336,8 @@ def test_verificar_sale_1_si_alguno_no_baja(tmp_path, capsys):
 # ---------------------------------------------------------------- descargar.descargar
 
 def _ficha():
-    return next(f for f in fuentes.cargar_fuentes(RAIZ_REAL) if f["id"] == "sega-fm27")
+    """La ficha real como vigente: la marca pausó FM27 el 19 nov 2026; aquí se prueba el camino de descarga."""
+    return como_vigente(next(f for f in fuentes.cargar_fuentes(RAIZ_REAL) if f["id"] == "sega-fm27"))
 
 
 def _candidato(url):
@@ -492,7 +493,8 @@ def test_faltan_sin_material_de_ese_tag_sale_0(capsys):
     assert "nada que faltar" in capsys.readouterr().out
 
 
-def test_vistos_con_la_url_de_drive_bloquea_al_candidato_del_release(repo):
+def test_vistos_con_la_url_de_drive_bloquea_al_candidato_del_release(repo_fm27):
+    repo = repo_fm27                                # FM27 está pausada en el repo real: copia vigente
     from fabrica import puertas
     from fabrica.detectar import detectar
     from test_n8 import AHORA

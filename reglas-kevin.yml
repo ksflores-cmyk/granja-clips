@@ -1,0 +1,35 @@
+# Reglas de Kevin: cada queja se vuelve regla (tarea #18, plan de la noche del 20 nov 2026).
+#
+# Cómo añadir una queja nueva (sin tocar código, salvo el paso 4):
+#   1. Copia el bloque de una regla de la lista `reglas:` y pégalo al final.
+#   2. Pon un `id` único en minúsculas, números y guiones (ej. `texto-chico`) y la `fecha` de hoy (AAAA-MM-DD).
+#   3. Escribe en `queja` las palabras de Kevin tal cual y en `regla` lo que debe cumplir el clip, en una frase.
+#   4. Si se puede medir sobre el MP4 o el plan, escribe una función en `fabrica/editar/reglas_kevin.py`, regístrala
+#      en `REVISIONES` y pon su nombre en `revision`. Si no, deja `revision: null`: la regla no frena nada y llega
+#      como nota a los críticos con modelo (tarea #21).
+#   5. `estado: vigente` la hace valer; `estado: retirada` la apaga sin borrarla (no pone punto ni nota).
+#   6. Corre `python -m fabrica.validar` y `python -m pytest -q pruebas/test_reglas_kevin.py`.
+# La puerta de estilo lee este archivo en cada toma. Si el archivo está roto, la puerta se pone en rojo.
+version: 1
+reglas:
+  - id: muy-simple
+    fecha: 2026-11-19
+    queja: "muy simple"
+    regla: "Ninguna toma sin movimiento ni audio: toda toma se mueve y se oye"
+    revision: con_movimiento_y_audio
+    estado: vigente
+    contexto: "Toma 1 informativa del 19 nov: texto solo, sin audio ni movimiento."
+  - id: sin-musica
+    fecha: 2026-11-19
+    queja: "sin música"
+    regla: "Toda pieza sin audio propio lleva pista CC0 verificada (salvo campaña con sin_musica: true)"
+    revision: musica_cc0_sin_audio_propio
+    estado: vigente
+    contexto: "Decisión 5 del 19 nov."
+  - id: ocupa-todo
+    fecha: 2026-11-19
+    queja: "que el clip ocupe todo"
+    regla: "El clip llena el 9:16: sin franjas"
+    revision: sin_franjas
+    estado: vigente
+    contexto: "Decisión 5 del 19 nov."

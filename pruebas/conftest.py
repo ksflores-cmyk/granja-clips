@@ -48,7 +48,33 @@ def repo(tmp_path):
     (destino / "PAUSA").write_text(PAUSA_DE_ARRANQUE, encoding="utf-8")
     (destino / "config" / "modo.yml").write_text(MODO_DE_ARRANQUE, encoding="utf-8")
     _estado_de_arranque(destino)
+    # Sin voces por omisión: ninguna prueba ajena a `test_voces.py` carga whisper ni corta silencios de sus videos.
+    voces = destino / "config" / "voces.yml"
+    if voces.exists():
+        import re
+        voces.write_text(re.sub(r"(?m)^activo: true", "activo: false", voces.read_text(encoding="utf-8")),
+                         encoding="utf-8")
     return destino
+
+
+def como_vigente(ficha: dict) -> dict:
+    """Copia de una ficha pausada como si su campaña siguiera abierta (estado vigente, publicable true).
+    La ficha real de FM27 está pausada desde el 19 nov 2026; las pruebas del camino de campaña usan esta copia."""
+    import copy
+    f = copy.deepcopy(ficha)
+    f.update(estado="vigente", publicable=True)
+    f.pop("motivo_pausa", None)
+    return f
+
+
+@pytest.fixture
+def repo_fm27(repo):
+    """La copia temporal del repo con la ficha `sega-fm27` vigente (en el repo real está pausada)."""
+    ruta = repo / "fuentes.yml"
+    datos = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    datos = [como_vigente(f) if isinstance(f, dict) and f.get("id") == "sega-fm27" else f for f in datos]
+    ruta.write_text(yaml.safe_dump(datos, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    return repo
 
 
 @pytest.fixture
@@ -81,6 +107,7 @@ def raiz_musica(tmp_path_factory):
     audio.mkdir()
     raiz.mkdir()
     shutil.copy(RAIZ_REAL / "marca.yml", raiz / "marca.yml")
+    shutil.copy(RAIZ_REAL / "reglas-kevin.yml", raiz / "reglas-kevin.yml")   # la puerta lee las reglas de Kevin
     shutil.copytree(RAIZ_REAL / "marca", raiz / "marca", ignore=shutil.ignore_patterns("musica"))
     pistas = []
     for i in range(3):

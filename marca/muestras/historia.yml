@@ -1,0 +1,56 @@
+# Las 2 muestras de la historia (#20), sobre material CC BY ya autorizado en fuentes.yml (plantilla v2, con audio).
+# Se renderizan después de las 3 de muestras.yml; las dos pasan la puerta de estilo y quedan en el artefacto `muestras`.
+# `historia-bbb`: el plan lo arma el eslabón sin IA con las señales del video. `historia-sintel`: plan JSON fijo, como
+# si lo devolviera el modelo: cámara lenta, pausa, zoom suave y un efecto (`sfx: {tipo: ...}` se resuelve contra los
+# efectos disponibles; sin efectos, ese momento pasa a zoom_suave y el manifiesto lo dice). Tiempos de `plan` en
+# segundos del archivo; los de `lineas`, relativos al recorte.
+muestras:
+  - id: historia-bbb
+    pilar: momentos
+    fuente_id: bbb-cc-by
+    video:
+      url: https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4
+      sha256: 543a4ad9fef4c9e0004ec9482cb7225c2574b0f889291e8270b1c4d61dbc1ab8
+    licencia: "CC BY 3.0, © Blender Foundation (peach.blender.org)"
+    enlace_licencia: https://creativecommons.org/licenses/by/3.0/
+    recorte: {inicio: 24.0, duracion: 18.0}
+    toma:
+      numero: 5
+      gancho: "El conejo y el roedor"
+      palabra_lapiz: "ROEDOR"
+      lapiz: círculo
+      escena: "EXT. PRADERA — DÍA"
+      credito: "Con: Blender Foundation (CC BY 3.0)"
+    lineas:
+      - {t0: 2.0, t1: 6.0, acotacion: "(el prado se mueve)"}
+    historia: {eslabon: sin-ia}
+
+  - id: historia-sintel
+    pilar: primeras_veces
+    fuente_id: sintel-cc-by
+    video:
+      url: https://raw.githubusercontent.com/mdn/shared-assets/main/videos/sintel-short.mp4
+      sha256: 358447f332663e6f3794816e32b8072526fcba8bf8744dc7fb3387afb5b2fceb
+    licencia: "CC BY 3.0, © Blender Foundation (durian.blender.org)"
+    enlace_licencia: https://creativecommons.org/licenses/by/3.0/
+    recorte: {inicio: 39.6, duracion: 17.0}
+    toma:
+      numero: 6
+      gancho: "Ella busca a un dragón"
+      palabra_lapiz: "DRAGÓN"
+      lapiz: subrayado
+      escena: "INT. CABAÑA DEL CHAMÁN — NOCHE"
+      credito: "Con: Blender Foundation (CC BY 3.0)"
+    lineas:
+      - {t0: 0.8, t1: 5.2, nombre: "CHAMÁN", frase: "¿Qué te trae a la tierra de los guardianes?", original: "What brings you to the land of the gatekeepers?"}
+      - {t0: 6.4, t1: 8.9, nombre: "SINTEL", frase: "Busco a alguien.", original: "I'm searching for someone."}
+      - {t0: 14.8, t1: 16.4, nombre: "SINTEL", frase: "Un dragón.", original: "A dragon."}
+    historia:
+      eslabon: fijo
+      plan:
+        apertura: {t0: 53.0, t1: 55.0}
+        momentos:
+          - {t0: 41.0, t1: 44.0, sentimiento: tension, tratamiento: zoom_suave, sfx: null}
+          - {t0: 47.0, t1: 48.4, sentimiento: asombro, tratamiento: camara_lenta, sfx: null}
+          - {t0: 50.0, t1: 51.0, sentimiento: sorpresa, tratamiento: sfx, sfx: {tipo: golpe}}
+          - {t0: 54.0, t1: 55.0, sentimiento: tension, tratamiento: pausa, sfx: null}
