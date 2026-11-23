@@ -718,23 +718,25 @@ def test_el_diagnostico_no_imprime_http_000000():
 
 def test_con_10_caidas_lentas_no_se_pasa_del_tope_de_ojos(tmp_path, monkeypatch):
     """Revisión de Codex (PR #31): con 4 respaldos caben hasta 10 peticiones, pero el tope acumulado (`tope_ojos_s`)
-    sigue mandando: cada 503 tarda 40 s de reloj simulado y ninguna petición empieza pasado el tope."""
+    manda. Reloj simulado; ListModels activo; cada petición consume todo el tiempo que se le da (caso peor de un
+    timeout) y luego da 503. Ni peticiones ni esperas pasan del tope."""
     reloj = [1000.0]
     monkeypatch.setattr(ojos.time, "monotonic", lambda: reloj[0])
-    inicios = []
+    tope = CFG_REAL["tope_ojos_s"]
+    dados = []
 
     class Lento(Transporte):
-        def __call__(self, url, encabezados, cuerpo):
-            inicios.append(reloj[0] - 1000.0)
-            reloj[0] += 40.0
+        def __call__(self, url, encabezados, cuerpo, tiempo):
+            usado = reloj[0] - 1000.0
+            dados.append((usado, tiempo))
+            reloj[0] += tiempo                                   # consume el timeout completo
             return super().__call__(url, encabezados, cuerpo)
 
+    todos = [CFG_REAL["modelo"], *CFG_REAL["modelos_respaldo"]]
+    g = Lista((200, lista(*todos)))
     t = Lento(*[(503, "x")] * 10)
-    def esperar(s):
-        reloj[0] += s
-    m = mirar(tmp_path, t, config={**CFG_REAL, "listar_modelos": False}, espera=esperar)
-    tope = CFG_REAL["tope_ojos_s"]
+    m = mirar(tmp_path, t, config={**CFG_REAL, "listar_modelos": True}, espera=lambda s: reloj.__setitem__(0, reloj[0] + s),
+              transporte_lista=g)
     assert m.datos is None and m.pasajero
-    assert inicios and all(x < tope for x in inicios)          # ninguna petición arranca pasado el tope
-    assert reloj[0] - 1000.0 <= tope + 40.0                     # a lo sumo la última petición en curso al vencer
-    assert len(inicios) < 10                                    # el tope corta antes de agotar los 10 intentos
+    assert dados and all(usado + tiempo <= tope + 1e-6 for usado, tiempo in dados)   # cada timeout cabe en lo que queda
+    assert reloj[0] - 1000.0 <= tope + 1e-6                                          # el total no pasa del tope
