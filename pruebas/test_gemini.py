@@ -714,3 +714,27 @@ def test_validar_revisa_max_por_ciclo(repo):
 def test_el_diagnostico_no_imprime_http_000000():
     texto = (RAIZ_REAL / ".github" / "workflows" / "diagnostico.yml").read_text(encoding="utf-8")
     assert '|| echo "000"' not in texto and texto.count("|| true)") >= 2
+
+
+def test_con_10_caidas_lentas_no_se_pasa_del_tope_de_ojos(tmp_path, monkeypatch):
+    """Revisión de Codex (PR #31): con 4 respaldos caben hasta 10 peticiones, pero el tope acumulado (`tope_ojos_s`)
+    sigue mandando: cada 503 tarda 40 s de reloj simulado y ninguna petición empieza pasado el tope."""
+    reloj = [1000.0]
+    monkeypatch.setattr(ojos.time, "monotonic", lambda: reloj[0])
+    inicios = []
+
+    class Lento(Transporte):
+        def __call__(self, url, encabezados, cuerpo):
+            inicios.append(reloj[0] - 1000.0)
+            reloj[0] += 40.0
+            return super().__call__(url, encabezados, cuerpo)
+
+    t = Lento(*[(503, "x")] * 10)
+    def esperar(s):
+        reloj[0] += s
+    m = mirar(tmp_path, t, config={**CFG_REAL, "listar_modelos": False}, espera=esperar)
+    tope = CFG_REAL["tope_ojos_s"]
+    assert m.datos is None and m.pasajero
+    assert inicios and all(x < tope for x in inicios)          # ninguna petición arranca pasado el tope
+    assert reloj[0] - 1000.0 <= tope + 40.0                     # a lo sumo la última petición en curso al vencer
+    assert len(inicios) < 10                                    # el tope corta antes de agotar los 10 intentos
