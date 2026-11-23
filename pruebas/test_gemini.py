@@ -35,6 +35,10 @@ def cfg(**cambios):
     return {**CFG_REAL, "listar_modelos": False, **cambios}
 
 
+# Un 503 sostenido recorre el principal y todos los respaldos permitidos, con 2 intentos por modelo.
+N503 = 2 * (1 + min(CFG_REAL["respaldos_por_falla"], len(CFG_REAL["modelos_respaldo"])))
+
+
 def lista(*nombres, metodos=("generateContent",)):
     return json.dumps({"models": [{"name": f"models/{n}", "supportedGenerationMethods": list(metodos)}
                                   for n in nombres]})
@@ -58,8 +62,8 @@ class Lista:
 
 def test_la_config_real_pone_primero_el_modelo_que_respondio_en_4_s():
     assert CFG_REAL["modelo"] == "gemini-3-flash-preview"
-    assert CFG_REAL["modelos_respaldo"] == ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
-    assert (CFG_REAL["tiempo_por_intento_s"], CFG_REAL["tope_ojos_s"], CFG_REAL["respaldos_por_falla"]) == (90, 300, 2)
+    assert CFG_REAL["modelos_respaldo"] == ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.7-flash"]
+    assert (CFG_REAL["tiempo_por_intento_s"], CFG_REAL["tope_ojos_s"], CFG_REAL["respaldos_por_falla"]) == (90, 300, 4)
     assert CFG_REAL["listar_modelos"] is True and CFG_REAL["sin_ia"] == {"activo": True, "max_por_ciclo": 1, "duracion_objetivo_s": 20}
 
 
@@ -198,8 +202,8 @@ def test_respaldos_por_falla_sale_de_la_config(tmp_path):
 
 def test_sin_gemini_se_distingue_de_un_veto(tmp_path):
     assert mirar(tmp_path, Transporte(), clave=None).sin_gemini
-    assert mirar(tmp_path, Transporte(*[(503, "x")] * 6), config=cfg()).sin_gemini
-    assert mirar(tmp_path, Transporte(*[(404, "{}")] * 5), config=cfg()).sin_gemini
+    assert mirar(tmp_path, Transporte(*[(503, "x")] * N503), config=cfg()).sin_gemini
+    assert mirar(tmp_path, Transporte(*[(404, "{}")] * (N503 // 2)), config=cfg()).sin_gemini
     assert not mirar(tmp_path, Transporte((400, "mal")), config=cfg()).sin_gemini
     assert not mirar(tmp_path, Transporte(OK), config=cfg()).sin_gemini
 
@@ -377,13 +381,13 @@ CLAVE = {"GEMINI_API_KEY": "clave-de-prueba"}
 
 def caida():
     """Gemini caído en los 3 modelos (503 sostenido)."""
-    return Transporte(*[(503, "x")] * 6)
+    return Transporte(*[(503, "x")] * N503)
 
 
 @pytest.mark.parametrize("caso", ["pasajero", "404"])
 def test_sin_ia_se_activa_si_gemini_no_esta_disponible(repo, tmp_path, video20, sin_render, caso):
-    t, env = {"pasajero": (Transporte(*[(503, "x")] * 6), CLAVE),
-              "404": (Transporte(*[(404, "{}")] * 5), CLAVE),
+    t, env = {"pasajero": (Transporte(*[(503, "x")] * N503), CLAVE),
+              "404": (Transporte(*[(404, "{}")] * (N503 // 2)), CLAVE),
               "sin_clave": (caida(), CLAVE)}[caso]
     r = hacer(repo, tmp_path, video20, t, env)
     assert sin_render.llamadas, r.motivos                 # llegó a componer: no se descartó antes
@@ -412,7 +416,7 @@ def test_sin_ia_desactivada_es_el_descarte_pasajero_de_antes(repo, tmp_path, vid
     c = yaml.safe_load(ruta.read_text(encoding="utf-8"))
     c["sin_ia"]["activo"] = False
     ruta.write_text(yaml.safe_dump(c, allow_unicode=True), encoding="utf-8")
-    r = hacer(repo, tmp_path, video20, Transporte(*[(503, "x")] * 6), CLAVE)
+    r = hacer(repo, tmp_path, video20, Transporte(*[(503, "x")] * N503), CLAVE)
     assert not r.ok and "pasajero" in r.motivos[0] and r.gastar is False and not sin_render.llamadas
 
 
@@ -607,6 +611,18 @@ def test_tras_un_404_sin_respaldos_por_falla_se_rinde_como_antes(tmp_path):
     assert m.pasajero and m.datos is None and t.modelos() == ["a", "a", "b"]
 
 
+def test_con_503_en_el_principal_y_en_3_8_flash_responde_el_primer_lite_de_la_config_real(tmp_path):
+    """Caso de producción (22 nov): el 503 ya no agota los respaldos antes de llegar a los -lite."""
+    e = (503, "x")
+    t = Transporte(e, e, e, e, OK)                      # principal x2, gemini-3.8-flash x2, gemini-3.5-flash-lite 200
+    esperas = []
+    cfg_real = {**CFG_REAL, "listar_modelos": False}    # la config real, sin tocar el orden ni el tope
+    m = mirar(tmp_path, t, config=cfg_real, espera=esperas.append)
+    assert t.modelos() == [CFG_REAL["modelo"]] * 2 + ["gemini-3.8-flash"] * 2 + ["gemini-3.5-flash-lite"]
+    assert m.modelo == "gemini-3.5-flash-lite" and m.datos is not None and not m.pasajero
+    assert len(esperas) == 2 and all(0 <= x <= CFG_REAL["tope_ojos_s"] for x in esperas)     # 1 espera por modelo caído
+
+
 def test_el_get_de_listmodels_usa_el_presupuesto_restante(tmp_path):
     g = Lista((200, lista(CFG_REAL["modelo"])))
     mirar(tmp_path, Transporte(OK), config=cfg(listar_modelos=True, tope_ojos_s=6), transporte_lista=g)
@@ -701,3 +717,36 @@ def test_validar_revisa_max_por_ciclo(repo):
 def test_el_diagnostico_no_imprime_http_000000():
     texto = (RAIZ_REAL / ".github" / "workflows" / "diagnostico.yml").read_text(encoding="utf-8")
     assert '|| echo "000"' not in texto and texto.count("|| true)") >= 2
+
+
+def test_con_10_caidas_lentas_no_se_pasa_del_tope_de_ojos(tmp_path, monkeypatch):
+    """Revisión de Codex (PR #31): con 4 respaldos caben hasta 10 peticiones, pero el tope acumulado (`tope_ojos_s`)
+    manda. Reloj simulado; ListModels activo; cada petición consume todo el tiempo que se le da (caso peor de un
+    timeout) y luego da 503. Ni peticiones ni esperas pasan del tope."""
+    reloj = [1000.0]
+    monkeypatch.setattr(ojos.time, "monotonic", lambda: reloj[0])
+    tope = CFG_REAL["tope_ojos_s"]
+    dados = []
+
+    class Lento(Transporte):
+        def __call__(self, url, encabezados, cuerpo, tiempo):
+            usado = reloj[0] - 1000.0
+            dados.append((usado, tiempo))
+            reloj[0] += tiempo                                   # consume el timeout completo
+            return super().__call__(url, encabezados, cuerpo)
+
+    class ListaLenta(Lista):
+        def __call__(self, url, encabezados, tiempo):
+            dados.append((reloj[0] - 1000.0, tiempo))
+            reloj[0] += tiempo                                   # ListModels también consume su timeout completo
+            return super().__call__(url, encabezados, tiempo)
+
+    todos = [CFG_REAL["modelo"], *CFG_REAL["modelos_respaldo"]]
+    g = ListaLenta((200, lista(*todos)))
+    t = Lento(*[(503, "x")] * 10)
+    m = mirar(tmp_path, t, config={**CFG_REAL, "listar_modelos": True}, espera=lambda s: reloj.__setitem__(0, reloj[0] + s),
+              transporte_lista=g)
+    assert m.datos is None and m.pasajero
+    assert len(dados) >= 2 and g.llamadas                                           # ListModels y peticiones
+    assert all(usado + tiempo <= tope + 1e-6 for usado, tiempo in dados)   # cada timeout cabe en lo que queda
+    assert reloj[0] - 1000.0 <= tope + 1e-6                                          # el total no pasa del tope
