@@ -266,8 +266,8 @@ def _planificar_historia(raiz, ficha, datos, inicio: float, dur: float, cfg_h: d
 
 
 def _spoilers_en_lineas(lineas, temporada: dict) -> list[str]:
-    """Las líneas que ponen las voces (#19, transcripción de Whisper) no pasaron por `ojos.validar_respuesta`:
-    se les aplica el mismo filtro de palabras a evitar de la temporada (revisión de Codex, 22 nov)."""
+    """Motivos de spoiler en las líneas que ponen las voces (#19, transcripción de Whisper), que no pasaron por
+    `ojos.spoiler_de`: mismas palabras a evitar de la temporada. NO descarta: marca (22 nov 2026, decisión de Kevin)."""
     motivos = []
     for i, ln in enumerate(lineas or [], 1):
         for p in temporada.get("palabras_evitar", []) or []:
@@ -275,6 +275,21 @@ def _spoilers_en_lineas(lineas, temporada: dict) -> list[str]:
                 if ojos._contiene(texto, str(p)):
                     motivos.append(f"línea {i}: palabra a evitar {p!r} en la {donde} (posible spoiler)")
     return motivos
+
+
+def marcar_avisos(toma: Toma, datos: dict, temporada: dict, lineas) -> Toma:
+    """Marca la toma con sus avisos: spoiler (Gemini `spoiler: true` o una palabra a evitar en gancho, escena, acotación
+    o líneas que de verdad salen, sean de Gemini o de Whisper), cinemática (`cinematica: true`) y mods (`mods: true`).
+    Nunca descarta: una sola placa con los avisos sale al inicio (22 nov 2026, decisión de Kevin)."""
+    if toma is None:
+        return toma
+    motivos = ojos.avisos_de(datos, temporada, lineas=False)
+    extra = _spoilers_en_lineas(lineas, temporada)
+    if extra:
+        motivos["spoiler"] = motivos.get("spoiler", []) + extra
+    toma.avisos = ojos.ordenar_avisos(motivos)
+    toma.avisos_motivos = {a: motivos[a] for a in toma.avisos}
+    return toma
 
 
 def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, transporte, espera, entorno,
@@ -358,15 +373,13 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             # Puerta de nombres (#24) también para lo que ponen las voces (#19): el hablante sólo sale de la ficha
             # (el creador) o es OTRA VOZ, y ni las frases transcritas ni el rótulo llevan un nombre vetado. Si las
             # voces no pasan, se vuelve a las líneas de Gemini (ya limpias, sin cortes); si tampoco, se descarta.
-            motivos_voces = (nombres.revisar_nombres(toma, ev.lineas, creador, raiz, marca)
-                             + _spoilers_en_lineas(ev.lineas, temporada))
+            motivos_voces = nombres.revisar_nombres(toma, ev.lineas, creador, raiz, marca)
             if motivos_voces and ev.alterno is not None:
                 ev.lineas, ev.dur, ev.transcripcion = ev.alterno[0], ev.alterno[1], None
                 ev.tramos = None
                 ev.info = {**(ev.info or {}), "fuente_lineas": "gemini", "cortes": [],
                            "reintento": "líneas de Gemini sin cortes por la puerta de nombres: " + "; ".join(motivos_voces)[:300]}
-                motivos_voces = (nombres.revisar_nombres(toma, ev.lineas, creador, raiz, marca)
-                                 + _spoilers_en_lineas(ev.lineas, temporada))
+                motivos_voces = nombres.revisar_nombres(toma, ev.lineas, creador, raiz, marca)
             if motivos_voces:
                 return Resultado(False, [f"puerta de nombres (voces): {m}" for m in motivos_voces],
                                  gemini=mirada.datos, modelo=mirada.modelo, gastar=True)
@@ -382,6 +395,7 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                                         f"(GRANJA_MUSICA_DIR={mod_musica.carpeta() or ''}): sigue en silencio")
                         print(f"AVISO: {aviso_musica}")
                 def compuesta(lineas_, dur_, tramos_, h=None):
+                    marcar_avisos(toma, mirada.datos, temporada, lineas_)     # con las líneas que de verdad salen
                     with tempfile.TemporaryDirectory(prefix="trabajo-toma-") as trabajo:
                         with plazo.etapa("componer"):
                             plan_ = componer(marca, toma, lineas_, mp4, duracion=dur_, trabajo=Path(trabajo),
@@ -491,6 +505,9 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                 plan["transcripcion"] = transcripcion          # contrato de la tarea #17: palabras en tiempo de la toma
             plan_ruta.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
             fila = fila_marcador(candidato, ficha, toma, dur, ahora)
+            if toma.avisos:
+                fila["notas"] = "; ".join(f"{a}: " + ", ".join(toma.avisos_motivos.get(a, []))[:120]
+                                          for a in toma.avisos)[:240]
             if isinstance(plan.get("historia"), dict):
                 fila["historia"] = plan["historia"].get("proveedor") or ""
                 if plan["historia"].get("plan") is not None:

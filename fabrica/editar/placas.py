@@ -18,7 +18,7 @@ from . import lienzo
 from .lienzo import PUNTUACION, Toma, _limpia, partir
 from .marca import Marca
 
-TIPOS = ("cabecera", "fila", "mosca", "dialogo", "credito", "cierre", "marca_agua")
+TIPOS = ("cabecera", "alerta", "fila", "mosca", "dialogo", "credito", "cierre", "marca_agua")
 
 
 @dataclass
@@ -181,6 +181,35 @@ def placa_cabecera(marca: Marca, t: Toma, y: int, t1: float) -> Placa:
     return Placa("cabecera", px, int(y), 0.0, float(t1), img)
 
 
+# ---------------------------------------------------------------- avisos al inicio (spoiler, cinemática, mods)
+
+def texto_aviso(marca: Marca, avisos: list[str]) -> str:
+    """Texto de la placa: el de cada aviso en `marca.yml` (`avisos.textos`), en orden fijo y unidos con « · ». Del segundo
+    en adelante se quita la palabra inicial que comparten con el primero («ALERTA SPOILER · CINEMÁTICA · MODS»)."""
+    textos = marca.avisos["textos"]
+    partes = [str(textos[a]).strip().upper() for a in ("spoiler", "cinematica", "mods") if a in avisos]
+    if not partes:
+        raise ValueError("no hay avisos que dibujar")
+    inicio = partes[0].split(" ", 1)[0] + " "
+    return " · ".join([partes[0]] + [p[len(inicio):] if p.startswith(inicio) else p for p in partes[1:]])
+
+
+def placa_aviso(marca: Marca, avisos: list[str], y: int, t1: float) -> Placa:
+    """Aviso simple al inicio: placa de papel con el texto (`texto_aviso`) en Courier Prime negrita al tamaño de la fila
+    (pequeño: que se vea poco) y color lapiz_rojo, en el lugar del encabezado (bajo la fila) y de 0 a `t1` s. Corte seco."""
+    rel = int(marca.pc["relleno_placa"])
+    txt = texto_aviso(marca, avisos)
+    f = marca.fuente("bold", marca.pc["fila"]["tam_toma"])
+    a, d = _alto_fuente(f)
+    w, h = _par(f.getlength(txt) + 2 * rel), _par(a + d + 2 * rel)
+    if w > marca.pc["ancho_max_encabezado"]:
+        raise ValueError(f"el aviso mide {w} px y caben {marca.pc['ancho_max_encabezado']}: {txt!r}")
+    x = _x_placa(marca, w)
+    img = lienzo.papel_region(marca, x, int(y), w, h)
+    ImageDraw.Draw(img).text((rel, rel + a), txt, font=f, fill=marca.color("lapiz_rojo"), anchor="ls")
+    return Placa("alerta", x, int(y), 0.0, float(t1), img)
+
+
 # ---------------------------------------------------------------- mosca
 
 def placa_mosca(marca: Marca, duracion: float) -> Placa:
@@ -275,8 +304,22 @@ def construir(marca: Marca, t: Toma, lineas: list, duracion: float, logo: Path |
         raise ValueError(f"posición de placas desconocida: {posicion!r}")
     y_fila = int(marca.datos["dividida"]["placas_alterna"]["y_fila"]) if posicion == "alterna" else None
     fila = placa_fila(marca, t, duracion, y_fila)
-    t1_cab = max(0.0, min(float(marca.pc["gancho_s"]), float(duracion) - float(marca.m("cierre_s"))))
-    placas = [fila, placa_cabecera(marca, t, fila.y + fila.alto, t1_cab), placa_mosca(marca, duracion)]
+    tope_cab = float(duracion) - float(marca.m("cierre_s"))
+    t1_cab = max(0.0, min(float(marca.pc["gancho_s"]), tope_cab))
+    placas = [fila]
+    if t.avisos:
+        # El aviso abre la toma en el lugar del gancho (0 a `duracion_s`, sin alargar la toma ni tapar la fila, la mosca ni
+        # la zona de acción); el gancho entra al salir el aviso y se ve los mismos `gancho_s` de siempre.
+        dur_a = float(marca.avisos["duracion_s"])
+        if dur_a > tope_cab - 1.0:
+            raise ValueError(f"la toma dura {duracion:g} s: no cabe el aviso de {dur_a:g} s")
+        placas.append(placa_aviso(marca, t.avisos, fila.y + fila.alto, dur_a))
+        cab = placa_cabecera(marca, t, fila.y + fila.alto, max(0.0, min(dur_a + float(marca.pc["gancho_s"]), tope_cab)))
+        cab.t0 = dur_a
+        placas.append(cab)
+    else:
+        placas.append(placa_cabecera(marca, t, fila.y + fila.alto, t1_cab))
+    placas.append(placa_mosca(marca, duracion))
     if logo is not None:
         placas.append(placa_agua(marca, logo, duracion))
     tope = float(duracion) - float(marca.m("cierre_s"))        # un diálogo no convive con la placa de cierre

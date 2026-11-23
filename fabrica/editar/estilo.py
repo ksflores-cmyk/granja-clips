@@ -45,6 +45,7 @@ PIXEL_DISCREPANTE = 40      # |fotograma - esperado| en gris (tras 1 px de desen
 BLOQUE_PX = 24              # tamaño de una letra de la marca
 K_BLOQUE = 30               # píxeles discrepantes en un bloque que ponen el punto en rojo
 T_CABECERA_S = 0.5
+T_TRAS_ENTRADA_S = 0.15       # tras entrar una placa con t0 > 0 (gancho tras el aviso de spoiler), se mira a este margen
 # La duración real (ffprobe) debe coincidir con la del plan: un fotograma más un margen pequeño.
 TOL_DURACION_S = 1 / 30 + 0.1
 
@@ -154,7 +155,8 @@ def _toma(plan: dict) -> Toma:
     t = plan.get("toma", {})
     return Toma(numero=int(t.get("numero", 0)), gancho=str(t.get("gancho", "")),
                 palabra_lapiz=str(t.get("palabra_lapiz", "")), lapiz=str(t.get("lapiz", "subrayado")),
-                escena=str(t.get("escena", "")), credito=str(t.get("credito", "")))
+                escena=str(t.get("escena", "")), credito=str(t.get("credito", "")),
+                avisos=[a for a in ("spoiler", "cinematica", "mods") if a in (plan.get("avisos") or [])])
 
 
 def _fotograma(video: Path, seg: float) -> Image.Image | None:
@@ -521,10 +523,12 @@ def _cierre_v2(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
 def _gancho_se_va(video: Path, plan: dict, marca: Marca, cabecera: list[placas.Placa]) -> tuple[bool, str]:
     """Pasado `gancho_s`, el fotograma trae la fuente en la caja del gancho (la placa ya no está)."""
     dur = float(plan.get("duracion") or 0)
-    t = float(marca.pc["gancho_s"]) + 0.5
-    if not cabecera or t > dur - float(marca.m("cierre_s")) - 0.1:
+    if not cabecera:
         return True, ""
     p = cabecera[0]
+    t = float(p.t1) + 0.5            # la placa se va en `t1` (gancho_s, o gancho_s + el aviso de spoiler)
+    if t > dur - float(marca.m("cierre_s")) - 0.1:
+        return True, ""
     if _historia(plan) is not None:           # con historia se mide en un tramo plano, ya pasado el gancho
         plano = _t_plano(plan, marca, t, desde=t)
         tramos = _tramos(plan, marca) or []
@@ -603,11 +607,13 @@ def cabecera_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     dur = float(plan.get("duracion") or 0)
     if es_v2(plan):
         try:
-            esperadas = _del_tipo(_placas_del_plan(plan, marca), "fila", "cabecera")
+            esperadas = _del_tipo(_placas_del_plan(plan, marca), "fila", "alerta", "cabecera")
         except ValueError as e:
             return False, f"el plan no se puede dibujar: {e}"
         t = min(T_CABECERA_S, dur / 2) if dur > 0 else T_CABECERA_S
-        ok, det = _placas_visibles(Path(video), plan, marca, [(p, t) for p in esperadas])
+        # con aviso de spoiler el gancho entra al salir el aviso: se mira un poco después de su `t0`
+        ok, det = _placas_visibles(Path(video), plan, marca,
+                                   [(p, max(t, p.t0 + T_TRAS_ENTRADA_S) if p.t0 > 0 else t) for p in esperadas])
         # la fila (TOMA y crédito) se queda en pantalla toda la toma: también a 30 % y 70 %
         fila = _del_tipo(esperadas, "fila")
         ok2, det2 = _placas_visibles(Path(video), plan, marca,

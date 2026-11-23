@@ -238,12 +238,14 @@ def test_sin_juego_en_la_ficha_se_sigue_usando_la_temporada(marca, temporada):
 
 def test_los_spoilers_de_gta_no_aplican_a_una_ficha_con_otro_juego(marca, temporada):
     f = ficha_real()
-    assert ojos.temporada_de(f, temporada)["palabras_evitar"] == ["filtración", "filtrado", "leak", "pirata", "crack", "gratis"]
+    t = ojos.temporada_de(f, temporada)
+    assert t["palabras_evitar"] == [] and t["palabras_vetadas"] == ["filtración", "filtrado", "leak", "pirata", "crack", "gratis"]
     datos = json.loads((DATOS / "fm27_valida.json").read_text(encoding="utf-8"))
     datos["gancho"] = "Final de copa para Sebas"
     datos["palabra_lapiz"] = "COPA"
     assert ojos.validar_respuesta(datos, marca, ojos.temporada_de(f, temporada), duracion=20.0)[0]
-    assert not ojos.validar_respuesta(datos, marca, temporada, duracion=20.0)[0]   # con la temporada, sí es spoiler
+    assert ojos.validar_respuesta(datos, marca, temporada, duracion=20.0)[0]       # con la temporada ya no descarta...
+    assert ojos.avisos_de(datos, temporada)["spoiler"] and not ojos.avisos_de(datos, t)   # ...pero sí es spoiler (se marca)
 
 
 # ---------------------------------------------------------------- criterio 4: duración por ficha

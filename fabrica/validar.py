@@ -374,6 +374,7 @@ def validar_marca(m, inf: Informe) -> None:
     validar_maqueta(m, inf)
     validar_marca_agua(m, inf)
     validar_pantalla_completa(m, inf)
+    validar_avisos(m, inf)
     validar_dividida(m, inf)
     validar_voces_marca(m, inf)
 
@@ -466,6 +467,30 @@ def validar_marca_agua(m, inf: Informe) -> None:
         inf.error(f"{rel}.opacidad debe estar entre 0 y 1")
     if isinstance(ma.get("ancho"), (int, float)) and not isinstance(ma.get("ancho"), bool) and ma["ancho"] > 540:
         inf.error(f"{rel}.ancho {ma['ancho']}: el logo no puede pasar de la mitad del ancho (540)")
+
+
+AVISOS_S = (0.8, 1.5)             # segundos que se ve el aviso: lo bastante para leerlo, sin comerse el gancho
+AVISOS_TIPOS = ("spoiler", "cinematica", "mods")
+AVISO_MAX_CARACTERES = 24
+
+
+def validar_avisos(m, inf: Informe) -> None:
+    """`avisos` de marca.yml: duración de 0,8 a 1,5 s y un texto corto en mayúsculas por tipo (decisión de Kevin, 22 nov)."""
+    rel = "marca.yml: avisos"
+    a = m.get("avisos")
+    if not _claves(a, rel, ["duracion_s", "textos"], inf):
+        return
+    d = a["duracion_s"]
+    lo, hi = AVISOS_S
+    if not (isinstance(d, (int, float)) and not isinstance(d, bool) and lo <= d <= hi):
+        inf.error(f"{rel}: duracion_s debe ser un número de {lo:g} a {hi:g}")
+    if not _claves(a["textos"], f"{rel}.textos", list(AVISOS_TIPOS), inf):
+        return
+    for k in AVISOS_TIPOS:
+        t = a["textos"][k]
+        if not (isinstance(t, str) and t.strip() and t == t.upper() and "\n" not in t
+                and len(t) <= AVISO_MAX_CARACTERES):
+            inf.error(f"{rel}.textos.{k}: debe ser una sola línea en mayúsculas de hasta {AVISO_MAX_CARACTERES} caracteres")
 
 
 CLAVES_PANTALLA = ["zona_segura", "zona_accion", "tope_capas", "gancho_s", "relleno_placa", "ancho_max_encabezado",

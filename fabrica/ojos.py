@@ -43,7 +43,8 @@ MINIMO_INTENTO_S = 15                    # con menos que esto no se envía otra 
 TOPE_PETICION_BYTES = 20 * 1024 * 1024   # límite de la API para una petición en línea
 RECORTE_MIN_S, RECORTE_MAX_S = 7.0, 30.0
 TOL_S = 0.05
-CAMPOS_BOOL = ("apto", "spoiler", "desnudez", "cinematica", "juego_correcto")
+CAMPOS_BOOL = ("apto", "spoiler", "desnudez", "cinematica", "juego_correcto", "mods")
+AVISOS = ("spoiler", "cinematica", "mods")      # orden fijo de los avisos al inicio de la toma (marca.yml, `avisos`)
 CAMPOS_TEXTO = ("idioma_original", "gancho", "palabra_lapiz", "escena", "acotacion")
 
 
@@ -93,7 +94,7 @@ def esquema_respuesta(historia: bool = False) -> dict:
     campos = {
         "apto": booleano,
         "motivos": {"type": "ARRAY", "items": texto},
-        "spoiler": booleano, "desnudez": booleano, "cinematica": booleano, "juego_correcto": booleano,
+        "spoiler": booleano, "desnudez": booleano, "cinematica": booleano, "juego_correcto": booleano, "mods": booleano,
         "idioma_original": texto,
         "lineas": {"type": "ARRAY", "items": {
             "type": "OBJECT",
@@ -121,11 +122,13 @@ def juego_de(ficha: dict | None, temporada: dict) -> str:
 
 def temporada_de(ficha: dict | None, temporada: dict) -> dict:
     """La temporada que vale para esta ficha. Si la ficha declara su propio juego, los spoilers de la temporada
-    (GTA 6) no le aplican: usa `reglas.palabras_evitar` de la ficha (vacío si no hay)."""
+    (GTA 6) no le aplican (`palabras_evitar` queda vacío) y `reglas.palabras_evitar` de la ficha pasa a
+    `palabras_vetadas`: son reglas de contenido (filtraciones, piratería), NO spoilers, y siguen descartando."""
     if not (isinstance((ficha or {}).get("juego"), str) and ficha["juego"].strip()):
         return temporada
     return {**temporada, "nombre": ficha["juego"].strip(),
-            "palabras_evitar": list(((ficha.get("reglas") or {}).get("palabras_evitar")) or [])}
+            "palabras_evitar": [],
+            "palabras_vetadas": list(((ficha.get("reglas") or {}).get("palabras_evitar")) or [])}
 
 
 def rango_recorte(ficha: dict | None) -> tuple[float, float]:
@@ -165,7 +168,7 @@ def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: st
         "{{JUEGO}}": str(juego or temporada.get("nombre", "")),
         "{{NOTA_ESPECIAL}}": nota or "",
         "{{GANCHOS_PROHIBIDOS}}": ", ".join(marca.ganchos_prohibidos()),
-        "{{PALABRAS_EVITAR}}": ", ".join(str(p) for p in temporada.get("palabras_evitar", [])),
+        "{{PALABRAS_EVITAR}}": ", ".join(str(p) for p in temporada.get("palabras_evitar", [])) or "(ninguna)",
     }
     for k, v in cambios.items():
         texto = texto.replace(k, v)
@@ -488,6 +491,8 @@ def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float |
         return False, ["la respuesta no es un objeto JSON"]
     m: list[str] = []
     for c in CAMPOS_BOOL:
+        if c == "mods" and "mods" not in datos:       # respuestas viejas sin el campo: sin mods
+            continue
         if not isinstance(datos.get(c), bool):
             m.append(f"campo {c}: falta o no es booleano")
     for c in CAMPOS_TEXTO:
@@ -516,12 +521,10 @@ def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float |
     # veto del modelo
     if datos["apto"] is False:
         m.append("Gemini marcó apto: false" + (": " + "; ".join(datos["motivos"]) if datos["motivos"] else ""))
-    if datos["spoiler"]:
-        m.append("spoiler")
+    # El spoiler ya NO vetea (decisión de Kevin, 22 nov 2026): `spoiler_de` lo marca y la toma lleva ALERTA SPOILER.
     if datos["desnudez"]:
         m.append("desnudez")
-    if datos["cinematica"]:
-        m.append("cinemática aislada")
+    # La cinemática y los mods tampoco vetan (decisión de Kevin, 22 nov 2026): `avisos_de` los marca.
     if not datos["juego_correcto"]:
         m.append(f"no es el juego esperado ({juego or temporada.get('nombre', 'el de la temporada')})")
 
@@ -592,13 +595,56 @@ def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float |
         except ValueError as e:
             m.append(f"acotación: {e}")
 
-    # palabras a evitar (spoilers)
-    for p in temporada.get("palabras_evitar", []):
+    # palabras vetadas de la ficha (filtraciones, piratería): no son spoilers, siguen descartando
+    for p in temporada.get("palabras_vetadas", []) or []:
         for donde, texto in [("gancho", gancho), ("escena", escena), ("acotación", acot)] + \
                 [(f"línea {i}", ln["es"]) for i, ln in enumerate(lineas, 1)]:
             if _contiene(texto, str(p)):
                 m.append(f"palabra a evitar {p!r} en {donde}")
     return not m, m
+
+
+def spoiler_de(datos: dict, temporada: dict, lineas: bool = True) -> list[str]:
+    """Motivos por los que la toma se marca como spoiler (lista vacía si no lo es). NUNCA descarta (decisión de Kevin,
+    22 nov 2026: sin filtro de spoilers, pero con «ALERTA SPOILER» al inicio del clip).
+
+    Marca: Gemini con `spoiler: true`, o una palabra de `temporada["palabras_evitar"]` en el gancho, la escena, la
+    acotación o (con `lineas`) las líneas traducidas. `datos` ya validado (o, en el corte sin IA, armado por `sin_ia`).
+    """
+    motivos: list[str] = []
+    if datos.get("spoiler") is True:
+        extra = "; ".join(str(x) for x in (datos.get("motivos") or []) if x)
+        motivos.append("Gemini marcó spoiler: true" + (f" ({extra[:120]})" if extra else ""))
+    textos = [("gancho", str(datos.get("gancho") or "")), ("escena", str(datos.get("escena") or "")),
+              ("acotación", str(datos.get("acotacion") or ""))]
+    if lineas:
+        textos += [(f"línea {i}", str(ln.get("es") or "")) for i, ln in enumerate(datos.get("lineas") or [], 1)
+                   if isinstance(ln, dict)]
+    for p in temporada.get("palabras_evitar", []) or []:
+        for donde, texto in textos:
+            if _contiene(texto, str(p)):
+                motivos.append(f"palabra a evitar {p!r} en {donde}")
+    return motivos
+
+
+def avisos_de(datos: dict, temporada: dict, lineas: bool = True) -> dict[str, list[str]]:
+    """Avisos que lleva la toma al inicio, {tipo: motivos} sólo con los que aplican (orden de `AVISOS` en `ordenar`).
+    `spoiler`: ver `spoiler_de`; `cinematica`: Gemini con `cinematica: true`; `mods`: Gemini con `mods: true`.
+    Ninguno descarta (decisión de Kevin, 22 nov 2026)."""
+    salida: dict[str, list[str]] = {}
+    sp = spoiler_de(datos, temporada, lineas)
+    if sp:
+        salida["spoiler"] = sp
+    if datos.get("cinematica") is True:
+        salida["cinematica"] = ["Gemini marcó cinematica: true"]
+    if datos.get("mods") is True:
+        salida["mods"] = ["Gemini marcó mods: true"]
+    return salida
+
+
+def ordenar_avisos(tipos) -> list[str]:
+    """Los avisos en el orden fijo spoiler, cinematica, mods (sin repetir ni inventar)."""
+    return [a for a in AVISOS if a in set(tipos)]
 
 
 def partir_lineas(datos: dict, marca: Marca) -> list[dict]:
