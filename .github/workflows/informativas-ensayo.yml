@@ -45,5 +45,5 @@ jobs:
         with:
           name: informativas
           path: ${{ runner.temp }}/informativas
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: error

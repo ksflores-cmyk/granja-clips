@@ -3,13 +3,41 @@ description: >
   ffmpeg desde apt con tope de tiempo. Si el espejo del runner se cuelga
   (pasó el 18 nov 2026: 6 min sin terminar), repite con archive.ubuntu.com.
   Siempre paquetes firmados de Ubuntu: nada de binarios sin verificar.
+  Caché (tarea #24): los .deb se guardan con actions/cache (clave: versión de Ubuntu + lista de paquetes). Con
+  acierto se instalan con dpkg sin tocar la red; si dpkg falla (la imagen del runner cambió) o no hay caché, se
+  instala por apt como antes, y apt deja los .deb en la carpeta que se guarda al terminar el job.
 runs:
   using: composite
   steps:
+    - id: clave
+      shell: bash
+      run: |
+        . /etc/os-release
+        echo "dir=$HOME/.cache/ffmpeg-debs" >> "$GITHUB_OUTPUT"
+        echo "clave=debs-ubuntu-${VERSION_ID}-$(uname -m)-ffmpeg-v1" >> "$GITHUB_OUTPUT"
+    - id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.clave.outputs.dir }}
+        key: ${{ steps.clave.outputs.clave }}
     - shell: bash
+      env:
+        DEBS: ${{ steps.clave.outputs.dir }}
+        HAY_CACHE: ${{ steps.cache.outputs.cache-hit }}
       run: |
         set -u
-        apt_opts=(-o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20)
+        if [ "$HAY_CACHE" = "true" ] && ls "$DEBS"/*.deb > /dev/null 2>&1; then
+          if timeout --kill-after=10 120 sudo dpkg -i "$DEBS"/*.deb > /dev/null 2>&1 \
+             && ffmpeg -hide_banner -version > /dev/null 2>&1 && ffprobe -hide_banner -version > /dev/null 2>&1; then
+            ffmpeg -hide_banner -version | head -1
+            echo "ffmpeg y ffprobe listos (desde la caché de .deb)"
+            exit 0
+          fi
+          echo "::warning::la caché de .deb no sirvió (imagen distinta); se instala por apt"
+        fi
+        mkdir -p "$DEBS"
+        apt_opts=(-o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20
+                  -o "Dir::Cache::archives=$DEBS")
         instalar() {  # $1 = segundos para update, $2 = segundos para install
           timeout --kill-after=10 "$1" sudo apt-get "${apt_opts[@]}" update -q --error-on=any \
             && timeout --kill-after=10 "$2" sudo apt-get "${apt_opts[@]}" install -y -q --no-install-recommends ffmpeg
@@ -28,6 +56,9 @@ runs:
           done
           instalar 90 150 || { echo "::error::no se pudo instalar ffmpeg con ningún espejo"; exit 1; }
         fi
+        # apt corre como root: la caché la guarda el usuario del runner, sin carpetas de trabajo de apt.
+        sudo chown -R "$(id -u):$(id -g)" "$DEBS"
+        rm -rf "$DEBS/partial" "$DEBS/lock"
         ffmpeg -hide_banner -version | head -1
         ffprobe -hide_banner -version > /dev/null
         echo "ffmpeg y ffprobe listos"

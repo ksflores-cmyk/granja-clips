@@ -488,7 +488,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 
 def test_fabrica_yml_permite_los_archivos_y_abre_issues_con_etiqueta():
     wf = yaml.safe_load((RAIZ / ".github" / "workflows" / "fabrica.yml").read_text(encoding="utf-8"))
-    run = next(p for p in wf["jobs"]["producir"]["steps"] if "Cerrar el ciclo" in p.get("name", ""))["run"]
+    run = next(p for p in wf["jobs"]["fabrica"]["steps"] if "Cerrar el ciclo" in p.get("name", ""))["run"]
     permitidos = re.compile(re.search(r"PERMITIDOS='([^']+)'", run).group(1))
     assert permitidos.match("retiros.md") and permitidos.match("config/vetados.yml")
     assert permitidos.match("estado/alertas-retiro.json") and not permitidos.match("config/modo.yml")

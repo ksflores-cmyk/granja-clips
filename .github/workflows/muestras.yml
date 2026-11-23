@@ -1,32 +1,10 @@
 name: muestras
 
-# Renderiza las muestras de estilo (3 + 1 de música + 2 de historia, #20) en la nube y las deja como artefacto (3 días).
+# Renderiza las muestras de estilo (3 + 1 de música + 2 de historia, #20) en la nube y las deja como artefacto (1 día).
 # No escribe en ninguna rama: el video nunca entra al repo ni a la PC de Kevin.
+# Sólo a mano (workflow_dispatch) desde la tarea #24: ya no corre solo en push ni en PR (ahorro de minutos).
 on:
   workflow_dispatch:
-  push:
-    branches: ["main"]   # ahorro de minutos (20 nov): las ramas ya corren en su PR
-    paths:
-      - "marca/**"
-      - "fabrica/**"
-      - "marca.yml"
-      - "config/voces.yml"
-      - "fuentes.yml"
-      - "config/historia.yml"
-      - "requirements.txt"
-      - "requirements-voces.txt"
-      - ".github/workflows/muestras.yml"
-  pull_request:
-    paths:
-      - "marca/**"
-      - "fabrica/**"
-      - "marca.yml"
-      - "config/voces.yml"
-      - "fuentes.yml"
-      - "config/historia.yml"
-      - "requirements.txt"
-      - "requirements-voces.txt"
-      - ".github/workflows/muestras.yml"
 
 permissions:
   contents: read
@@ -86,5 +64,5 @@ jobs:
         with:
           name: muestras
           path: ${{ runner.temp }}/muestras
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: error

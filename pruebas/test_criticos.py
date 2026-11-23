@@ -527,7 +527,7 @@ def test_c9_ojos_mirar_registra_cada_petición_sólo_si_se_pide(tmp_path, marca)
     v.write_bytes(b"\x00" * 2048)
     temporada = yaml.safe_load((RAIZ_REAL / "temporada.yml").read_text(encoding="utf-8"))
     for pedido in (False, True):
-        t = Transporte((503, "{}"), (503, "{}"), (404, "{}"), (404, "{}"), (404, "{}"))
+        t = Transporte((503, "{}"), (503, "{}"), (404, "{}"), (404, "{}"), (404, "{}"), (404, "{}"), (404, "{}"))
         ojos.mirar(v, marca, temporada, raiz=tmp_path, duracion=20.0, transporte=t, espera=lambda s: None,
                    entorno=ENTORNO, config={**yaml.safe_load((RAIZ_REAL / "config" / "ojos.yml").read_text(encoding="utf-8")),
                                             "listar_modelos": False}, registrar_cupos=pedido)
