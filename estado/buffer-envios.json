@@ -847,5 +847,164 @@
    },
    "ficha_id": "t-elvisayomastercard"
   }
+ },
+ {
+  "id": "shorts|7|2026-11-23T17:30:00.000Z",
+  "plataforma": "shorts",
+  "toma": 7,
+  "dueAt": "2026-11-23T17:30:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-23/toma-007-5d00e40f.mp4",
+  "estado": "creado",
+  "post_id": "6b047303827feee79c0f7270",
+  "intento": "b39ef9454f37425fa3508350ffe3e3c2",
+  "registrado": true,
+  "texto": "Toma 007. Zyrpes intenta escapar de la policía en Vice City pero la suerte no está de su lado.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 7,
+    "gancho": "Persecución fallida en Vice City",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-zyrpesland",
+    "caption": "Zyrpes intenta escapar de la policía en Vice City pero la suerte no está de su lado.",
+    "frase": "¡Ah, que no hay salida!",
+    "hablante": "ZYRPESLAND",
+    "campana": "",
+    "duracion_s": 22.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "mods: Gemini marcó mods: true",
+    "creador": "twitch.tv/zyrpesland",
+    "id_origen": "VibrantStrangeBobaWutFace-uJt_k6lz-xpvf7Ri",
+    "claves": [
+     "VibrantStrangeBobaWutFace-uJt_k6lz-xpvf7Ri"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 007. Zyrpes intenta escapar de la policía en Vice City pero la suerte no está de su lado.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 007. Zyrpes intenta escapar de la policía en Vice City pero la suerte no está de su lado.",
+    "credito": "🎥 twitch.tv/zyrpesland",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 007. Zyrpes intenta escapar de la policía en Vice City pero la suerte no está de su lado.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 150
+   },
+   "ficha_id": "t-zyrpesland"
+  }
+ },
+ {
+  "id": "tiktok|7|2026-11-23T17:30:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 7,
+  "dueAt": "2026-11-23T17:30:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-23/toma-007-5d00e40f.mp4",
+  "estado": "creado",
+  "post_id": "6b047304bc9cbf561d500925",
+  "intento": "c76fd2d3cb514493bf1631679115f190",
+  "registrado": true,
+  "texto": "Toma 007. Zyrpes intenta escapar de la policía en Vice City pero la suerte no está de su lado.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 7,
+    "gancho": "Persecución fallida en Vice City",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-zyrpesland",
+    "caption": "Zyrpes intenta escapar de la policía en Vice City pero la suerte no está de su lado.",
+    "frase": "¡Ah, que no hay salida!",
+    "hablante": "ZYRPESLAND",
+    "campana": "",
+    "duracion_s": 22.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "mods: Gemini marcó mods: true",
+    "creador": "twitch.tv/zyrpesland",
+    "id_origen": "VibrantStrangeBobaWutFace-uJt_k6lz-xpvf7Ri",
+    "claves": [
+     "VibrantStrangeBobaWutFace-uJt_k6lz-xpvf7Ri"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 007. Zyrpes intenta escapar de la policía en Vice City pero la suerte no está de su lado.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/zyrpesland",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 007. Zyrpes intenta escapar de la policía en Vice City pero la suerte no está de su lado.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 150
+   },
+   "ficha_id": "t-zyrpesland"
+  }
+ },
+ {
+  "id": "reels|7|2026-11-23T17:30:00.000Z",
+  "plataforma": "reels",
+  "toma": 7,
+  "dueAt": "2026-11-23T17:30:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-23/toma-007-5d00e40f.mp4",
+  "estado": "creado",
+  "post_id": "6b047305cbe2b99010da3e83",
+  "intento": "40cf2db1db764dd7b95beec33ddd8148",
+  "registrado": true,
+  "texto": "Toma 007. Zyrpes intenta escapar de la policía en Vice City pero la suerte no está de su lado.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 7,
+    "gancho": "Persecución fallida en Vice City",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-zyrpesland",
+    "caption": "Zyrpes intenta escapar de la policía en Vice City pero la suerte no está de su lado.",
+    "frase": "¡Ah, que no hay salida!",
+    "hablante": "ZYRPESLAND",
+    "campana": "",
+    "duracion_s": 22.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "mods: Gemini marcó mods: true",
+    "creador": "twitch.tv/zyrpesland",
+    "id_origen": "VibrantStrangeBobaWutFace-uJt_k6lz-xpvf7Ri",
+    "claves": [
+     "VibrantStrangeBobaWutFace-uJt_k6lz-xpvf7Ri"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 007. Zyrpes intenta escapar de la policía en Vice City pero la suerte no está de su lado.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/zyrpesland",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 007. Zyrpes intenta escapar de la policía en Vice City pero la suerte no está de su lado.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 153
+   },
+   "ficha_id": "t-zyrpesland"
+  }
  }
 ]

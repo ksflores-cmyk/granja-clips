@@ -168,7 +168,7 @@
   origen: twitch
   twitch_login: zyrpesland
   broadcaster_id: '512025628'
-  seguidores: 159876
+  seguidores: 159893
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -209,7 +209,7 @@
   origen: twitch
   twitch_login: sajonarco
   broadcaster_id: '93191106'
-  seguidores: 67366
+  seguidores: 67367
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -250,7 +250,7 @@
   origen: twitch
   twitch_login: lamejorclase
   broadcaster_id: '598808171'
-  seguidores: 66737
+  seguidores: 66748
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -331,7 +331,7 @@
   origen: twitch
   twitch_login: srserpiente
   broadcaster_id: '30805171'
-  seguidores: 169015
+  seguidores: 169014
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -1053,7 +1053,7 @@
   origen: twitch
   twitch_login: gazadventures
   broadcaster_id: '92471567'
-  seguidores: 87452
+  seguidores: 87453
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -1134,7 +1134,7 @@
   origen: twitch
   twitch_login: ishika
   broadcaster_id: '157248383'
-  seguidores: 30211
+  seguidores: 30212
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -1175,7 +1175,7 @@
   origen: twitch
   twitch_login: agustinitita
   broadcaster_id: '547214346'
-  seguidores: 35847
+  seguidores: 35848
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -1216,8 +1216,8 @@
   origen: twitch
   twitch_login: suzyroxx
   broadcaster_id: '417684519'
-  seguidores: 182936
-  seguidores_leidos: '2026-11-21'
+  seguidores: 182914
+  seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1243,12 +1243,13 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-23'
+  vence: '2026-11-25'
   estado: vigente
   uso: produccion
   publicable: true
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
+  nombre_visible: Suzyroxx
 - id: t-vicesat
   tipo: T
   creador: twitch.tv/vicesat
@@ -2336,7 +2337,7 @@
   origen: twitch
   twitch_login: emagoplay
   broadcaster_id: '574587099'
-  seguidores: 34458
+  seguidores: 34459
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -3104,7 +3105,7 @@
   origen: twitch
   twitch_login: knooby
   broadcaster_id: '276541628'
-  seguidores: 19893
+  seguidores: 19912
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -3145,7 +3146,7 @@
   origen: twitch
   twitch_login: escocessl
   broadcaster_id: '132523000'
-  seguidores: 73457
+  seguidores: 73459
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -3384,3 +3385,85 @@
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
   nombre_visible: DonAngelillo
+- id: t-mjlabanda-unosiete
+  tipo: T
+  creador: twitch.tv/mjlabanda_unosiete
+  credito: twitch.tv/mjlabanda_unosiete
+  origen: twitch
+  twitch_login: mjlabanda_unosiete
+  broadcaster_id: '853240462'
+  seguidores: 9763
+  seguidores_leidos: '2026-11-23'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-25'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: mjlabanda_unosiete
+- id: t-jackfyah
+  tipo: T
+  creador: twitch.tv/jackfyah
+  credito: twitch.tv/jackfyah
+  origen: twitch
+  twitch_login: jackfyah
+  broadcaster_id: '75712983'
+  seguidores: 141142
+  seguidores_leidos: '2026-11-23'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-25'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: JackFyah
