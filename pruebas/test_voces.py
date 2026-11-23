@@ -657,7 +657,7 @@ def test_hacer_toma_modo_principal_reemplaza_las_lineas_y_corta_el_silencio(ento
     r, llamadas = entorno_toma(tmp_path, _voces_falsas([(0.0, 5.0), (6.0, 12.0)]))
     assert r.ok, r.motivos
     assert llamadas[0][0] == 2.0 and llamadas[0][1] == 12.0 and llamadas[0][2]["minimo_s"] == 7.0
-    assert llamadas[0][2]["nombre_streamer"] == "@probador"
+    assert llamadas[0][2]["nombre_streamer"] == "PROBADOR"     # nombre para mostrar (#30), no el login
     p = r.plan
     assert p["duracion"] == 11.0 and p["origen"]["duracion"] == 11.0 and p["origen"]["tramos"] == [[0.0, 5.0], [6.0, 12.0]]
     assert r.fila["duracion_s"] == 11.0
