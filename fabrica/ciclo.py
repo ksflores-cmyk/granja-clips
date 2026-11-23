@@ -588,14 +588,27 @@ def _claves_de(c) -> list[str]:
     return sorted({str(x) for x in [c.id_origen, *(getattr(c, "ids_origen", None) or [])] if x})
 
 
+def _frase_del_streamer(gemini) -> str:
+    """La primera frase (en español) que dice el streamer en la respuesta de Gemini; vacía si no hay."""
+    for ln in (gemini.get("lineas") if isinstance(gemini, dict) else None) or []:
+        if isinstance(ln, dict) and str(ln.get("hablante", "")).strip().upper() == "STREAMER" \
+                and isinstance(ln.get("es"), str) and ln["es"].strip():
+            return ln["es"].strip()
+    return ""
+
+
 def _toma_dict(r, c, ficha: dict) -> dict:
+    from .editar import nombres as mod_nombres
     f = r.fila
     caption = (getattr(r, "gemini", None) or {}).get("caption") if isinstance(getattr(r, "gemini", None), dict) else None
+    creador = c.creador or ficha.get("creador")
     return {"numero": f["toma"], "gancho": f["gancho"], "pilar": f["pilar"], "fuente_id": ficha.get("id"),
             "caption": caption if isinstance(caption, str) else "",
+            "frase": _frase_del_streamer(getattr(r, "gemini", None)),       # respaldo del caption (textos.respaldo_de_dialogo)
+            "hablante": mod_nombres.nombre_para_mostrar(mod_nombres.creador_de(creador, ficha), ficha),
             "campana": ficha.get("campana") or "", "duracion_s": f["duracion_s"],
             "historia": f.get("historia") or "",
-            "creador": c.creador or ficha.get("creador"), "id_origen": c.id_origen, "claves": _claves_de(c)}
+            "creador": creador, "id_origen": c.id_origen, "claves": _claves_de(c)}
 
 
 def claves_recientes(raiz, plataforma: str, cuando: datetime, horas: int) -> set[str]:

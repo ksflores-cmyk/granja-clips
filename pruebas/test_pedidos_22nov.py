@@ -29,7 +29,10 @@ def test_el_prompt_lleva_la_fecha_de_estreno_las_plataformas_y_la_fecha_de_hoy(m
     assert "PS5" in p and "Xbox Series X|S" in p
     assert "22 de noviembre de 2026" in p and "2026-11-22" in p
     assert "GTA 6 salió el" in p and "categoría oficial de Twitch" in p
-    assert "no es una filtración" in p and "juego sin lanzar" in p
+    assert "no es una filtración ni un juego sin lanzar" in p
+    assert "Sigue siendo `apto: false` el material previo al estreno o extraído del juego (filtración)" in p
+    assert "una copia pirata" in p and "programas de trampas externos" in p
+    assert "no es una filtración, un tráiler" not in p and "No lo descartes por eso" not in p
     assert "{{" not in p
 
 
@@ -52,7 +55,8 @@ def test_la_fecha_de_hoy_por_defecto_es_la_de_guatemala(marca, temporada):
 def test_los_trucos_y_curiosidades_se_permiten_y_los_hacks_no(marca, temporada):
     p = ojos.instruccion(marca, temporada, 12.0)
     assert "trucos del propio juego" in p and "SÍ se permiten" in p and "no son motivo de descarte" in p
-    assert "programas de trampas externos (hacks)" in p and "piratería" in p
+    assert "programas de trampas externos (hacks)" in p and "copia pirata" in p
+    assert "extraído del juego (filtración)" in p
 
 
 # ---------------------------------------------------------------- 3. subtítulos ya quemados
@@ -310,17 +314,94 @@ def test_validar_acepta_apodo_y_nombre_visible_y_rechaza_los_malos():
         assert any("nombre_visible" in e for e in errores(nombre_visible=malo)), malo
 
 
-def test_la_regla_de_7_dias_mira_tambien_el_gancho(tmp_path):
+def test_la_regla_de_7_dias_es_la_de_main_y_los_respaldos_de_dialogo_no_chocan(tmp_path):
     from fabrica import publicar
     from fabrica.publicar import Descartada
+    assert not hasattr(publicar, "_clave_gancho")
     hoy = date(2026, 11, 22)
-    a = {**TOMA_C, "numero": 1, "caption": None, "gancho": "Pollo atropella un coche"}
-    b = {**a, "numero": 8, "gancho": "Dragón sobrevuela la ciudad"}        # mismo respaldo (1 y 8 caen en la misma frase de 7)
+    a = {**TOMA_C, "numero": 1, "caption": None, "gancho": "Pollo atropella un coche",
+         "frase": "Ya podéis perrear", "hablante": "MIRIAM PETRICOR"}
+    b = {**a, "numero": 8, "gancho": "Dragón sobrevuela la ciudad", "frase": "No me lo puedo creer"}
     ta = armar_textos(a, ficha_t(), "shorts", tmp_path, hoy)
-    assert primera(a)[10:] == primera(b)[10:]
+    assert primera(a) == "Toma 001. «Ya podéis perrear», dice MIRIAM PETRICOR"
     ruta = tmp_path / "estado" / "buffer-textos.json"
-    publicar._escribir_json(ruta, [{"fecha": "2026-11-21", "plataforma": "shorts", "gancho": publicar._clave_gancho(a),
+    publicar._escribir_json(ruta, [{"fecha": "2026-11-21", "plataforma": "shorts",
                                     "huella": publicar.hashlib.sha256(publicar._cuerpo_sin_toma(ta["texto"]).encode()).hexdigest()}])
-    armar_textos(b, ficha_t(), "shorts", tmp_path, hoy)                           # otro gancho, misma frase: pasa
+    armar_textos(b, ficha_t(), "shorts", tmp_path, hoy)                  # frases distintas: no chocan
     with pytest.raises(Descartada, match="repetido"):
-        armar_textos({**a, "numero": 8}, ficha_t(), "shorts", tmp_path, hoy)         # mismo gancho y frase: no
+        armar_textos({**a, "numero": 8}, ficha_t(), "shorts", tmp_path, hoy)   # mismo texto: choca, como en main
+
+
+def test_el_respaldo_sin_frase_o_con_frase_mala_vuelve_a_las_frases_fijas():
+    base = {**TOMA_C, "caption": None, "hablante": "MIRIAM PETRICOR"}
+    assert primera({**base, "frase": ""}) == primera({**base, "frase": None, "hablante": ""})
+    assert "dice" not in primera({**base, "frase": "x" * 130})                   # demasiado larga
+    assert "dice" not in primera({**base, "frase": "Pollo atropella un coche"})   # igual al gancho
+    assert "dice" not in primera({**base, "frase": "Rubius se ríe"})              # nombre vetado
+    assert "dice" not in primera({**base, "frase": "Ya podéis perrear", "hablante": ""})   # sin nombre
+
+
+def test_el_caption_de_gemini_con_palabra_vetada_de_la_ficha_usa_el_respaldo():
+    ficha = {**ficha_t(), "reglas": {**ficha_t().get("reglas", {}), "palabras_evitar": ["filtración", "pirata"]}}
+    for malo in ("Esto parece una filtración del juego", "Versión pirata a la vista"):
+        t = {**TOMA_C, "caption": malo, "frase": "Ya podéis perrear", "hablante": "ANA"}
+        linea = primera(t, ficha=ficha)
+        assert "filtraci" not in linea and "pirata" not in linea and linea == "Toma 004. «Ya podéis perrear», dice ANA"
+    ok = primera({**TOMA_C, "caption": "¿Quién conducía ese coche?"}, ficha=ficha)
+    assert ok == "Toma 004. ¿Quién conducía ese coche?"
+    assert primera({**TOMA_C, "caption": "Rubius lo vio venir"}, ficha=ficha) != "Toma 004. Rubius lo vio venir"
+
+
+def test_toma_dict_lleva_la_primera_frase_del_streamer_y_su_nombre():
+    from types import SimpleNamespace as S
+    from fabrica import ciclo
+    gem = {"caption": "", "lineas": [{"hablante": "OTRA VOZ", "es": "Hola"}, {"hablante": "STREAMER", "es": "Ya podéis perrear"}]}
+    r = S(fila={"toma": 7, "gancho": "G", "pilar": "momentos", "duracion_s": 10, "historia": ""}, gemini=gem)
+    c = S(creador="twitch.tv/miriam_petricor", id_origen="a", ids_origen=[])
+    t = ciclo._toma_dict(r, c, {"id": "t-x", "twitch_login": "miriam_petricor", "creador": "twitch.tv/miriam_petricor"})
+    assert t["frase"] == "Ya podéis perrear" and t["hablante"] == "MIRIAM PETRICOR"
+
+
+def test_con_login_apodo_y_nombre_visible_vetados_no_hay_nombre_y_el_credito_queda(marca, temporada):
+    ficha = {"twitch_login": "auronplay", "creador": "twitch.tv/auronplay", "apodo": "Ibai", "nombre_visible": "Rubius"}
+    assert nombres.nombre_para_mostrar("twitch.tv/auronplay", ficha) == ""
+    assert nombres.nombre_para_mostrar("auronplay", {"twitch_login": "auronplay"}) == ""
+    assert nombres.nombre_para_mostrar("ana", {"twitch_login": "ana"}) == "ANA"
+    ficha_ok = {**ficha, "nombre_visible": "Ana_Lia"}
+    assert nombres.nombre_para_mostrar("auronplay", ficha_ok) == "ANA LIA"          # basta un nombre bueno
+    ficha = {**ficha_propia(creador="twitch.tv/auronplay", twitch_login="auronplay"), "apodo": "Ibai", "nombre_visible": "Rubius"}
+    toma, lineas, _, _ = mod_toma.armar(cargar_dato("valida"), marca, ficha, 5, "twitch.tv/auronplay", temporada)
+    assert toma.escena == "INT. STREAM"
+    assert {ln.nombre for ln in lineas if ln.nombre} <= {nombres.OTRA_VOZ}
+    assert "auronplay" in toma.credito.lower()                       # el crédito de campaña se queda
+
+
+def test_compilado_descarta_el_segmento_con_aviso(tmp_path, marca, temporada, monkeypatch):
+    import types
+    from fabrica import formatos
+    from fabrica.editar.lienzo import Toma
+    toma = Toma(numero=1, gancho="x", palabra_lapiz="x", lapiz=1, escena="INT. STREAM", credito="Con: a")
+    monkeypatch.setattr(formatos, "armar", lambda *a, **k: (toma, [], 0.0, 10.0))
+    monkeypatch.setattr(formatos.ojos, "validar_respuesta", lambda *a, **k: (True, []))
+    monkeypatch.setattr(formatos.ojos, "mirar", lambda *a, **k: types.SimpleNamespace(datos={"spoiler": True}, motivo=""))
+    monkeypatch.setattr(formatos, "copia_para_ojos", lambda *a, **k: tmp_path / "x.mp4")
+    monkeypatch.setattr(formatos.mod_descargar, "descargar", lambda *a, **k: _Desc(tmp_path))
+    ctx = types.SimpleNamespace(ahora=AHORA, raiz=RAIZ_REAL, pila=_Pila(), cfg={}, marca=marca, temporada=temporada,
+                                numero=1, abrir=None, ejecutor=None, transporte=None, espera=None, entorno=None)
+    monkeypatch.setattr(formatos, "_recorte_de", lambda *a, **k: None)
+    monkeypatch.setattr(formatos.ojos, "temporada_de", lambda f, t: t)
+    monkeypatch.setattr(formatos.ojos, "juego_de", lambda f, t: "GTA 6")
+    monkeypatch.setattr(formatos.ojos, "nota_de_ficha", lambda f: "")
+    cand = types.SimpleNamespace(id_origen="a", url="u", creador="ana", creado_en=AHORA)
+    with pytest.raises(formatos.ErrorSegmento, match="aviso spoiler: no va en compilados"):
+        formatos.preparar_segmento(cand, {"id": "f", "creador": "ana"}, ctx)
+
+
+class _Pila:
+    def enter_context(self, x):
+        return x
+
+
+class _Desc:
+    def __init__(self, ruta):
+        self.ruta, self.duracion = ruta / "x.mp4", 20.0

@@ -44,18 +44,22 @@ def nombre_para_mostrar(creador: str | None, ficha: dict | None, raiz=None) -> s
     el `apodo` (campo opcional, manda), si no el `nombre_visible` de Twitch (se guarda al armar la ficha T), si no el
     login sin guiones bajos. El apodo y el nombre visible sólo valen si `creador` es el de la propia ficha (en las
     campañas el creador llega por archivo y puede ser otro). Nunca sale lo que diga el modelo ni un nombre de
-    `config/vetados.yml`: si el apodo o el nombre visible lo traen, se usa el login."""
+    `config/vetados.yml`: si el apodo o el nombre visible lo traen, se usa el login. Si el login también está vetado
+    (y no hay apodo ni nombre visible que sirva), devuelve "" y el video no lleva nombre: el hablante sale `OTRA VOZ`
+    y la escena `INT. STREAM`. El crédito de campaña («Con: ...») no pasa por aquí: lo exige la campaña."""
     login = _limpiar_visible(nombre_corto(creador))
     f = ficha or {}
     propios = {normalizar(nombre_corto(x)) for x in (f.get("twitch_login"), f.get("creador")) if x}
+    todos = logins_vetados(raiz)
+    login_vetado = normalizar(nombre_corto(creador)) in {normalizar(v) for v in todos}
     if not login or normalizar(login) not in propios:
-        return login
-    vetados = {v for v in logins_vetados(raiz) if normalizar(v) != normalizar(login)}
+        return "" if login_vetado else login
+    vetados = {v for v in todos if normalizar(v) != normalizar(login)}
     for campo in ("apodo", "nombre_visible"):
         cand = _limpiar_visible(f.get(campo))
         if cand and not _vetado_en(cand, vetados):
             return cand
-    return login
+    return "" if login_vetado else login
 
 
 def etiqueta_hablante(hablante: str, creador: str | None) -> str:

@@ -178,15 +178,16 @@ def contexto_juego(temporada: dict, juego: str | None = None, hoy=None) -> str:
     nombre = str(temporada.get("nombre") or "").strip()
     esperado = str(juego or nombre).strip()
     partes = [f"Fecha de hoy: {_fecha_texto(hoy)}. Tu conocimiento puede ser anterior a esa fecha: lo que no reconozcas "
-              "puede ser contenido posterior a tu entrenamiento, no una filtración."]
+              "puede ser contenido posterior a tu entrenamiento."]
     estreno = _fecha_texto(temporada.get("fecha_estreno"))
     if nombre and estreno and esperado == nombre:
         plat = temporada.get("plataformas_juego") or []
         en = f" en {' y '.join(str(p) for p in plat)}" if plat else ""
         partes.append(
             f"{nombre} salió el {estreno}{en}. Este clip viene de la categoría oficial de Twitch de ese juego: es "
-            f"gameplay real de {nombre} ya lanzado; no es una filtración, un tráiler ni un juego sin lanzar. No lo "
-            f"descartes por eso. Pon `juego_correcto: false` sólo si se ve CLARAMENTE otro juego distinto (por ejemplo "
+            f"gameplay real de {nombre} ya lanzado, así que el juego en sí no es una filtración ni un juego sin lanzar. "
+            f"Sigue siendo `apto: false` el material previo al estreno o extraído del juego (filtración), una copia "
+            f"pirata y los programas de trampas externos. Pon `juego_correcto: false` sólo si se ve CLARAMENTE otro juego distinto (por ejemplo "
             f"Minecraft). Si parece {nombre} con cosas raras (texturas, personajes o vehículos cambiados, o parecido a "
             f"un juego anterior de la saga), es `mods: true`, no otro juego.")
     return " ".join(partes)
