@@ -10,7 +10,15 @@ from .pausa import pausa_t_activa
 from .vetados import fuentes_retiradas, logins_vetados
 
 RUTA_FICHAS_T = "estado/fichas-t.yml"
-RE_ID_T = re.compile(r"^t-[a-z0-9]+(-[a-z0-9]+)*$")
+# Un login de Twitch ([a-z0-9_]{3,25}) pasa "_" a "-": los ids viejos no cambian, y los logins con "_" al final o
+# doble ("stephaniemx_", "a__b") dan "t-stephaniemx-", "t-a--b", que también valen (el login no trae guiones: no choca).
+RE_ID_T = re.compile(r"^t-[a-z0-9][a-z0-9-]*$")
+
+
+def id_ficha_t(login: str) -> str:
+    """Id estable de la ficha T de un login de Twitch."""
+    return "t-" + str(login).lower().replace("_", "-")
+
 
 
 def _fuentes_yml(raiz=None) -> list[dict]:

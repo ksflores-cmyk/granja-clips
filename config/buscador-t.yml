@@ -5,9 +5,9 @@ idioma: es
 seguidores_min: 1000
 seguidores_max: 300000
 max_clips_por_streamer_dia: 2
-max_streams: 20            # streams en vivo del juego que se miran
-paginas_clips_juego: 3     # páginas de 100 clips del juego
-max_streamers: 40          # tope de llamadas de seguidores por corrida
+max_streams: 40            # streams en vivo del juego que se miran
+paginas_clips_juego: 5     # páginas de 100 clips del juego
+max_streamers: 80          # tope de llamadas de seguidores por corrida
 horas: 24
 duracion_s: [10, 45]
 plataformas: [shorts, tiktok, reels]

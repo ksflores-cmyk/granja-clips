@@ -56,7 +56,7 @@ def _de_retiros(raiz) -> set[str]:
         for c in celdas:
             out.update(m.lower() for m in RE_CANAL.findall(c))
         if len(celdas) > 1:
-            m = re.fullmatch(r"t-([a-z0-9]+(?:-[a-z0-9]+)*)", celdas[1].strip().lower())
+            m = re.fullmatch(r"t-([a-z0-9][a-z0-9-]*)", celdas[1].strip().lower())
             if m:
                 out.add(m.group(1).replace("-", "_"))
     return out
