@@ -899,7 +899,8 @@
     "largo": 150
    },
    "ficha_id": "t-zyrpesland"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|7|2026-11-23T17:30:00.000Z",
@@ -952,7 +953,8 @@
     "largo": 150
    },
    "ficha_id": "t-zyrpesland"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|7|2026-11-23T17:30:00.000Z",
@@ -1005,6 +1007,166 @@
     "largo": 153
    },
    "ficha_id": "t-zyrpesland"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "shorts|8|2026-11-23T19:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 8,
+  "dueAt": "2026-11-23T19:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-23/toma-008-15e4af23.mp4",
+  "estado": "creado",
+  "post_id": "6b048039768ab8d8e4026c26",
+  "intento": "0be510e0cb4a4ff7b2c945681f50c81f",
+  "registrado": true,
+  "texto": "Toma 008. Cuando las cosas se ponen feas en la calle hay que correr sin mirar atrás\n\n🎥 twitch.tv/mjlabanda_unosiete\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 8,
+    "gancho": "Corriendo por el callejón",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-mjlabanda-unosiete",
+    "caption": "Cuando las cosas se ponen feas en la calle hay que correr sin mirar atrás",
+    "frase": "estoy rayando mi gente, rayando sale el día",
+    "hablante": "MJLABANDA UNOSIETE",
+    "campana": "",
+    "duracion_s": 11.5,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/mjlabanda_unosiete",
+    "id_origen": "ViscousSleepyGrasshopperArsonNoSexy-wBFqNrg-L3O0SEFA",
+    "claves": [
+     "ViscousSleepyGrasshopperArsonNoSexy-wBFqNrg-L3O0SEFA"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 008. Cuando las cosas se ponen feas en la calle hay que correr sin mirar atrás\n\n🎥 twitch.tv/mjlabanda_unosiete\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 008. Cuando las cosas se ponen feas en la calle hay que correr sin mirar atrás",
+    "credito": "🎥 twitch.tv/mjlabanda_unosiete",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 008. Cuando las cosas se ponen feas en la calle hay que correr sin mirar atrás\n\n🎥 twitch.tv/mjlabanda_unosiete\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 147
+   },
+   "ficha_id": "t-mjlabanda-unosiete"
+  }
+ },
+ {
+  "id": "tiktok|8|2026-11-23T19:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 8,
+  "dueAt": "2026-11-23T19:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-23/toma-008-15e4af23.mp4",
+  "estado": "creado",
+  "post_id": "6b04803a768ab8d8e4026c7d",
+  "intento": "e60a237595fa408ca24300031a10173b",
+  "registrado": true,
+  "texto": "Toma 008. Cuando las cosas se ponen feas en la calle hay que correr sin mirar atrás\n\n🎥 twitch.tv/mjlabanda_unosiete\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 8,
+    "gancho": "Corriendo por el callejón",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-mjlabanda-unosiete",
+    "caption": "Cuando las cosas se ponen feas en la calle hay que correr sin mirar atrás",
+    "frase": "estoy rayando mi gente, rayando sale el día",
+    "hablante": "MJLABANDA UNOSIETE",
+    "campana": "",
+    "duracion_s": 11.5,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/mjlabanda_unosiete",
+    "id_origen": "ViscousSleepyGrasshopperArsonNoSexy-wBFqNrg-L3O0SEFA",
+    "claves": [
+     "ViscousSleepyGrasshopperArsonNoSexy-wBFqNrg-L3O0SEFA"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 008. Cuando las cosas se ponen feas en la calle hay que correr sin mirar atrás\n\n🎥 twitch.tv/mjlabanda_unosiete\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/mjlabanda_unosiete",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 008. Cuando las cosas se ponen feas en la calle hay que correr sin mirar atrás\n\n🎥 twitch.tv/mjlabanda_unosiete\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 147
+   },
+   "ficha_id": "t-mjlabanda-unosiete"
+  }
+ },
+ {
+  "id": "reels|8|2026-11-23T19:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 8,
+  "dueAt": "2026-11-23T19:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-23/toma-008-15e4af23.mp4",
+  "estado": "creado",
+  "post_id": "6b04803a76f8581f138c4b93",
+  "intento": "fa8ebdeec8284ca6a34c874af0872ca1",
+  "registrado": true,
+  "texto": "Toma 008. Cuando las cosas se ponen feas en la calle hay que correr sin mirar atrás\n\n🎥 twitch.tv/mjlabanda_unosiete\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 8,
+    "gancho": "Corriendo por el callejón",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-mjlabanda-unosiete",
+    "caption": "Cuando las cosas se ponen feas en la calle hay que correr sin mirar atrás",
+    "frase": "estoy rayando mi gente, rayando sale el día",
+    "hablante": "MJLABANDA UNOSIETE",
+    "campana": "",
+    "duracion_s": 11.5,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/mjlabanda_unosiete",
+    "id_origen": "ViscousSleepyGrasshopperArsonNoSexy-wBFqNrg-L3O0SEFA",
+    "claves": [
+     "ViscousSleepyGrasshopperArsonNoSexy-wBFqNrg-L3O0SEFA"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 008. Cuando las cosas se ponen feas en la calle hay que correr sin mirar atrás\n\n🎥 twitch.tv/mjlabanda_unosiete\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/mjlabanda_unosiete",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 008. Cuando las cosas se ponen feas en la calle hay que correr sin mirar atrás\n\n🎥 twitch.tv/mjlabanda_unosiete\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 150
+   },
+   "ficha_id": "t-mjlabanda-unosiete"
   }
  }
 ]

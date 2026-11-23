@@ -331,7 +331,7 @@
   origen: twitch
   twitch_login: srserpiente
   broadcaster_id: '30805171'
-  seguidores: 169014
+  seguidores: 169015
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -1134,7 +1134,7 @@
   origen: twitch
   twitch_login: ishika
   broadcaster_id: '157248383'
-  seguidores: 30212
+  seguidores: 30218
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -1175,7 +1175,7 @@
   origen: twitch
   twitch_login: agustinitita
   broadcaster_id: '547214346'
-  seguidores: 35848
+  seguidores: 35850
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -1216,7 +1216,7 @@
   origen: twitch
   twitch_login: suzyroxx
   broadcaster_id: '417684519'
-  seguidores: 182914
+  seguidores: 182915
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -1257,8 +1257,8 @@
   origen: twitch
   twitch_login: vicesat
   broadcaster_id: '110387651'
-  seguidores: 15707
-  seguidores_leidos: '2026-11-22'
+  seguidores: 16077
+  seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1284,12 +1284,13 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-24'
+  vence: '2026-11-25'
   estado: vigente
   uso: produccion
   publicable: true
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
+  nombre_visible: vicesat
 - id: t-elmeap
   tipo: T
   creador: twitch.tv/elmeap
@@ -1457,8 +1458,8 @@
   origen: twitch
   twitch_login: victoriarodrgzz
   broadcaster_id: '73577459'
-  seguidores: 45404
-  seguidores_leidos: '2026-11-21'
+  seguidores: 45545
+  seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1484,12 +1485,13 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-23'
+  vence: '2026-11-25'
   estado: vigente
   uso: produccion
   publicable: true
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
+  nombre_visible: victoriarodrgzz
 - id: t-superblazing-
   tipo: T
   creador: twitch.tv/superblazing_
@@ -1497,8 +1499,8 @@
   origen: twitch
   twitch_login: superblazing_
   broadcaster_id: '573251394'
-  seguidores: 28187
-  seguidores_leidos: '2026-11-22'
+  seguidores: 28276
+  seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1524,12 +1526,13 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-24'
+  vence: '2026-11-25'
   estado: vigente
   uso: produccion
   publicable: true
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
+  nombre_visible: superblazing_
 - id: t-tibsonm
   tipo: T
   creador: twitch.tv/tibsonm
@@ -3351,7 +3354,7 @@
   origen: twitch
   twitch_login: donangelillo
   broadcaster_id: '513440587'
-  seguidores: 33901
+  seguidores: 33905
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -3433,7 +3436,7 @@
   origen: twitch
   twitch_login: jackfyah
   broadcaster_id: '75712983'
-  seguidores: 141142
+  seguidores: 141141
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -3467,3 +3470,167 @@
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
   nombre_visible: JackFyah
+- id: t-soyalexwhite
+  tipo: T
+  creador: twitch.tv/soyalexwhite
+  credito: twitch.tv/soyalexwhite
+  origen: twitch
+  twitch_login: soyalexwhite
+  broadcaster_id: '176597728'
+  seguidores: 17985
+  seguidores_leidos: '2026-11-23'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-25'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: SoyAlexWhite
+- id: t-lechu
+  tipo: T
+  creador: twitch.tv/lechu
+  credito: twitch.tv/lechu
+  origen: twitch
+  twitch_login: lechu
+  broadcaster_id: '105216837'
+  seguidores: 122206
+  seguidores_leidos: '2026-11-23'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-25'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: Lechu
+- id: t-donluckymx
+  tipo: T
+  creador: twitch.tv/donluckymx
+  credito: twitch.tv/donluckymx
+  origen: twitch
+  twitch_login: donluckymx
+  broadcaster_id: '618494764'
+  seguidores: 65914
+  seguidores_leidos: '2026-11-23'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-25'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: donluckymx
+- id: t-newgameplus
+  tipo: T
+  creador: twitch.tv/newgameplus
+  credito: twitch.tv/newgameplus
+  origen: twitch
+  twitch_login: newgameplus
+  broadcaster_id: '52325209'
+  seguidores: 16325
+  seguidores_leidos: '2026-11-23'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-25'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: newgameplus
