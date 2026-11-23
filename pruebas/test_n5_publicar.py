@@ -2,6 +2,7 @@
 import csv
 import json
 import shutil
+from pathlib import Path
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -1483,3 +1484,100 @@ def test_borrador_con_subida_guardada_pero_respuesta_perdida_igual_borra(repo):
                             transporte_buffer=BufferSimulado(), transporte_almacen=transporte,
                             ahora=lambda: AHORA)
     assert cod == 1 and supa.objetos == {}, sal
+
+
+# ---------------- caché de la introspección (estado/buffer-esquema.json) ----------------
+
+def _tipos_pedidos(sim):
+    return [q for q in sim.consultas if "__type" in q]
+
+
+def test_cache_primera_corrida_lee_y_guarda_segunda_no_llama_a_type(tmp_path):
+    sim = BufferSimulado()
+    pub1, _ = vivo(tmp_path, sim)
+    primero = pub1.esquema
+    leidas = len(_tipos_pedidos(sim))
+    assert leidas >= 5
+    guardado = json.loads((tmp_path / "estado" / "buffer-esquema.json").read_text(encoding="utf-8"))
+    assert guardado["esquema"] == primero and guardado["leido"].startswith("2026-11-18")
+    sim2 = BufferSimulado()
+    pub2, _ = vivo(tmp_path, sim2)             # otra corrida: cliente y Publicador nuevos, mismo estado/
+    assert pub2.esquema == primero
+    assert sim2.consultas == []
+
+
+def test_cache_de_8_dias_se_renueva(tmp_path):
+    pub, _ = vivo(tmp_path)
+    pub.esquema
+    ruta = tmp_path / "estado" / "buffer-esquema.json"
+    d = json.loads(ruta.read_text(encoding="utf-8"))
+    d["leido"] = (AHORA - timedelta(days=8)).isoformat()
+    ruta.write_text(json.dumps(d), encoding="utf-8")
+    sim = BufferSimulado()
+    pub2, _ = vivo(tmp_path, sim)
+    pub2.esquema
+    assert _tipos_pedidos(sim)
+    assert json.loads(ruta.read_text(encoding="utf-8"))["leido"].startswith("2026-11-18T12")
+    d["leido"] = (AHORA - timedelta(days=6)).isoformat()      # con 6 días sigue vigente
+    ruta.write_text(json.dumps(d), encoding="utf-8")
+    sim3 = BufferSimulado()
+    vivo(tmp_path, sim3)[0].esquema
+    assert sim3.consultas == []
+
+
+def test_cache_ilegible_o_incompleta_se_relee(tmp_path):
+    ruta = tmp_path / "estado" / "buffer-esquema.json"
+    ruta.parent.mkdir()
+    for basura in ("{no es json", json.dumps({"leido": AHORA.isoformat(), "esquema": {"tipos": {}}}),
+                   json.dumps({"leido": "ayer", "esquema": {}})):
+        ruta.write_text(basura, encoding="utf-8")
+        sim = BufferSimulado()
+        assert vivo(tmp_path, sim)[0].esquema["tipos"]["CreatePostInput"]
+        assert _tipos_pedidos(sim)
+
+
+class _CreateConErrores(BufferSimulado):
+    def __init__(self, mensaje, **kw):
+        super().__init__(**kw)
+        self.mensaje, self.creates = mensaje, 0
+
+    def __call__(self, metodo, url, encabezados, cuerpo=None, tiempo=60):
+        if "createPost" in json.loads(cuerpo.decode("utf-8"))["query"]:
+            self.consultas.append("createPost")
+            self.creates += 1
+            return F.resp(200, {"errors": [{"message": self.mensaje}]})
+        return super().__call__(metodo, url, encabezados, cuerpo, tiempo)
+
+
+@pytest.mark.parametrize("mensaje", ['Unknown argument "foo" on field "createPost"',
+                                     'Cannot query field "dueAt" on type "Post"',
+                                     'Unknown type "CreatePostInput2"',
+                                     'Field "madeForKids" is not defined by type "YoutubePostMetadataInput"'])
+def test_error_de_esquema_en_createpost_borra_la_cache_y_no_reintenta(tmp_path, mensaje):
+    sim = _CreateConErrores(mensaje)
+    pub, _ = vivo(tmp_path, sim)
+    pub.esquema
+    ruta = tmp_path / "estado" / "buffer-esquema.json"
+    assert ruta.exists()
+    with pytest.raises(publicar.ErrorIncierto):
+        pub._crear({"channelId": "canal-yt-001", "text": "x"}, "canal-yt-001")
+    assert sim.creates == 1                    # una mutación NUNCA se repite en la misma corrida
+    assert not ruta.exists()
+    sim2 = BufferSimulado()
+    vivo(tmp_path, sim2)[0].esquema            # la próxima corrida vuelve a leer
+    assert _tipos_pedidos(sim2) and ruta.exists()
+
+
+def test_error_de_createpost_que_no_es_de_esquema_conserva_la_cache(tmp_path):
+    sim = _CreateConErrores("Internal server hiccup")
+    pub, _ = vivo(tmp_path, sim)
+    pub.esquema
+    with pytest.raises(publicar.ErrorIncierto):
+        pub._crear({"channelId": "canal-yt-001", "text": "x"}, "canal-yt-001")
+    assert (tmp_path / "estado" / "buffer-esquema.json").exists()
+
+
+def test_el_ciclo_guarda_estado_completo_asi_que_incluye_buffer_esquema():
+    """fabrica.yml hace `git add -A -- estado` y PERMITIDOS acepta estado/.*: el archivo nuevo viaja con el ciclo."""
+    wf = (Path(__file__).resolve().parent.parent / ".github" / "workflows" / "fabrica.yml").read_text(encoding="utf-8")
+    assert "estado/.*" in wf and "marcador.csv registro.md estado config/canales.yml" in wf
