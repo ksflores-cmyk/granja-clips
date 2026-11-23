@@ -194,3 +194,18 @@ def test_veredicto_exige_20_por_ciento_y_vistas_sin_caer():
     assert retencion.veredicto(d(59.9, 100)) == "seguir"        # +19,8 %: empate
     assert retencion.veredicto(d(70.0, 85)) == "seguir"         # gana en % pero pierde 15 % de vistas
     assert retencion.veredicto(d(40.0, 100)) == "control"
+
+
+def test_la_fila_publicada_conserva_los_avisos_de_la_edicion():
+    # Revisión de Codex (unión de #28 y #30): las notas de la fila publicada llevan los avisos de la edición.
+    import inspect
+    from fabrica import ciclo, publicar
+    assert "nota_edicion" in inspect.getsource(ciclo._toma_dict)
+    assert "nota_edicion" in inspect.getsource(publicar)
+
+
+def test_gancho_inicio_va_al_final_de_la_firma():
+    import inspect
+    from fabrica import ojos
+    for fn in (ojos.instruccion, ojos.mirar):
+        assert list(inspect.signature(fn).parameters)[-1] == "gancho_inicio_s"

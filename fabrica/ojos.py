@@ -195,8 +195,8 @@ def contexto_juego(temporada: dict, juego: str | None = None, hoy=None) -> str:
 
 def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: str | None = None,
                 nota: str | None = None, recorte: tuple[float, float] | None = None,
-                historia: dict | None = None, gancho_inicio_s: float | None = None, hoy=None,
-                streamer: str | None = None) -> str:
+                historia: dict | None = None, hoy=None, streamer: str | None = None,
+                gancho_inicio_s: float | None = None) -> str:
     """Arma la instrucción desde `ojos_prompt.md` con la duración, el juego y las listas de marca y temporada.
 
     `historia` ({cfg, sfx: [ids], prohibe_sfx}) activa la sección «9. historia»; sin él, el prompt sale sin ella.
@@ -378,7 +378,7 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
           juego: str | None = None, nota: str | None = None,
           recorte: tuple[float, float] | None = None, transporte_lista=None,
           registrar_cupos: bool = False, historia: dict | None = None,
-          gancho_inicio_s: float | None = None, hoy=None, streamer: str | None = None) -> Mirada:
+          hoy=None, streamer: str | None = None, gancho_inicio_s: float | None = None) -> Mirada:
     """Le pide a Gemini el análisis del clip. Reintenta una vez ante 429 o 5xx; ante 404 prueba el modelo siguiente.
     `historia` ({cfg, sfx, prohibe_sfx}) pide además el plan por momentos en la MISMA llamada (no gasta otra petición).
 

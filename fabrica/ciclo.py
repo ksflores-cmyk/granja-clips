@@ -609,6 +609,7 @@ def _toma_dict(r, c, ficha: dict) -> dict:
             "campana": ficha.get("campana") or "", "duracion_s": f["duracion_s"],
             "historia": f.get("historia") or "", "prueba": f.get("prueba") or "",
             "prueba_nota": ((getattr(r, "plan", None) or {}).get("prueba") or {}).get("nota") or "",
+            "nota_edicion": f.get("notas") or "",          # avisos (spoiler, cinemática, mods) de la fila de edición
             "creador": creador, "id_origen": c.id_origen, "claves": _claves_de(c)}
 
 

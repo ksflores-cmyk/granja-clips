@@ -824,7 +824,8 @@ class Publicador:
             "gancho": toma.get("gancho", ""), "duracion_s": toma.get("duracion_s", ""),
             "credito": textos.get("credito", ""), "url": "", "estado_campana": "",
             "notas": f"origen:{fuente_id} buffer:{post['id']}"
-                     + (f"; prueba: {toma['prueba_nota']}" if toma.get("prueba_nota") else ""),
+                     + (f"; prueba: {toma['prueba_nota']}" if toma.get("prueba_nota") else "")
+                     + (f"; {toma['nota_edicion']}" if toma.get("nota_edicion") else ""),
             "historia": toma.get("historia") or "", "prueba": toma.get("prueba") or ""})
         previos = _leer_json(_ruta_estado(self.raiz, "buffer-textos.json"), [])
         previos.append({"fecha": self.ahora().astimezone(ZONA).date().isoformat(),
