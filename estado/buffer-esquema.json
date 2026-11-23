@@ -1,0 +1,361 @@
+{
+ "leido": "2026-11-23T06:00:43+00:00",
+ "esquema": {
+  "tipos": {
+   "CreatePostInput": {
+    "aiAssisted": {
+     "tipo": "Boolean",
+     "lista": false,
+     "obligatorio": false
+    },
+    "assets": {
+     "tipo": "AssetInput",
+     "lista": true,
+     "obligatorio": false
+    },
+    "channelId": {
+     "tipo": "ChannelId",
+     "lista": false,
+     "obligatorio": true
+    },
+    "draftId": {
+     "tipo": "DraftId",
+     "lista": false,
+     "obligatorio": false
+    },
+    "dueAt": {
+     "tipo": "DateTime",
+     "lista": false,
+     "obligatorio": false
+    },
+    "ideaId": {
+     "tipo": "IdeaId",
+     "lista": false,
+     "obligatorio": false
+    },
+    "metadata": {
+     "tipo": "PostInputMetaData",
+     "lista": false,
+     "obligatorio": false
+    },
+    "mode": {
+     "tipo": "ShareMode",
+     "lista": false,
+     "obligatorio": true
+    },
+    "needsApproval": {
+     "tipo": "Boolean",
+     "lista": false,
+     "obligatorio": false
+    },
+    "saveToDraft": {
+     "tipo": "Boolean",
+     "lista": false,
+     "obligatorio": false
+    },
+    "schedulingType": {
+     "tipo": "SchedulingType",
+     "lista": false,
+     "obligatorio": true
+    },
+    "source": {
+     "tipo": "String",
+     "lista": false,
+     "obligatorio": false
+    },
+    "tagIds": {
+     "tipo": "TagId",
+     "lista": true,
+     "obligatorio": false
+    },
+    "text": {
+     "tipo": "String",
+     "lista": false,
+     "obligatorio": false
+    }
+   },
+   "PostInputMetaData": {
+    "bluesky": {
+     "tipo": "BlueskyPostMetadataInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "facebook": {
+     "tipo": "FacebookPostMetadataInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "google": {
+     "tipo": "GoogleBusinessPostMetadataInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "instagram": {
+     "tipo": "InstagramPostMetadataInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "linkedin": {
+     "tipo": "LinkedInPostMetadataInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "mastodon": {
+     "tipo": "MastodonPostMetadataInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "pinterest": {
+     "tipo": "PinterestPostMetadataInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "substack": {
+     "tipo": "SubstackPostMetadataInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "threads": {
+     "tipo": "ThreadsPostMetadataInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "tiktok": {
+     "tipo": "TikTokPostMetadataInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "twitter": {
+     "tipo": "TwitterPostMetadataInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "youtube": {
+     "tipo": "YoutubePostMetadataInput",
+     "lista": false,
+     "obligatorio": false
+    }
+   },
+   "YoutubePostMetadataInput": {
+    "categoryId": {
+     "tipo": "String",
+     "lista": false,
+     "obligatorio": false
+    },
+    "embeddable": {
+     "tipo": "Boolean",
+     "lista": false,
+     "obligatorio": false
+    },
+    "isAiGenerated": {
+     "tipo": "Boolean",
+     "lista": false,
+     "obligatorio": false
+    },
+    "license": {
+     "tipo": "YoutubeLicense",
+     "lista": false,
+     "obligatorio": false
+    },
+    "madeForKids": {
+     "tipo": "Boolean",
+     "lista": false,
+     "obligatorio": false
+    },
+    "notifySubscribers": {
+     "tipo": "Boolean",
+     "lista": false,
+     "obligatorio": false
+    },
+    "privacy": {
+     "tipo": "YoutubePrivacy",
+     "lista": false,
+     "obligatorio": false
+    },
+    "title": {
+     "tipo": "String",
+     "lista": false,
+     "obligatorio": false
+    }
+   },
+   "InstagramPostMetadataInput": {
+    "firstComment": {
+     "tipo": "String",
+     "lista": false,
+     "obligatorio": false
+    },
+    "geolocation": {
+     "tipo": "InstagramGeolocationInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "isAiGenerated": {
+     "tipo": "Boolean",
+     "lista": false,
+     "obligatorio": false
+    },
+    "link": {
+     "tipo": "String",
+     "lista": false,
+     "obligatorio": false
+    },
+    "shouldShareToFeed": {
+     "tipo": "Boolean",
+     "lista": false,
+     "obligatorio": true
+    },
+    "stickerFields": {
+     "tipo": "InstagramStickerFieldsInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "type": {
+     "tipo": "PostType",
+     "lista": false,
+     "obligatorio": true
+    }
+   },
+   "DeletePostInput": {
+    "id": {
+     "tipo": "PostId",
+     "lista": false,
+     "obligatorio": true
+    }
+   },
+   "AssetInput": {
+    "document": {
+     "tipo": "DocumentAssetInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "image": {
+     "tipo": "ImageAssetInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "video": {
+     "tipo": "VideoAssetInput",
+     "lista": false,
+     "obligatorio": false
+    }
+   },
+   "TikTokPostMetadataInput": {
+    "isAiGenerated": {
+     "tipo": "Boolean",
+     "lista": false,
+     "obligatorio": false
+    },
+    "title": {
+     "tipo": "String",
+     "lista": false,
+     "obligatorio": false
+    }
+   },
+   "VideoAssetInput": {
+    "metadata": {
+     "tipo": "VideoMetadataInput",
+     "lista": false,
+     "obligatorio": false
+    },
+    "thumbnailUrl": {
+     "tipo": "String",
+     "lista": false,
+     "obligatorio": false
+    },
+    "url": {
+     "tipo": "String",
+     "lista": false,
+     "obligatorio": true
+    }
+   }
+  },
+  "consultas": {
+   "account": [],
+   "dailyPostingLimits": [
+    "input"
+   ],
+   "channel": [
+    "input"
+   ],
+   "channels": [
+    "input"
+   ],
+   "aggregatedPostMetrics": [
+    "input"
+   ],
+   "snippets": [
+    "after",
+    "first",
+    "input"
+   ],
+   "collaborationNotes": [
+    "after",
+    "first",
+    "input"
+   ],
+   "post": [
+    "input"
+   ],
+   "posts": [
+    "after",
+    "first",
+    "input"
+   ],
+   "contentItem": [
+    "input"
+   ],
+   "contentItems": [
+    "after",
+    "first",
+    "input"
+   ],
+   "tag": [
+    "input"
+   ],
+   "tagsV2": [
+    "after",
+    "first",
+    "input"
+   ],
+   "selectableTeamMembers": [
+    "after",
+    "first",
+    "input"
+   ],
+   "instagramAudio": [
+    "input"
+   ],
+   "searchInstagramAudio": [
+    "input"
+   ],
+   "trendingInstagramAudio": [
+    "input"
+   ],
+   "instagramAudioCatalog": [
+    "input"
+   ],
+   "searchInstagramAudioCatalog": [
+    "input"
+   ],
+   "configuration": [
+    "input"
+   ],
+   "postTemplate": [
+    "input"
+   ],
+   "postTemplates": [
+    "after",
+    "first",
+    "input"
+   ],
+   "ideaGroups": [
+    "input"
+   ],
+   "ideas": [
+    "after",
+    "first",
+    "input"
+   ]
+  }
+ }
+}

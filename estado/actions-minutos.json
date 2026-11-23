@@ -15,10 +15,19 @@
     "muestras": 43,
     "puerta": 370
    }
+  },
+  "2026-11-22": {
+   "total": 1067,
+   "por_workflow": {
+    "fabrica": 117,
+    "formatos": 57,
+    "informativas-ensayo": 5,
+    "muestras": 97,
+    "musica": 1,
+    "puerta": 789,
+    "sfx": 1
+   }
   }
  },
- "_en_curso": {
-  "inicio": "2026-11-23T00:00:39-06:00",
-  "run_id": "45121240647"
- }
+ "2026-11-23": 1.0
 }
