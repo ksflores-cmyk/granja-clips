@@ -23,7 +23,7 @@ import yaml
 
 from . import plazo
 from .config import cargar_yaml, raiz_repo
-from .fuentes import RUTA_FICHAS_T, cargar_fuentes, es_publicable
+from .fuentes import RUTA_FICHAS_T, cargar_fuentes, es_publicable, id_ficha_t
 from .pausa import pausa_t_activa
 from .vetados import equipos_vetados, logins_vetados
 
@@ -238,7 +238,7 @@ def config_t(raiz=None) -> dict:
 def _ficha_t(login: str, bid: str, seguidores: int, juego: str, cfg: dict, hoy,
              hashtags: list | None = None, nombre_visible: str | None = None) -> dict:
     ficha = {
-        "id": "t-" + login.replace("_", "-"), "tipo": "T", "creador": f"twitch.tv/{login}",
+        "id": id_ficha_t(login), "tipo": "T", "creador": f"twitch.tv/{login}",
         "credito": f"twitch.tv/{login}", "origen": "twitch", "twitch_login": login,
         "broadcaster_id": str(bid), "seguidores": int(seguidores), "seguidores_leidos": hoy.isoformat(),
         "juego": juego,
@@ -271,6 +271,16 @@ def detectar_t(raiz, ahora: datetime, cliente: ClienteTwitch | None = None):
 
 
 def detectar_t_con_descartes(raiz, ahora: datetime, cliente: ClienteTwitch | None = None):
+    """Como `_buscar_t` y deja UNA línea de registro con el resumen (sin claves). Si el buscador está apagado
+    o no corre (sin clips mirados ni descartes), no dice nada."""
+    cands, saltos, fichas, descartes = _buscar_t(raiz, ahora, cliente)
+    if descartes:
+        motivos = ", ".join(f"{m}={n}" for m, n in descartes.items() if not m.startswith("_")) or "ninguno"
+        print(f"buscador T: {descartes.get('_clips_vistos', 0)} mirados, {len(cands)} candidatos; descartes: {motivos}")
+    return cands, saltos, fichas, descartes
+
+
+def _buscar_t(raiz, ahora: datetime, cliente: ClienteTwitch | None = None):
     """Busca clips del juego de la temporada de streamers medianos y pequeños en español.
 
     Devuelve (candidatos, saltos, fichas, descartes) donde descartes es {motivo: cantidad}
