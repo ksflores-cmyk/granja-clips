@@ -370,11 +370,11 @@ def test_palabra_del_lapiz_fuera_del_gancho(marca, temporada):
 def test_palabras_a_evitar_en_gancho_escena_y_lineas_marcan_spoiler_y_no_descartan(campo, marca, temporada):
     d = cargar_dato("valida")
     if campo == "gancho":
-        d["gancho"] = "Kai ve el final"; d["palabra_lapiz"] = "FINAL"
+        d["gancho"] = "Kai ve el jefe final"; d["palabra_lapiz"] = "JEFE"
     elif campo == "escena":
         d["escena"] = "INT. STREAM DE KAI — ÚLTIMA MISIÓN"
     else:
-        d["lineas"][0]["es"] = "Ella muere aquí, la traición era cierta."
+        d["lineas"][0]["es"] = "Ya vi el final del juego entero."
     ok, m = ojos.validar_respuesta(d, marca, temporada, duracion=20.0)
     assert ok, m                                    # ya no descarta (22 nov 2026): marca spoiler
     assert any("palabra a evitar" in x for x in ojos.avisos_de(d, temporada)["spoiler"])

@@ -56,12 +56,12 @@ def test_el_esquema_y_el_prompt_piden_mods_y_ya_no_vetan_por_spoiler():
 
 def test_palabra_a_evitar_en_gancho_escena_o_linea_marca_y_no_descarta(marca, temporada):
     datos = cargar_dato("valida")
-    datos["gancho"] = "El final de la historia"
+    datos["gancho"] = "Llega el jefe final ya"
     datos["palabra_lapiz"] = "FINAL"
     assert ojos.validar_respuesta(datos, marca, temporada, duracion=20.0)[0]
-    assert any("final" in m and "gancho" in m for m in ojos.avisos_de(datos, temporada)["spoiler"])
+    assert any("jefe final" in m and "gancho" in m for m in ojos.avisos_de(datos, temporada)["spoiler"])
     datos = cargar_dato("valida")
-    datos["lineas"][0]["es"] = "Ya vi el giro de la historia"
+    datos["lineas"][0]["es"] = "Ya vi el final del juego entero"
     assert ojos.validar_respuesta(datos, marca, temporada, duracion=20.0)[0]
     assert any("línea 1" in m for m in ojos.avisos_de(datos, temporada)["spoiler"])
 

@@ -241,8 +241,8 @@ def test_los_spoilers_de_gta_no_aplican_a_una_ficha_con_otro_juego(marca, tempor
     t = ojos.temporada_de(f, temporada)
     assert t["palabras_evitar"] == [] and t["palabras_vetadas"] == ["filtración", "filtrado", "leak", "pirata", "crack", "gratis"]
     datos = json.loads((DATOS / "fm27_valida.json").read_text(encoding="utf-8"))
-    datos["gancho"] = "Final de copa para Sebas"
-    datos["palabra_lapiz"] = "COPA"
+    datos["gancho"] = "Sebas llega al jefe final"
+    datos["palabra_lapiz"] = "JEFE"
     assert ojos.validar_respuesta(datos, marca, ojos.temporada_de(f, temporada), duracion=20.0)[0]
     assert ojos.validar_respuesta(datos, marca, temporada, duracion=20.0)[0]       # con la temporada ya no descarta...
     assert ojos.avisos_de(datos, temporada)["spoiler"] and not ojos.avisos_de(datos, t)   # ...pero sí es spoiler (se marca)

@@ -423,10 +423,10 @@ def test_sin_ia_con_titulo_flojo_descarta_sin_gastar_la_fuente(repo, tmp_path, v
 
 
 def test_sin_ia_con_palabra_a_evitar_en_el_titulo_marca_spoiler_y_sigue(repo, tmp_path, video20, sin_render):
-    hacer(repo, tmp_path, video20, caida(), CLAVE, cand=candidato(titulo="El final de la historia"))
+    hacer(repo, tmp_path, video20, caida(), CLAVE, cand=candidato(titulo="Llega el jefe final ya"))
     assert sin_render.llamadas, "llegó a componer: no se descartó"
     toma_, lineas, kw = sin_render.llamadas[0]
-    assert toma_.avisos == ["spoiler"] and "final" in toma_.avisos_motivos["spoiler"][0]
+    assert toma_.avisos == ["spoiler"] and "jefe final" in toma_.avisos_motivos["spoiler"][0]
 
 
 def test_sin_ia_con_un_dict_que_no_valida_descarta_y_gasta(repo, tmp_path, video20, sin_render, monkeypatch):
