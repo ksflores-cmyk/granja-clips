@@ -195,10 +195,12 @@ def contexto_juego(temporada: dict, juego: str | None = None, hoy=None) -> str:
 
 def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: str | None = None,
                 nota: str | None = None, recorte: tuple[float, float] | None = None,
-                historia: dict | None = None, hoy=None, streamer: str | None = None) -> str:
+                historia: dict | None = None, hoy=None, streamer: str | None = None,
+                gancho_inicio_s: float | None = None) -> str:
     """Arma la instrucción desde `ojos_prompt.md` con la duración, el juego y las listas de marca y temporada.
 
     `historia` ({cfg, sfx: [ids], prohibe_sfx}) activa la sección «9. historia»; sin él, el prompt sale sin ella.
+    `gancho_inicio_s` (prueba de retención, brazo corta) pide que el momento fuerte caiga en el primer segundo del recorte.
     `hoy` (fecha) y `streamer` (nombre del creador de la ficha) alimentan el contexto de la temporada y el caption."""
     texto = RUTA_PROMPT.read_text(encoding="utf-8")
     if historia:
@@ -214,6 +216,9 @@ def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: st
         "{{CONTEXTO}}": contexto_juego(temporada, juego, hoy),
         "{{STREAMER_FICHA}}": str(streamer or "").strip() or "ninguno: no nombres a nadie",
         "{{NOTA_ESPECIAL}}": nota or "",
+        "{{GANCHO_INICIO}}": (f" El recorte debe empezar como mucho {gancho_inicio_s:g} s antes del momento más fuerte: "
+                              "el gancho visual o sonoro ocurre en el primer segundo, sin preámbulo ni aire muerto."
+                              if gancho_inicio_s else ""),
         "{{GANCHOS_PROHIBIDOS}}": ", ".join(marca.ganchos_prohibidos()),
         "{{PALABRAS_EVITAR}}": ", ".join(str(p) for p in temporada.get("palabras_evitar", [])) or "(ninguna)",
     }
@@ -372,8 +377,8 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
           transporte=None, espera=time.sleep, entorno=None, config: dict | None = None,
           juego: str | None = None, nota: str | None = None,
           recorte: tuple[float, float] | None = None, transporte_lista=None,
-          registrar_cupos: bool = False, historia: dict | None = None, hoy=None,
-          streamer: str | None = None) -> Mirada:
+          registrar_cupos: bool = False, historia: dict | None = None,
+          hoy=None, streamer: str | None = None, gancho_inicio_s: float | None = None) -> Mirada:
     """Le pide a Gemini el análisis del clip. Reintenta una vez ante 429 o 5xx; ante 404 prueba el modelo siguiente.
     `historia` ({cfg, sfx, prohibe_sfx}) pide además el plan por momentos en la MISMA llamada (no gasta otra petición).
 
@@ -390,7 +395,8 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
     if tam > tope:
         return Mirada(None, motivo=f"el video pesa {tam / 1048576:.1f} MB y el máximo en línea es "
                                    f"{cfg['max_mb_en_linea']} MB", del_material=True)
-    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego, nota, recorte, historia, hoy, streamer),
+    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego, nota, recorte, historia,
+                                         gancho_inicio_s=gancho_inicio_s, hoy=hoy, streamer=streamer),
                              ruta_video.read_bytes(),
                              float(cfg["temperatura"]), historia=bool(historia))
     if len(cuerpo) > TOPE_PETICION_BYTES:     # el base64 infla un tercio: se mide lo que de verdad se envía

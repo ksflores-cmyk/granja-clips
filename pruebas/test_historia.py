@@ -1331,8 +1331,8 @@ def test_todas_las_filas_del_marcador_tienen_las_columnas_de_la_cabecera():
     import csv
     from fabrica.registro import CABECERA_MARCADOR
     filas = list(csv.reader((RAIZ_REAL / "marcador.csv").read_text(encoding="utf-8").splitlines()))
-    assert filas[0] == list(CABECERA_MARCADOR) and len(CABECERA_MARCADOR) == 26
-    assert all(len(f) == 26 for f in filas), [len(f) for f in filas]
+    assert filas[0] == list(CABECERA_MARCADOR) and len(CABECERA_MARCADOR) == 27
+    assert all(len(f) == 27 for f in filas), [len(f) for f in filas]
 
 
 def test_los_requisitos_fijan_scenedetect_y_opencv_sin_chocar():

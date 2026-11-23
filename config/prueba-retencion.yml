@@ -1,0 +1,11 @@
+# Prueba de retención (Kevin, 21 nov 2026): la mitad de las tomas, cortas (10 a 14 s) con el gancho en el primer
+# segundo; la otra mitad, como hoy (control). Datos de Buffer: TikTok ve 4,7 y 5,4 s de tomas de 17-20 s; Reels 7-8 s.
+# Cómo se mide: procedimientos/prueba-retencion.md. Informe: python -m fabrica.retencion --informe
+activa: true
+nombre: corta-10-14
+inicio: 2026-11-22
+brazos:
+  corta: {duracion_s: [10, 14], gancho_max_s: 1.0}   # el recorte dura de 10 a 14 s y empieza a lo sumo 1 s antes del momento fuerte
+  control: {}                                         # sin cambios: lo de siempre
+asignacion: alterna por número de toma (par = corta, impar = control)
+min_tomas_por_brazo: 10
