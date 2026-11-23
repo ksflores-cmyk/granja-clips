@@ -1,8 +1,6 @@
 {
-  "apto": false,
-  "motivos": [
-    "es una cinemática sin jugador"
-  ],
+  "apto": true,
+  "motivos": [],
   "spoiler": false,
   "desnudez": false,
   "cinematica": true,

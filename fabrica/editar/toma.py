@@ -91,20 +91,22 @@ def armar(datos: dict, marca: Marca, ficha: dict, numero: int,
     `creador`: el creador recortado cuando la ficha lo trae por archivo (campañas); si no, el de la ficha.
     Los nombres salen de la ficha, no del modelo: `STREAMER` o el creador -> su nombre; otro hablante ->
     `OTRA VOZ`; una escena `INT. STREAM` o con un nombre vetado -> `sin_ia.escena_de`."""
-    creador = nombres.creador_de(creador, ficha)
+    creador = nombres.creador_de(creador, ficha)             # el login: la línea de crédito «Con: ...» lo lleva tal cual
+    nombre = nombres.nombre_para_mostrar(creador, ficha, raiz)   # el que se ve en el video: apodo > nombre visible > login
     ini, fin = float(datos["recorte"]["inicio"]), float(datos["recorte"]["fin"])
     dur = round(fin - ini, 3)
+    quemados = datos.get("subtitulos_quemados") is True       # el clip ya trae sus subtítulos: sin nuestro bloque de diálogo
     toma = Toma(numero=numero, gancho=datos["gancho"].strip(), palabra_lapiz=datos["palabra_lapiz"].strip(),
                 lapiz=lapiz_de(numero),
-                escena=nombres.escena_segura(datos["escena"], creador, marca, temporada, raiz),
-                credito=f"Con: {creador}")
+                escena=nombres.escena_segura(datos["escena"], nombre, marca, temporada, raiz),
+                credito=f"Con: {creador}", subtitulos_del_clip=quemados)
     tope = dur - float(marca.m("cierre_s"))      # el último medio segundo es el cierre
     lineas: list[Linea] = []
     for ln in ojos.partir_lineas(datos, marca):
         t0, t1 = max(0.0, round(ln["t0"] - ini, 3)), min(tope, round(ln["t1"] - ini, 3))
         if t1 - t0 < MIN_LINEA_S:
             continue
-        lineas.append(Linea(t0=t0, t1=t1, nombre=nombres.etiqueta_hablante(ln["hablante"], creador), frase=ln["es"].strip(),
+        lineas.append(Linea(t0=t0, t1=t1, nombre=nombres.etiqueta_hablante(ln["hablante"], nombre), frase=ln["es"].strip(),
                             original=ln["original"]))
     acot = datos["acotacion"].strip()
     if acot:
@@ -113,6 +115,8 @@ def armar(datos: dict, marca: Marca, ficha: dict, numero: int,
         else:
             lineas.append(Linea(t0=INICIO_ACOTACION_S, t1=max(INICIO_ACOTACION_S + MIN_LINEA_S, tope - 0.2),
                                 acotacion=acot))
+    if quemados:
+        lineas = []
     return toma, lineas, ini, dur
 
 
@@ -267,8 +271,8 @@ def _planificar_historia(raiz, ficha, datos, inicio: float, dur: float, cfg_h: d
 
 
 def _spoilers_en_lineas(lineas, temporada: dict) -> list[str]:
-    """Las líneas que ponen las voces (#19, transcripción de Whisper) no pasaron por `ojos.validar_respuesta`:
-    se les aplica el mismo filtro de palabras a evitar de la temporada (revisión de Codex, 22 nov)."""
+    """Motivos de spoiler en las líneas que ponen las voces (#19, transcripción de Whisper), que no pasaron por
+    `ojos.spoiler_de`: mismas palabras a evitar de la temporada. NO descarta: marca (22 nov 2026, decisión de Kevin)."""
     motivos = []
     for i, ln in enumerate(lineas or [], 1):
         for p in temporada.get("palabras_evitar", []) or []:
@@ -276,6 +280,21 @@ def _spoilers_en_lineas(lineas, temporada: dict) -> list[str]:
                 if ojos._contiene(texto, str(p)):
                     motivos.append(f"línea {i}: palabra a evitar {p!r} en la {donde} (posible spoiler)")
     return motivos
+
+
+def marcar_avisos(toma: Toma, datos: dict, temporada: dict, lineas) -> Toma:
+    """Marca la toma con sus avisos: spoiler (Gemini `spoiler: true` o una palabra a evitar en gancho, escena, acotación
+    o líneas que de verdad salen, sean de Gemini o de Whisper), cinemática (`cinematica: true`) y mods (`mods: true`).
+    Nunca descarta: una sola placa con los avisos sale al inicio (22 nov 2026, decisión de Kevin)."""
+    if toma is None:
+        return toma
+    motivos = ojos.avisos_de(datos, temporada, lineas=False)
+    extra = _spoilers_en_lineas(lineas, temporada)
+    if extra:
+        motivos["spoiler"] = motivos.get("spoiler", []) + extra
+    toma.avisos = ojos.ordenar_avisos(motivos)
+    toma.avisos_motivos = {a: motivos[a] for a in toma.avisos}
+    return toma
 
 
 def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, transporte, espera, entorno,
@@ -327,12 +346,15 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             except subprocess.CalledProcessError as e:     # ffmpeg rechazó el archivo: es del material
                 return Resultado(False, [f"copia ligera: ffmpeg no pudo leer el archivo ({type(e).__name__})"],
                                  gastar=True)
+            entrada = fuentes.entrada_material(ficha, url=candidato.url)
+            creador = nombres.creador_de(entrada["creador"] if entrada else None, ficha)
+            nombre = nombres.nombre_para_mostrar(creador, ficha, raiz)
             with plazo.etapa("ojos (Gemini)"):
                 mirada = ojos.mirar(video_ojos, marca, temporada, raiz=raiz, duracion=d.duracion,
                                     transporte=transporte, espera=espera, entorno=entorno, juego=juego,
                                     nota=" ".join(x for x in (ojos.nota_de_ficha(ficha), nota_juez) if x) or None,
                                     recorte=recorte, transporte_lista=transporte_lista, registrar_cupos=True,
-                                    gancho_inicio_s=gancho_ini,
+                                    gancho_inicio_s=gancho_ini, hoy=hoy, streamer=nombre,
                                     **({"historia": pide_historia} if pide_historia else {}))
             # Sin clave o con clave mala (401/403) es un error de configuración, no una caída de Gemini:
             # ahí no hay corte sin IA.
@@ -378,28 +400,28 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                                    f"{aj[1] - aj[0]:.1f} s (sin estirar)")
                     mirada = replace(mirada, datos={**mirada.datos, "recorte": {"inicio": aj[0], "fin": aj[1]}})
             numero = contador_toma(raiz)
-            entrada = fuentes.entrada_material(ficha, url=candidato.url)
-            creador = nombres.creador_de(entrada["creador"] if entrada else None, ficha)
             toma, lineas, inicio, dur = armar(mirada.datos, marca, ficha, numero, creador, temporada, raiz)
-            motivos_nombres = nombres.revisar_nombres(toma, lineas, creador, raiz)
+            motivos_nombres = nombres.revisar_nombres(toma, lineas, nombre, raiz, tambien=(creador,))
             if motivos_nombres:
                 return Resultado(False, [f"puerta de nombres: {m}" for m in motivos_nombres],
                                  gemini=mirada.datos, modelo=mirada.modelo, gastar=True)
             mp4 = salida / f"toma-{numero:03d}-{_nombre_seguro(candidato.id_origen)}.mp4"
             plan_ruta = mp4.with_suffix(".plan.json")
-            ev = _etapa_voces(raiz, marca, d.ruta, inicio, dur, lineas, mirada.datos, creador, recorte[0])
+            ev = _etapa_voces(raiz, marca, d.ruta, inicio, dur, lineas, mirada.datos, nombre, recorte[0])
+            if mirada.datos.get("subtitulos_quemados") is True:      # ni las voces de Whisper se ponen: los subtítulos ya vienen en el clip
+                ev.lineas = []
+                if ev.alterno is not None:
+                    ev.alterno = ([], *ev.alterno[1:])
             # Puerta de nombres (#24) también para lo que ponen las voces (#19): el hablante sólo sale de la ficha
             # (el creador) o es OTRA VOZ, y ni las frases transcritas ni el rótulo llevan un nombre vetado. Si las
             # voces no pasan, se vuelve a las líneas de Gemini (ya limpias, sin cortes); si tampoco, se descarta.
-            motivos_voces = (nombres.revisar_nombres(toma, ev.lineas, creador, raiz, marca)
-                             + _spoilers_en_lineas(ev.lineas, temporada))
+            motivos_voces = nombres.revisar_nombres(toma, ev.lineas, nombre, raiz, marca, tambien=(creador,))
             if motivos_voces and ev.alterno is not None:
                 ev.lineas, ev.dur, ev.transcripcion = ev.alterno[0], ev.alterno[1], None
                 ev.tramos = None
                 ev.info = {**(ev.info or {}), "fuente_lineas": "gemini", "cortes": [],
                            "reintento": "líneas de Gemini sin cortes por la puerta de nombres: " + "; ".join(motivos_voces)[:300]}
-                motivos_voces = (nombres.revisar_nombres(toma, ev.lineas, creador, raiz, marca)
-                                 + _spoilers_en_lineas(ev.lineas, temporada))
+                motivos_voces = nombres.revisar_nombres(toma, ev.lineas, nombre, raiz, marca, tambien=(creador,))
             if motivos_voces:
                 return Resultado(False, [f"puerta de nombres (voces): {m}" for m in motivos_voces],
                                  gemini=mirada.datos, modelo=mirada.modelo, gastar=True)
@@ -415,6 +437,7 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                                         f"(GRANJA_MUSICA_DIR={mod_musica.carpeta() or ''}): sigue en silencio")
                         print(f"AVISO: {aviso_musica}")
                 def compuesta(lineas_, dur_, tramos_, h=None):
+                    marcar_avisos(toma, mirada.datos, temporada, lineas_)     # con las líneas que de verdad salen
                     with tempfile.TemporaryDirectory(prefix="trabajo-toma-") as trabajo:
                         with plazo.etapa("componer"):
                             plan_ = componer(marca, toma, lineas_, mp4, duracion=dur_, trabajo=Path(trabajo),
@@ -530,6 +553,10 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             # Después de anotar la prueba (revisión de Codex, 22 nov): el plan guardado lleva el brazo.
             plan_ruta.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
             fila = fila_marcador(candidato, ficha, toma, dur, ahora, etiqueta_prueba)
+            if toma.avisos:
+                avisos_txt = "; ".join(f"{a}: " + ", ".join(toma.avisos_motivos.get(a, []))[:120]
+                                       for a in toma.avisos)[:240]
+                fila["notas"] = "; ".join(x for x in (fila.get("notas"), avisos_txt) if x)
             if isinstance(plan.get("historia"), dict):
                 fila["historia"] = plan["historia"].get("proveedor") or ""
                 if plan["historia"].get("plan") is not None:

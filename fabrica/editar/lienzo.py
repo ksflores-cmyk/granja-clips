@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 
 import numpy as np
@@ -22,6 +22,13 @@ class Toma:
     lapiz: str = "subrayado"     # subrayado o círculo
     escena: str = ""             # línea de escena
     credito: str = ""            # "Con: ..." o "Fuente: ..."
+    avisos: list = field(default_factory=list)            # avisos al inicio, en orden fijo: spoiler, cinematica, mods
+    avisos_motivos: dict = field(default_factory=dict)    # {aviso: [motivos]} (sólo va al plan; no se dibuja)
+    subtitulos_del_clip: bool = False    # el clip ya trae subtítulos quemados: la toma va sin bloque de diálogo (plan["subtitulos"])
+
+    @property
+    def spoiler(self) -> bool:
+        return "spoiler" in self.avisos
 
 
 def partir(texto: str, f: ImageFont.FreeTypeFont, ancho_max: float) -> list[str]:

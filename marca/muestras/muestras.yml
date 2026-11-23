@@ -154,6 +154,52 @@ muestras:
       - {t0: 0.8, t1: 4.2, nombre: "STREAMER", frase: "Ahora sí, atentos."}
       - {t0: 5.2, t1: 8.2, acotacion: "(señala la pantalla)"}
 
+  # Muestra con avisos (decisión de Kevin, 22 nov 2026): marcada como spoiler y cinemática, abre con una sola placa de aviso
+  # de `marca.yml` (`avisos`): «ALERTA SPOILER · CINEMÁTICA» de 0 a `duracion_s`, antes del gancho.
+  - id: avisos-bbb
+    pilar: momentos
+    fuente_id: bbb-cc-by
+    disposicion: completa
+    video:
+      url: https://raw.githubusercontent.com/mediaelement/mediaelement-files/master/big_buck_bunny.mp4
+      sha256: 543a4ad9fef4c9e0004ec9482cb7225c2574b0f889291e8270b1c4d61dbc1ab8
+    licencia: "CC BY 3.0, © Blender Foundation (peach.blender.org)"
+    enlace_licencia: https://creativecommons.org/licenses/by/3.0/
+    recorte: {inicio: 40.0, duracion: 10.0}
+    toma:
+      numero: 8
+      gancho: "El conejo vuelve a la luz"
+      palabra_lapiz: "LUZ"
+      lapiz: subrayado
+      escena: "EXT. PRADERA — MAÑANA"
+      credito: "Con: Blender Foundation (CC BY 3.0)"
+      avisos: [spoiler, cinematica]
+      avisos_motivos: {spoiler: ["muestra: Gemini marcó spoiler: true"], cinematica: ["muestra: Gemini marcó cinematica: true"]}
+    lineas:
+      - {t0: 4.0, t1: 8.5, acotacion: "(sale sin prisa)"}
+
+  # Clip que ya trae sus subtítulos quemados (22 nov 2026): la toma va sin nuestro bloque de diálogo (`subtitulos_del_clip`
+  # en la toma; el plan dice `"subtitulos": "del clip"`). La puerta de estilo lo acepta con ese aviso en el plan.
+  - id: sin-subs-sintel
+    pilar: primeras_veces
+    fuente_id: sintel-cc-by
+    disposicion: completa
+    video:
+      url: https://raw.githubusercontent.com/mdn/shared-assets/main/videos/sintel-short.mp4
+      sha256: 358447f332663e6f3794816e32b8072526fcba8bf8744dc7fb3387afb5b2fceb
+    licencia: "CC BY 3.0, © Blender Foundation (durian.blender.org)"
+    enlace_licencia: https://creativecommons.org/licenses/by/3.0/
+    recorte: {inicio: 39.6, duracion: 17.0}
+    toma:
+      numero: 9
+      gancho: "Ella busca a un dragón"
+      palabra_lapiz: "DRAGÓN"
+      lapiz: círculo
+      escena: "INT. CABAÑA DEL CHAMÁN — NOCHE"
+      credito: "Con: Blender Foundation (CC BY 3.0)"
+      subtitulos_del_clip: true
+    lineas: []
+
   # 4.ª muestra (tarea #19 `voces`): la misma escena de Sintel con transcripción, voces por color, silencios cortados y
   # golpes. El audio está en inglés: se conservan las frases en español de arriba y se toma de la transcripción la voz
   # de cada línea y los silencios. Corre faster-whisper (modelos de config/voces.yml) y escribe voces.json con los

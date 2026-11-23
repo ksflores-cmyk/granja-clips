@@ -10,16 +10,14 @@ desbloqueo: "medianoche local del 19 nov 2026 en todas las regiones"
 ventana_estreno:
   inicio: "2026-11-18T05:00:00-06:00"
   fin: "2026-11-20T23:59:00-06:00"
-palabras_evitar:        # spoilers y trama: si aparecen, el clip se descarta
-  - final
+palabras_evitar:        # frases de trama: si aparecen, la toma lleva «ALERTA SPOILER» (decisión de Kevin, 22 nov 2026; ya no se descarta)
+  # Sólo frases largas: «final», «muere» o «giro» salen en casi cualquier directo y pondrían el aviso a todo.
+  # La señal principal es el `spoiler: true` de Gemini.
   - epílogo
   - créditos finales
-  - muere
-  - muerte de
-  - traición
-  - giro
   - jefe final
   - última misión
+  - final del juego
 cupos:
   # Decisión de Kevin (19 nov 2026, 8:00 p. m.): 6 clips al día por red, también en estreno.
   por_dia_por_plataforma: 6

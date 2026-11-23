@@ -365,6 +365,13 @@ def plan_json(marca: Marca, t: Toma, lineas: list[Linea], duracion: float, *,
     }
     if plantilla is not None:
         plan["plantilla"] = plantilla
+    if t.subtitulos_del_clip:      # los subtítulos ya vienen en el clip: ni diálogo ni voces nuestras (la puerta de estilo lo lee)
+        plan["subtitulos"] = "del clip"
+    if t.avisos:            # la toma abre con una placa de aviso (la puerta de estilo lee `avisos` para dibujar la misma)
+        plan["avisos"] = list(t.avisos)
+        plan["avisos_motivos"] = {k: [str(x) for x in v] for k, v in (t.avisos_motivos or {}).items()}
+        if t.spoiler:
+            plan["spoiler"] = {"es": True, "motivos": [str(x) for x in (t.avisos_motivos or {}).get("spoiler", [])]}
     if campana is not None:
         plan["campana"] = campana
     return plan

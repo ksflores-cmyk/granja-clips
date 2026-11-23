@@ -47,7 +47,7 @@ def test_toma_003_baity_se_vuelve_taisontv():
 def test_streamer_y_el_propio_creador_con_formato_distinto_llevan_el_nombre():
     ficha = {"creador": "sebas_beron"}
     _, lineas = _armar(_datos("Streamer", hablante2="@Sebas Beron"), ficha)
-    assert [ln.nombre for ln in lineas] == ["SEBAS_BERON", "SEBAS_BERON"]
+    assert [ln.nombre for ln in lineas] == ["SEBAS BERON", "SEBAS BERON"]       # sin guiones bajos (22 nov 2026)
 
 
 def test_otro_hablante_es_otra_voz():

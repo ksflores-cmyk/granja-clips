@@ -160,6 +160,12 @@ dividida:                       # tarea #16: pantalla dividida (facecam arriba, 
     paso_juego: 2               # paso (px de análisis) de la búsqueda de la zona del juego
     peso_centro: 0.05           # preferencia por un recorte centrado cuando hay empate
     peso_tamano: 0.1            # preferencia por el recorte más grande
+avisos:                         # decisión de Kevin (22 nov 2026): spoiler, cinemática y mods no descartan; avisan al inicio del clip
+  duracion_s: 1.2               # visible desde el cuadro 0 hasta este segundo (de 0,8 a 1,5); el gancho entra al salir el aviso
+  textos:                       # mayúsculas, una línea; con varios avisos, una sola placa: «ALERTA SPOILER · CINEMÁTICA · MODS»
+    spoiler: "ALERTA SPOILER"
+    cinematica: "ALERTA CINEMÁTICA"
+    mods: "ALERTA MODS"
 prohibido:
   - subtítulos palabra por palabra con una palabra en amarillo
   - emojis dentro del video

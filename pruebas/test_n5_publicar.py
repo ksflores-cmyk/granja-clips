@@ -15,6 +15,8 @@ from fabrica.publicar import (AlertaRoja, ClienteBuffer, Cuota, Descartada, Erro
                               Publicador, armar_carga, confirmar_canales, hueco_a_utc, textos)
 from fabrica.simulacion import BufferSimulado, SupabaseSimulado
 
+pytestmark = pytest.mark.usefixtures("primera_linea_con_gancho")      # ver conftest: el caption se prueba en test_pedidos_22nov
+
 CLAVE = "bfr_clave-inventada-n5"       # EJEMPLO-FALSO
 SUPA_URL = "https://proyecto-falso.supabase.invalid"
 SUPA_CLAVE = "sb_secret_inventada-n5"  # EJEMPLO-FALSO

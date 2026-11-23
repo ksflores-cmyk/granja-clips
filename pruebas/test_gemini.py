@@ -298,10 +298,11 @@ def test_gancho_prohibido_de_marca_cae_al_respaldo(marca, monkeypatch):
     assert sin_ia.gancho_de("No vas a creer esto", ficha, marca, TEMPORADA)[0] == "Mira esta jugada"
 
 
-def test_palabra_a_evitar_en_el_titulo_es_descarte_directo_aunque_haya_respaldo(marca):
+def test_palabra_a_evitar_en_el_titulo_ya_no_descarta_sigue_el_titulo(marca):
+    # antes era descarte directo (22 nov 2026, decisión de Kevin: el spoiler se marca, no se descarta)
     ficha = ficha_propia(reglas={"gancho_sin_ia": "Mira esta jugada"})
     g, motivo, definitivo = sin_ia.gancho_de("El final de la historia", ficha, marca, TEMPORADA)
-    assert g is None and "final" in motivo and definitivo is True
+    assert g == "El final de la historia" and motivo is None and definitivo is False
 
 
 def test_un_gancho_que_no_cabe_en_dos_lineas_cae_al_respaldo(marca):
@@ -394,8 +395,8 @@ def test_sin_ia_se_activa_si_gemini_no_esta_disponible(repo, tmp_path, video20, 
 
 def test_sin_ia_no_se_activa_si_gemini_vetó(repo, tmp_path, video20, sin_render, monkeypatch):
     monkeypatch.setattr(sin_ia, "construir", lambda *a, **k: pytest.fail("no debe entrar sin IA"))
-    r = hacer(repo, tmp_path, video20, Transporte((200, sobre(respuesta_grabada("spoiler")))), CLAVE)
-    assert not r.ok and any("spoiler" in m for m in r.motivos) and r.modelo != "sin-ia" and r.gastar is True
+    r = hacer(repo, tmp_path, video20, Transporte((200, sobre(respuesta_grabada("desnudez")))), CLAVE)
+    assert not r.ok and any("desnudez" in m for m in r.motivos) and r.modelo != "sin-ia" and r.gastar is True
     r = hacer(repo, tmp_path, video20, Transporte((200, sobre(respuesta_grabada("gancho_generico")))), CLAVE)
     assert not r.ok and r.modelo != "sin-ia" and r.gastar is True and not sin_render.llamadas
 
@@ -421,9 +422,11 @@ def test_sin_ia_con_titulo_flojo_descarta_sin_gastar_la_fuente(repo, tmp_path, v
     assert not sin_render.llamadas
 
 
-def test_sin_ia_con_palabra_a_evitar_en_el_titulo_gasta_la_fuente(repo, tmp_path, video20, sin_render):
-    r = hacer(repo, tmp_path, video20, caida(), CLAVE, cand=candidato(titulo="El final de la historia"))
-    assert not r.ok and r.gastar is True and "final" in r.motivos[0]
+def test_sin_ia_con_palabra_a_evitar_en_el_titulo_marca_spoiler_y_sigue(repo, tmp_path, video20, sin_render):
+    hacer(repo, tmp_path, video20, caida(), CLAVE, cand=candidato(titulo="Llega el jefe final ya"))
+    assert sin_render.llamadas, "llegó a componer: no se descartó"
+    toma_, lineas, kw = sin_render.llamadas[0]
+    assert toma_.avisos == ["spoiler"] and "jefe final" in toma_.avisos_motivos["spoiler"][0]
 
 
 def test_sin_ia_con_un_dict_que_no_valida_descarta_y_gasta(repo, tmp_path, video20, sin_render, monkeypatch):
