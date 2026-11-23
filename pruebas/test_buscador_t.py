@@ -653,3 +653,61 @@ def test_el_cupo_cuenta_tambien_lo_ya_programado_para_manana(r):
     n6.anotar(r, fecha=manana, fuente_id="t-ana", plataforma="shorts")
     ap, desc = puertas.filtrar(r, [cand_t("a")], noche, "shorts")
     assert ap == [] and "cupo del streamer lleno" in desc[0][1]
+
+
+# ------------------------------------------------------------ ids de ficha con "_" al final o doble
+
+@pytest.mark.parametrize("login,esperado", [
+    ("stephaniemx_", "t-stephaniemx-"), ("a__b", "t-a--b"), ("taisontv", "t-taisontv"),
+    ("dicrim_rd69", "t-dicrim-rd69"), ("mi_streamer", "t-mi-streamer"),
+])
+def test_id_de_ficha_t_pasa_la_regex_para_cualquier_login_de_twitch(login, esperado):
+    assert fuentes.id_ficha_t(login) == esperado
+    assert fuentes.RE_ID_T.match(esperado)
+    ficha = detectar._ficha_t(login, "9", 5000, "GTA 6", detectar.CONFIG_T_DEFECTO,
+                              datetime(2026, 11, 20).date())
+    assert ficha["id"] == esperado and fuentes.RE_ID_T.match(ficha["id"])
+
+
+def test_ids_distintos_para_logins_distintos_y_ids_viejos_intactos():
+    logins = ["ab_", "ab", "a__b", "a_b", "a-b".replace("-", "x")]
+    assert len({fuentes.id_ficha_t(x) for x in logins}) == len(logins)
+    for viejo in ("t-ejemplo", "t-mi-streamer", "t-dicrim-rd69", "t-taisontv"):
+        assert fuentes.RE_ID_T.match(viejo)
+    for malo in ("t-", "t--a", "x-ana", "t-A"):
+        assert not fuentes.RE_ID_T.match(malo)
+
+
+def test_ficha_con_login_terminado_en_guion_bajo_llega_a_candidatos_y_se_guarda(r):
+    t = Twitch(clips=[clip("c1", "1", "StephanieMx_", 300)], users={"1": "stephaniemx_"}, followers={"1": 5000})
+    cands, _, fichas = correr_t(r, t)
+    assert ids(cands) == ["c1"] and fichas[0]["id"] == "t-stephaniemx-"
+    detectar.guardar_fichas_t(r, fichas)
+    assert "t-stephaniemx-" in [f["id"] for f in fuentes.fichas_t_guardadas(r)]
+
+
+def test_vetar_por_retiros_con_id_de_guion_final_veta_el_login(r):
+    (r / "retiros.md").write_text(
+        "# Retiros\n\n| Fecha | Fuente | Publicación | Quién pidió | Motivo | Acción |\n|---|---|---|---|---|---|\n"
+        "| 2026-11-20 | t-stephaniemx- | x | ella | pidió | vetada |\n"
+        "| 2026-11-20 | t-a--b | x | ella | pidió | vetada |\n", encoding="utf-8")
+    assert {"stephaniemx_", "a__b"} <= vetados.logins_vetados(r)
+
+
+# ------------------------------------------------------------ línea de medición
+
+def test_una_linea_de_registro_con_el_resumen_del_buscador(r, capsys):
+    t = mundo()
+    cands, _, _, desc = detectar.detectar_t_con_descartes(r, AHORA, cliente(t))
+    lineas = [x for x in capsys.readouterr().out.splitlines() if x.startswith("buscador T:")]
+    assert len(lineas) == 1
+    assert lineas[0].startswith(f"buscador T: {desc['_clips_vistos']} mirados, {len(cands)} candidatos; descartes: ")
+    assert CLAVE_ID not in lineas[0] and CLAVE_SECRETO not in lineas[0]
+
+
+def test_la_linea_de_medicion_cuenta_los_descartes_por_motivo(r, capsys):
+    t = Twitch(clips=[clip("c1", "1", "Ana", 300), clip("c2", "2", "Beto", 200, lang="en")],
+               users={"1": "ana", "2": "beto"}, followers={"1": 5000, "2": 5000})
+    detectar.detectar_t_con_descartes(r, AHORA, cliente(t))
+    out = capsys.readouterr().out
+    assert "buscador T: 2 mirados, 1 candidatos; descartes: idioma distinto=1" in out

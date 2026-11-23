@@ -472,7 +472,8 @@
     "largo": 102
    },
    "ficha_id": "t-miriam-petricor"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|4|2026-11-22T01:00:00.000Z",
@@ -518,7 +519,8 @@
     "largo": 102
    },
    "ficha_id": "t-miriam-petricor"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|4|2026-11-22T01:00:00.000Z",
@@ -564,6 +566,286 @@
     "largo": 105
    },
    "ficha_id": "t-miriam-petricor"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "shorts|5|2026-11-22T04:30:00.000Z",
+  "plataforma": "shorts",
+  "toma": 5,
+  "dueAt": "2026-11-22T04:30:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-21/toma-005-4e9964ab.mp4",
+  "estado": "creado",
+  "post_id": "6b026a40024796909221546e",
+  "intento": "720d29d4b1b04d00947701efc8b131ef",
+  "registrado": true,
+  "texto": "Toma 005. ahi siiiiiiiiiiii se escucha la play5\n\n🎥 twitch.tv/cahos_gaming\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 5,
+    "gancho": "ahi siiiiiiiiiiii se escucha la play5",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-cahos-gaming",
+    "campana": "",
+    "duracion_s": 20.0,
+    "creador": "twitch.tv/cahos_gaming",
+    "id_origen": "ManlyGrotesqueAmazonSSSsss-qkFtvUo3elGh9GN7",
+    "claves": [
+     "ManlyGrotesqueAmazonSSSsss-qkFtvUo3elGh9GN7"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 005. ahi siiiiiiiiiiii se escucha la play5\n\n🎥 twitch.tv/cahos_gaming\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 005. ahi siiiiiiiiiiii se escucha la play5",
+    "credito": "🎥 twitch.tv/cahos_gaming",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 005. ahi siiiiiiiiiiii se escucha la play5\n\n🎥 twitch.tv/cahos_gaming\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 105
+   },
+   "ficha_id": "t-cahos-gaming"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|5|2026-11-22T04:30:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 5,
+  "dueAt": "2026-11-22T04:30:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-21/toma-005-4e9964ab.mp4",
+  "estado": "creado",
+  "post_id": "6b026a4102479690922154ba",
+  "intento": "681a8925682946a6876654695b52b9ca",
+  "registrado": true,
+  "texto": "Toma 005. ahi siiiiiiiiiiii se escucha la play5\n\n🎥 twitch.tv/cahos_gaming\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 5,
+    "gancho": "ahi siiiiiiiiiiii se escucha la play5",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-cahos-gaming",
+    "campana": "",
+    "duracion_s": 20.0,
+    "creador": "twitch.tv/cahos_gaming",
+    "id_origen": "ManlyGrotesqueAmazonSSSsss-qkFtvUo3elGh9GN7",
+    "claves": [
+     "ManlyGrotesqueAmazonSSSsss-qkFtvUo3elGh9GN7"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 005. ahi siiiiiiiiiiii se escucha la play5\n\n🎥 twitch.tv/cahos_gaming\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/cahos_gaming",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 005. ahi siiiiiiiiiiii se escucha la play5\n\n🎥 twitch.tv/cahos_gaming\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 105
+   },
+   "ficha_id": "t-cahos-gaming"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "reels|5|2026-11-22T04:30:00.000Z",
+  "plataforma": "reels",
+  "toma": 5,
+  "dueAt": "2026-11-22T04:30:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-21/toma-005-4e9964ab.mp4",
+  "estado": "creado",
+  "post_id": "6b026a42d864a01105965f59",
+  "intento": "daf1464a01254eefadd02cb2c38946f7",
+  "registrado": true,
+  "texto": "Toma 005. ahi siiiiiiiiiiii se escucha la play5\n\n🎥 twitch.tv/cahos_gaming\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 5,
+    "gancho": "ahi siiiiiiiiiiii se escucha la play5",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-cahos-gaming",
+    "campana": "",
+    "duracion_s": 20.0,
+    "creador": "twitch.tv/cahos_gaming",
+    "id_origen": "ManlyGrotesqueAmazonSSSsss-qkFtvUo3elGh9GN7",
+    "claves": [
+     "ManlyGrotesqueAmazonSSSsss-qkFtvUo3elGh9GN7"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 005. ahi siiiiiiiiiiii se escucha la play5\n\n🎥 twitch.tv/cahos_gaming\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/cahos_gaming",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 005. ahi siiiiiiiiiiii se escucha la play5\n\n🎥 twitch.tv/cahos_gaming\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 108
+   },
+   "ficha_id": "t-cahos-gaming"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "shorts|6|2026-11-23T01:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 6,
+  "dueAt": "2026-11-23T01:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-22/toma-006-a87d6c1e.mp4",
+  "estado": "creado",
+  "post_id": "6b03834d846b0ee907cab883",
+  "intento": "11af0fe8548c4174a0535d5c0a0decc5",
+  "registrado": true,
+  "texto": "Toma 006. ¿El coche? impoluto\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 6,
+    "gancho": "¿El coche? impoluto",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-elvisayomastercard",
+    "campana": "",
+    "duracion_s": 20.0,
+    "creador": "twitch.tv/elvisayomastercard",
+    "id_origen": "CloudySneakyCougarDAESuppy-2nSwuDdeBX699M-j",
+    "claves": [
+     "CloudySneakyCougarDAESuppy-2nSwuDdeBX699M-j"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 006. ¿El coche? impoluto\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 006. ¿El coche? impoluto",
+    "credito": "🎥 twitch.tv/elvisayomastercard",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 006. ¿El coche? impoluto\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 93
+   },
+   "ficha_id": "t-elvisayomastercard"
+  }
+ },
+ {
+  "id": "tiktok|6|2026-11-23T01:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 6,
+  "dueAt": "2026-11-23T01:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-22/toma-006-a87d6c1e.mp4",
+  "estado": "creado",
+  "post_id": "6b03834fd864a0110507056f",
+  "intento": "2d27c153cf2f4edaa670f5e9f2cf352a",
+  "registrado": true,
+  "texto": "Toma 006. ¿El coche? impoluto\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 6,
+    "gancho": "¿El coche? impoluto",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-elvisayomastercard",
+    "campana": "",
+    "duracion_s": 20.0,
+    "creador": "twitch.tv/elvisayomastercard",
+    "id_origen": "CloudySneakyCougarDAESuppy-2nSwuDdeBX699M-j",
+    "claves": [
+     "CloudySneakyCougarDAESuppy-2nSwuDdeBX699M-j"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 006. ¿El coche? impoluto\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/elvisayomastercard",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 006. ¿El coche? impoluto\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 93
+   },
+   "ficha_id": "t-elvisayomastercard"
+  }
+ },
+ {
+  "id": "reels|6|2026-11-23T01:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 6,
+  "dueAt": "2026-11-23T01:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-22/toma-006-a87d6c1e.mp4",
+  "estado": "creado",
+  "post_id": "6b03834f846b0ee907cab9e6",
+  "intento": "5c6e7388185848acb0c030e277a05e69",
+  "registrado": true,
+  "texto": "Toma 006. ¿El coche? impoluto\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 6,
+    "gancho": "¿El coche? impoluto",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-elvisayomastercard",
+    "campana": "",
+    "duracion_s": 20.0,
+    "creador": "twitch.tv/elvisayomastercard",
+    "id_origen": "CloudySneakyCougarDAESuppy-2nSwuDdeBX699M-j",
+    "claves": [
+     "CloudySneakyCougarDAESuppy-2nSwuDdeBX699M-j"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 006. ¿El coche? impoluto\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/elvisayomastercard",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 006. ¿El coche? impoluto\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 96
+   },
+   "ficha_id": "t-elvisayomastercard"
   }
  }
 ]
