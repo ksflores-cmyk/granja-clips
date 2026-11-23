@@ -12,6 +12,9 @@ from fabrica.publicar import Descartada, armar_carga, textos
 REDES = ("shorts", "tiktok", "reels")
 
 
+pytestmark = pytest.mark.usefixtures("primera_linea_con_gancho")      # ver conftest: el caption se prueba en test_pedidos_22nov
+
+
 def ficha_fm27() -> dict:
     return copy.deepcopy(next(f for f in cargar_fuentes() if f["id"] == "sega-fm27"))
 

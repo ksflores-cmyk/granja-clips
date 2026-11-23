@@ -29,6 +29,9 @@ ASSETS = {"SEBASBERON": "fm27-sebasberon.mp4", "DARO": "fm27-daro.mp4", "ERIC ZZ
 RED = {"reels": 0, "tiktok": 1, "shorts": 2}
 
 
+pytestmark = pytest.mark.usefixtures("primera_linea_con_gancho")      # ver conftest: el caption se prueba en test_pedidos_22nov
+
+
 def ficha_real() -> dict:
     return next(f for f in fuentes.cargar_fuentes(RAIZ_REAL) if f["id"] == "sega-fm27")
 
@@ -238,12 +241,14 @@ def test_sin_juego_en_la_ficha_se_sigue_usando_la_temporada(marca, temporada):
 
 def test_los_spoilers_de_gta_no_aplican_a_una_ficha_con_otro_juego(marca, temporada):
     f = ficha_real()
-    assert ojos.temporada_de(f, temporada)["palabras_evitar"] == ["filtración", "filtrado", "leak", "pirata", "crack", "gratis"]
+    t = ojos.temporada_de(f, temporada)
+    assert t["palabras_evitar"] == [] and t["palabras_vetadas"] == ["filtración", "filtrado", "leak", "pirata", "crack", "gratis"]
     datos = json.loads((DATOS / "fm27_valida.json").read_text(encoding="utf-8"))
-    datos["gancho"] = "Final de copa para Sebas"
-    datos["palabra_lapiz"] = "COPA"
+    datos["gancho"] = "Sebas llega al jefe final"
+    datos["palabra_lapiz"] = "JEFE"
     assert ojos.validar_respuesta(datos, marca, ojos.temporada_de(f, temporada), duracion=20.0)[0]
-    assert not ojos.validar_respuesta(datos, marca, temporada, duracion=20.0)[0]   # con la temporada, sí es spoiler
+    assert ojos.validar_respuesta(datos, marca, temporada, duracion=20.0)[0]       # con la temporada ya no descarta...
+    assert ojos.avisos_de(datos, temporada)["spoiler"] and not ojos.avisos_de(datos, t)   # ...pero sí es spoiler (se marca)
 
 
 # ---------------------------------------------------------------- criterio 4: duración por ficha

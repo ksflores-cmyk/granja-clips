@@ -624,7 +624,7 @@ def test_las_muestras_son_las_3_de_siempre_mas_3_divididas(marca):
     todas = muestras.cargar_muestras()
     assert [m["id"] for m in todas][:3] == ["dialogo-sintel", "momento-bbb", "pajaro-bbb"]
     divididas = [m for m in todas if m.get("disposicion") == "dividida"]
-    assert len(todas) == 7 and len(divididas) == 3 and todas[-1]["id"] == "voces-sintel" and all(m["disposicion"] == "completa" for m in todas[:3])
+    assert len(todas) == 9 and len(divididas) == 3 and todas[-1]["id"] == "voces-sintel" and all(m["disposicion"] == "completa" for m in todas[:3])
     assert len({m["stream"]["esquina_facecam"] for m in divididas}) == 3          # una esquina distinta en cada una
     assert sum(1 for m in divididas if m["stream"]["alerta_s"] is not None) == 1  # y una sola con alerta
     for m in divididas:

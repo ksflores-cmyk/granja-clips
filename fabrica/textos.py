@@ -200,6 +200,122 @@ def _preparar_gancho(bruto, toma: dict, ficha: dict, cfg: dict, plataforma: str 
     return g
 
 
+# ---------------------------------------------------------------- caption (el texto de la publicación NO es el gancho)
+
+CAPTION_MAX = 120
+_NOMBRES_DEL_MODELO = ("gemini", "claude", "chatgpt", "gpt", "openai", "anthropic", "copilot", "llama", "bard")
+# Frases de respaldo por pilar (sin palabras del clip: así nunca repiten el gancho). La regla de «el mismo texto no se repite
+# en 7 días» (`publicar._comprobar_repetido`) compara el texto entero: por eso el respaldo preferido es la primera frase del
+# diálogo del clip (`respaldo_de_dialogo`), distinta en cada toma; estas frases fijas sólo salen si no hay diálogo.
+RESPALDOS_CAPTION = {
+    "primeras_veces": ["Una de las primeras veces que se ve esto en el juego.",
+                       "Primeras horas con el juego y ya pasan estas cosas.",
+                       "¿Habías visto algo así desde el estreno?",
+                       "Se descubre en directo, sin guion.",
+                       "¿Tú lo habrías probado así?",
+                       "Así se estrena el juego en directo. ¿Qué harías tú?",
+                       "Para ser de los primeros días, esto no se lo esperaba nadie."],
+    "momentos": ["¿Tú qué habrías hecho en su lugar?",
+                 "Pasa en pleno directo y nadie lo vio venir.",
+                 "Un momento de directo con final inesperado.",
+                 "Cuéntanos si te ha pasado algo parecido.",
+                 "Así se vive esto en directo.",
+                 "Directo y sin guion. ¿Quién lo hubiera dicho?",
+                 "Y tú, ¿cómo habrías reaccionado?"],
+    "dato_util": ["Un detalle que muchos pasan por alto.",
+                  "¿Sabías que el juego hace esto?",
+                  "Apúntalo por si te sirve en tu partida.",
+                  "Un dato curioso del juego.",
+                  "¿Lo habías notado?",
+                  "Guárdalo para tu próxima partida.",
+                  "Una curiosidad que no sale en ningún tutorial."],
+}
+
+
+def _casi_igual(a: str, b: str) -> bool:
+    """Dos textos son casi iguales (sin acentos, mayúsculas ni signos): iguales, uno contiene al otro o comparten
+    la gran mayoría de sus palabras."""
+    pa, pb = _palabras(a), _palabras(b)
+    if not pa or not pb:
+        return False
+    sa, sb = " ".join(pa), " ".join(pb)
+    if sa == sb or sa in sb or sb in sa:
+        return True
+    ca, cb = set(pa), set(pb)
+    return len(ca & cb) / len(ca | cb) >= 0.7
+
+
+def _palabras_vetadas(ficha: dict) -> list[str]:
+    """Palabras que el texto no puede llevar: `reglas.palabras_evitar` de la ficha y las de `temporada.yml`."""
+    out = [str(p) for p in ((ficha.get("reglas") or {}).get("palabras_evitar")) or []]
+    try:
+        t = cargar_yaml("temporada.yml")
+    except Exception:  # noqa: BLE001 (sin temporada: sólo las de la ficha)
+        t = {}
+    for campo in ("palabras_evitar", "palabras_vetadas"):
+        out += [str(p) for p in (t.get(campo) if isinstance(t, dict) else None) or []]
+    return out
+
+
+def respaldo_de_dialogo(toma: dict) -> str:
+    """`«<primera frase del diálogo>», dice <NOMBRE>` si la toma trae `frase` y `hablante`; si no, vacío."""
+    frase = " ".join(str(toma.get("frase") or "").split()).strip(" «»\"")
+    nombre = " ".join(str(toma.get("hablante") or "").split())
+    return f"«{frase}», dice {nombre}" if frase and nombre else ""
+
+
+def _caption_valido(c: str, gancho: str, toma: dict, ficha: dict, cfg: dict, plataforma: str | None) -> bool:
+    """Una frase corta, sin emojis ni hashtags ni arrobas, distinta del gancho, sin nombres vetados ni del modelo y que
+    pase el filtro de ganchos genéricos o en inglés."""
+    if not c or len(c) > CAPTION_MAX or "@" in c or "#" in c or _casi_igual(c, gancho):
+        return False
+    palabras = _palabras(c)
+    if any(m in palabras for m in _NOMBRES_DEL_MODELO):
+        return False
+    for p in _palabras_vetadas(ficha):                 # lo vetado de la ficha y de la temporada (no sólo en el gancho)
+        if _evita(palabras, _palabras(p)):
+            return False
+    from .vetados import logins_vetados
+    propios = set(_nombres_del_creador(toma, ficha))
+    for v in logins_vetados():
+        pv = _palabras(v.replace("_", " "))
+        if pv and _contiene(palabras, pv) and not set(pv) <= propios:
+            return False
+    try:
+        comprobar_gancho(c, toma, ficha, cfg, plataforma)
+    except Descartada:
+        return False
+    return True
+
+
+def caption_de(toma: dict, ficha: dict, cfg: dict, gancho: str, plataforma: str | None = None) -> str:
+    """El texto que acompaña a `Toma nnn.`: el `caption` de la toma si es válido; si falta o se parece al gancho, una
+    frase de respaldo (la primera frase del diálogo con el nombre del streamer; sin diálogo, una fija según el pilar y el
+    número de toma) que tampoco se parece al gancho. Nunca el gancho.
+    Vacío sólo si ninguna frase sirve (entonces el texto es sólo `Toma nnn.`)."""
+    crudo = toma.get("caption")
+    if isinstance(crudo, str) and crudo.strip():
+        c = limpiar_gancho(crudo, toma, ficha, cfg)
+        if _caption_valido(c, gancho, toma, ficha, cfg, plataforma):
+            return c
+    r = limpiar_gancho(respaldo_de_dialogo(toma), toma, ficha, cfg)
+    if r and _caption_valido(r, gancho, toma, ficha, cfg, plataforma):
+        return r
+    pilar = str(toma.get("pilar") or "")
+    lista = RESPALDOS_CAPTION[pilar if pilar in RESPALDOS_CAPTION else "momentos"]
+    n = int(toma["numero"]) if str(toma.get("numero", "")).isdigit() else 0
+    for i in range(len(lista)):
+        c = lista[(n + i) % len(lista)]
+        if _caption_valido(c, gancho, toma, ficha, cfg, plataforma):
+            return c
+    return ""
+
+
+def _primera_linea(toma: dict, ficha: dict, cfg: dict, gancho: str, plataforma: str | None) -> str:
+    caption = caption_de(toma, ficha, cfg, gancho, plataforma)
+    return f"Toma {_numero(toma)}." + (f" {caption}" if caption else "")
+
+
 # ---------------------------------------------------------------- crédito
 
 _LOGIN_VALIDO = re.compile(r"[A-Za-z0-9_]{1,25}")
@@ -313,7 +429,7 @@ def _titulo_de(primera: str, plataforma: str, cfg: dict) -> str | None:
 def _campana(toma: dict, ficha: dict, plataforma: str, cfg: dict) -> dict:
     """Texto de una campaña con brief (SEGA FM27). Orden fijo:
 
-        Toma nnn. <gancho en español>
+        Toma nnn. <caption en español, distinta del gancho>
         <blanco>
         @footballmanager            (etiquetas_obligatorias, tal cual)
         <etiqueta del creador>      (la de su red; una línea por creador, en el orden de la toma)
@@ -346,7 +462,7 @@ def _campana(toma: dict, ficha: dict, plataforma: str, cfg: dict) -> dict:
     if 1 + len(_hashtags(obligatorias)) + len(extras) < lim["min_hashtags"]:
         raise Descartada(f"{plataforma} necesita de {lim['min_hashtags']} a {lim['max_hashtags']} "
                          "etiquetas y no hay suficientes")
-    primera = f"Toma {_numero(toma)}. {gancho}"
+    primera = _primera_linea(toma, ficha, cfg, gancho, plataforma)
     cola = [*obligatorias, *etiquetas_creador, divulgacion] + ([" ".join(extras)] if extras else [])
     texto = primera + "\n\n" + "\n".join(cola)
     if any("#" in linea for linea in cola[:cola.index(divulgacion)]):
@@ -420,7 +536,7 @@ def armar(toma: dict, ficha: dict, plataforma: str, cfg: dict | None = None) -> 
         datos = [d for d in (_limpio(_sin_hashtags(str(d))) for d in toma.get("datos") or []) if d]
     else:
         gancho = _preparar_gancho(toma.get("gancho"), toma, ficha, cfg, plataforma)
-        primera = f"Toma {_numero(toma)}. {gancho}"
+        primera = _primera_linea(toma, ficha, cfg, gancho, plataforma)
         if plataforma == "reels":
             valor = [v for v in (_limpio(_sin_hashtags(str(v))) for v in toma.get("valor") or []) if v][:2]
     # Si no cabe: primero se recorta el valor (Reels) o los datos (informativa), frase por frase.

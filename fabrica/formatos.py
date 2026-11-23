@@ -28,7 +28,7 @@ from .editar.lienzo import Toma, _limpia
 from .editar import tecnica
 from .editar.marca import Marca
 from .editar import nombres as mod_nombres
-from .editar.toma import Resultado, armar, copia_para_ojos, lapiz_de
+from .editar.toma import Resultado, armar, copia_para_ojos, lapiz_de, marcar_avisos
 from . import textos as mod_textos   # la tarea #8: límites por red, título, hashtags y comprobaciones finales
 from .publicar import Descartada, _comprobar_repetido, _limpio
 from .registro import ZONA, contador_toma
@@ -459,7 +459,11 @@ def preparar_segmento(candidato: Candidato, ficha: dict, ctx: Contexto) -> Segme
     creador = (entrada or {}).get("creador") or candidato.creador or ficha.get("creador") or ""
     creador = mod_nombres.creador_de(creador, ficha)
     toma, lineas, inicio, dur = armar(mirada.datos, ctx.marca, ficha, ctx.numero, creador, temporada, ctx.raiz)
-    motivos_nombres = mod_nombres.revisar_nombres(toma, lineas, creador, ctx.raiz)
+    marcar_avisos(toma, mirada.datos, temporada, lineas)
+    if toma.avisos:      # el aviso (placa) va sólo al inicio de un clip suelto: en un compilado el segmento se descarta
+        raise ErrorSegmento("; ".join(f"aviso {a}: no va en compilados" for a in toma.avisos))
+    nombre = mod_nombres.nombre_para_mostrar(creador, ficha, ctx.raiz)       # el que `armar` pone en los rótulos
+    motivos_nombres = mod_nombres.revisar_nombres(toma, lineas, creador, ctx.raiz, tambien=(nombre,))
     if motivos_nombres:
         raise ErrorSegmento("; ".join(f"puerta de nombres: {m}" for m in motivos_nombres))
     return Segmento(fuente=d.ruta, inicio=inicio, duracion=dur, toma=toma, lineas=lineas, ficha=ficha,

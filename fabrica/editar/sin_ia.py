@@ -4,7 +4,7 @@ Arma un diccionario con la MISMA forma que la respuesta de Gemini para que pase 
 `toma.armar`, `componer` y la puerta de estilo de siempre. Sin traducción inventada: `lineas` va vacío y la
 acotación en blanco. El recorte se elige por picos de volumen y cambios de escena; el gancho sale del título.
 
-Sólo se usa cuando Gemini NO respondió. Si respondió y vetó (apto false, spoiler, validación roja), eso es un
+Sólo se usa cuando Gemini NO respondió. Si respondió y vetó (apto false, validación roja), eso es un
 descarte y aquí no se entra. Es determinista: el mismo video da el mismo recorte.
 
 El análisis (ffmpeg) y el puntaje (`elegir_inicio`) están separados: el puntaje es una función pura de listas
@@ -202,10 +202,7 @@ def _problema_gancho(gancho: str, marca: Marca, temporada: dict) -> str | None:
     for g in marca.ganchos_prohibidos():
         if ojos._sin_acentos(g) in ojos._sin_acentos(gancho):
             return f"gancho genérico prohibido ({g})"
-    for p in temporada.get("palabras_evitar", []):
-        if ojos._contiene(gancho, str(p)):
-            return f"palabra a evitar ({p})"
-    return None
+    return None            # una palabra a evitar ya no vetea el gancho: marca la toma como spoiler (`ojos.spoiler_de`)
 
 
 def palabra_lapiz_de(gancho: str) -> str:
@@ -217,10 +214,7 @@ def palabra_lapiz_de(gancho: str) -> str:
 def gancho_de(titulo: str, ficha: dict | None, marca: Marca,
               temporada: dict) -> tuple[str | None, str | None, bool]:
     """(gancho, None, False) o (None, motivo de descarte, definitivo). Del título; si no sirve, `reglas.gancho_sin_ia`
-    de la ficha. `definitivo` es True si el título trae una palabra a evitar (el video no mejora con otro intento)."""
-    for p in temporada.get("palabras_evitar", []):
-        if ojos._contiene(str(titulo or ""), str(p)):
-            return None, f"el título contiene {p!r}, palabra a evitar (posible spoiler)", True
+    de la ficha. Una palabra a evitar en el título ya no descarta (22 nov 2026): `construir` marca la toma como spoiler."""
     recortado = " ".join(limpiar_titulo(titulo).split()[:marca.max_palabras_gancho])
     problema = _problema_gancho(recortado, marca, temporada)
     if problema is None:
@@ -241,7 +235,7 @@ def escena_de(creador: str | None, marca: Marca, temporada: dict | None = None) 
     ancho = marca.ancho - 2 * marca.m("margen")
     if marca.fuente("regular", marca.m("tam_escena")).getlength(escena) > ancho:
         return corta
-    if any(ojos._contiene(escena, str(p)) for p in (temporada or {}).get("palabras_evitar", [])):
+    if any(ojos._contiene(escena, str(p)) for p in [*(temporada or {}).get("palabras_evitar", []), *(temporada or {}).get("palabras_vetadas", [])]):
         return corta
     return escena
 
@@ -264,10 +258,14 @@ def construir(ruta: Path, candidato, ficha: dict | None, marca: Marca, temporada
         return Construccion(None, "sin IA: el video dura menos que el mínimo", gastar=True)
     creador = getattr(candidato, "creador", None) or (ficha or {}).get("creador")
     datos = {
-        "apto": True, "motivos": [], "spoiler": False, "desnudez": False, "cinematica": False,
+        "apto": True, "motivos": [], "spoiler": False, "desnudez": False, "cinematica": False, "mods": False,
         "juego_correcto": True, "idioma_original": str(getattr(candidato, "idioma", "") or "desconocido"),
         "lineas": [], "gancho": gancho, "palabra_lapiz": palabra_lapiz_de(gancho),
         "escena": escena_de(creador, marca, temporada), "acotacion": "",
         "recorte": {"inicio": rec[0], "fin": rec[1]},
     }
+    # Sin ojos no se sabe si hay trama: sólo se marca si el título (el gancho) trae una palabra a evitar.
+    motivos = ojos.spoiler_de({**datos, "gancho": f"{gancho} {getattr(candidato, 'titulo', '') or ''}"}, temporada)
+    if motivos:
+        datos["spoiler"], datos["motivos"] = True, [f"sin IA: {m}" for m in motivos]
     return Construccion(datos)

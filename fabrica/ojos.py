@@ -19,6 +19,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from pathlib import Path
 
 from . import cupos as mod_cupos
@@ -28,6 +29,7 @@ from .editar import dialogo as mod_dialogo
 from .editar import historia as mod_historia
 from .editar.lienzo import PUNTUACION, partir
 from .editar.marca import Marca
+from .registro import ZONA
 
 URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
 URL_LISTA = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000"
@@ -43,7 +45,9 @@ MINIMO_INTENTO_S = 15                    # con menos que esto no se envía otra 
 TOPE_PETICION_BYTES = 20 * 1024 * 1024   # límite de la API para una petición en línea
 RECORTE_MIN_S, RECORTE_MAX_S = 7.0, 30.0
 TOL_S = 0.05
-CAMPOS_BOOL = ("apto", "spoiler", "desnudez", "cinematica", "juego_correcto")
+CAMPOS_BOOL = ("apto", "spoiler", "desnudez", "cinematica", "juego_correcto", "mods", "subtitulos_quemados")
+CAMPOS_BOOL_OPCIONALES = ("mods", "subtitulos_quemados")    # respuestas viejas sin el campo: false
+AVISOS = ("spoiler", "cinematica", "mods")      # orden fijo de los avisos al inicio de la toma (marca.yml, `avisos`)
 CAMPOS_TEXTO = ("idioma_original", "gancho", "palabra_lapiz", "escena", "acotacion")
 
 
@@ -93,7 +97,8 @@ def esquema_respuesta(historia: bool = False) -> dict:
     campos = {
         "apto": booleano,
         "motivos": {"type": "ARRAY", "items": texto},
-        "spoiler": booleano, "desnudez": booleano, "cinematica": booleano, "juego_correcto": booleano,
+        "spoiler": booleano, "desnudez": booleano, "cinematica": booleano, "juego_correcto": booleano, "mods": booleano,
+        "subtitulos_quemados": booleano, "caption": texto,
         "idioma_original": texto,
         "lineas": {"type": "ARRAY", "items": {
             "type": "OBJECT",
@@ -121,11 +126,13 @@ def juego_de(ficha: dict | None, temporada: dict) -> str:
 
 def temporada_de(ficha: dict | None, temporada: dict) -> dict:
     """La temporada que vale para esta ficha. Si la ficha declara su propio juego, los spoilers de la temporada
-    (GTA 6) no le aplican: usa `reglas.palabras_evitar` de la ficha (vacío si no hay)."""
+    (GTA 6) no le aplican (`palabras_evitar` queda vacío) y `reglas.palabras_evitar` de la ficha pasa a
+    `palabras_vetadas`: son reglas de contenido (filtraciones, piratería), NO spoilers, y siguen descartando."""
     if not (isinstance((ficha or {}).get("juego"), str) and ficha["juego"].strip()):
         return temporada
     return {**temporada, "nombre": ficha["juego"].strip(),
-            "palabras_evitar": list(((ficha.get("reglas") or {}).get("palabras_evitar")) or [])}
+            "palabras_evitar": [],
+            "palabras_vetadas": list(((ficha.get("reglas") or {}).get("palabras_evitar")) or [])}
 
 
 def rango_recorte(ficha: dict | None) -> tuple[float, float]:
@@ -146,12 +153,53 @@ def nota_de_ficha(ficha: dict | None) -> str:
             "presentación, no lo llames gameplay. Ganchos sin exageraciones ni odio. El texto va en español.")
 
 
+MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
+         "noviembre", "diciembre")
+
+
+def _fecha_texto(f) -> str:
+    """`2026-11-19` (texto o fecha) -> `19 de noviembre de 2026 (2026-11-19)`; si no es una fecha, el texto tal cual."""
+    if isinstance(f, str):
+        try:
+            f = date.fromisoformat(f.strip()[:10])
+        except ValueError:
+            return f.strip()
+    if isinstance(f, datetime):
+        f = f.date()
+    if isinstance(f, date):
+        return f"{f.day} de {MESES[f.month - 1]} de {f.year} ({f.isoformat()})"
+    return ""
+
+
+def contexto_juego(temporada: dict, juego: str | None = None, hoy=None) -> str:
+    """Párrafo de contexto para Gemini: la fecha de hoy y, si el juego esperado es el de la temporada, que ya salió.
+    Gemini cree que el juego no ha salido y descarta clips reales como «filtración» o «mod de otro juego»."""
+    hoy = hoy or datetime.now(ZONA).date()
+    nombre = str(temporada.get("nombre") or "").strip()
+    esperado = str(juego or nombre).strip()
+    partes = [f"Fecha de hoy: {_fecha_texto(hoy)}. Tu conocimiento puede ser anterior a esa fecha: lo que no reconozcas "
+              "puede ser contenido posterior a tu entrenamiento."]
+    estreno = _fecha_texto(temporada.get("fecha_estreno"))
+    if nombre and estreno and esperado == nombre:
+        plat = temporada.get("plataformas_juego") or []
+        en = f" en {' y '.join(str(p) for p in plat)}" if plat else ""
+        partes.append(
+            f"{nombre} salió el {estreno}{en}. Este clip viene de la categoría oficial de Twitch de ese juego; que "
+            f"{nombre} se vea distinto de lo que conoces no lo vuelve una filtración ni un juego sin lanzar. "
+            f"Sigue siendo `apto: false` el material previo al estreno o extraído del juego (filtración), una copia "
+            f"pirata y los programas de trampas externos. Pon `juego_correcto: false` sólo si se ve CLARAMENTE otro juego distinto (por ejemplo "
+            f"Minecraft). Si parece {nombre} con cosas raras (texturas, personajes o vehículos cambiados, o parecido a "
+            f"un juego anterior de la saga), es `mods: true`, no otro juego.")
+    return " ".join(partes)
+
+
 def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: str | None = None,
                 nota: str | None = None, recorte: tuple[float, float] | None = None,
-                historia: dict | None = None) -> str:
+                historia: dict | None = None, hoy=None, streamer: str | None = None) -> str:
     """Arma la instrucción desde `ojos_prompt.md` con la duración, el juego y las listas de marca y temporada.
 
-    `historia` ({cfg, sfx: [ids], prohibe_sfx}) activa la sección «9. historia»; sin él, el prompt sale sin ella."""
+    `historia` ({cfg, sfx: [ids], prohibe_sfx}) activa la sección «9. historia»; sin él, el prompt sale sin ella.
+    `hoy` (fecha) y `streamer` (nombre del creador de la ficha) alimentan el contexto de la temporada y el caption."""
     texto = RUTA_PROMPT.read_text(encoding="utf-8")
     if historia:
         sec = mod_historia.instruccion(historia.get("cfg"), historia.get("sfx"), historia.get("prohibe_sfx"))
@@ -163,9 +211,11 @@ def instruccion(marca: Marca, temporada: dict, duracion: float | None, juego: st
         "{{RECORTE_MIN}}": f"{lo:g}", "{{RECORTE_MAX}}": f"{hi:g}",
         "{{DURACION}}": f"{duracion:.1f}" if duracion else "desconocida",
         "{{JUEGO}}": str(juego or temporada.get("nombre", "")),
+        "{{CONTEXTO}}": contexto_juego(temporada, juego, hoy),
+        "{{STREAMER_FICHA}}": str(streamer or "").strip() or "ninguno: no nombres a nadie",
         "{{NOTA_ESPECIAL}}": nota or "",
         "{{GANCHOS_PROHIBIDOS}}": ", ".join(marca.ganchos_prohibidos()),
-        "{{PALABRAS_EVITAR}}": ", ".join(str(p) for p in temporada.get("palabras_evitar", [])),
+        "{{PALABRAS_EVITAR}}": ", ".join(str(p) for p in temporada.get("palabras_evitar", [])) or "(ninguna)",
     }
     for k, v in cambios.items():
         texto = texto.replace(k, v)
@@ -322,7 +372,8 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
           transporte=None, espera=time.sleep, entorno=None, config: dict | None = None,
           juego: str | None = None, nota: str | None = None,
           recorte: tuple[float, float] | None = None, transporte_lista=None,
-          registrar_cupos: bool = False, historia: dict | None = None) -> Mirada:
+          registrar_cupos: bool = False, historia: dict | None = None, hoy=None,
+          streamer: str | None = None) -> Mirada:
     """Le pide a Gemini el análisis del clip. Reintenta una vez ante 429 o 5xx; ante 404 prueba el modelo siguiente.
     `historia` ({cfg, sfx, prohibe_sfx}) pide además el plan por momentos en la MISMA llamada (no gasta otra petición).
 
@@ -339,7 +390,8 @@ def mirar(ruta_video: Path, marca: Marca, temporada: dict, *, raiz=None, duracio
     if tam > tope:
         return Mirada(None, motivo=f"el video pesa {tam / 1048576:.1f} MB y el máximo en línea es "
                                    f"{cfg['max_mb_en_linea']} MB", del_material=True)
-    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego, nota, recorte, historia), ruta_video.read_bytes(),
+    cuerpo = cuerpo_peticion(instruccion(marca, temporada, duracion, juego, nota, recorte, historia, hoy, streamer),
+                             ruta_video.read_bytes(),
                              float(cfg["temperatura"]), historia=bool(historia))
     if len(cuerpo) > TOPE_PETICION_BYTES:     # el base64 infla un tercio: se mide lo que de verdad se envía
         return Mirada(None, motivo=f"la petición serializada pesa {len(cuerpo) / 1048576:.1f} MB y el tope es "
@@ -562,6 +614,8 @@ def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float |
         return False, ["la respuesta no es un objeto JSON"]
     m: list[str] = []
     for c in CAMPOS_BOOL:
+        if c in CAMPOS_BOOL_OPCIONALES and c not in datos:       # respuestas viejas sin el campo: false
+            continue
         if not isinstance(datos.get(c), bool):
             m.append(f"campo {c}: falta o no es booleano")
     for c in CAMPOS_TEXTO:
@@ -590,12 +644,10 @@ def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float |
     # veto del modelo
     if datos["apto"] is False:
         m.append("Gemini marcó apto: false" + (": " + "; ".join(datos["motivos"]) if datos["motivos"] else ""))
-    if datos["spoiler"]:
-        m.append("spoiler")
+    # El spoiler ya NO vetea (decisión de Kevin, 22 nov 2026): `spoiler_de` lo marca y la toma lleva ALERTA SPOILER.
     if datos["desnudez"]:
         m.append("desnudez")
-    if datos["cinematica"]:
-        m.append("cinemática aislada")
+    # La cinemática y los mods tampoco vetan (decisión de Kevin, 22 nov 2026): `avisos_de` los marca.
     if not datos["juego_correcto"]:
         m.append(f"no es el juego esperado ({juego or temporada.get('nombre', 'el de la temporada')})")
 
@@ -668,13 +720,56 @@ def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float |
         except ValueError as e:
             m.append(f"acotación: {e}")
 
-    # palabras a evitar (spoilers)
-    for p in temporada.get("palabras_evitar", []):
+    # palabras vetadas de la ficha (filtraciones, piratería): no son spoilers, siguen descartando
+    for p in temporada.get("palabras_vetadas", []) or []:
         for donde, texto in [("gancho", gancho), ("escena", escena), ("acotación", acot)] + \
                 [(f"línea {i}", ln["es"]) for i, ln in enumerate(lineas, 1)]:
             if _contiene(texto, str(p)):
                 m.append(f"palabra a evitar {p!r} en {donde}")
     return not m, m
+
+
+def spoiler_de(datos: dict, temporada: dict, lineas: bool = True) -> list[str]:
+    """Motivos por los que la toma se marca como spoiler (lista vacía si no lo es). NUNCA descarta (decisión de Kevin,
+    22 nov 2026: sin filtro de spoilers, pero con «ALERTA SPOILER» al inicio del clip).
+
+    Marca: Gemini con `spoiler: true`, o una palabra de `temporada["palabras_evitar"]` en el gancho, la escena, la
+    acotación o (con `lineas`) las líneas traducidas. `datos` ya validado (o, en el corte sin IA, armado por `sin_ia`).
+    """
+    motivos: list[str] = []
+    if datos.get("spoiler") is True:
+        extra = "; ".join(str(x) for x in (datos.get("motivos") or []) if x)
+        motivos.append("Gemini marcó spoiler: true" + (f" ({extra[:120]})" if extra else ""))
+    textos = [("gancho", str(datos.get("gancho") or "")), ("escena", str(datos.get("escena") or "")),
+              ("acotación", str(datos.get("acotacion") or ""))]
+    if lineas:
+        textos += [(f"línea {i}", str(ln.get("es") or "")) for i, ln in enumerate(datos.get("lineas") or [], 1)
+                   if isinstance(ln, dict)]
+    for p in temporada.get("palabras_evitar", []) or []:
+        for donde, texto in textos:
+            if _contiene(texto, str(p)):
+                motivos.append(f"palabra a evitar {p!r} en {donde}")
+    return motivos
+
+
+def avisos_de(datos: dict, temporada: dict, lineas: bool = True) -> dict[str, list[str]]:
+    """Avisos que lleva la toma al inicio, {tipo: motivos} sólo con los que aplican (orden de `AVISOS` en `ordenar`).
+    `spoiler`: ver `spoiler_de`; `cinematica`: Gemini con `cinematica: true`; `mods`: Gemini con `mods: true`.
+    Ninguno descarta (decisión de Kevin, 22 nov 2026)."""
+    salida: dict[str, list[str]] = {}
+    sp = spoiler_de(datos, temporada, lineas)
+    if sp:
+        salida["spoiler"] = sp
+    if datos.get("cinematica") is True:
+        salida["cinematica"] = ["Gemini marcó cinematica: true"]
+    if datos.get("mods") is True:
+        salida["mods"] = ["Gemini marcó mods: true"]
+    return salida
+
+
+def ordenar_avisos(tipos) -> list[str]:
+    """Los avisos en el orden fijo spoiler, cinematica, mods (sin repetir ni inventar)."""
+    return [a for a in AVISOS if a in set(tipos)]
 
 
 def partir_lineas(datos: dict, marca: Marca) -> list[dict]:

@@ -7,6 +7,8 @@ Tu criterio son los SUBTÍTULOS y el texto en pantalla:
 
 «pasa» sólo si todo el texto es legible y queda fuera de los botones.
 
+Si la transcripción dice «(sin diálogo)», puede que el clip original ya traiga sus propios subtítulos quemados en la imagen: no los juzgues como texto de la marca.
+
 Transcripción (segundos desde el inicio del clip):
 {{TRANSCRIPCION}}
 {{QUEJAS}}

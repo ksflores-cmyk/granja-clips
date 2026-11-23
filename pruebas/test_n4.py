@@ -280,8 +280,8 @@ def test_la_peticion_lleva_video_en_linea_esquema_temperatura_y_la_instruccion(t
     gc = cuerpo["generationConfig"]
     assert gc["responseMimeType"] == "application/json" and gc["temperature"] == 0.2
     campos = set(gc["responseSchema"]["properties"])
-    assert campos == {"apto", "motivos", "spoiler", "desnudez", "cinematica", "juego_correcto", "idioma_original",
-                      "lineas", "gancho", "palabra_lapiz", "escena", "acotacion", "recorte"}
+    assert campos == {"apto", "motivos", "spoiler", "desnudez", "cinematica", "juego_correcto", "mods", "idioma_original",
+                      "subtitulos_quemados", "caption", "lineas", "gancho", "palabra_lapiz", "escena", "acotacion", "recorte"}
     assert set(gc["responseSchema"]["properties"]["lineas"]["items"]["properties"]) == \
         {"t0", "t1", "hablante", "original", "es"}
     texto = partes[1]["text"]
@@ -304,9 +304,7 @@ def test_respuesta_valida_pasa(marca, temporada):
     ("campo_faltante", "campo gancho"),
     ("gancho_8_palabras", "8 palabras"),
     ("gancho_generico", "genérico"),
-    ("spoiler", "spoiler"),
     ("desnudez", "desnudez"),
-    ("cinematica", "cinemática"),
     ("juego_incorrecto", "juego esperado"),
     ("recorte_fuera", "recorte"),
     ("frase_imposible", "no cabe"),
@@ -369,16 +367,17 @@ def test_palabra_del_lapiz_fuera_del_gancho(marca, temporada):
 
 
 @pytest.mark.parametrize("campo", ["gancho", "escena", "linea"])
-def test_palabras_a_evitar_en_gancho_escena_y_lineas(campo, marca, temporada):
+def test_palabras_a_evitar_en_gancho_escena_y_lineas_marcan_spoiler_y_no_descartan(campo, marca, temporada):
     d = cargar_dato("valida")
     if campo == "gancho":
-        d["gancho"] = "Kai ve el final"; d["palabra_lapiz"] = "FINAL"
+        d["gancho"] = "Kai ve el jefe final"; d["palabra_lapiz"] = "JEFE"
     elif campo == "escena":
         d["escena"] = "INT. STREAM DE KAI — ÚLTIMA MISIÓN"
     else:
-        d["lineas"][0]["es"] = "Ella muere aquí, la traición era cierta."
+        d["lineas"][0]["es"] = "Ya vi el final del juego entero."
     ok, m = ojos.validar_respuesta(d, marca, temporada, duracion=20.0)
-    assert not ok and any("palabra a evitar" in x for x in m), m
+    assert ok, m                                    # ya no descarta (22 nov 2026): marca spoiler
+    assert any("palabra a evitar" in x for x in ojos.avisos_de(d, temporada)["spoiler"])
 
 
 def test_escena_sin_formato_de_guion(marca, temporada):
@@ -600,12 +599,12 @@ def test_hacer_toma_de_punta_a_punta_pasa_la_puerta_de_estilo(repo, tmp_path, vi
 
 
 @pytest.mark.slow
-def test_hacer_toma_con_spoiler_es_descarte_con_su_motivo(repo, tmp_path, video20, carpetas):
+def test_hacer_toma_con_spoiler_ya_no_descarta_la_marca_con_aviso(repo, tmp_path, video20, carpetas):
+    # antes: descarte con motivo «spoiler» y «apto: false» (decisión de Kevin del 22 nov 2026: se marca y lleva aviso)
     r = correr(repo, "spoiler", tmp_path, video20)
-    assert not r.ok and r.mp4 is None
-    assert any("spoiler" in m for m in r.motivos) and any("apto: false" in m for m in r.motivos)
-    assert not list((tmp_path / "salida").glob("*.mp4"))
-    assert not any(c.exists() for c in carpetas)
+    assert r.ok, r.motivos
+    assert r.plan["avisos"] == ["spoiler"] and r.plan["spoiler"]["es"] is True
+    assert r.mp4.is_file() and not any(c.exists() for c in carpetas)
 
 
 def test_hacer_toma_sin_clave_descarta(repo, tmp_path, video20):
@@ -933,14 +932,14 @@ def test_respuesta_de_sintel_con_juego_incorrecto_se_descarta_y_la_propia_pasa(m
 
 # ---------------------------------------------------------------- ronda 2
 
-def test_prompt_de_la_muestra_aclara_cinematica_y_el_de_produccion_conserva_el_veto(marca, temporada):
+def test_prompt_de_la_muestra_aclara_cinematica_y_el_de_produccion_la_marca(marca, temporada):
     from fabrica.editar import prueba_ojos
     muestra = ojos.instruccion(marca, temporada, 52.0, prueba_ojos.JUEGO_MUESTRA, prueba_ojos.NOTA_MUESTRA)
     prod = ojos.instruccion(marca, temporada, 52.0)
     assert "escena sin transformación editorial" in muestra and "NO cuenta como cinemática aislada" in muestra
     assert "CC BY" in muestra and "cinemática aislada" in muestra
     assert "sin transformación editorial" not in prod and "{{" not in prod and "{{" not in muestra
-    assert "una cinemática aislada" in prod and "GTA 6" in prod
+    assert "`cinematica: true`" in prod and "`mods: true`" in prod and "GTA 6" in prod
 
 
 def test_prueba_ojos_envia_la_nota_de_la_muestra(tmp_path, video20, monkeypatch):

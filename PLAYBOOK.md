@@ -1,10 +1,12 @@
 # PLAYBOOK · Granja de Clips
 
-**Canal permanente · Temporada 1: GTA 6** · Versión 1.2 · 17 nov 2026
+**Canal permanente · Temporada 1: GTA 6** · Versión 1.3 · 22 nov 2026
 Redactado por el Cuartel General (Fable) para el Project "Granja de Clips".
 Adapta el prompt de referencia "Faceless GTA 6 Clipping Page" (17 secciones) al sistema de Kevin.
 
 Cambios de la versión 1.1: canal permanente y no atado a GTA 6 (secciones 1, 2 y 5), sistema visual propio (sección 5B) y plan de arranque para el miércoles 18 nov antes del mediodía (sección 17).
+
+Cambios de la versión 1.3 (22 nov 2026, decisión de Kevin): los spoilers, las cinemáticas y los clips con mods ya no se descartan; se publican con un aviso al inicio (sección 3B). Los trucos del juego y las curiosidades se publican; búsqueda propia de clips no subidos (sección 3C).
 
 ---
 
@@ -108,10 +110,24 @@ Sobre la descarga:
 Prohibido siempre, con o sin campaña:
 
 - Filtraciones, builds filtradas, datos extraídos del juego, copias piratas.
-- Finales, cinemáticas aisladas, montajes de diálogos de la trama, TV o radio del juego fuera de contexto.
-- Trucos, exploits, mods o "cómo jugar antes".
+- Programas de trampas externos (hacks), piratería y "cómo jugar antes".
 - "Capturas" o "gameplay" generados por IA presentados como reales.
 - Sorteos falsos y cualquier cosa que parezca comunicación oficial de Rockstar o de un creador.
+
+### 3B. Avisos en lugar de descarte (decisión de Kevin, 22 nov 2026)
+
+Los spoilers (incluidos finales y trama), las cinemáticas y los clips con mods (modificaciones del juego; en GTA 6 llegarán con la versión de PC) **no se descartan**: se publican con un aviso al inicio del clip.
+
+- Textos: `ALERTA SPOILER`, `ALERTA CINEMÁTICA`, `ALERTA MODS`. Si hay varios, una sola placa con todos.
+- Aviso simple, con el sistema visual de la marca (5B), encima del video, rápido (unos 1,2 s desde el primer cuadro) y que se vea poco. No alarga la toma ni tapa el crédito.
+- Lo marca Gemini, una palabra de `temporada.yml` (`palabras_evitar`) o la transcripción de voz; la fábrica anota los avisos en el plan y en el marcador.
+- Siguen siendo descarte: filtraciones, desnudez, juego incorrecto, nombres vetados y material sin permiso.
+- Trucos del propio juego (códigos, combinaciones de botones como las de GTA 5), trucos que descubre un jugador y curiosidades: se publican sin aviso (decisión de Kevin, 22 nov 2026).
+- Riesgo conocido: la política de video de Rockstar dice que retira finales, cinemáticas aisladas y mods. Un retiro sigue el protocolo de la sección 12.
+
+### 3C. Búsqueda propia (decisión de Kevin, 22 nov 2026)
+
+La fábrica no espera sólo campañas: busca clips por su cuenta en Twitch (humor, reacciones, momentos, lo que sea) de streamers medianos y pequeños en español, y prioriza los clips que nadie ha subido todavía, o hace sus propios recortes, antes que repetir lo que ya circula.
 
 Material oficial (tipo D): la política de Rockstar cubre el uso de fan no comercial y Take-Two puede retirar material cuando quiera. Por eso esas publicaciones no se mandan a campañas ni cuentan como ingreso, y nunca pasan del 10 % de la mezcla.
 
@@ -284,7 +300,7 @@ Quién hace qué:
 | Subagentes Claude (Sonnet, Haiku) | En paralelo: cazador de campañas, verificador de permisos, revisor de estilo, redactor de procedimientos | Tareas cortas con salida comprobable |
 | Codex | Construye módulos en la nube sobre el repo y revisa | Disponible hasta el 11 dic |
 | Antigravity | Revisa cada cambio y usa su agente de navegador para comprobar flujos web | Sólo código en disco |
-| API de Gemini (dentro de la fábrica) | Ve el video, transcribe, traduce, propone gancho, marca spoilers | Capa gratuita |
+| API de Gemini (dentro de la fábrica) | Ve el video, transcribe, traduce, propone gancho, marca spoilers, cinemáticas y mods para su aviso | Capa gratuita |
 | Gemini Argon Alto | Investigación manual que Kevin le pasa | Sin acceso al repo |
 
 Regla de revisión de Kevin: toda tarea la revisan Codex y Antigravity; cada uno da su opinión y un aporte extra. Máximo 2 rondas. Se sale por pruebas en verde, no por opinión.
@@ -305,7 +321,7 @@ Presupuestos:
    - YouTube: Gemini lee el enlace público del directo o del video y devuelve momentos con minuto y segundo.
    - Material del brief.
 3. **Puertas baratas (código).** Fuente vigente, juego correcto, duración posible, no repetido, cupo del día.
-4. **Puerta de contenido (Gemini).** Descarta spoilers, cinemáticas, finales, desnudez y lo que no se entiende sin contexto. Devuelve transcripción con quién habla, traducción al español, encabezado de toma y línea de escena.
+4. **Puerta de contenido (Gemini).** Descarta desnudez, juego incorrecto y lo que no se entiende sin contexto. Marca spoilers, cinemáticas y mods para su aviso (sección 3B). Devuelve transcripción con quién habla, traducción al español, encabezado de toma y línea de escena.
 5. **Editar** con el sistema visual (secciones 5B y 9).
 6. **Publicar** en las plataformas activas (sección 11), con hora explícita.
 7. **Registrar** una fila en el marcador y otra en `registro.md`. Subir el contador de tomas.
@@ -324,10 +340,10 @@ Republicar tal cual no vale: las campañas rechazan contenido reutilizado y las 
 1. **Gancho en el primer segundo.** El encabezado de toma, que dice por qué seguir viendo: `TOMA 007 — KAI VE EL MAPA POR PRIMERA VEZ`, `TOMA 012 — EL NPC LE CONTESTA`.
 2. **Recorte.** De 7 a 30 segundos. Sin aire muerto al inicio. Termina en el remate.
 3. **Subtítulos en español quemados.** En formato de diálogo, dentro de la zona segura y con alto contraste. Si el creador habla inglés, se traduce. Es nuestra diferencia.
-4. **Línea de escena.** Quién es, dónde está y en qué momento del juego, sin spoilers.
+4. **Línea de escena.** Quién es, dónde está y en qué momento del juego.
 5. **Crédito y etiquetas.** En el cierre del video (`Con: @creador`) y en el texto de la publicación (`🎥 @creador` en su propia línea), más lo que exija el brief.
 
-Sin spoilers en el gancho ni en la miniatura durante la semana del estreno.
+Si el clip trae spoiler, cinemática o mods, lleva su aviso al inicio (sección 3B).
 
 | Plataforma | Formato | Resolución | Duración por defecto |
 |---|---|---|---|
@@ -410,7 +426,7 @@ Plan B si Buffer se queda corto: pedir la auditoría de la API de YouTube y de T
 Kevin no aprueba publicaciones. Las puertas deciden:
 
 - **Verde: se publica solo.** Fuente vigente, pasa las puertas de las secciones 3, 5B y 8, cumple el brief.
-- **Descartar: no se publica y se anota el motivo.** Cualquier duda sobre permiso, spoiler, dato sin verificar, calidad, estilo o regla del brief. No se le pregunta a Kevin.
+- **Descartar: no se publica y se anota el motivo.** Cualquier duda sobre permiso, dato sin verificar, calidad, estilo o regla del brief. Spoilers, cinemáticas y mods no se descartan: llevan aviso (sección 3B). No se le pregunta a Kevin.
 - **Rojo: se crea el archivo `PAUSA`, la fábrica se detiene y se avisa a Kevin.** Sólo por:
   - una solicitud de retiro o reclamo de derechos;
   - un strike, una restricción o un aviso de la plataforma;
@@ -431,10 +447,8 @@ Marcador (`marcador.csv` o una hoja), una fila por publicación:
 ```
 id_clip, toma, fecha, hora, plataforma, pilar, fuente_id, campana, gancho, duracion_s, credito, url,
 vistas_12h, vistas_24h, vistas_72h, likes, compartidos, comentarios, guardados, seguidores,
-prueba, estado_campana, motivo_rechazo, pago_usd, notas, historia
+prueba, estado_campana, motivo_rechazo, pago_usd, notas
 ```
-
-`historia` (#20): el eslabón que armó el plan de edición por momentos (`gemini`, `segundo`, `sin-ia`) o vacío si la toma salió sin historia; sirve para medir qué eslabón rinde.
 
 Reglas:
 

@@ -76,6 +76,11 @@ class Marca:
         return self.datos["marca_agua"]
 
     @property
+    def avisos(self) -> dict:
+        """Avisos al inicio de una toma marcada (clave `avisos` de marca.yml): {duracion_s, textos {spoiler, cinematica, mods}}."""
+        return self.datos["avisos"]
+
+    @property
     def pc(self) -> dict:
         """Medidas de la plantilla de pantalla completa (clave `pantalla_completa` de marca.yml)."""
         return self.datos["pantalla_completa"]

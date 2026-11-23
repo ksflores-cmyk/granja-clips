@@ -236,8 +236,8 @@ def config_t(raiz=None) -> dict:
 
 
 def _ficha_t(login: str, bid: str, seguidores: int, juego: str, cfg: dict, hoy,
-             hashtags: list | None = None) -> dict:
-    return {
+             hashtags: list | None = None, nombre_visible: str | None = None) -> dict:
+    ficha = {
         "id": id_ficha_t(login), "tipo": "T", "creador": f"twitch.tv/{login}",
         "credito": f"twitch.tv/{login}", "origen": "twitch", "twitch_login": login,
         "broadcaster_id": str(bid), "seguidores": int(seguidores), "seguidores_leidos": hoy.isoformat(),
@@ -253,6 +253,12 @@ def _ficha_t(login: str, bid: str, seguidores: int, juego: str, cfg: dict, hoy,
         "estado": "vigente", "uso": "produccion", "publicable": True,
         "notas": "Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip de Twitch.",
     }
+    nv = " ".join(str(nombre_visible or "").split())
+    if nv and len(nv) <= 40 and not re.search(r"[<>#@/\\]", nv):
+        # El nombre visible de Twitch (`display_name`; en los clips llega como `broadcaster_name`): es lo que se muestra
+        # en el video en lugar del login. Un `apodo` puesto a mano en la ficha manda sobre éste.
+        ficha["nombre_visible"] = nv
+    return ficha
 
 
 def _clave_nombre(n: str) -> str:
@@ -394,7 +400,7 @@ def _buscar_t(raiz, ahora: datetime, cliente: ClienteTwitch | None = None):
         if n_seg > int(cfg["seguidores_max"]):
             desc("seguidores por encima del máximo", len(lista))
             continue
-        ficha = _ficha_t(login, bid, n_seg, nombre_juego, cfg, hoy, temporada.get("hashtags"))
+        ficha = _ficha_t(login, bid, n_seg, nombre_juego, cfg, hoy, temporada.get("hashtags"), nombre)
         mejores = sorted(lista, key=lambda c: -int(c.get("view_count", 0)))[:int(cfg["max_clips_por_streamer_dia"])]
         desc("más de los permitidos por streamer", len(lista) - len(mejores))
         for c in mejores:
@@ -424,7 +430,8 @@ def guardar_fichas_t(raiz, fichas: list[dict]) -> None:
     except Exception:  # noqa: BLE001
         pass
     for f in fichas:
-        actuales[f["id"]] = f
+        apodo = (actuales.get(f["id"]) or {}).get("apodo")
+        actuales[f["id"]] = {**f, "apodo": apodo} if apodo and not f.get("apodo") else f   # el apodo es a mano: no se pierde
     ruta.parent.mkdir(parents=True, exist_ok=True)
     cabecera = ("# Fichas T generadas por el buscador (fabrica/detectar.py). Generado: no editar a mano.\n"
                 "# Un retiro en retiros.md o un login en config/vetados.yml las veta al cargarlas.\n")
