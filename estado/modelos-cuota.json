@@ -1,0 +1,13 @@
+{
+ "proveedores": {
+  "gemini": {
+   "ventana": [
+    1795406819.913554,
+    1795406842.338661
+   ],
+   "dia": "2026-11-22",
+   "peticiones_dia": 21,
+   "tokens_dia": 28415
+  }
+ }
+}

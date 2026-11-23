@@ -40,6 +40,14 @@ TOPES = {"ventana_15min": 150, "dia": 600, "mes": 3000, "canal_mes": 1000}
 VENTANA_S = 15 * 60
 # Campos opcionales que enviamos: si el esquema no los tiene, se quitan y se anota.
 OPCIONALES = {"madeForKids", "privacy", "shouldShareToFeed"}
+# Caché de la introspección (estado/buffer-esquema.json): el esquema casi no cambia y leerlo cuesta ~10
+# llamadas de la cuota mensual (3000). No hay config/buffer.yml: la vigencia es esta constante.
+RUTA_ESQUEMA = "estado/buffer-esquema.json"
+DIAS_ESQUEMA = 7
+# Un error de GraphQL con estas frases apunta a que el esquema cambió: se borra la caché.
+RE_ERROR_ESQUEMA = re.compile(
+    r"unknown (argument|type|field|input)|cannot query field|is not defined|"
+    r"field ['\"]?\w+['\"]? (is )?(not defined|doesn't exist)|unknown directive", re.IGNORECASE)
 TIPOS_BASE = ["CreatePostInput", "PostInputMetaData", "YoutubePostMetadataInput",
               "InstagramPostMetadataInput", "DeletePostInput"]
 
@@ -157,6 +165,7 @@ class ClienteBuffer:
         self._clave = clave
         self.transporte = transporte or red.transporte_urllib
         self.dormir = dormir
+        self.raiz = raiz
         self.cuota = Cuota(raiz, ahora)
 
     def consulta(self, query: str, variables: dict | None = None, canal: str | None = None,
@@ -242,6 +251,40 @@ class ClienteBuffer:
             pendientes += [s for s in siguientes if s]  # el activo de video sale de `assets` y su `video`
         q = self.consulta(Q_CONSULTAS).get("__type") or {}
         return normalizar_esquema(crudos, q.get("fields") or [])
+
+
+def _esquema_valido(e) -> bool:
+    return (isinstance(e, dict) and isinstance(e.get("tipos"), dict) and "CreatePostInput" in e["tipos"]
+            and isinstance(e.get("consultas"), dict))
+
+
+def _esquema_cacheado(cliente: "ClienteBuffer") -> dict:
+    """Esquema de la caché si tiene menos de DIAS_ESQUEMA días; si no, lo lee de Buffer y lo guarda."""
+    ruta = raiz_repo(cliente.raiz) / RUTA_ESQUEMA
+    ahora = cliente.cuota.ahora()
+    d = _leer_json(ruta, {})
+    try:
+        if isinstance(d, dict) and _esquema_valido(d.get("esquema")):
+            edad = ahora - datetime.fromisoformat(str(d["leido"]).replace("Z", "+00:00"))
+            if timedelta(0) <= edad < timedelta(days=DIAS_ESQUEMA):
+                return d["esquema"]
+    except (ValueError, TypeError, KeyError):
+        pass
+    esquema = cliente.introspeccion()
+    try:
+        _escribir_json(ruta, {"leido": ahora.astimezone(timezone.utc).replace(microsecond=0).isoformat(),
+                              "esquema": esquema})
+    except OSError:
+        pass                      # sin caché sólo se gasta cuota: nunca frena la publicación
+    return esquema
+
+
+def invalidar_esquema(raiz) -> None:
+    """Borra la caché: la próxima corrida vuelve a leer el esquema de Buffer."""
+    try:
+        (raiz_repo(raiz) / RUTA_ESQUEMA).unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def _lit(valor) -> str:
@@ -558,7 +601,7 @@ class Publicador:
     @property
     def esquema(self) -> dict:
         if self._esquema is None:
-            self._esquema = self.cliente.introspeccion()
+            self._esquema = _esquema_cacheado(self.cliente)
         return self._esquema
 
     # ---- libro de envíos (con candado entre procesos) ----
@@ -612,7 +655,13 @@ class Publicador:
             raise ErrorBuffer("createPost no está permitido en ensayo")
         if self.modo == "borrador" and carga.get("saveToDraft") is not True:
             raise ErrorBuffer("en borrador createPost sólo se manda con saveToDraft")
-        data = self.cliente.consulta(M_CREAR, {"input": carga}, canal=canal_id, mutacion=True)
+        try:
+            data = self.cliente.consulta(M_CREAR, {"input": carga}, canal=canal_id, mutacion=True)
+        except ErrorIncierto as e:
+            # Un error de esquema invalida la caché para la próxima corrida; la mutación NO se reintenta aquí.
+            if str(e).startswith("GraphQL") and RE_ERROR_ESQUEMA.search(str(e)):
+                invalidar_esquema(self.raiz)
+            raise
         r = data.get("createPost")
         if not isinstance(r, dict):
             raise ErrorIncierto("createPost devolvió una respuesta sin discriminador o inesperada; "

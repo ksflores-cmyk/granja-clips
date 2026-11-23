@@ -488,7 +488,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 
 def test_fabrica_yml_permite_los_archivos_y_abre_issues_con_etiqueta():
     wf = yaml.safe_load((RAIZ / ".github" / "workflows" / "fabrica.yml").read_text(encoding="utf-8"))
-    run = next(p for p in wf["jobs"]["producir"]["steps"] if "Cerrar el ciclo" in p.get("name", ""))["run"]
+    run = next(p for p in wf["jobs"]["fabrica"]["steps"] if "Cerrar el ciclo" in p.get("name", ""))["run"]
     permitidos = re.compile(re.search(r"PERMITIDOS='([^']+)'", run).group(1))
     assert permitidos.match("retiros.md") and permitidos.match("config/vetados.yml")
     assert permitidos.match("estado/alertas-retiro.json") and not permitidos.match("config/modo.yml")
@@ -683,3 +683,77 @@ def test_si_la_etiqueta_no_existe_el_aviso_sale_igual_sin_ella(r, tmp_path):
 
     assert retiros.abrir_avisos(r, gh) == ["reclamo|p1"] and alertas(r)[0]["avisada"] is True
     assert "--label" not in llamadas[-1] and llamadas[-1][:3] == ["gh", "issue", "create"]
+
+
+# ---------------------------------------------------------------- --diagnostico (sólo lectura)
+
+class BufferDiag(BufferFalso):
+    """BufferFalso más organizaciones y canales, y posts en error por canal."""
+
+    def __init__(self, por_canal=None, **kw):
+        super().__init__(**kw)
+        self.por_canal = por_canal or {}
+
+    def __call__(self, metodo, url, encabezados, cuerpo=None, tiempo=60):
+        q = json.loads(cuerpo.decode("utf-8"))["query"]
+        if self.estado == 200 and "organizations" in q:
+            self.consultas.append(q)
+            return F.resp(200, {"data": {"account": {"organizations": [{"id": ORG, "name": "Org"}]}}})
+        if self.estado == 200 and "channels(" in q:
+            self.consultas.append(q)
+            return F.resp(200, {"data": {"channels": [
+                {"id": CANALES["shorts"], "name": "guionvivo", "displayName": "G", "service": "youtube",
+                 "isQueuePaused": False},
+                {"id": CANALES["tiktok"], "name": "guionvivo", "displayName": "G", "service": "tiktok",
+                 "isQueuePaused": False},
+                {"id": CANALES["reels"], "name": "guionvivo", "displayName": "G", "service": "instagram",
+                 "isQueuePaused": False}]}})
+        if self.estado == 200 and "posts(" in q:
+            self.consultas.append(q)
+            for canal, posts in self.por_canal.items():
+                if f'"{canal}"' in q:
+                    return F.resp(200, {"data": {"posts": {"edges": [{"node": p} for p in posts],
+                                                           "pageInfo": {"hasNextPage": False, "endCursor": None}}}})
+            return F.resp(200, {"data": {"posts": {"edges": [], "pageInfo": {"hasNextPage": False}}}})
+        return super().__call__(metodo, url, encabezados, cuerpo, tiempo)
+
+
+def diag(r, buf):
+    sal = []
+    cod = retiros.main(["--diagnostico", "--raiz", str(r)], env={"BUFFER_API_KEY": CLAVE}, transporte=buf,
+                       ahora=AHORA, salida=sal.append)
+    return cod, "\n".join(sal)
+
+
+def test_diagnostico_lista_vacia(r):
+    antes = arbol(r)
+    cod, texto = diag(r, BufferDiag())
+    assert cod == 0 and arbol(r) == antes
+    assert "3 canal(es) visto(s)" in texto and "selector de error elegido: error" in texto
+    assert texto.count("0 publicación(es) en error") >= 3
+
+
+def test_diagnostico_una_en_error_sólo_dice_red_fecha_y_clase(r):
+    antes = arbol(r)
+    largo = f"copyright claim por {CLAVE} " + "x" * 300
+    buf = BufferDiag({CANALES["shorts"]: [error_post("p1", largo)]})
+    cod, texto = diag(r, buf)
+    assert cod == 0 and arbol(r) == antes          # no escribe retiros.md, vetados, PAUSA, cuota ni vistos
+    assert CLAVE not in texto and "shorts: 1 publicación(es) en error" in texto
+    # Registros públicos: ni el texto del error, ni el id de la publicación, ni nombres o ids de canales.
+    assert "copyright claim" not in texto and "p1" not in texto
+    assert not any(c in texto for c in CANALES.values())
+    linea = next(l for l in texto.splitlines() if l.strip().startswith("shorts |"))
+    assert "2026-11-19" in linea and linea.split(" | ")[2] == retiros.clasificar(largo)
+
+
+def test_diagnostico_fallo_de_la_api_da_1_sin_secretos(r):
+    antes = arbol(r)
+    cod, texto = diag(r, BufferDiag(estado=500))
+    assert cod == 1 and arbol(r) == antes
+    assert "falló la consulta a Buffer (" in texto and CLAVE not in texto and "500" not in texto
+
+
+def test_diagnostico_sin_clave_da_1(r):
+    sal = []
+    assert retiros.main(["--diagnostico", "--raiz", str(r)], env={}, salida=sal.append) == 1

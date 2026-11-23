@@ -318,9 +318,9 @@ def test_el_tope_de_300_deja_pasar_un_dia_de_6_producir_de_40_minutos(r):
 
 # ---------------------------------------------------------------- 7. workflow
 
-def test_el_cron_del_workflow_es_el_minuto_23_de_cada_hora():
-    texto = WORKFLOW.read_text(encoding="utf-8")
-    assert re.findall(r'^\s*- cron: "([^"]+)"', texto, re.M) == ["23 * * * *"]
+def test_el_cron_del_workflow_es_sólo_respaldo_en_el_minuto_23():
+    texto = WORKFLOW.read_text(encoding="utf-8")       # los huecos: pruebas/test_ahorro_actions.py
+    assert re.findall(r'^\s*- cron: "([^"]+)"', texto, re.M) == ["23 14,16,18,21,0,3 * * *"]
 
 
 # ---------------------------------------------------------------- 8. validar
