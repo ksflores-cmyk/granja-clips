@@ -1,0 +1,8 @@
+# Sólo para las voces (tarea #19): se instala en `producir` (fabrica.yml) y en `muestras.yml`.
+# Todo fijado, también lo que faster-whisper arrastra. Las pruebas no lo necesitan (usan transcriptor falso).
+faster-whisper==1.2.1
+ctranslate2==4.9.0
+onnxruntime==1.29.0
+av==19.0.2
+tokenizers==0.23.3
+huggingface_hub==2.4.0

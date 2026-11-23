@@ -431,8 +431,10 @@ Marcador (`marcador.csv` o una hoja), una fila por publicación:
 ```
 id_clip, toma, fecha, hora, plataforma, pilar, fuente_id, campana, gancho, duracion_s, credito, url,
 vistas_12h, vistas_24h, vistas_72h, likes, compartidos, comentarios, guardados, seguidores,
-prueba, estado_campana, motivo_rechazo, pago_usd, notas
+prueba, estado_campana, motivo_rechazo, pago_usd, notas, historia
 ```
+
+`historia` (#20): el eslabón que armó el plan de edición por momentos (`gemini`, `segundo`, `sin-ia`) o vacío si la toma salió sin historia; sirve para medir qué eslabón rinde.
 
 Reglas:
 

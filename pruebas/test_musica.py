@@ -234,7 +234,8 @@ def test_informativa_sin_musica_sale_en_rojo_en_la_puerta(repo, tmp_path):
     plan = componer.componer(marca, TOMA, LINEAS, tmp_path / "t.mp4", duracion=11.0, trabajo=tmp_path / "w",
                              movimiento=True)
     assert plan["audio"] == {"tipo": "silencio"}
-    rojos = [x[0] for x in estilo.revisar(tmp_path / "t.mp4", plan, marca) if not x[1]]
+    rojos = [x[0] for x in estilo.revisar(tmp_path / "t.mp4", plan, marca)
+             if not x[1] and not x[0].startswith("[regla-kevin] ")]   # las reglas de Kevin: test_reglas_kevin.py
     assert rojos == ["[plan] Música CC0 en pieza sin audio propio"]
 
 
@@ -244,7 +245,8 @@ def test_informativa_con_musica_pero_sin_movimiento_sale_en_rojo(banco, tmp_path
     marca = Marca.cargar(repo)
     plan = componer.componer(marca, TOMA, LINEAS, tmp_path / "t.mp4", duracion=11.0, trabajo=tmp_path / "w",
                              musica=mod_musica.elegir(repo, 1, audio))
-    rojos = [x[0] for x in estilo.revisar(tmp_path / "t.mp4", plan, marca) if not x[1]]
+    rojos = [x[0] for x in estilo.revisar(tmp_path / "t.mp4", plan, marca)
+             if not x[1] and not x[0].startswith("[regla-kevin] ")]   # las reglas de Kevin: test_reglas_kevin.py
     assert rojos == ["[fotograma] Movimiento en pieza sin video"]
 
 

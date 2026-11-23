@@ -1,0 +1,52 @@
+# Los críticos (tarea #21, fabrica/editar/criticos.py): tres críticos que NO vieron el plan editorial miran el MP4
+# final (6 fotogramas + lo que se oye y se lee) y un juez decide. Cadena (Q0, sólo gratis): Gemini -> segundo
+# proveedor (APAGADO) -> sin IA (código, siempre disponible). La clave sólo vive en GEMINI_API_KEY.
+activo: true                 # false: la toma sale como antes (sin críticos y sin clave `criticos` en el plan)
+modo: cadena                 # cadena = Gemini y, si falla, sin IA; sin_ia = sólo el código (sin red)
+temperatura: 0.2
+tiempo_por_llamada_s: 40     # tope de cada petición (se recorta a lo que quede de `tope_s` y del plazo del ciclo)
+tope_s: 120                  # presupuesto por ronda (3 críticos + juez); lo que no quepa cae a sin IA
+reserva_publicar_s: 130      # del plazo del ciclo los críticos nunca tocan esto (TIEMPO_MIN_PUBLICAR_S 120 + 10); sin
+                             # ese margen no hay decisión y la toma sale como hoy. (ciclo.py no se importa: ciclo importa toma)
+minimo_ronda2_s: 360         # plazo mínimo para replantear (TIEMPO_MIN_INTENTO_S 240 + TIEMPO_MIN_PUBLICAR_S 120); si no
+                             # alcanza: descarte pasajero («sin tiempo para la ronda 2»), la fuente no se gasta
+fotogramas: {n: 6, lado_max: 512}
+juez:
+  con_modelo: true           # false: decide sólo la regla (siempre es el respaldo y fija el piso de seguridad)
+cupos:                       # la cuenta (estado/modelos-cuota.json) mide también las peticiones de los ojos. Topes CONSERVADORES: Google no publica una cifra fija para el plan gratis (varía por
+  gemini:                    # proyecto, ver AI Studio); la cuenta real se mide en estado/modelos-cuota.json
+    rpm: 10                  # peticiones por ventana de 60 s
+    rpd: 200                 # peticiones por día (hora de Guatemala)
+    reserva_ojos: 20         # peticiones del día que los críticos nunca usan, para que los ojos sigan teniendo cupo
+    pausa_429_s: 600         # tras un 429 los críticos saltan a Gemini este tiempo (los ojos no)
+  espera_max_s: 45           # si la ventana de un minuto está llena se espera hasta esto; si no, sin IA
+segundo:                     # segundo proveedor: cliente genérico chat/completions compatible con OpenAI
+  activo: false
+  motivo: "GitHub Models retirado el 30 jul 2026"   # elegir otro proveedor gratis lo decide Kevin (regla 7)
+  url: "https://api.ejemplo.invalid/v1/chat/completions"
+  modelo: "por-definir"
+  secreto: SEGUNDO_PROVEEDOR_CLAVE   # NOMBRE de la variable de entorno; la clave nunca entra al repo
+sin_ia:                      # umbrales de los críticos sin IA (deterministas).
+  # Calibración (21 nov 2026, Sintel y BBB reales de `muestras`). Cambio, luma y nitidez se miden SÓLO en el recorte
+  # de `pantalla_completa.zona_accion` (ahí no va ninguna placa: se mide el video, no la marca). Resultados de las 3
+  # piezas: cambio entre fotogramas 5.7 a 96 (umbral 2); nitidez 3 a 202 (Sintel, animación suave, es la más baja:
+  # umbral 2.5; un clip con gblur sigma 40 da ~2.1 en los 6 fotogramas); luma media 33 a 185 (umbral negro 12 / blanco 248); papel con forma
+  # de placa en la franja de botones 0 % (umbral 6 %; el papel plano sin tinta, p. ej. una pared crema, no cuenta);
+  # volumen medio -44 a -25 dB (Sintel -44.1: por eso el mínimo es -55); caracteres por segundo 2.7 a 9.8 (umbral 17).
+  # Las tres piezas pasan los tres críticos. Dos o más fotogramas casi negros o blancos de 6 = puntaje 2.
+  historia:
+    audio_inicio_s: 2        # el audio de los primeros N s no debe ser silencio (gancho inmediato)
+    silencio_db: -50         # pico por debajo de esto = silencio
+    cambio_min: 2.0          # diferencia media (0-255) entre miniaturas grises consecutivas que cuenta como cambio
+    min_pares_con_cambio: 0.5   # fracción de los pares de fotogramas que debe cambiar
+  subtitulos:
+    max_cps: 17              # caracteres por segundo de lectura
+    tolerancia_papel: 10     # distancia máxima por canal RGB al papel de marca para contar un píxel como papel
+    max_papel_en_botones: 0.06  # fracción de la franja de botones que puede parecerse al papel
+  tecnica:
+    negro_max: 12            # luma media de un fotograma por debajo de esto = casi negro
+    blanco_min: 248          # luma media por encima de esto = casi blanco
+    min_nitidez: 2.5         # varianza del laplaciano (gris) del recorte de la zona de acción, mínima
+    min_cuadros_nitidos: 4   # de 6
+    vol_min_db: -55          # volumen medio (volumedetect) mínimo
+    vol_max_db: -3           # y máximo

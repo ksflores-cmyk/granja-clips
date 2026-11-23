@@ -621,7 +621,8 @@ def test_la_campana_pagada_va_antes_que_la_ficha_t():
     assert ids(ciclo.ordenar([tt, pagada], t)) == ["tt", "fm"]     # sin campaña pagada, manda el pilar
 
 
-def test_elegir_candidatos_pone_primero_la_pagada(r):
+def test_elegir_candidatos_pone_primero_la_pagada(repo_fm27):
+    r = repo_fm27                                   # FM27 está pausada en el repo real: copia vigente
     con_fichas(r)
     pagada = cand_t("fm", fuente="sega-fm27", origen="brief", pilar="momentos", vistas_por_hora=0.0,
                     creado_en=None, juego_id=None, duracion_s=None)

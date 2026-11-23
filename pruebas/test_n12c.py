@@ -132,9 +132,13 @@ def vertical(tmp_path_factory, marca):
     return {"mp4": mp4, "plan": plan, "fuente": fuente, "base": base}
 
 
+# las reglas de Kevin (tarea #18) las prueban test_reglas_kevin.py; aquí se miran los puntos de la puerta de siempre
+REGLAS_KEVIN = "[regla-kevin] "
+
+
 def malos(puntos):
     """Puntos en rojo, sin el de duración (las fuentes sintéticas de prueba duran 4 s, menos de 7)."""
-    return [n for n, ok, _ in puntos if not ok and "Duración de 7 a 30" not in n]
+    return [n for n, ok, _ in puntos if not ok and "Duración de 7 a 30" not in n and not n.startswith(REGLAS_KEVIN)]
 
 
 @necesita_ffmpeg
@@ -181,7 +185,7 @@ def test_fuente_corta_da_error_antes_de_ffmpeg(tmp_path, marca, monkeypatch):
 def test_puerta_en_verde_con_video_de_fuente(vertical, marca):
     puntos = estilo.revisar(vertical["mp4"], vertical["plan"], marca)
     assert malos(puntos) == [], [p for p in puntos if not p[1]]
-    assert all(n.startswith(("[fotograma] ", "[plan] ")) for n, _, _ in puntos)
+    assert all(n.startswith(("[fotograma] ", "[plan] ", REGLAS_KEVIN)) for n, _, _ in puntos)
     assert any("sha256 del MP4" in n and len(d) == 64 for n, _, d in puntos)
     for n in ("Cabecera en el video", "Diálogo en el video", "Cuerpo coincide con el origen", "Mosca en el video",
               "Bordes coinciden con la fuente (sin franjas)", "Audio original del clip"):

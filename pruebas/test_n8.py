@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from conftest import RAIZ_REAL
+from conftest import RAIZ_REAL, como_vigente
 from fabrica import fuentes, validar
 
 CREADORES = {
@@ -33,11 +33,19 @@ def ficha_real() -> dict:
     return next(f for f in fuentes.cargar_fuentes(RAIZ_REAL) if f["id"] == "sega-fm27")
 
 
+def ficha_vigente() -> dict:
+    """La ficha real con la campaña abierta: la marca la pausó el 19 nov 2026 (ver test de abajo)."""
+    return como_vigente(ficha_real())
+
+
 # ---------------------------------------------------------------- criterio 1: la ficha
 
 def test_ficha_sega_fm27_trae_lo_del_brief():
-    f = ficha_real()
-    assert (f["tipo"], f["estado"], f["uso"], f["publicable"]) == ("A", "vigente", "produccion", True)
+    real = ficha_real()
+    assert (real["tipo"], real["estado"], real["uso"], real["publicable"]) == ("A", "pausada", "produccion", False)
+    assert "Pausada por la marca" in real["motivo_pausa"] and "19 nov 2026" in real["motivo_pausa"]
+    assert fuentes.es_publicable(real, date(2026, 11, 21)) == (False, "estado 'pausada': debe ser vigente")
+    f = ficha_vigente()
     assert f["campana"] == "SEGA FM27 (Clipping Culture)"
     assert (f["tarifa_usd_por_mil"], f["minimo_por_clip_usd"], f["tope_por_clip_usd"],
             f["presupuesto_restante"]) == (2.0, 2, 600, 5000)
@@ -52,7 +60,10 @@ def test_ficha_sega_fm27_trae_lo_del_brief():
 
 
 def test_ficha_sega_fm27_cinco_urls_directas_con_creador_y_etiquetas():
-    f = ficha_real()
+    real = ficha_real()
+    assert not fuentes.autoriza_descarga(real, date(2026, 11, 21), "produccion", fuentes.urls_material(real)[0],
+                                         pilar="momentos")[0]                    # pausada: no se baja nada
+    f = ficha_vigente()
     urls = fuentes.urls_material(f)
     assert len(urls) == 5
     for u in urls:
@@ -595,22 +606,26 @@ def candidatos_de_fm27(repo):
     return {c.creador: c for c in detectar.detectar(repo, AHORA, None) if c.fuente_id == "sega-fm27"}
 
 
-def test_el_detector_trae_los_cinco_videos_con_su_creador(repo):
-    cands = candidatos_de_fm27(repo)
+def test_el_detector_trae_los_cinco_videos_con_su_creador(repo_fm27):
+    cands = candidatos_de_fm27(repo_fm27)
     assert sorted(cands) == sorted(CREADORES)
     assert all(c.origen == "brief" and c.pilar is None and c.url == PREFIJO_RELEASE + ASSETS[c.creador] for c in cands.values())
     assert cands["HABEMUS GAMER"].titulo == "HABEMUS GAMER.mov"
 
 
+def test_con_la_ficha_real_pausada_el_detector_no_trae_nada_de_fm27(repo):
+    assert candidatos_de_fm27(repo) == {}
+
+
 @pytest.mark.slow
-def test_ensayo_de_punta_a_punta_con_la_ficha_sega_fm27(repo, tmp_path, video):
-    cand = candidatos_de_fm27(repo)["DARO"]
+def test_ensayo_de_punta_a_punta_con_la_ficha_sega_fm27(repo_fm27, tmp_path, video):
+    cand = candidatos_de_fm27(repo_fm27)["DARO"]
     cand.pilar = "momentos"
-    ficha = next(f for f in fuentes.cargar_fuentes(repo) if f["id"] == "sega-fm27")
+    ficha = next(f for f in fuentes.cargar_fuentes(repo_fm27) if f["id"] == "sega-fm27")
     datos = (DATOS / "fm27_valida.json").read_text(encoding="utf-8")
     tr = Transporte(datos)
-    antes = (repo / "marca.yml").read_text(encoding="utf-8")
-    r = mod_toma.hacer_toma(repo, cand, ficha, AHORA, salida=tmp_path / "salida", abrir=lambda u: Resp(video.read_bytes()),
+    antes = (repo_fm27 / "marca.yml").read_text(encoding="utf-8")
+    r = mod_toma.hacer_toma(repo_fm27, cand, ficha, AHORA, salida=tmp_path / "salida", abrir=lambda u: Resp(video.read_bytes()),
                             transporte=tr, entorno={"GEMINI_API_KEY": "clave-de-prueba"}, espera=lambda s: None)
     assert r.ok, r.motivos
     # la puerta de estilo en verde, con la marca de agua y el audio original demostrados
@@ -618,7 +633,7 @@ def test_ensayo_de_punta_a_punta_con_la_ficha_sega_fm27(repo, tmp_path, video):
     assert punto(r.puntos, "Marca de agua de la campaña")[0]
     assert punto(r.puntos, "Audio original del clip")[0]
     assert punto(r.puntos, "Duración de 10 a 30 s")[0]
-    assert (repo / "marca.yml").read_text(encoding="utf-8") == antes
+    assert (repo_fm27 / "marca.yml").read_text(encoding="utf-8") == antes
     # Gemini recibió el juego de la ficha y el recorte de la ficha, no el de la temporada
     instruccion = tr.cuerpos[0]["contents"][0]["parts"][1]["text"]
     assert "Football Manager 27" in instruccion and "GTA" not in instruccion and "de 10 a 30 segundos" in instruccion
@@ -640,13 +655,13 @@ def test_ensayo_de_punta_a_punta_con_la_ficha_sega_fm27(repo, tmp_path, video):
 
 
 @pytest.mark.slow
-def test_ensayo_gemini_dice_que_no_es_fm27_y_se_descarta_sin_hablar_de_gta(repo, tmp_path, video):
-    cand = candidatos_de_fm27(repo)["ERIC ZZETA"]
+def test_ensayo_gemini_dice_que_no_es_fm27_y_se_descarta_sin_hablar_de_gta(repo_fm27, tmp_path, video):
+    cand = candidatos_de_fm27(repo_fm27)["ERIC ZZETA"]
     cand.pilar = "momentos"
-    ficha = next(f for f in fuentes.cargar_fuentes(repo) if f["id"] == "sega-fm27")
+    ficha = next(f for f in fuentes.cargar_fuentes(repo_fm27) if f["id"] == "sega-fm27")
     d = json.loads((DATOS / "fm27_valida.json").read_text(encoding="utf-8"))
     d["juego_correcto"] = False
-    r = mod_toma.hacer_toma(repo, cand, ficha, AHORA, salida=tmp_path / "s", abrir=lambda u: Resp(video.read_bytes()),
+    r = mod_toma.hacer_toma(repo_fm27, cand, ficha, AHORA, salida=tmp_path / "s", abrir=lambda u: Resp(video.read_bytes()),
                             transporte=Transporte(json.dumps(d)), entorno={"GEMINI_API_KEY": "clave-de-prueba"},
                             espera=lambda s: None)
     assert not r.ok and any("Football Manager 27" in m for m in r.motivos) and not any("GTA" in m for m in r.motivos)
@@ -688,7 +703,7 @@ def test_silencio_se_mide_de_verdad_un_tono_anadido_sale_en_rojo(marca, tmp_path
 
 
 def test_la_ficha_con_presupuesto_cero_se_cierra():
-    f = copy.deepcopy(ficha_real())
+    f = ficha_vigente()
     f["presupuesto_restante"] = 0
     assert fuentes.es_publicable(f, date(2026, 11, 18)) == (False, "presupuesto agotado")
 
@@ -757,13 +772,13 @@ def test_palabras_de_filtracion_en_el_gancho_se_descartan(marca, temporada):
     assert not ok and any("palabra a evitar 'leak'" in x for x in m)
 
 
-def test_el_material_de_la_campana_va_primero_y_luego_twitch_por_vistas(repo, editar_yaml):
+def test_el_material_de_la_campana_va_primero_y_luego_twitch_por_vistas(repo_fm27, editar_yaml):
     sys_path = str(Path(__file__).parent)
     import sys
     sys.path.insert(0, sys_path)
     import test_n3 as N3
-    editar_yaml(repo, "fuentes.yml", lambda d: d + [N3.base()])
-    cands = detectar.detectar(repo, N3.AHORA, N3.cliente())
+    editar_yaml(repo_fm27, "fuentes.yml", lambda d: d + [N3.base()])
+    cands = detectar.detectar(repo_fm27, N3.AHORA, N3.cliente())
     ids = [c.fuente_id for c in cands]
     primeros = ids[:5]
     assert primeros == ["sega-fm27"] * 5 and "canal-ejemplo" in ids[5:]
@@ -788,11 +803,11 @@ def test_completar_sigue_con_los_demas_si_una_consulta_falla(tmp_path):
 
 @pytest.mark.parametrize("creador", list(CREADORES))
 @pytest.mark.parametrize("red", REDES)
-def test_candidato_fm27_por_toma_dict_y_textos_da_la_etiqueta_de_cada_red(repo, creador, red):
+def test_candidato_fm27_por_toma_dict_y_textos_da_la_etiqueta_de_cada_red(repo_fm27, creador, red):
     from fabrica import ciclo
     from fabrica.editar.toma import Resultado
-    cand = candidatos_de_fm27(repo)[creador]
-    ficha = next(f for f in fuentes.cargar_fuentes(repo) if f["id"] == "sega-fm27")
+    cand = candidatos_de_fm27(repo_fm27)[creador]
+    ficha = next(f for f in fuentes.cargar_fuentes(repo_fm27) if f["id"] == "sega-fm27")
     r = Resultado(True, fila={"toma": 5, "gancho": "Sebas ficha al delantero", "pilar": "momentos",
                               "duracion_s": 12.0})
     td = ciclo._toma_dict(r, cand, ficha)

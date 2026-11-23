@@ -2,19 +2,23 @@
 
 Campañas o permisos vistos que todavía no tienen alta en `fuentes.yml`. El alta la hace el Project con Kevin.
 
-## Top 5 de hoy (2026-11-21), ordenado por tarifa × presupuesto que queda
+## Top 5 de hoy (2026-11-22), ordenado por tarifa × presupuesto que queda
 
-Los números de GTA 6 son de la lectura del 20 nov: hoy contentrewards.com bloqueó la relectura de las páginas de campaña (permiso de acceso sin responder), así que **no están reverificadas** y «presupuesto» puede ser el total, no lo que queda. A igualdad, GTA 6 va arriba.
+Presupuestos de gtaclipper.com (actualizada 22 nov) y del listado de Content Rewards leído hoy; las páginas de campaña individuales de Content Rewards no se pudieron releer (permiso de acceso sin responder), así que reglas, mínimos y topes son los del 20 nov o «sin dato». Excluidas las que exigen logo o producto de patrocinador (choca con la marca, sección 5B) y las de música. A igualdad, GTA 6 arriba.
 
-| # | Campaña | Tarifa × presupuesto (US$) | Juego | Redes | Aviso |
+| # | Campaña | Tarifa × queda (US$) | Juego | Redes | Aviso |
 |---|---|---|---|---|---|
-| 1 | [Lauren Hamden GTA 6](https://contentrewards.com/c/campaigns/dd617572-f0f7-4754-8df5-4c0deb81763a) | 1.50 × 5,000 = 7,500 | GTA 6 | TT, IG | Pide cuenta dedicada; sin YT Shorts |
-| 2 | [KreekCraft GTA 6](https://contentrewards.com/c/campaigns/2eaa14fb-6927-4136-897e-b096e0d907d6) | 1 × 6,824 = 6,824 | GTA 6 | TT, IG, YT | Overlay obligatorio (choca con marca: por revisar) |
-| 3 | [Dylan Page GTA VI Marathon](https://contentrewards.com/c/campaigns/39753a1a-f1f3-491b-a8f6-0cfee0af0c97) | 1 × 5,000 = 5,000 | GTA 6 | TT, IG, YT, X | Maratón de 120 h |
-| 4 | [Ruben Atienza Clipping](https://contentrewards.com/discover/29c92590-738b-4421-a675-75e5ddfe4c32) | 1.00 (IG) × 4,690 = 4,690 | Lifestyle, no juego | TT, IG, YT | **Nueva.** Español; no es gaming: encaje con la marca por confirmar |
-| 5 | [AsianJeff](https://contentrewards.com/c/campaigns/bbd3a963-9a23-457c-bc15-6697971d9902) | 1 × 2,500 = 2,500 | GTA 6 | TT, IG, YT, X | Playthrough en Twitch |
+| 1 | [GTA Clips (AArthurTV)](https://whop.com/experiences/exp_KZckYGtrnbujDg/campaigns/6e9ca548-f36c-42c2-abc0-61f89b4b53ba) | 1.50 × 5,000 = 7,500 | GTA 6 | sin dato | **Nueva** (badge New). Reglas, mínimo y tope sin dato |
+| 2 | [Lauren Hamden GTA 6](https://contentrewards.com/c/campaigns/dd617572-f0f7-4754-8df5-4c0deb81763a) | 1.50 × 4,419 = 6,629 | GTA 6 | TT, IG | Pide cuenta dedicada; sin YT Shorts |
+| 3 | [Dylan Page GTA VI Marathon](https://contentrewards.com/c/campaigns/39753a1a-f1f3-491b-a8f6-0cfee0af0c97) | 1.20 × 4,952 = 5,942 | GTA 6 | TT, IG, YT, X | Tarifa subió de 1.00 a 1.20 según gtaclipper |
+| 4 | [Ruben Atienza Clipping](https://contentrewards.com/discover/29c92590-738b-4421-a675-75e5ddfe4c32) | 1.00 (IG) × 4,690 = 4,690 | Lifestyle | TT, IG, YT | Español; no es juego (encaje por confirmar). Dato del 21 nov, no releído |
+| 5 | [Dasgasd3m x RUCKUS](https://contentrewards.com/c/campaigns/051002dd-5c46-43d0-a446-43f2957ba3a9) | 2.00 × 905 = 1,810 | GTA 6 | TT, YT | Cuentas que publican sólo GTA 6; Kick; mín. 20 / tope 150 |
 
-Descartadas del Top: Gattouz x 1WIN (0.35 × 10,000 = 3,500, patrocinio de apuestas) y los pools de Kai Cenat, LACY, Clix y YourRAGE (sin tarifa por mil; mínimos de 400k a 750k vistas).
+Siguen: AsianJeff 1.00 × 1,790 = 1,790; Bobby VanRiper 1.50 × 853 = 1,279; Boeshi 1.00 × 1,693.
+
+**Fuera del Top por choque de marca (logo o producto obligatorio):** BenDaDonnn x Puffco (1.00 × 9,835 = 9,835), ClipUp Logo (0–0.30 × 14,907), LuxDrop Logo (0.75 × 6,568), GTA Clipper Logo (0.50 × 975), Hoodrich (1.00 × 5,000; no es juego; logo obligatorio). **KreekCraft:** casi agotada (quedan US$244 de 6,824).
+
+Descartadas del Top: Gattouz x 1WIN (patrocinio de apuestas) y los pools de Kai Cenat, LACY, Clix y YourRAGE (sin tarifa por mil; mínimos de 400k a 750k vistas).
 
 ## Campañas
 
@@ -45,6 +49,24 @@ Descartadas del Top: Gattouz x 1WIN (0.35 × 10,000 = 3,500, patrocinio de apues
 | 2026-11-21 | [Arc Raiders VIP Clipping](https://contentrewards.com/discover/9a1fbc53-42de-4487-a1a8-58db5578adef) | Content Rewards, Arc Raiders | US$2/mil | 8 / 225; US$0 de US$20,000 | IG, TT, YT | Carpeta de Drive | **Cerrada** («Submissions closed») |
 | 2026-11-21 | [Fexr (Plox Media)](https://contentrewards.com/discover/fffe2df2-d591-4ab8-80b1-12dbe2095673) | Content Rewards, streamer | YT 1.50, TT/IG 2.00 | 2 / 320; US$0 de US$3,056 | YT, TT, IG | Google Doc | Agotada (estado «no disponible») |
 | 2026-11-21 | [Kevin Furest](https://contentrewards.com/discover/1296c67b-0acc-442d-97e1-33d4a4029846) | Content Rewards, marca personal | US$1/mil | YT 5/40, IG 1/100; US$0 de US$3,000 | IG, YT | Google Doc | **Cerrada** |
+| 2026-11-22 | [GTA Clips (AArthurTV)](https://whop.com/experiences/exp_KZckYGtrnbujDg/campaigns/6e9ca548-f36c-42c2-abc0-61f89b4b53ba) | Whop, GTA 6 | US$1.50/mil | sin dato; quedan US$5,000 | sin dato | Sin dato | **Nueva** (gtaclipper.com, badge New). Idioma por confirmar |
+| 2026-11-22 | [BrettLiftsXP GTA VI $2 CPM](https://whop.com/experiences/exp_3qkLSu3ieMiFDM/campaigns/954cf1f2-1a69-4f0f-b46c-18a9dfddb219) | Whop (Funnel Clips), GTA 6 | US$0.50 a 2.00/mil | sin dato; quedan US$825 | sin dato | Sin dato | **Nueva** |
+| 2026-11-22 | [Parkerr (ClipHaus)](https://whop.com/experiences/exp_BmRo1Cepnpq46o/campaigns/e41de449-3eca-4343-a11c-b194e7a3379a) | Whop, GTA 6 | US$0.60/mil | tope US$100; quedan US$548 | sin dato | Sin dato | **Nueva**. Tarifa baja |
+| 2026-11-22 | [Lysium / Benji Ramos](https://whop.com/experiences/exp_KZckYGtrnbujDg/campaigns/6d896f33-152f-42a9-92f4-662199228349) | Whop, GTA 6 (RP) | US$1.50/mil | tope US$150; quedan US$423 | sin dato | Handle de Lysium visible; «apply to join» | **Nueva**; gtaviclipper la marca «sin confirmar» |
+| 2026-11-22 | [Bichou Miami (Risor)](https://whop.com/experiences/exp_SHH656S5302Ffx/campaigns/f0b0fbac-c754-45e5-96f6-aef8796dac91) | Whop, GTA 6 | US$1.00/mil | 5 / 75; quedan US$581 | sin dato | Kick | **Nueva**. Francés: no encaja con la marca (español/inglés) |
+| 2026-11-22 | [BenDaDonnn x Puffco](https://whop.com/experiences/exp_KZckYGtrnbujDg/campaigns/bb66f9eb-b90e-4dd0-8cee-9f3cd566c9a0) | Whop, GTA 6 + patrocinador | US$1.00/mil | sin dato; quedan US$9,835 | sin dato | Producto del patrocinador debe salir | **Nueva**. Choca con la marca |
+| 2026-11-22 | [LuxDrop Logo Clipping](https://whop.com/experiences/exp_6DJh0DkDMhATvG/campaigns/1b3065cb-29fd-4631-a252-ec3f6d28a583) | Whop, GTA 6 + patrocinador | US$0.75/mil | sin dato; quedan US$6,568 | sin dato | Logo obligatorio (LuxDrop, casino) | **Nueva**. Choca con la marca |
+| 2026-11-22 | [ClipUp Logo Campaign](https://whop.com/experiences/exp_iXJEwHJKe6nf7s/campaigns/802cf95a-ea84-4070-9a96-8a917831cb16) | Whop, GTA 6 + logo | US$0 a 0.30/mil | sin dato; quedan US$14,907 | sin dato | Logo obligatorio | **Nueva**. Choca con la marca; tarifa mínima |
+| 2026-11-22 | [GTA Clipper Logo Campaign](https://whop.com/experiences/exp_3XuozWlyyQaylJ/campaigns/686f6547-172e-4b76-99be-c26eabd5a2cf) | Whop, GTA 6 + logo | US$0.50/mil | sin dato; quedan US$975 | sin dato | Logo obligatorio | **Nueva**. Choca con la marca |
+| 2026-11-22 | [«Things I Could've Said» (música)](https://whop.com/experiences/exp_fpLeAptYLmerl7/campaigns/2e5951c8-a46b-404a-b88b-79fbac7ce6e4) y [[GTA VI] MUSIC 10 TRACKS](https://whop.com/experiences/exp_iFGPORmvZzqFCR/campaigns/f8706345-4971-43c8-999b-42346038ce02) | Whop, sonido GTA 6 | US$0.18 a 1.50 / 0.75 | quedan US$1,000 / US$691 | sin dato | Campañas de canciones | **Nuevas**, descartadas: no son clips de juego |
+| 2026-11-22 | [Hoodrich Clipping](https://contentrewards.com/discover/60e19a6d-066c-4090-8728-02eb6bd789ef) | Content Rewards, streamer (crédito/negocios) | US$1.00/mil | 1 / 100; quedan US$5,000 | TT, IG, YT | Logo de marca y enlace en bio; aprobación previa | Activa, inglés. No es juego y choca con la marca |
+| 2026-11-22 | [Stanley Meng](https://contentrewards.com/discover/8a91bc4a-feb8-455d-87de-95d82f69e5eb) | Content Rewards, streamer | US$1.00/mil | 2 / 100; quedan US$346 | sólo TT | Reglas en un Google Doc no leído | Activa, inglés. Poco presupuesto |
+| 2026-11-22 | [Elina Meng](https://contentrewards.com/discover/972f3c20-33bb-4a2c-9025-d6b15aa7d075) | Content Rewards, streamer | US$1.00/mil | 2 / 100; quedan US$29 | sólo TT | Drive y Google Doc | Agotada en la práctica |
+| 2026-11-22 | [Dooly Clipping](https://contentrewards.com/discover/372d68ea-252e-4dea-9c6c-be8c6f0230ec) | Content Rewards, streamer | US$1.00/mil | 1 / 100; US$0 de US$1,000 | IG, TT | Drive | **Cerrada** («Submissions closed») |
+| 2026-11-22 | [JiggyTurner IRL](https://contentrewards.com/discover/64b994c2-204a-46fb-8bbc-a744969608b8) | Content Rewards, streamer IRL | US$0.75/mil | 3 / 100; quedan US$2 de US$500 | YT, IG, TT | Etiquetas obligatorias; exige 40 % audiencia Tier 1; sin plantillas OpusClip/CapCut | **Pausada** |
+| 2026-11-22 | [Daniel Curto (ClippiXStudio Español)](https://www.contentrewards.com/campaigns/ebc7dd27-5d08-4d06-86d5-659706286077) | Content Rewards, streamer (trading) | US$1.00/mil | 1 / 100; quedan ~US$970 de US$2,000 | sólo TT, IG | 4 archivos de referencia bloqueados | **Leída**: activa, español, 64 creadores. No es juego |
+| 2026-11-22 | [Chris Van Vliet Podcast (Clip Summit)](https://contentrewards.com/c/discover) | Content Rewards, podcast | US$1.00/mil | sin dato; ~US$800 restantes de US$3.4K | sin dato | Sin dato | Sólo vista en el listado. No es juego |
+| 2026-11-22 | [Carlos Esparraga «Clips hablando»](https://contentrewards.com/c/discover) | Content Rewards | US$0.20 a 1.00/mil | ~US$1.8K restantes de US$10K | sin dato | Sólo vista en el listado | Español. Probablemente la misma de «Gangsta Trainer» de arriba (herramienta de trucos: no se recomienda) |
 
 Campañas de sonido GTA 6 vistas el 20 nov y descartadas (no son clips de juego): Tokyo Girl (US$0.70), Aron Orlando "Miami House Party" (US$1), 8lanco (US$1). Fuentes: [Content Rewards](https://contentrewards.com/articles/gta-6-clipping) (mod. 20 nov), [Oakgen](https://oakgen.ai/blog/gta-6-clipping-campaigns) (19 nov), [OpenClip](https://openclip.app/clipping/gta-6-clipping) (19 nov). Ninguna campaña en español de GTA 6 ni de streamer hispano encontrada en Content Rewards, Clippers Flow (sin GTA), Clipeamos ni Clipo (sin resultados).
 
@@ -71,3 +93,13 @@ Reclamos de derechos de autor: búsqueda del 20 nov sin casos nuevos confirmados
 - **Streamers hispanos con campaña** (seguidores por confirmar): Ruben Atienza, Dominguero y Daniel Curto, arriba. De los del juego de la temporada, [deusamir](https://streamscharts.com/channels/deusamir) tiene ficha en Streams Charts pero no pude leer sus seguidores; Folagor, aXoZer y Creative siguen por confirmar.
 - **Reclamos de derechos de autor:** la búsqueda del 21 nov sólo halló retiros de Take-Two contra filtraciones y videos falsos de GTA 6 en X y YouTube (hechos de agosto y anteriores; [TorrentFreak](https://torrentfreak.com/take-two-expands-gta-6-leak-hunt-with-dmca-subpoenas/)). Ningún reclamo confirmado contra un streamer o una agencia. `config/vetados.yml` sin cambios.
 - Los datos de las páginas de campaña los leyó un subagente por paráfrasis; lo que no aparecía va como «sin dato».
+
+## Radar del 2026-11-22
+
+- **GTA 6:** 11 campañas nuevas (9 de clips, 2 de música). La mejor encaje: [GTA Clips (AArthurTV)](https://whop.com/experiences/exp_KZckYGtrnbujDg/campaigns/6e9ca548-f36c-42c2-abc0-61f89b4b53ba), US$1.50/mil con US$5,000 sin tocar; reglas sin dato. Cuatro nuevas exigen logo o producto de patrocinador (Puffco, LuxDrop, ClipUp, GTA Clipper Logo): chocan con la marca. Fuentes: [gtaclipper.com](https://gtaclipper.com/campaigns) (actualizada 22 nov; 26 campañas, US$101.1K restantes), [gtaviclipper.com](https://gtaviclipper.com/board) (revisión manual del 16 nov) y [StoryCut](https://www.storycut.com/blog/gta-6-clipping) (20 nov). Contradicciones entre fuentes: KreekCraft (US$0.50 y US$244 restantes en gtaclipper y en el listado de Content Rewards, frente a US$1 en StoryCut), Lysium y LACY.
+- **Cierres:** SEGA FM27 **pausada o agotada desde el 16 nov** (trailer, US$20,000, pausada; versión en español, US$4,000, presupuesto agotado) según el [artículo de Content Rewards](https://contentrewards.com/articles/video-game-clipping-campaigns) (mod. 20 nov); ya no aparece en el listado en vivo. **Speed/Expedia:** ninguna campaña en ninguna página leída ni en la búsqueda (sólo prensa de la alianza): sin evidencia, tratar como inexistente. Cerradas o pausadas nuevas: Dooly, JiggyTurner; casi agotadas: KreekCraft, Elina Meng; pausadas (gtaviclipper, 16 nov): ClipScales y Seal.
+- **No pude leer hoy** (permiso de acceso sin responder o error del servidor): [afeca1a0](https://contentrewards.com/discover/afeca1a0-f44c-46ad-8194-09d62b56589e), [Show Nemoto Clipping 2](https://contentrewards.com/discover/1073f7a5-5232-4a53-84ed-af7a886929fa), la página de campaña de las ocho de GTA 6 de Content Rewards y la recapitulación de [Streams Charts](https://streamscharts.com/news/gta-6-day1-recap). Los presupuestos de GTA 6 vienen de gtaclipper.com, no de las páginas de campaña.
+- **Clipeamos, Whop, Clippers Flow y Clipo:** sin campañas propias en español halladas. Whop alberga las campañas listadas en gtaclipper.com (enlaces de arriba). Ninguna campaña en español de GTA 6.
+- **Streamers (1,000 a 300,000 seguidores):** ninguno confirmado. [win.gg](https://win.gg/most-watched-streamers-gta-6-launch-day/) (19 nov) trae horas vistas y picos, pero no seguidores: Rubius, DjMaRiiO, IlloJuan (pico 703,700) y HoneyMad son demasiado grandes. Siguen por confirmar Folagor, aXoZer, Creative y deusamir (arriba).
+- **Reclamos de derechos de autor:** la búsqueda del 22 nov sólo devolvió artículos generales sobre la DMCA en Twitch (guías y explicaciones), sin reclamo confirmado contra un streamer o una agencia. `config/vetados.yml` sin cambios.
+- Los datos de las páginas los leyeron subagentes por paráfrasis; lo que no aparecía va como «sin dato».

@@ -1,0 +1,42 @@
+# Voces: transcripción propia con faster-whisper (CPU, sin torch), voces por color, silencios y golpes (fabrica/voces.py).
+# Si la biblioteca o el modelo no están, la toma sigue como antes (sin voces) y el plan dice por qué.
+activo: true                 # false: no se analiza el audio; todo como antes
+modo: principal              # principal: si el idioma es español, las líneas salen de la transcripción (la acotación de Gemini se conserva)
+                             # respaldo: sólo cuando Gemini no dio líneas (o el corte fue sin IA)
+modelo: small                # modelo de faster-whisper del ciclo (base | small ...); se baja una vez y queda en caché
+modelos_medir: [base, small] # sólo para la muestra: mide el tiempo de carga y de transcripción de cada uno
+idioma: null                 # siempre null: whisper AUTODETECTA. Con `language` dado no detecta nada (devuelve lo pedido con prob 1) y
+                             # convertiría audio en otro idioma en "español". El código ignora cualquier otro valor.
+idioma_prob_min: 0.5         # el audio cuenta como español sólo si whisper lo detecta con al menos esta probabilidad
+p_palabra_min: 0.35          # una palabra con menos probabilidad que esto se descarta (junto con símbolos como ♪ y [Música])
+tope_s: 150                  # presupuesto de la etapa `voces` dentro del plazo del ciclo
+reserva_s: 150               # además del tope debe quedar esto del ciclo para componer y la puerta; si no, se salta con log
+silencio_min_s: 0.6          # un tramo sin voz y por debajo del umbral más largo que esto se corta
+margen_s: 0.12               # lo que se deja a cada lado de un silencio cortado (corte seco con aire mínimo)
+umbral_db: -40               # dBFS RMS (ventanas de 20 ms) por debajo del cual hay silencio
+golpes:                      # picos de audio (para marcar el ritmo)
+  sobre_mediana_db: 12       # un golpe supera la mediana de la envolvente por esto...
+  piso_db: -30               # ...y además nunca queda por debajo de este nivel absoluto (dBFS)
+  separacion_s: 1.0          # separación mínima entre dos golpes
+  max: 8                     # como mucho los N más fuertes
+hablantes:                   # separación de voces sin dependencias nuevas (MFCC + tono, k-medias de 2)
+  max: 2
+  separacion_min: 0.25       # silueta mínima para creer que son dos voces; si no, todo es del streamer
+  minimo_s: 1.5              # tiempo mínimo que debe hablar la voz minoritaria
+lineas:                      # cómo se agrupan las palabras en subtítulos
+  pausa_s: 0.5               # una pausa mayor parte la frase
+  max_s: 4.5                 # una línea no dura más que esto
+alucinaciones:               # frases típicas que whisper inventa en silencio o música. Se descarta el segmento ENTERO si es igual
+                             # o casi igual (sin mayúsculas, tildes ni signos); un texto real que contenga la frase no se toca
+  - "subtítulos realizados por la comunidad de amara.org"
+  - "subtítulos por la comunidad de amara.org"
+  - "amara.org"
+  - "gracias por ver el vídeo"
+  - "gracias por ver"
+  - "gracias por vernos"
+  - "suscríbete"
+  - "suscribete"
+  - "thanks for watching"
+  - "thank you for watching"
+  - "subtitles by"
+nombre_otra: "OTRA VOZ"      # rótulo de la voz que no es del streamer

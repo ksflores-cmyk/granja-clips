@@ -21,3 +21,14 @@
 - 2026-11-21 15:03 GT · ciclo: sin toma
 - 2026-11-21 15:44 GT · ciclo: sin toma
 - 2026-11-21 18:06 GT · ciclo: toma 4 (primeras_veces) programada en shorts, tiktok, reels
+- 2026-11-21 21:03 GT · ciclo: sin toma
+- 2026-11-21 22:06 GT · ciclo: toma 5 (primeras_veces) programada en shorts, tiktok, reels
+- 2026-11-22 08:03 GT · ciclo: sin toma
+- 2026-11-22 09:04 GT · ciclo: sin toma
+- 2026-11-22 10:07 GT · ciclo: sin toma
+- 2026-11-22 11:04 GT · ciclo: sin toma
+- 2026-11-22 12:00 GT · ciclo: sin toma
+- 2026-11-22 12:01 GT · ciclo: sin toma
+- 2026-11-22 15:03 GT · ciclo: sin toma
+- 2026-11-22 16:03 GT · ciclo: sin toma
+- 2026-11-22 18:05 GT · ciclo: toma 6 (primeras_veces) programada en shorts, tiktok, reels
