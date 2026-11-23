@@ -567,7 +567,7 @@
   origen: twitch
   twitch_login: aaronjaureguii
   broadcaster_id: '1382351624'
-  seguidores: 38039
+  seguidores: 38057
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -727,7 +727,7 @@
   origen: twitch
   twitch_login: miriam_petricor
   broadcaster_id: '577594813'
-  seguidores: 87275
+  seguidores: 87307
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -1247,7 +1247,7 @@
   origen: twitch
   twitch_login: vicesat
   broadcaster_id: '110387651'
-  seguidores: 15563
+  seguidores: 15707
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -1287,8 +1287,8 @@
   origen: twitch
   twitch_login: elmeap
   broadcaster_id: '648164647'
-  seguidores: 94958
-  seguidores_leidos: '2026-11-21'
+  seguidores: 95125
+  seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1314,7 +1314,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-23'
+  vence: '2026-11-24'
   estado: vigente
   uso: produccion
   publicable: true
@@ -1487,8 +1487,8 @@
   origen: twitch
   twitch_login: superblazing_
   broadcaster_id: '573251394'
-  seguidores: 27774
-  seguidores_leidos: '2026-11-21'
+  seguidores: 28135
+  seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1514,7 +1514,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-23'
+  vence: '2026-11-24'
   estado: vigente
   uso: produccion
   publicable: true
@@ -1727,8 +1727,8 @@
   origen: twitch
   twitch_login: josefattv
   broadcaster_id: '488087884'
-  seguidores: 44915
-  seguidores_leidos: '2026-11-21'
+  seguidores: 44932
+  seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1754,7 +1754,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-23'
+  vence: '2026-11-24'
   estado: vigente
   uso: produccion
   publicable: true
@@ -2047,7 +2047,7 @@
   origen: twitch
   twitch_login: elvisayomastercard
   broadcaster_id: '21565409'
-  seguidores: 233116
+  seguidores: 233122
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
