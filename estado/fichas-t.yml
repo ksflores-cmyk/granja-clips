@@ -1327,7 +1327,7 @@
   origen: twitch
   twitch_login: jucaviapri
   broadcaster_id: '186736829'
-  seguidores: 250749
+  seguidores: 250767
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -1487,7 +1487,7 @@
   origen: twitch
   twitch_login: superblazing_
   broadcaster_id: '573251394'
-  seguidores: 28176
+  seguidores: 28187
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -1647,8 +1647,8 @@
   origen: twitch
   twitch_login: jimrsng
   broadcaster_id: '24534372'
-  seguidores: 101919
-  seguidores_leidos: '2026-11-21'
+  seguidores: 101930
+  seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1674,7 +1674,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-23'
+  vence: '2026-11-24'
   estado: vigente
   uso: produccion
   publicable: true
@@ -1727,7 +1727,7 @@
   origen: twitch
   twitch_login: josefattv
   broadcaster_id: '488087884'
-  seguidores: 44948
+  seguidores: 44950
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -1807,7 +1807,7 @@
   origen: twitch
   twitch_login: azrazk
   broadcaster_id: '1054230264'
-  seguidores: 16937
+  seguidores: 16955
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -1927,7 +1927,7 @@
   origen: twitch
   twitch_login: cursedfiber78
   broadcaster_id: '231053562'
-  seguidores: 138358
+  seguidores: 138361
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -2127,7 +2127,7 @@
   origen: twitch
   twitch_login: ikiimartin
   broadcaster_id: '484249913'
-  seguidores: 110812
+  seguidores: 110818
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -2167,7 +2167,7 @@
   origen: twitch
   twitch_login: soybranflores
   broadcaster_id: '564659635'
-  seguidores: 51905
+  seguidores: 51906
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -2207,7 +2207,7 @@
   origen: twitch
   twitch_login: ismanuplay
   broadcaster_id: '153417489'
-  seguidores: 288895
+  seguidores: 288903
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -2247,7 +2247,7 @@
   origen: twitch
   twitch_login: mitroxfumandoporro
   broadcaster_id: '758199700'
-  seguidores: 4315
+  seguidores: 4317
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -2287,7 +2287,7 @@
   origen: twitch
   twitch_login: aleowens
   broadcaster_id: '279595162'
-  seguidores: 9129
+  seguidores: 9146
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -2407,7 +2407,7 @@
   origen: twitch
   twitch_login: 13steg
   broadcaster_id: '257878446'
-  seguidores: 34543
+  seguidores: 34550
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -2447,7 +2447,7 @@
   origen: twitch
   twitch_login: mirreytv
   broadcaster_id: '105827290'
-  seguidores: 274817
+  seguidores: 274924
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -2487,7 +2487,7 @@
   origen: twitch
   twitch_login: metapodparapresidente
   broadcaster_id: '564302532'
-  seguidores: 88166
+  seguidores: 88167
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -2567,7 +2567,7 @@
   origen: twitch
   twitch_login: checoche14
   broadcaster_id: '611255972'
-  seguidores: 43883
+  seguidores: 43885
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
@@ -2648,6 +2648,126 @@
   twitch_login: godtito_
   broadcaster_id: '190004581'
   seguidores: 1034
+  seguidores_leidos: '2026-11-22'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-24'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+- id: t-shelbi-live
+  tipo: T
+  creador: twitch.tv/shelbi_live
+  credito: twitch.tv/shelbi_live
+  origen: twitch
+  twitch_login: shelbi_live
+  broadcaster_id: '544436069'
+  seguidores: 24173
+  seguidores_leidos: '2026-11-22'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-24'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+- id: t-xwlumpy
+  tipo: T
+  creador: twitch.tv/xwlumpy
+  credito: twitch.tv/xwlumpy
+  origen: twitch
+  twitch_login: xwlumpy
+  broadcaster_id: '662899088'
+  seguidores: 42653
+  seguidores_leidos: '2026-11-22'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-24'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+- id: t-0elita
+  tipo: T
+  creador: twitch.tv/0elita
+  credito: twitch.tv/0elita
+  origen: twitch
+  twitch_login: 0elita
+  broadcaster_id: '603596484'
+  seguidores: 108101
   seguidores_leidos: '2026-11-22'
   juego: GTA 6
   reglas:
