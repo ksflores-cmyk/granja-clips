@@ -222,3 +222,13 @@ def autoriza_descarga(ficha: dict | None, hoy: date, uso: str, url: str | None =
     if material is not None and (url is None or url not in material):
         return False, f"url fuera de material: {url!r}"
     return True, "ok"
+
+
+def hay_campana_cr(raiz=None) -> bool:
+    """¿Hay alguna ficha vigente, publicable y con `cr_campaign_id`? Si no, el robot de envío no tiene qué hacer."""
+    return any(f.get("estado") == "vigente" and f.get("publicable") is True and f.get("cr_campaign_id")
+               for f in _fuentes_yml(raiz))
+
+
+if __name__ == "__main__":      # `python3 -m fabrica.fuentes`: imprime cr=si|no (lo usa el primer paso de fabrica.yml)
+    print("cr=" + ("si" if hay_campana_cr() else "no"))
