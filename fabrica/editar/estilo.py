@@ -156,7 +156,8 @@ def _toma(plan: dict) -> Toma:
     return Toma(numero=int(t.get("numero", 0)), gancho=str(t.get("gancho", "")),
                 palabra_lapiz=str(t.get("palabra_lapiz", "")), lapiz=str(t.get("lapiz", "subrayado")),
                 escena=str(t.get("escena", "")), credito=str(t.get("credito", "")),
-                avisos=[a for a in ("spoiler", "cinematica", "mods") if a in (plan.get("avisos") or [])])
+                avisos=[a for a in ("spoiler", "cinematica", "mods") if a in (plan.get("avisos") or [])],
+                subtitulos_del_clip=plan.get("subtitulos") == "del clip")
 
 
 def _fotograma(video: Path, seg: float) -> Image.Image | None:
@@ -647,6 +648,15 @@ def _geometria(plan: dict, marca: Marca) -> dict | None:
     except ValueError:
         return None
     return {"y_contenido": y_cont, "cuerpo": None, "y_dialogo": y_cont + marca.m("alto_dialogo_sin_video")}
+
+
+def sin_dialogo_propio(plan: dict) -> tuple[bool, str]:
+    """Con `plan["subtitulos"] == "del clip"` la toma va sin líneas ni placas de diálogo nuestras (el clip ya las trae)."""
+    capas = [c.get("tipo") for c in ((plan.get("geometria") or {}).get("capas") or [])
+             if isinstance(c, dict) and str(c.get("tipo", "")).startswith("dialogo")]
+    if plan.get("lineas") or capas:
+        return False, f"el plan dice que los subtítulos vienen en el clip y trae {len(plan.get('lineas') or [])} línea(s) y {len(capas)} placa(s) de diálogo"
+    return True, "sin líneas ni placas de diálogo (los subtítulos vienen en el clip)"
 
 
 def dialogo_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
@@ -1393,6 +1403,9 @@ def revisar(video: Path, plan: dict, marca: Marca, ficha: dict | None = None) ->
     punto("fotograma", "Cierre visible en el video (CORTE. y crédito)", ok_cierre, det_cierre)
     ok_cab, det_cab = cabecera_visible(Path(video), plan, marca)
     punto("fotograma", "Cabecera en el video", ok_cab, det_cab)
+    if plan.get("subtitulos") == "del clip":       # el clip trae sus subtítulos: la toma va sin bloque de diálogo
+        ok_sub, det_sub = sin_dialogo_propio(plan)
+        punto("plan", "Subtítulos del clip: sin bloque de diálogo nuestro", ok_sub, det_sub)
     ok_dia, det_dia = dialogo_visible(Path(video), plan, marca)
     punto("fotograma", "Diálogo en el video", ok_dia, det_dia)
     if v2:

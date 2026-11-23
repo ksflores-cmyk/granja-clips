@@ -32,6 +32,32 @@ def nombre_corto(creador: str | None) -> str:
     return " ".join(s.split()).upper()
 
 
+def _limpiar_visible(texto) -> str:
+    """Un nombre para mostrar: sin `@`, sin guiones bajos, en una línea y en mayúsculas ("Miriam_Petricor" -> "MIRIAM PETRICOR")."""
+    s = str(texto or "").replace("@", " ").replace("_", " ")
+    s = "".join(c for c in s if c.isprintable())
+    return " ".join(s.split()).upper()
+
+
+def nombre_para_mostrar(creador: str | None, ficha: dict | None, raiz=None) -> str:
+    """El nombre del streamer tal como se ve en el video (hablante, escena, rótulo de voces). Sale SÓLO de la ficha:
+    el `apodo` (campo opcional, manda), si no el `nombre_visible` de Twitch (se guarda al armar la ficha T), si no el
+    login sin guiones bajos. El apodo y el nombre visible sólo valen si `creador` es el de la propia ficha (en las
+    campañas el creador llega por archivo y puede ser otro). Nunca sale lo que diga el modelo ni un nombre de
+    `config/vetados.yml`: si el apodo o el nombre visible lo traen, se usa el login."""
+    login = _limpiar_visible(nombre_corto(creador))
+    f = ficha or {}
+    propios = {normalizar(nombre_corto(x)) for x in (f.get("twitch_login"), f.get("creador")) if x}
+    if not login or normalizar(login) not in propios:
+        return login
+    vetados = {v for v in logins_vetados(raiz) if normalizar(v) != normalizar(login)}
+    for campo in ("apodo", "nombre_visible"):
+        cand = _limpiar_visible(f.get(campo))
+        if cand and not _vetado_en(cand, vetados):
+            return cand
+    return login
+
+
 def etiqueta_hablante(hablante: str, creador: str | None) -> str:
     """El nombre corto del creador si el modelo dijo `STREAMER` o el nombre del creador; si no, `OTRA VOZ`."""
     nombre = nombre_corto(creador)
@@ -59,14 +85,15 @@ def escena_segura(escena: str, creador: str | None, marca, temporada: dict | Non
     return e
 
 
-def revisar_nombres(toma, lineas, creador: str | None, raiz=None, marca=None) -> list[str]:
+def revisar_nombres(toma, lineas, creador: str | None, raiz=None, marca=None, tambien=()) -> list[str]:
     """Motivos de rechazo (vacía = verde). `creador` es el de la ficha, ya resuelto con `creador_de`.
 
     `marca`: si se da, el rótulo del streamer de los subtítulos por voz (`voces.nombre_visible`, que recorta el nombre
-    a la columna) también cuenta como el nombre del creador."""
+    a la columna) también cuenta como el nombre del creador. `tambien`: otras formas del nombre del creador que son
+    suyas (su login, cuando `creador` ya es el nombre visible o el apodo)."""
     motivos: list[str] = []
     propio = nombre_corto(creador)
-    permitidos = {normalizar(propio)}
+    permitidos = {normalizar(propio)} | {normalizar(nombre_corto(x)) for x in tambien}
     if marca is not None:
         from .. import voces as mod_voces      # importación diferida: voces importa este módulo
         permitidos.add(normalizar(mod_voces.nombre_visible(creador, marca)))
@@ -77,7 +104,7 @@ def revisar_nombres(toma, lineas, creador: str | None, raiz=None, marca=None) ->
                 motivos.append(f"línea {i}: el hablante {nombre!r} no es el creador ni {OTRA_VOZ}")
         elif ln.frase:
             motivos.append(f"línea {i}: frase sin hablante")
-    vetados = {v for v in logins_vetados(raiz) if normalizar(v) != normalizar(propio)}
+    vetados = {v for v in logins_vetados(raiz) if normalizar(v) not in permitidos}
     campos = [("escena", toma.escena), ("crédito", toma.credito), ("gancho", toma.gancho)]
     for i, ln in enumerate(lineas, 1):
         campos += [(f"nombre de la línea {i}", ln.nombre), (f"acotación de la línea {i}", ln.acotacion),

@@ -29,6 +29,9 @@ ASSETS = {"SEBASBERON": "fm27-sebasberon.mp4", "DARO": "fm27-daro.mp4", "ERIC ZZ
 RED = {"reels": 0, "tiktok": 1, "shorts": 2}
 
 
+pytestmark = pytest.mark.usefixtures("primera_linea_con_gancho")      # ver conftest: el caption se prueba en test_pedidos_22nov
+
+
 def ficha_real() -> dict:
     return next(f for f in fuentes.cargar_fuentes(RAIZ_REAL) if f["id"] == "sega-fm27")
 

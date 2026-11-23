@@ -474,15 +474,26 @@ def _leer_json(ruta: Path, defecto):
         return defecto
 
 
+def _clave_gancho(toma: dict) -> str:
+    """Huella del gancho ya limpio: el texto de la publicación lleva el `caption` (distinto del gancho), así que dos
+    clips con la misma frase de respaldo no se confunden si sus ganchos son distintos."""
+    limpio = mod_textos.limpiar_gancho(toma.get("gancho"), toma, {}, mod_textos.cargar_config())
+    return hashlib.sha256(_cuerpo_sin_toma(f"Toma 0. {limpio}").encode("utf-8")).hexdigest()[:16]
+
+
 def _comprobar_repetido(raiz, texto: str, plataforma: str, toma: dict, hoy: date | None) -> None:
-    """El mismo texto no se repite en 7 días: registro propio de textos y `gancho` del marcador."""
+    """El mismo texto no se repite en 7 días: registro propio de textos y `gancho` del marcador.
+
+    Una entrada nueva del registro guarda también la huella del gancho (`gancho`): sólo choca si el gancho es el mismo.
+    Las entradas viejas, sin ese campo, chocan por el texto solo, como siempre."""
     hoy = hoy or datetime.now(ZONA).date()
     desde = hoy - timedelta(days=DIAS_SIN_REPETIR)
     cuerpo = _cuerpo_sin_toma(texto)
     huella = hashlib.sha256(cuerpo.encode("utf-8")).hexdigest()
+    clave = _clave_gancho(toma)
     for r in _leer_json(_ruta_estado(raiz, "buffer-textos.json"), []):
         if r.get("plataforma") == plataforma and r.get("huella") == huella \
-                and date.fromisoformat(r["fecha"]) > desde:
+                and r.get("gancho", clave) == clave and date.fromisoformat(r["fecha"]) > desde:
             raise Descartada(f"texto repetido: ya se publicó el {r['fecha']} (no se repite en 7 días)")
     marcador = Path(raiz_repo(raiz) / "marcador.csv")
     if marcador.exists():
@@ -778,7 +789,8 @@ class Publicador:
         previos = _leer_json(_ruta_estado(self.raiz, "buffer-textos.json"), [])
         previos.append({"fecha": self.ahora().astimezone(ZONA).date().isoformat(),
                         "plataforma": plataforma,
-                        "huella": hashlib.sha256(_cuerpo_sin_toma(textos["texto"]).encode()).hexdigest()})
+                        "huella": hashlib.sha256(_cuerpo_sin_toma(textos["texto"]).encode()).hexdigest(),
+                        "gancho": _clave_gancho(toma)})
         _escribir_json(_ruta_estado(self.raiz, "buffer-textos.json"), previos[-300:])
 
     # ---- reconciliación ----

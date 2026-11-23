@@ -24,6 +24,7 @@ class Toma:
     credito: str = ""            # "Con: ..." o "Fuente: ..."
     avisos: list = field(default_factory=list)            # avisos al inicio, en orden fijo: spoiler, cinematica, mods
     avisos_motivos: dict = field(default_factory=dict)    # {aviso: [motivos]} (sólo va al plan; no se dibuja)
+    subtitulos_del_clip: bool = False    # el clip ya trae subtítulos quemados: la toma va sin bloque de diálogo (plan["subtitulos"])
 
     @property
     def spoiler(self) -> bool:

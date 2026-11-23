@@ -135,3 +135,13 @@ def repo_con_musica(repo, raiz_musica, monkeypatch):
     shutil.copytree(raiz / "marca" / "musica", repo / "marca" / "musica")
     monkeypatch.setenv("GRANJA_MUSICA_DIR", str(audio))
     return repo
+
+
+@pytest.fixture
+def primera_linea_con_gancho(monkeypatch):
+    """Aísla pruebas viejas que miden la limpieza del gancho y los límites por red con la primera línea `Toma nnn. <gancho>`.
+    Desde el 22 nov 2026 esa línea lleva el `caption` (distinto del gancho): su regla y sus respaldos se prueban en
+    `test_pedidos_22nov.py`; aquí se vuelve a la forma anterior."""
+    from fabrica import textos as mod_textos
+    monkeypatch.setattr(mod_textos, "_primera_linea",
+                        lambda toma, ficha, cfg, gancho, plataforma: f"Toma {mod_textos._numero(toma)}. {gancho}")

@@ -459,7 +459,8 @@ def preparar_segmento(candidato: Candidato, ficha: dict, ctx: Contexto) -> Segme
     creador = (entrada or {}).get("creador") or candidato.creador or ficha.get("creador") or ""
     creador = mod_nombres.creador_de(creador, ficha)
     toma, lineas, inicio, dur = armar(mirada.datos, ctx.marca, ficha, ctx.numero, creador, temporada, ctx.raiz)
-    motivos_nombres = mod_nombres.revisar_nombres(toma, lineas, creador, ctx.raiz)
+    nombre = mod_nombres.nombre_para_mostrar(creador, ficha, ctx.raiz)       # el que `armar` pone en los rótulos
+    motivos_nombres = mod_nombres.revisar_nombres(toma, lineas, creador, ctx.raiz, tambien=(nombre,))
     if motivos_nombres:
         raise ErrorSegmento("; ".join(f"puerta de nombres: {m}" for m in motivos_nombres))
     return Segmento(fuente=d.ruta, inicio=inicio, duracion=dur, toma=toma, lineas=lineas, ficha=ficha,

@@ -323,7 +323,7 @@ def construir(marca: Marca, t: Toma, lineas: list, duracion: float, logo: Path |
     if logo is not None:
         placas.append(placa_agua(marca, logo, duracion))
     tope = float(duracion) - float(marca.m("cierre_s"))        # un diálogo no convive con la placa de cierre
-    for i, ln in enumerate(lineas, 1):
+    for i, ln in enumerate([] if t.subtitulos_del_clip else lineas, 1):      # subtítulos ya quemados: sin bloque nuestro
         p = placa_dialogo(marca, i, ln)
         p.t1 = min(p.t1, tope)
         if p.t0 >= p.t1:

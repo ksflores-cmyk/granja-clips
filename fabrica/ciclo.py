@@ -590,7 +590,9 @@ def _claves_de(c) -> list[str]:
 
 def _toma_dict(r, c, ficha: dict) -> dict:
     f = r.fila
+    caption = (getattr(r, "gemini", None) or {}).get("caption") if isinstance(getattr(r, "gemini", None), dict) else None
     return {"numero": f["toma"], "gancho": f["gancho"], "pilar": f["pilar"], "fuente_id": ficha.get("id"),
+            "caption": caption if isinstance(caption, str) else "",
             "campana": ficha.get("campana") or "", "duracion_s": f["duracion_s"],
             "historia": f.get("historia") or "",
             "creador": c.creador or ficha.get("creador"), "id_origen": c.id_origen, "claves": _claves_de(c)}

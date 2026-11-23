@@ -256,6 +256,11 @@ def _validar_campos_n3(ficha: dict, et: str, inf: Informe) -> None:
     tl = ficha.get("twitch_login")
     if tl is not None and not (isinstance(tl, str) and re.fullmatch(r"[A-Za-z0-9_]{1,25}", tl)):
         inf.error(f"{et}: twitch_login debe ser texto (letras, números y guion bajo)")
+    for campo in ("apodo", "nombre_visible"):      # nombre que se ve en el video: apodo (a mano) o el de Twitch (generado)
+        v = ficha.get(campo)
+        if v is not None and not (isinstance(v, str) and v.strip() and len(v.strip()) <= 40
+                                  and not re.search(r"[<>#@/\\]", v)):
+            inf.error(f"{et}: {campo} debe ser texto corto (hasta 40 caracteres, sin @, # ni enlaces)")
     mat = ficha.get("material")
     if mat is not None:
         if not (isinstance(mat, list) and mat):
