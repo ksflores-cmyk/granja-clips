@@ -7,6 +7,7 @@ import json
 from datetime import date
 
 import pytest
+from pathlib import Path
 import yaml
 
 from conftest import RAIZ_REAL
@@ -29,7 +30,7 @@ def test_el_prompt_lleva_la_fecha_de_estreno_las_plataformas_y_la_fecha_de_hoy(m
     assert "PS5" in p and "Xbox Series X|S" in p
     assert "22 de noviembre de 2026" in p and "2026-11-22" in p
     assert "GTA 6 salió el" in p and "categoría oficial de Twitch" in p
-    assert "no es una filtración ni un juego sin lanzar" in p
+    assert "no lo vuelve una filtración ni un juego sin lanzar" in p
     assert "Sigue siendo `apto: false` el material previo al estreno o extraído del juego (filtración)" in p
     assert "una copia pirata" in p and "programas de trampas externos" in p
     assert "no es una filtración, un tráiler" not in p and "No lo descartes por eso" not in p
@@ -405,3 +406,19 @@ class _Pila:
 class _Desc:
     def __init__(self, ruta):
         self.ruta, self.duracion = ruta / "x.mp4", 20.0
+
+
+def test_con_login_vetado_el_apodo_o_nombre_visible_no_lo_devuelven(tmp_path, monkeypatch):
+    # Revisión de Codex (ronda 2): si el login está vetado, el apodo o el nombre visible no pueden devolverlo.
+    from fabrica.editar import nombres
+    monkeypatch.setattr(nombres, "logins_vetados", lambda raiz=None: {"westcol"})
+    ficha = {"twitch_login": "westcol", "creador": "twitch.tv/westcol", "nombre_visible": "WestCOL", "apodo": "Westcol"}
+    assert nombres.nombre_para_mostrar("twitch.tv/westcol", ficha) == ""
+    ficha["apodo"] = "El Patrón"
+    assert nombres.nombre_para_mostrar("twitch.tv/westcol", ficha) == "EL PATRÓN"
+
+
+def test_el_prompt_pide_apto_false_para_filtraciones_y_pirateria_en_la_regla_de_apto():
+    texto = (Path(__file__).resolve().parents[1] / "fabrica" / "ojos_prompt.md").read_text(encoding="utf-8")
+    regla = next(l for l in texto.splitlines() if l.startswith("1. `apto`"))
+    assert "filtración" in regla and "pirata" in regla and "`false`, con los motivos en `motivos`, sólo si" not in regla

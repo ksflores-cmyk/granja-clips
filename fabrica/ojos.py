@@ -184,8 +184,8 @@ def contexto_juego(temporada: dict, juego: str | None = None, hoy=None) -> str:
         plat = temporada.get("plataformas_juego") or []
         en = f" en {' y '.join(str(p) for p in plat)}" if plat else ""
         partes.append(
-            f"{nombre} salió el {estreno}{en}. Este clip viene de la categoría oficial de Twitch de ese juego: es "
-            f"gameplay real de {nombre} ya lanzado, así que el juego en sí no es una filtración ni un juego sin lanzar. "
+            f"{nombre} salió el {estreno}{en}. Este clip viene de la categoría oficial de Twitch de ese juego; que "
+            f"{nombre} se vea distinto de lo que conoces no lo vuelve una filtración ni un juego sin lanzar. "
             f"Sigue siendo `apto: false` el material previo al estreno o extraído del juego (filtración), una copia "
             f"pirata y los programas de trampas externos. Pon `juego_correcto: false` sólo si se ve CLARAMENTE otro juego distinto (por ejemplo "
             f"Minecraft). Si parece {nombre} con cosas raras (texturas, personajes o vehículos cambiados, o parecido a "

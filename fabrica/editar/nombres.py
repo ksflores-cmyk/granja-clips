@@ -54,7 +54,9 @@ def nombre_para_mostrar(creador: str | None, ficha: dict | None, raiz=None) -> s
     login_vetado = normalizar(nombre_corto(creador)) in {normalizar(v) for v in todos}
     if not login or normalizar(login) not in propios:
         return "" if login_vetado else login
-    vetados = {v for v in todos if normalizar(v) != normalizar(login)}
+    # Si el login está vetado, también cuenta para el apodo y el nombre visible (revisión de Codex, ronda 2): no
+    # pueden devolver el mismo nombre por otra vía. Si no lo está, se aparta para que el nombre propio no choque.
+    vetados = set(todos) if login_vetado else {v for v in todos if normalizar(v) != normalizar(login)}
     for campo in ("apodo", "nombre_visible"):
         cand = _limpiar_visible(f.get(campo))
         if cand and not _vetado_en(cand, vetados):
