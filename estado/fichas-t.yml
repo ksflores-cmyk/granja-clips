@@ -87,8 +87,8 @@
   origen: twitch
   twitch_login: ubietoo
   broadcaster_id: '152769289'
-  seguidores: 138043
-  seguidores_leidos: '2026-11-20'
+  seguidores: 138370
+  seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -114,12 +114,13 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-22'
+  vence: '2026-11-25'
   estado: vigente
   uso: produccion
   publicable: true
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
+  nombre_visible: Ubietoo
 - id: t-taisontv
   tipo: T
   creador: twitch.tv/taisontv
@@ -248,7 +249,7 @@
   origen: twitch
   twitch_login: lamejorclase
   broadcaster_id: '598808171'
-  seguidores: 66713
+  seguidores: 66730
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -1170,8 +1171,8 @@
   origen: twitch
   twitch_login: agustinitita
   broadcaster_id: '547214346'
-  seguidores: 35832
-  seguidores_leidos: '2026-11-21'
+  seguidores: 35843
+  seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1197,12 +1198,13 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-23'
+  vence: '2026-11-25'
   estado: vigente
   uso: produccion
   publicable: true
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
+  nombre_visible: agustinitita
 - id: t-suzyroxx
   tipo: T
   creador: twitch.tv/suzyroxx
@@ -2810,7 +2812,7 @@
   origen: twitch
   twitch_login: franbeuve
   broadcaster_id: '1132877357'
-  seguidores: 54360
+  seguidores: 54362
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -2851,7 +2853,7 @@
   origen: twitch
   twitch_login: mastervland
   broadcaster_id: '120779507'
-  seguidores: 11480
+  seguidores: 11481
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -3097,7 +3099,7 @@
   origen: twitch
   twitch_login: knooby
   broadcaster_id: '276541628'
-  seguidores: 19890
+  seguidores: 19893
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -3138,7 +3140,7 @@
   origen: twitch
   twitch_login: escocessl
   broadcaster_id: '132523000'
-  seguidores: 73451
+  seguidores: 73455
   seguidores_leidos: '2026-11-23'
   juego: GTA 6
   reglas:
@@ -3336,3 +3338,44 @@
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
   nombre_visible: WiccanaTV
+- id: t-donangelillo
+  tipo: T
+  creador: twitch.tv/donangelillo
+  credito: twitch.tv/donangelillo
+  origen: twitch
+  twitch_login: donangelillo
+  broadcaster_id: '513440587'
+  seguidores: 33899
+  seguidores_leidos: '2026-11-23'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-25'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: DonAngelillo
