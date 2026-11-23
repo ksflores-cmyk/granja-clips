@@ -732,11 +732,18 @@ def test_con_10_caidas_lentas_no_se_pasa_del_tope_de_ojos(tmp_path, monkeypatch)
             reloj[0] += tiempo                                   # consume el timeout completo
             return super().__call__(url, encabezados, cuerpo)
 
+    class ListaLenta(Lista):
+        def __call__(self, url, encabezados, tiempo):
+            dados.append((reloj[0] - 1000.0, tiempo))
+            reloj[0] += tiempo                                   # ListModels también consume su timeout completo
+            return super().__call__(url, encabezados, tiempo)
+
     todos = [CFG_REAL["modelo"], *CFG_REAL["modelos_respaldo"]]
-    g = Lista((200, lista(*todos)))
+    g = ListaLenta((200, lista(*todos)))
     t = Lento(*[(503, "x")] * 10)
     m = mirar(tmp_path, t, config={**CFG_REAL, "listar_modelos": True}, espera=lambda s: reloj.__setitem__(0, reloj[0] + s),
               transporte_lista=g)
     assert m.datos is None and m.pasajero
-    assert dados and all(usado + tiempo <= tope + 1e-6 for usado, tiempo in dados)   # cada timeout cabe en lo que queda
+    assert len(dados) >= 2 and g.llamadas                                           # ListModels y peticiones
+    assert all(usado + tiempo <= tope + 1e-6 for usado, tiempo in dados)   # cada timeout cabe en lo que queda
     assert reloj[0] - 1000.0 <= tope + 1e-6                                          # el total no pasa del tope
