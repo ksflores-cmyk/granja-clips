@@ -1223,7 +1223,8 @@
     "largo": 122
    },
    "ficha_id": "t-victoriarodrgzz"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|9|2026-11-23T22:30:00.000Z",
@@ -1276,7 +1277,8 @@
     "largo": 122
    },
    "ficha_id": "t-victoriarodrgzz"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|9|2026-11-23T22:30:00.000Z",
@@ -1329,6 +1331,166 @@
     "largo": 125
    },
    "ficha_id": "t-victoriarodrgzz"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "shorts|10|2026-11-24T01:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 10,
+  "dueAt": "2026-11-24T01:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-23/toma-010-245e8a6a.mp4",
+  "estado": "rechazado",
+  "post_id": null,
+  "intento": "627960bdd5c940699fc3e257e9e72cf5",
+  "registrado": false,
+  "texto": "Toma 010. Sofig reflexiona sobre las virtudes físicas de sus colegas mientras explora el fondo marino.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 10,
+    "gancho": "Buceo y chismes sobre Grefg",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-sofig",
+    "caption": "Sofig reflexiona sobre las virtudes físicas de sus colegas mientras explora el fondo marino.",
+    "frase": "Tú hablando de amor y Grefg, de comer tetas y culo y que él tiene las dos.",
+    "hablante": "SOFIG",
+    "campana": "",
+    "duracion_s": 11.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/sofig",
+    "id_origen": "LazySullenSquirrelBigBrother-MJr-1YJa2W5JNq27",
+    "claves": [
+     "LazySullenSquirrelBigBrother-MJr-1YJa2W5JNq27"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 010. Sofig reflexiona sobre las virtudes físicas de sus colegas mientras explora el fondo marino.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 010. Sofig reflexiona sobre las virtudes físicas de sus colegas mientras explora el fondo…",
+    "credito": "🎥 twitch.tv/sofig",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 010. Sofig reflexiona sobre las virtudes físicas de sus colegas mientras explora el fondo marino.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 153
+   },
+   "ficha_id": "t-sofig"
+  }
+ },
+ {
+  "id": "tiktok|10|2026-11-24T01:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 10,
+  "dueAt": "2026-11-24T01:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-23/toma-010-245e8a6a.mp4",
+  "estado": "creado",
+  "post_id": "6b04d4b3f0d7b1e0de988119",
+  "intento": "e3684586e9e64ed58d0eef31750e658f",
+  "registrado": true,
+  "texto": "Toma 010. Sofig reflexiona sobre las virtudes físicas de sus colegas mientras explora el fondo marino.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 10,
+    "gancho": "Buceo y chismes sobre Grefg",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-sofig",
+    "caption": "Sofig reflexiona sobre las virtudes físicas de sus colegas mientras explora el fondo marino.",
+    "frase": "Tú hablando de amor y Grefg, de comer tetas y culo y que él tiene las dos.",
+    "hablante": "SOFIG",
+    "campana": "",
+    "duracion_s": 11.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/sofig",
+    "id_origen": "LazySullenSquirrelBigBrother-MJr-1YJa2W5JNq27",
+    "claves": [
+     "LazySullenSquirrelBigBrother-MJr-1YJa2W5JNq27"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 010. Sofig reflexiona sobre las virtudes físicas de sus colegas mientras explora el fondo marino.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/sofig",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 010. Sofig reflexiona sobre las virtudes físicas de sus colegas mientras explora el fondo marino.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 153
+   },
+   "ficha_id": "t-sofig"
+  }
+ },
+ {
+  "id": "reels|10|2026-11-24T01:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 10,
+  "dueAt": "2026-11-24T01:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-23/toma-010-245e8a6a.mp4",
+  "estado": "creado",
+  "post_id": "6b04d4b46734c08a26985366",
+  "intento": "c1bee705d6bf4696ac80e27c1d826f6b",
+  "registrado": true,
+  "texto": "Toma 010. Sofig reflexiona sobre las virtudes físicas de sus colegas mientras explora el fondo marino.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 10,
+    "gancho": "Buceo y chismes sobre Grefg",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-sofig",
+    "caption": "Sofig reflexiona sobre las virtudes físicas de sus colegas mientras explora el fondo marino.",
+    "frase": "Tú hablando de amor y Grefg, de comer tetas y culo y que él tiene las dos.",
+    "hablante": "SOFIG",
+    "campana": "",
+    "duracion_s": 11.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/sofig",
+    "id_origen": "LazySullenSquirrelBigBrother-MJr-1YJa2W5JNq27",
+    "claves": [
+     "LazySullenSquirrelBigBrother-MJr-1YJa2W5JNq27"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 010. Sofig reflexiona sobre las virtudes físicas de sus colegas mientras explora el fondo marino.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/sofig",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 010. Sofig reflexiona sobre las virtudes físicas de sus colegas mientras explora el fondo marino.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 156
+   },
+   "ficha_id": "t-sofig"
   }
  }
 ]
