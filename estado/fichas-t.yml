@@ -169,7 +169,7 @@
   origen: twitch
   twitch_login: zyrpesland
   broadcaster_id: '512025628'
-  seguidores: 159940
+  seguidores: 159957
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -1059,7 +1059,7 @@
   origen: twitch
   twitch_login: gazadventures
   broadcaster_id: '92471567'
-  seguidores: 87469
+  seguidores: 87473
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -1140,7 +1140,7 @@
   origen: twitch
   twitch_login: ishika
   broadcaster_id: '157248383'
-  seguidores: 30227
+  seguidores: 30236
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -1181,7 +1181,7 @@
   origen: twitch
   twitch_login: agustinitita
   broadcaster_id: '547214346'
-  seguidores: 35862
+  seguidores: 35866
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -1223,7 +1223,7 @@
   twitch_login: suzyroxx
   broadcaster_id: '417684519'
   seguidores: 182915
-  seguidores_leidos: '2026-11-23'
+  seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1249,7 +1249,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-25'
+  vence: '2026-11-26'
   estado: vigente
   uso: produccion
   publicable: true
@@ -2841,7 +2841,7 @@
   origen: twitch
   twitch_login: franbeuve
   broadcaster_id: '1132877357'
-  seguidores: 54388
+  seguidores: 54389
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -3620,7 +3620,7 @@
   origen: twitch
   twitch_login: newgameplus
   broadcaster_id: '52325209'
-  seguidores: 16333
+  seguidores: 16335
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -3661,7 +3661,7 @@
   origen: twitch
   twitch_login: sofig
   broadcaster_id: '500081308'
-  seguidores: 107635
+  seguidores: 107639
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -3866,7 +3866,7 @@
   origen: twitch
   twitch_login: xagepa
   broadcaster_id: '1371991307'
-  seguidores: 2399
+  seguidores: 2407
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -4440,7 +4440,7 @@
   origen: twitch
   twitch_login: mysticentwitch
   broadcaster_id: '661542274'
-  seguidores: 43332
+  seguidores: 43333
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -4474,3 +4474,85 @@
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
   nombre_visible: MYSTICenTWITCH
+- id: t-gordoliv
+  tipo: T
+  creador: twitch.tv/gordoliv
+  credito: twitch.tv/gordoliv
+  origen: twitch
+  twitch_login: gordoliv
+  broadcaster_id: '126394685'
+  seguidores: 24839
+  seguidores_leidos: '2026-11-24'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-26'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: Gordoliv
+- id: t-failets
+  tipo: T
+  creador: twitch.tv/failets
+  credito: twitch.tv/failets
+  origen: twitch
+  twitch_login: failets
+  broadcaster_id: '824203836'
+  seguidores: 9066
+  seguidores_leidos: '2026-11-24'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-26'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: Failets

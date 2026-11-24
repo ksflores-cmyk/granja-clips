@@ -1816,5 +1816,164 @@
    },
    "ficha_id": "t-xagepa"
   }
+ },
+ {
+  "id": "shorts|13|2026-11-24T17:30:00.000Z",
+  "plataforma": "shorts",
+  "toma": 13,
+  "dueAt": "2026-11-24T17:30:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-24/toma-013-211d0ea4.mp4",
+  "estado": "creado",
+  "post_id": "6b05c47e04f9f3a5e6fbd384",
+  "intento": "03375b922287484bb40a1022a04a210f",
+  "registrado": true,
+  "texto": "Toma 013. Para ser de los primeros días, esto no se lo esperaba nadie.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 13,
+    "gancho": "Patrocinio de RedBull",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-sofig",
+    "caption": "",
+    "frase": "",
+    "hablante": "SOFIG",
+    "campana": "",
+    "duracion_s": 20.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/sofig",
+    "id_origen": "FunnyInventiveTitanM4xHeh-w7KQtWxgwgOBfBnv",
+    "claves": [
+     "FunnyInventiveTitanM4xHeh-w7KQtWxgwgOBfBnv"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 013. Para ser de los primeros días, esto no se lo esperaba nadie.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 013. Para ser de los primeros días, esto no se lo esperaba nadie.",
+    "credito": "🎥 twitch.tv/sofig",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 013. Para ser de los primeros días, esto no se lo esperaba nadie.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 121
+   },
+   "ficha_id": "t-sofig"
+  }
+ },
+ {
+  "id": "tiktok|13|2026-11-24T17:30:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 13,
+  "dueAt": "2026-11-24T17:30:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-24/toma-013-211d0ea4.mp4",
+  "estado": "creado",
+  "post_id": "6b05c47fa1fe31a32b2b405a",
+  "intento": "40a18f794c4243b19a2613a6462670d7",
+  "registrado": true,
+  "texto": "Toma 013. Para ser de los primeros días, esto no se lo esperaba nadie.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 13,
+    "gancho": "Patrocinio de RedBull",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-sofig",
+    "caption": "",
+    "frase": "",
+    "hablante": "SOFIG",
+    "campana": "",
+    "duracion_s": 20.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/sofig",
+    "id_origen": "FunnyInventiveTitanM4xHeh-w7KQtWxgwgOBfBnv",
+    "claves": [
+     "FunnyInventiveTitanM4xHeh-w7KQtWxgwgOBfBnv"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 013. Para ser de los primeros días, esto no se lo esperaba nadie.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/sofig",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 013. Para ser de los primeros días, esto no se lo esperaba nadie.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 121
+   },
+   "ficha_id": "t-sofig"
+  }
+ },
+ {
+  "id": "reels|13|2026-11-24T17:30:00.000Z",
+  "plataforma": "reels",
+  "toma": 13,
+  "dueAt": "2026-11-24T17:30:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-24/toma-013-211d0ea4.mp4",
+  "estado": "creado",
+  "post_id": "6b05c47f20f9e770f07b97f2",
+  "intento": "5397362a49724b60aba587661ded6176",
+  "registrado": true,
+  "texto": "Toma 013. Para ser de los primeros días, esto no se lo esperaba nadie.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 13,
+    "gancho": "Patrocinio de RedBull",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-sofig",
+    "caption": "",
+    "frase": "",
+    "hablante": "SOFIG",
+    "campana": "",
+    "duracion_s": 20.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/sofig",
+    "id_origen": "FunnyInventiveTitanM4xHeh-w7KQtWxgwgOBfBnv",
+    "claves": [
+     "FunnyInventiveTitanM4xHeh-w7KQtWxgwgOBfBnv"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 013. Para ser de los primeros días, esto no se lo esperaba nadie.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/sofig",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 013. Para ser de los primeros días, esto no se lo esperaba nadie.\n\n🎥 twitch.tv/sofig\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 124
+   },
+   "ficha_id": "t-sofig"
+  }
  }
 ]
