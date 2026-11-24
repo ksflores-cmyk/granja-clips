@@ -45,3 +45,4 @@
 - 2026-11-23 18:05 GT · ciclo: toma 10 (primeras_veces) programada en tiktok, reels; falló shorts
 - 2026-11-23 21:04 GT · ciclo: toma 11 (primeras_veces) programada en tiktok, reels; falló shorts
 - 2026-11-24 07:56 GT · ciclo: toma 12 (primeras_veces) programada en shorts, tiktok, reels
+- 2026-11-24 09:01 GT · retiros: error de Buffer en shorts 6b05979b049dcb84bdfc9a80: The daily posting limit for this channel has been reached! Please try reducing the amount of times per day in your sched
