@@ -1975,5 +1975,164 @@
    },
    "ficha_id": "t-sofig"
   }
+ },
+ {
+  "id": "shorts|14|2026-11-24T22:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 14,
+  "dueAt": "2026-11-24T22:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-24/toma-014-52bb1ede.mp4",
+  "estado": "creado",
+  "post_id": "6b05fbe3bbd94e83696e21c8",
+  "intento": "73f5f6fc085e40d09462459d0c89369d",
+  "registrado": true,
+  "texto": "Toma 014. Lucía tiene problemas con las tuberías y Jason no parece muy preocupado.\n\n🎥 twitch.tv/cowi\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 14,
+    "gancho": "Problemas domésticos en Leonida",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-cowi",
+    "caption": "Lucía tiene problemas con las tuberías y Jason no parece muy preocupado.",
+    "frase": "",
+    "hablante": "COWI",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/cowi",
+    "id_origen": "InexpensiveImpossibleCattleOpieOP-uKvmBGkGSkM4nR83",
+    "claves": [
+     "InexpensiveImpossibleCattleOpieOP-uKvmBGkGSkM4nR83"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 014. Lucía tiene problemas con las tuberías y Jason no parece muy preocupado.\n\n🎥 twitch.tv/cowi\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 014. Lucía tiene problemas con las tuberías y Jason no parece muy preocupado.",
+    "credito": "🎥 twitch.tv/cowi",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 014. Lucía tiene problemas con las tuberías y Jason no parece muy preocupado.\n\n🎥 twitch.tv/cowi\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 132
+   },
+   "ficha_id": "t-cowi"
+  }
+ },
+ {
+  "id": "tiktok|14|2026-11-24T22:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 14,
+  "dueAt": "2026-11-24T22:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-24/toma-014-52bb1ede.mp4",
+  "estado": "creado",
+  "post_id": "6b05fbe39dd8377af11f1e2f",
+  "intento": "fef69a214d824d6d862f2423ea94f9c1",
+  "registrado": true,
+  "texto": "Toma 014. Lucía tiene problemas con las tuberías y Jason no parece muy preocupado.\n\n🎥 twitch.tv/cowi\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 14,
+    "gancho": "Problemas domésticos en Leonida",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-cowi",
+    "caption": "Lucía tiene problemas con las tuberías y Jason no parece muy preocupado.",
+    "frase": "",
+    "hablante": "COWI",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/cowi",
+    "id_origen": "InexpensiveImpossibleCattleOpieOP-uKvmBGkGSkM4nR83",
+    "claves": [
+     "InexpensiveImpossibleCattleOpieOP-uKvmBGkGSkM4nR83"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 014. Lucía tiene problemas con las tuberías y Jason no parece muy preocupado.\n\n🎥 twitch.tv/cowi\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/cowi",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 014. Lucía tiene problemas con las tuberías y Jason no parece muy preocupado.\n\n🎥 twitch.tv/cowi\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 132
+   },
+   "ficha_id": "t-cowi"
+  }
+ },
+ {
+  "id": "reels|14|2026-11-24T22:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 14,
+  "dueAt": "2026-11-24T22:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-24/toma-014-52bb1ede.mp4",
+  "estado": "creado",
+  "post_id": "6b05fbe4bc79b3715eac2164",
+  "intento": "cb576eb613f24933956ee183d9720da6",
+  "registrado": true,
+  "texto": "Toma 014. Lucía tiene problemas con las tuberías y Jason no parece muy preocupado.\n\n🎥 twitch.tv/cowi\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 14,
+    "gancho": "Problemas domésticos en Leonida",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-cowi",
+    "caption": "Lucía tiene problemas con las tuberías y Jason no parece muy preocupado.",
+    "frase": "",
+    "hablante": "COWI",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/cowi",
+    "id_origen": "InexpensiveImpossibleCattleOpieOP-uKvmBGkGSkM4nR83",
+    "claves": [
+     "InexpensiveImpossibleCattleOpieOP-uKvmBGkGSkM4nR83"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 014. Lucía tiene problemas con las tuberías y Jason no parece muy preocupado.\n\n🎥 twitch.tv/cowi\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/cowi",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 014. Lucía tiene problemas con las tuberías y Jason no parece muy preocupado.\n\n🎥 twitch.tv/cowi\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 135
+   },
+   "ficha_id": "t-cowi"
+  }
  }
 ]
