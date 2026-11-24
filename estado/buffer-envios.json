@@ -1385,7 +1385,8 @@
     "largo": 153
    },
    "ficha_id": "t-sofig"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|10|2026-11-24T01:00:00.000Z",
@@ -1438,7 +1439,8 @@
     "largo": 153
    },
    "ficha_id": "t-sofig"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|10|2026-11-24T01:00:00.000Z",
@@ -1491,6 +1493,166 @@
     "largo": 156
    },
    "ficha_id": "t-sofig"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "shorts|11|2026-11-24T04:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 11,
+  "dueAt": "2026-11-24T04:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-23/toma-011-931a4f91.mp4",
+  "estado": "rechazado",
+  "post_id": null,
+  "intento": "a67b97b254064f0cb69381160d5be8d6",
+  "registrado": false,
+  "texto": "Toma 011. XAGEPA resuelve un pequeño incidente de tráfico a puñetazo limpio.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 11,
+    "gancho": "Accidente y pelea en la calle",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-xagepa",
+    "caption": "XAGEPA resuelve un pequeño incidente de tráfico a puñetazo limpio.",
+    "frase": "",
+    "hablante": "XAGEPA",
+    "campana": "",
+    "duracion_s": 30.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/xagepa",
+    "id_origen": "AbnegateWimpyWoodpeckerHassaanChop-UbfpeaFROy3GQLHf",
+    "claves": [
+     "AbnegateWimpyWoodpeckerHassaanChop-UbfpeaFROy3GQLHf"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 011. XAGEPA resuelve un pequeño incidente de tráfico a puñetazo limpio.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 011. XAGEPA resuelve un pequeño incidente de tráfico a puñetazo limpio.",
+    "credito": "🎥 twitch.tv/xagepa",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 011. XAGEPA resuelve un pequeño incidente de tráfico a puñetazo limpio.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 128
+   },
+   "ficha_id": "t-xagepa"
+  }
+ },
+ {
+  "id": "tiktok|11|2026-11-24T04:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 11,
+  "dueAt": "2026-11-24T04:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-23/toma-011-931a4f91.mp4",
+  "estado": "creado",
+  "post_id": "6b04fed3f0d7b1e0dea88a2a",
+  "intento": "5854ac566a624581a7d49d3fcf772625",
+  "registrado": true,
+  "texto": "Toma 011. XAGEPA resuelve un pequeño incidente de tráfico a puñetazo limpio.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 11,
+    "gancho": "Accidente y pelea en la calle",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-xagepa",
+    "caption": "XAGEPA resuelve un pequeño incidente de tráfico a puñetazo limpio.",
+    "frase": "",
+    "hablante": "XAGEPA",
+    "campana": "",
+    "duracion_s": 30.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/xagepa",
+    "id_origen": "AbnegateWimpyWoodpeckerHassaanChop-UbfpeaFROy3GQLHf",
+    "claves": [
+     "AbnegateWimpyWoodpeckerHassaanChop-UbfpeaFROy3GQLHf"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 011. XAGEPA resuelve un pequeño incidente de tráfico a puñetazo limpio.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/xagepa",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 011. XAGEPA resuelve un pequeño incidente de tráfico a puñetazo limpio.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 128
+   },
+   "ficha_id": "t-xagepa"
+  }
+ },
+ {
+  "id": "reels|11|2026-11-24T04:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 11,
+  "dueAt": "2026-11-24T04:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-23/toma-011-931a4f91.mp4",
+  "estado": "creado",
+  "post_id": "6b04fed3db52b449cf1de343",
+  "intento": "f12cb6d4316b4bfa8914d94df3546982",
+  "registrado": true,
+  "texto": "Toma 011. XAGEPA resuelve un pequeño incidente de tráfico a puñetazo limpio.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 11,
+    "gancho": "Accidente y pelea en la calle",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-xagepa",
+    "caption": "XAGEPA resuelve un pequeño incidente de tráfico a puñetazo limpio.",
+    "frase": "",
+    "hablante": "XAGEPA",
+    "campana": "",
+    "duracion_s": 30.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/xagepa",
+    "id_origen": "AbnegateWimpyWoodpeckerHassaanChop-UbfpeaFROy3GQLHf",
+    "claves": [
+     "AbnegateWimpyWoodpeckerHassaanChop-UbfpeaFROy3GQLHf"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 011. XAGEPA resuelve un pequeño incidente de tráfico a puñetazo limpio.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/xagepa",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 011. XAGEPA resuelve un pequeño incidente de tráfico a puñetazo limpio.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 131
+   },
+   "ficha_id": "t-xagepa"
   }
  }
 ]
