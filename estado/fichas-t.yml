@@ -128,7 +128,7 @@
   origen: twitch
   twitch_login: taisontv
   broadcaster_id: '115156753'
-  seguidores: 165574
+  seguidores: 165573
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -656,8 +656,8 @@
   origen: twitch
   twitch_login: darcfalcon13
   broadcaster_id: '803417396'
-  seguidores: 8982
-  seguidores_leidos: '2026-11-23'
+  seguidores: 9011
+  seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -683,7 +683,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-25'
+  vence: '2026-11-26'
   estado: vigente
   uso: produccion
   publicable: true
@@ -977,8 +977,8 @@
   origen: twitch
   twitch_login: caith_sith
   broadcaster_id: '60515258'
-  seguidores: 49322
-  seguidores_leidos: '2026-11-23'
+  seguidores: 49321
+  seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1004,7 +1004,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-25'
+  vence: '2026-11-26'
   estado: vigente
   uso: produccion
   publicable: true
@@ -1059,7 +1059,7 @@
   origen: twitch
   twitch_login: gazadventures
   broadcaster_id: '92471567'
-  seguidores: 87473
+  seguidores: 87474
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -1140,7 +1140,7 @@
   origen: twitch
   twitch_login: ishika
   broadcaster_id: '157248383'
-  seguidores: 30236
+  seguidores: 30239
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -1181,7 +1181,7 @@
   origen: twitch
   twitch_login: agustinitita
   broadcaster_id: '547214346'
-  seguidores: 35866
+  seguidores: 35867
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -1222,7 +1222,7 @@
   origen: twitch
   twitch_login: suzyroxx
   broadcaster_id: '417684519'
-  seguidores: 182915
+  seguidores: 182918
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -1263,8 +1263,8 @@
   origen: twitch
   twitch_login: vicesat
   broadcaster_id: '110387651'
-  seguidores: 16519
-  seguidores_leidos: '2026-11-23'
+  seguidores: 16687
+  seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1290,7 +1290,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-25'
+  vence: '2026-11-26'
   estado: vigente
   uso: produccion
   publicable: true
@@ -1465,8 +1465,8 @@
   origen: twitch
   twitch_login: victoriarodrgzz
   broadcaster_id: '73577459'
-  seguidores: 45575
-  seguidores_leidos: '2026-11-23'
+  seguidores: 45584
+  seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1492,7 +1492,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-25'
+  vence: '2026-11-26'
   estado: vigente
   uso: produccion
   publicable: true
@@ -2841,7 +2841,7 @@
   origen: twitch
   twitch_login: franbeuve
   broadcaster_id: '1132877357'
-  seguidores: 54389
+  seguidores: 54390
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -3579,8 +3579,8 @@
   origen: twitch
   twitch_login: donluckymx
   broadcaster_id: '618494764'
-  seguidores: 65914
-  seguidores_leidos: '2026-11-23'
+  seguidores: 65912
+  seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -3606,7 +3606,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-25'
+  vence: '2026-11-26'
   estado: vigente
   uso: produccion
   publicable: true
@@ -3661,7 +3661,7 @@
   origen: twitch
   twitch_login: sofig
   broadcaster_id: '500081308'
-  seguidores: 107639
+  seguidores: 107642
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -3866,7 +3866,7 @@
   origen: twitch
   twitch_login: xagepa
   broadcaster_id: '1371991307'
-  seguidores: 2407
+  seguidores: 2418
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
@@ -4440,7 +4440,7 @@
   origen: twitch
   twitch_login: mysticentwitch
   broadcaster_id: '661542274'
-  seguidores: 43333
+  seguidores: 43335
   seguidores_leidos: '2026-11-24'
   juego: GTA 6
   reglas:
