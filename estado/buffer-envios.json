@@ -1547,7 +1547,8 @@
     "largo": 128
    },
    "ficha_id": "t-xagepa"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|11|2026-11-24T04:00:00.000Z",
@@ -1600,7 +1601,8 @@
     "largo": 128
    },
    "ficha_id": "t-xagepa"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|11|2026-11-24T04:00:00.000Z",
@@ -1653,6 +1655,7 @@
     "largo": 131
    },
    "ficha_id": "t-xagepa"
-  }
+  },
+  "ruta_borrada": true
  }
 ]
