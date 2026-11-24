@@ -1657,5 +1657,164 @@
    "ficha_id": "t-xagepa"
   },
   "ruta_borrada": true
+ },
+ {
+  "id": "shorts|12|2026-11-24T15:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 12,
+  "dueAt": "2026-11-24T15:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-24/toma-012-22943047.mp4",
+  "estado": "creado",
+  "post_id": "6b05979b049dcb84bdfc9a80",
+  "intento": "fb7791f4a91245cb80a7a0626552d53a",
+  "registrado": true,
+  "texto": "Toma 012. Xagepa presencia un accidente de tráfico totalmente inesperado mientras viaja en taxi.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 12,
+    "gancho": "Accidente aleatorio en la carretera",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-xagepa",
+    "caption": "Xagepa presencia un accidente de tráfico totalmente inesperado mientras viaja en taxi.",
+    "frase": "Pero...",
+    "hablante": "XAGEPA",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/xagepa",
+    "id_origen": "SaltyShinyCheetahBCWarrior-W9iBXOpqMfpfWprZ",
+    "claves": [
+     "SaltyShinyCheetahBCWarrior-W9iBXOpqMfpfWprZ"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 012. Xagepa presencia un accidente de tráfico totalmente inesperado mientras viaja en taxi.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 012. Xagepa presencia un accidente de tráfico totalmente inesperado mientras viaja en taxi.",
+    "credito": "🎥 twitch.tv/xagepa",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 012. Xagepa presencia un accidente de tráfico totalmente inesperado mientras viaja en taxi.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 148
+   },
+   "ficha_id": "t-xagepa"
+  }
+ },
+ {
+  "id": "tiktok|12|2026-11-24T15:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 12,
+  "dueAt": "2026-11-24T15:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-24/toma-012-22943047.mp4",
+  "estado": "creado",
+  "post_id": "6b05979b049dcb84bdfc9ac5",
+  "intento": "d39469d59bbb4f7cb7fc1f442e3bf7f6",
+  "registrado": true,
+  "texto": "Toma 012. Xagepa presencia un accidente de tráfico totalmente inesperado mientras viaja en taxi.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 12,
+    "gancho": "Accidente aleatorio en la carretera",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-xagepa",
+    "caption": "Xagepa presencia un accidente de tráfico totalmente inesperado mientras viaja en taxi.",
+    "frase": "Pero...",
+    "hablante": "XAGEPA",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/xagepa",
+    "id_origen": "SaltyShinyCheetahBCWarrior-W9iBXOpqMfpfWprZ",
+    "claves": [
+     "SaltyShinyCheetahBCWarrior-W9iBXOpqMfpfWprZ"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 012. Xagepa presencia un accidente de tráfico totalmente inesperado mientras viaja en taxi.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/xagepa",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 012. Xagepa presencia un accidente de tráfico totalmente inesperado mientras viaja en taxi.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 148
+   },
+   "ficha_id": "t-xagepa"
+  }
+ },
+ {
+  "id": "reels|12|2026-11-24T15:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 12,
+  "dueAt": "2026-11-24T15:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-24/toma-012-22943047.mp4",
+  "estado": "creado",
+  "post_id": "6b05979c2ae15c1acf889657",
+  "intento": "2d7c218eb4be419ab6cf80d64b05664e",
+  "registrado": true,
+  "texto": "Toma 012. Xagepa presencia un accidente de tráfico totalmente inesperado mientras viaja en taxi.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 12,
+    "gancho": "Accidente aleatorio en la carretera",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-xagepa",
+    "caption": "Xagepa presencia un accidente de tráfico totalmente inesperado mientras viaja en taxi.",
+    "frase": "Pero...",
+    "hablante": "XAGEPA",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/xagepa",
+    "id_origen": "SaltyShinyCheetahBCWarrior-W9iBXOpqMfpfWprZ",
+    "claves": [
+     "SaltyShinyCheetahBCWarrior-W9iBXOpqMfpfWprZ"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 012. Xagepa presencia un accidente de tráfico totalmente inesperado mientras viaja en taxi.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/xagepa",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 012. Xagepa presencia un accidente de tráfico totalmente inesperado mientras viaja en taxi.\n\n🎥 twitch.tv/xagepa\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 151
+   },
+   "ficha_id": "t-xagepa"
+  }
  }
 ]
