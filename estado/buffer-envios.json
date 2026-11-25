@@ -2189,7 +2189,8 @@
     "largo": 138
    },
    "ficha_id": "t-ubietoo"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|15|2026-11-25T01:00:00.000Z",
@@ -2242,7 +2243,8 @@
     "largo": 138
    },
    "ficha_id": "t-ubietoo"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|15|2026-11-25T01:00:00.000Z",
@@ -2295,6 +2297,166 @@
     "largo": 141
    },
    "ficha_id": "t-ubietoo"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "shorts|16|2026-11-25T04:30:00.000Z",
+  "plataforma": "shorts",
+  "toma": 16,
+  "dueAt": "2026-11-25T04:30:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-24/toma-016-962ec69d.mp4",
+  "estado": "rechazado",
+  "post_id": null,
+  "intento": "bcf05418e2384c41a2a71df58fa4b275",
+  "registrado": false,
+  "texto": "Toma 016. Aleowens comprueba las reacciones de los animales en Vice City\n\n🎥 twitch.tv/aleowens\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 16,
+    "gancho": "Jason patea a un perro",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-aleowens",
+    "caption": "Aleowens comprueba las reacciones de los animales en Vice City",
+    "frase": "Está bueno el perro, ¿no?",
+    "hablante": "ALEOWENS",
+    "campana": "",
+    "duracion_s": 11.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/aleowens",
+    "id_origen": "CrepuscularColdLorisBatChest-mde5G3MN6B0Dw1Gb",
+    "claves": [
+     "CrepuscularColdLorisBatChest-mde5G3MN6B0Dw1Gb"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 016. Aleowens comprueba las reacciones de los animales en Vice City\n\n🎥 twitch.tv/aleowens\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 016. Aleowens comprueba las reacciones de los animales en Vice City",
+    "credito": "🎥 twitch.tv/aleowens",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 016. Aleowens comprueba las reacciones de los animales en Vice City\n\n🎥 twitch.tv/aleowens\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 126
+   },
+   "ficha_id": "t-aleowens"
+  }
+ },
+ {
+  "id": "tiktok|16|2026-11-25T04:30:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 16,
+  "dueAt": "2026-11-25T04:30:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-24/toma-016-962ec69d.mp4",
+  "estado": "creado",
+  "post_id": "6b065eabb6204bca46c4d6cf",
+  "intento": "cab1bd154509449b8b600ed3034f9715",
+  "registrado": true,
+  "texto": "Toma 016. Aleowens comprueba las reacciones de los animales en Vice City\n\n🎥 twitch.tv/aleowens\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 16,
+    "gancho": "Jason patea a un perro",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-aleowens",
+    "caption": "Aleowens comprueba las reacciones de los animales en Vice City",
+    "frase": "Está bueno el perro, ¿no?",
+    "hablante": "ALEOWENS",
+    "campana": "",
+    "duracion_s": 11.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/aleowens",
+    "id_origen": "CrepuscularColdLorisBatChest-mde5G3MN6B0Dw1Gb",
+    "claves": [
+     "CrepuscularColdLorisBatChest-mde5G3MN6B0Dw1Gb"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 016. Aleowens comprueba las reacciones de los animales en Vice City\n\n🎥 twitch.tv/aleowens\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/aleowens",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 016. Aleowens comprueba las reacciones de los animales en Vice City\n\n🎥 twitch.tv/aleowens\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 126
+   },
+   "ficha_id": "t-aleowens"
+  }
+ },
+ {
+  "id": "reels|16|2026-11-25T04:30:00.000Z",
+  "plataforma": "reels",
+  "toma": 16,
+  "dueAt": "2026-11-25T04:30:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-24/toma-016-962ec69d.mp4",
+  "estado": "creado",
+  "post_id": "6b065eabb6204bca46c4d700",
+  "intento": "9b4c4cfaf5eb4e98b97e95f67deca021",
+  "registrado": true,
+  "texto": "Toma 016. Aleowens comprueba las reacciones de los animales en Vice City\n\n🎥 twitch.tv/aleowens\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 16,
+    "gancho": "Jason patea a un perro",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-aleowens",
+    "caption": "Aleowens comprueba las reacciones de los animales en Vice City",
+    "frase": "Está bueno el perro, ¿no?",
+    "hablante": "ALEOWENS",
+    "campana": "",
+    "duracion_s": 11.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/aleowens",
+    "id_origen": "CrepuscularColdLorisBatChest-mde5G3MN6B0Dw1Gb",
+    "claves": [
+     "CrepuscularColdLorisBatChest-mde5G3MN6B0Dw1Gb"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 016. Aleowens comprueba las reacciones de los animales en Vice City\n\n🎥 twitch.tv/aleowens\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/aleowens",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 016. Aleowens comprueba las reacciones de los animales en Vice City\n\n🎥 twitch.tv/aleowens\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 129
+   },
+   "ficha_id": "t-aleowens"
   }
  }
 ]
