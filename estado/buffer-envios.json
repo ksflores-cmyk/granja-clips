@@ -2351,7 +2351,8 @@
     "largo": 126
    },
    "ficha_id": "t-aleowens"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|16|2026-11-25T04:30:00.000Z",
@@ -2404,7 +2405,8 @@
     "largo": 126
    },
    "ficha_id": "t-aleowens"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|16|2026-11-25T04:30:00.000Z",
@@ -2457,6 +2459,7 @@
     "largo": 129
    },
    "ficha_id": "t-aleowens"
-  }
+  },
+  "ruta_borrada": true
  }
 ]
