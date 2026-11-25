@@ -2620,5 +2620,164 @@
    },
    "ficha_id": "t-zyrpesland"
   }
+ },
+ {
+  "id": "shorts|18|2026-11-25T22:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 18,
+  "dueAt": "2026-11-25T22:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-25/toma-018-d61e92c1.mp4",
+  "estado": "creado",
+  "post_id": "6b074d457ef3c56ccf7c19ee",
+  "intento": "65a7d4727d074a74a6122883935dae68",
+  "registrado": true,
+  "texto": "Toma 018. JUCAVIAPRI se encuentra con una conductora muy agresiva en las calles de Port Gellhorn.\n\n🎥 twitch.tv/jucaviapri\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 18,
+    "gancho": "Conductora furiosa en Port Gellhorn",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-jucaviapri",
+    "caption": "JUCAVIAPRI se encuentra con una conductora muy agresiva en las calles de Port Gellhorn.",
+    "frase": "",
+    "hablante": "JUCAVIAPRI",
+    "campana": "",
+    "duracion_s": 10.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/jucaviapri",
+    "id_origen": "ZealousSmokyGooseYouWHY-wbZe0SM50F7VYWEG",
+    "claves": [
+     "ZealousSmokyGooseYouWHY-wbZe0SM50F7VYWEG"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 018. JUCAVIAPRI se encuentra con una conductora muy agresiva en las calles de Port Gellhorn.\n\n🎥 twitch.tv/jucaviapri\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 018. JUCAVIAPRI se encuentra con una conductora muy agresiva en las calles de Port Gellhorn.",
+    "credito": "🎥 twitch.tv/jucaviapri",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 018. JUCAVIAPRI se encuentra con una conductora muy agresiva en las calles de Port Gellhorn.\n\n🎥 twitch.tv/jucaviapri\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 153
+   },
+   "ficha_id": "t-jucaviapri"
+  }
+ },
+ {
+  "id": "tiktok|18|2026-11-25T22:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 18,
+  "dueAt": "2026-11-25T22:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-25/toma-018-d61e92c1.mp4",
+  "estado": "creado",
+  "post_id": "6b074d47209be591e2e14bda",
+  "intento": "ed3b1cf7e7ea4c9baf770b111c02bc0c",
+  "registrado": true,
+  "texto": "Toma 018. JUCAVIAPRI se encuentra con una conductora muy agresiva en las calles de Port Gellhorn.\n\n🎥 twitch.tv/jucaviapri\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 18,
+    "gancho": "Conductora furiosa en Port Gellhorn",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-jucaviapri",
+    "caption": "JUCAVIAPRI se encuentra con una conductora muy agresiva en las calles de Port Gellhorn.",
+    "frase": "",
+    "hablante": "JUCAVIAPRI",
+    "campana": "",
+    "duracion_s": 10.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/jucaviapri",
+    "id_origen": "ZealousSmokyGooseYouWHY-wbZe0SM50F7VYWEG",
+    "claves": [
+     "ZealousSmokyGooseYouWHY-wbZe0SM50F7VYWEG"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 018. JUCAVIAPRI se encuentra con una conductora muy agresiva en las calles de Port Gellhorn.\n\n🎥 twitch.tv/jucaviapri\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/jucaviapri",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 018. JUCAVIAPRI se encuentra con una conductora muy agresiva en las calles de Port Gellhorn.\n\n🎥 twitch.tv/jucaviapri\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 153
+   },
+   "ficha_id": "t-jucaviapri"
+  }
+ },
+ {
+  "id": "reels|18|2026-11-25T22:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 18,
+  "dueAt": "2026-11-25T22:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-25/toma-018-d61e92c1.mp4",
+  "estado": "creado",
+  "post_id": "6b074d48b39ac731b6fe78ec",
+  "intento": "fbb6ebf76fa14953a1c4c64eb0ddf061",
+  "registrado": true,
+  "texto": "Toma 018. JUCAVIAPRI se encuentra con una conductora muy agresiva en las calles de Port Gellhorn.\n\n🎥 twitch.tv/jucaviapri\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 18,
+    "gancho": "Conductora furiosa en Port Gellhorn",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-jucaviapri",
+    "caption": "JUCAVIAPRI se encuentra con una conductora muy agresiva en las calles de Port Gellhorn.",
+    "frase": "",
+    "hablante": "JUCAVIAPRI",
+    "campana": "",
+    "duracion_s": 10.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/jucaviapri",
+    "id_origen": "ZealousSmokyGooseYouWHY-wbZe0SM50F7VYWEG",
+    "claves": [
+     "ZealousSmokyGooseYouWHY-wbZe0SM50F7VYWEG"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 018. JUCAVIAPRI se encuentra con una conductora muy agresiva en las calles de Port Gellhorn.\n\n🎥 twitch.tv/jucaviapri\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/jucaviapri",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 018. JUCAVIAPRI se encuentra con una conductora muy agresiva en las calles de Port Gellhorn.\n\n🎥 twitch.tv/jucaviapri\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 156
+   },
+   "ficha_id": "t-jucaviapri"
+  }
  }
 ]
