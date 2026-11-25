@@ -1,13 +1,13 @@
 {
  "ventana": [
-  1795629649.597135
+  1795633251.193433
  ],
  "dia": "2026-11-25",
- "llamadas_dia": 30,
+ "llamadas_dia": 31,
  "mes": "2026-11",
- "llamadas_mes": 473,
+ "llamadas_mes": 474,
  "canales_mes": {
-  "6afd248cece6dfde5f047187": 101,
+  "6afd248cece6dfde5f047187": 102,
   "6afd2436ece6dfde5f046c7f": 34,
   "6afd2350ece6dfde5f045b08": 34
  },
