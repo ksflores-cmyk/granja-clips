@@ -128,7 +128,7 @@
   origen: twitch
   twitch_login: taisontv
   broadcaster_id: '115156753'
-  seguidores: 165584
+  seguidores: 165583
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -210,7 +210,7 @@
   origen: twitch
   twitch_login: sajonarco
   broadcaster_id: '93191106'
-  seguidores: 67409
+  seguidores: 67414
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -292,7 +292,7 @@
   origen: twitch
   twitch_login: mada
   broadcaster_id: '59667627'
-  seguidores: 72119
+  seguidores: 72120
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -374,7 +374,7 @@
   origen: twitch
   twitch_login: flowstreetvi
   broadcaster_id: '175772774'
-  seguidores: 18757
+  seguidores: 18759
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -1265,7 +1265,7 @@
   origen: twitch
   twitch_login: vicesat
   broadcaster_id: '110387651'
-  seguidores: 17136
+  seguidores: 17140
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -2038,7 +2038,7 @@
   origen: twitch
   twitch_login: angelysaras
   broadcaster_id: '21646144'
-  seguidores: 125163
+  seguidores: 125176
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -2850,7 +2850,7 @@
   origen: twitch
   twitch_login: franbeuve
   broadcaster_id: '1132877357'
-  seguidores: 54409
+  seguidores: 54410
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -2891,8 +2891,8 @@
   origen: twitch
   twitch_login: mastervland
   broadcaster_id: '120779507'
-  seguidores: 11488
-  seguidores_leidos: '2026-11-24'
+  seguidores: 11494
+  seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -2918,7 +2918,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-26'
+  vence: '2026-11-27'
   estado: vigente
   uso: produccion
   publicable: true
@@ -4285,7 +4285,7 @@
   origen: twitch
   twitch_login: missiefu
   broadcaster_id: '534183306'
-  seguidores: 1890
+  seguidores: 1891
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -4613,8 +4613,8 @@
   origen: twitch
   twitch_login: imarixu
   broadcaster_id: '1219215658'
-  seguidores: 8857
-  seguidores_leidos: '2026-11-24'
+  seguidores: 8862
+  seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -4640,7 +4640,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-26'
+  vence: '2026-11-27'
   estado: vigente
   uso: produccion
   publicable: true
@@ -5433,7 +5433,7 @@
   origen: twitch
   twitch_login: elvirayuki
   broadcaster_id: '209514370'
-  seguidores: 97089
+  seguidores: 97123
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -5556,7 +5556,7 @@
   origen: twitch
   twitch_login: wefere
   broadcaster_id: '146213773'
-  seguidores: 98038
+  seguidores: 98039
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -5679,7 +5679,7 @@
   origen: twitch
   twitch_login: labeuchi_official
   broadcaster_id: '752413818'
-  seguidores: 1096
+  seguidores: 1105
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
