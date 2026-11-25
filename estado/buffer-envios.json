@@ -2461,5 +2461,164 @@
    "ficha_id": "t-aleowens"
   },
   "ruta_borrada": true
+ },
+ {
+  "id": "shorts|17|2026-11-25T17:30:00.000Z",
+  "plataforma": "shorts",
+  "toma": 17,
+  "dueAt": "2026-11-25T17:30:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-25/toma-017-57afb106.mp4",
+  "estado": "creado",
+  "post_id": "6b0715b017239ec480504f4a",
+  "intento": "3a5957ae5d3d4632a3d7b4aa5d389509",
+  "registrado": true,
+  "texto": "Toma 017. Se descubre en directo, sin guion.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 17,
+    "gancho": "DROPS A POR EL BUGATTI Y",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-zyrpesland",
+    "caption": "",
+    "frase": "",
+    "hablante": "ZYRPESLAND",
+    "campana": "",
+    "duracion_s": 20.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/zyrpesland",
+    "id_origen": "RespectfulColorfulSandwichFrankerZ-OxP34Ci-ShWL3YgJ",
+    "claves": [
+     "RespectfulColorfulSandwichFrankerZ-OxP34Ci-ShWL3YgJ"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 017. Se descubre en directo, sin guion.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 017. Se descubre en directo, sin guion.",
+    "credito": "🎥 twitch.tv/zyrpesland",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 017. Se descubre en directo, sin guion.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 100
+   },
+   "ficha_id": "t-zyrpesland"
+  }
+ },
+ {
+  "id": "tiktok|17|2026-11-25T17:30:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 17,
+  "dueAt": "2026-11-25T17:30:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-25/toma-017-57afb106.mp4",
+  "estado": "creado",
+  "post_id": "6b0715b117239ec480504fa6",
+  "intento": "619680eec7ba40a7b8c0ec855eaff45e",
+  "registrado": true,
+  "texto": "Toma 017. Se descubre en directo, sin guion.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 17,
+    "gancho": "DROPS A POR EL BUGATTI Y",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-zyrpesland",
+    "caption": "",
+    "frase": "",
+    "hablante": "ZYRPESLAND",
+    "campana": "",
+    "duracion_s": 20.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/zyrpesland",
+    "id_origen": "RespectfulColorfulSandwichFrankerZ-OxP34Ci-ShWL3YgJ",
+    "claves": [
+     "RespectfulColorfulSandwichFrankerZ-OxP34Ci-ShWL3YgJ"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 017. Se descubre en directo, sin guion.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/zyrpesland",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 017. Se descubre en directo, sin guion.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 100
+   },
+   "ficha_id": "t-zyrpesland"
+  }
+ },
+ {
+  "id": "reels|17|2026-11-25T17:30:00.000Z",
+  "plataforma": "reels",
+  "toma": 17,
+  "dueAt": "2026-11-25T17:30:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-25/toma-017-57afb106.mp4",
+  "estado": "creado",
+  "post_id": "6b0715b141a05339f0f29fbb",
+  "intento": "ac9860de86a74739acffce3351c9cdd6",
+  "registrado": true,
+  "texto": "Toma 017. Se descubre en directo, sin guion.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 17,
+    "gancho": "DROPS A POR EL BUGATTI Y",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-zyrpesland",
+    "caption": "",
+    "frase": "",
+    "hablante": "ZYRPESLAND",
+    "campana": "",
+    "duracion_s": 20.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/zyrpesland",
+    "id_origen": "RespectfulColorfulSandwichFrankerZ-OxP34Ci-ShWL3YgJ",
+    "claves": [
+     "RespectfulColorfulSandwichFrankerZ-OxP34Ci-ShWL3YgJ"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 017. Se descubre en directo, sin guion.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/zyrpesland",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 017. Se descubre en directo, sin guion.\n\n🎥 twitch.tv/zyrpesland\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 103
+   },
+   "ficha_id": "t-zyrpesland"
+  }
  }
 ]

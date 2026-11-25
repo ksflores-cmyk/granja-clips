@@ -57,3 +57,4 @@
 - 2026-11-24 22:06 GT · ciclo: toma 16 (primeras_veces) programada en tiktok, reels; falló shorts
 - 2026-11-25 08:13 GT · ciclo: sin tiempo, no se publicó
 - 2026-11-25 09:11 GT · ciclo: sin tiempo, no se publicó
+- 2026-11-25 11:06 GT · ciclo: toma 17 (primeras_veces) programada en shorts, tiktok, reels

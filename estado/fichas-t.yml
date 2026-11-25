@@ -169,7 +169,7 @@
   origen: twitch
   twitch_login: zyrpesland
   broadcaster_id: '512025628'
-  seguidores: 160052
+  seguidores: 160082
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -374,7 +374,7 @@
   origen: twitch
   twitch_login: flowstreetvi
   broadcaster_id: '175772774'
-  seguidores: 18759
+  seguidores: 18761
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -576,8 +576,8 @@
   origen: twitch
   twitch_login: aaronjaureguii
   broadcaster_id: '1382351624'
-  seguidores: 38196
-  seguidores_leidos: '2026-11-24'
+  seguidores: 38220
+  seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -603,7 +603,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-26'
+  vence: '2026-11-27'
   estado: vigente
   uso: produccion
   publicable: true
@@ -1224,8 +1224,8 @@
   origen: twitch
   twitch_login: suzyroxx
   broadcaster_id: '417684519'
-  seguidores: 182919
-  seguidores_leidos: '2026-11-24'
+  seguidores: 182908
+  seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1251,7 +1251,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-26'
+  vence: '2026-11-27'
   estado: vigente
   uso: produccion
   publicable: true
@@ -1265,7 +1265,7 @@
   origen: twitch
   twitch_login: vicesat
   broadcaster_id: '110387651'
-  seguidores: 17140
+  seguidores: 17153
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -3137,8 +3137,8 @@
   origen: twitch
   twitch_login: knooby
   broadcaster_id: '276541628'
-  seguidores: 19912
-  seguidores_leidos: '2026-11-23'
+  seguidores: 19958
+  seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -3164,7 +3164,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-25'
+  vence: '2026-11-27'
   estado: vigente
   uso: produccion
   publicable: true
@@ -3383,8 +3383,8 @@
   origen: twitch
   twitch_login: donangelillo
   broadcaster_id: '513440587'
-  seguidores: 33905
-  seguidores_leidos: '2026-11-23'
+  seguidores: 33974
+  seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -3410,7 +3410,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-25'
+  vence: '2026-11-27'
   estado: vigente
   uso: produccion
   publicable: true
@@ -5474,7 +5474,7 @@
   origen: twitch
   twitch_login: anarko919
   broadcaster_id: '69173719'
-  seguidores: 3930
+  seguidores: 3929
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -5556,7 +5556,7 @@
   origen: twitch
   twitch_login: wefere
   broadcaster_id: '146213773'
-  seguidores: 98039
+  seguidores: 98050
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
@@ -5638,7 +5638,7 @@
   origen: twitch
   twitch_login: mxsurfboard
   broadcaster_id: '649781029'
-  seguidores: 2822
+  seguidores: 2823
   seguidores_leidos: '2026-11-25'
   juego: GTA 6
   reglas:
