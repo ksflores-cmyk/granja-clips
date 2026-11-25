@@ -2027,7 +2027,8 @@
     "largo": 132
    },
    "ficha_id": "t-cowi"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|14|2026-11-24T22:00:00.000Z",
@@ -2080,7 +2081,8 @@
     "largo": 132
    },
    "ficha_id": "t-cowi"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|14|2026-11-24T22:00:00.000Z",
@@ -2133,6 +2135,166 @@
     "largo": 135
    },
    "ficha_id": "t-cowi"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "shorts|15|2026-11-25T01:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 15,
+  "dueAt": "2026-11-25T01:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-24/toma-015-e6becabf.mp4",
+  "estado": "creado",
+  "post_id": "6b062644a8becebb77466d92",
+  "intento": "68541a40caa842869c8a2c0c4a514fc9",
+  "registrado": true,
+  "texto": "Toma 015. Ubietoo descubre que presumir antes de tiempo en GTA 6 siempre termina mal.\n\n🎥 twitch.tv/ubietoo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 15,
+    "gancho": "Exceso de confianza en la pista",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-ubietoo",
+    "caption": "Ubietoo descubre que presumir antes de tiempo en GTA 6 siempre termina mal.",
+    "frase": "Voy muy sobrado, voy muy sobrado. Acabo de pegar un trompo.",
+    "hablante": "UBIETOO",
+    "campana": "",
+    "duracion_s": 15.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/ubietoo",
+    "id_origen": "PlainBreakableFerretYee-CfNtpn6-JtL--QiU",
+    "claves": [
+     "PlainBreakableFerretYee-CfNtpn6-JtL--QiU"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 015. Ubietoo descubre que presumir antes de tiempo en GTA 6 siempre termina mal.\n\n🎥 twitch.tv/ubietoo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 015. Ubietoo descubre que presumir antes de tiempo en GTA 6 siempre termina mal.",
+    "credito": "🎥 twitch.tv/ubietoo",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 015. Ubietoo descubre que presumir antes de tiempo en GTA 6 siempre termina mal.\n\n🎥 twitch.tv/ubietoo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 138
+   },
+   "ficha_id": "t-ubietoo"
+  }
+ },
+ {
+  "id": "tiktok|15|2026-11-25T01:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 15,
+  "dueAt": "2026-11-25T01:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-24/toma-015-e6becabf.mp4",
+  "estado": "creado",
+  "post_id": "6b062645f0b405190ac5a917",
+  "intento": "84b1d6a7a4aa426fa3ee99016fd46b5b",
+  "registrado": true,
+  "texto": "Toma 015. Ubietoo descubre que presumir antes de tiempo en GTA 6 siempre termina mal.\n\n🎥 twitch.tv/ubietoo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 15,
+    "gancho": "Exceso de confianza en la pista",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-ubietoo",
+    "caption": "Ubietoo descubre que presumir antes de tiempo en GTA 6 siempre termina mal.",
+    "frase": "Voy muy sobrado, voy muy sobrado. Acabo de pegar un trompo.",
+    "hablante": "UBIETOO",
+    "campana": "",
+    "duracion_s": 15.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/ubietoo",
+    "id_origen": "PlainBreakableFerretYee-CfNtpn6-JtL--QiU",
+    "claves": [
+     "PlainBreakableFerretYee-CfNtpn6-JtL--QiU"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 015. Ubietoo descubre que presumir antes de tiempo en GTA 6 siempre termina mal.\n\n🎥 twitch.tv/ubietoo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/ubietoo",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 015. Ubietoo descubre que presumir antes de tiempo en GTA 6 siempre termina mal.\n\n🎥 twitch.tv/ubietoo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 138
+   },
+   "ficha_id": "t-ubietoo"
+  }
+ },
+ {
+  "id": "reels|15|2026-11-25T01:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 15,
+  "dueAt": "2026-11-25T01:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-24/toma-015-e6becabf.mp4",
+  "estado": "creado",
+  "post_id": "6b062646c4ff71faa81cd4d5",
+  "intento": "7f685499e75c42baaf265e68a1dbc9e8",
+  "registrado": true,
+  "texto": "Toma 015. Ubietoo descubre que presumir antes de tiempo en GTA 6 siempre termina mal.\n\n🎥 twitch.tv/ubietoo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 15,
+    "gancho": "Exceso de confianza en la pista",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-ubietoo",
+    "caption": "Ubietoo descubre que presumir antes de tiempo en GTA 6 siempre termina mal.",
+    "frase": "Voy muy sobrado, voy muy sobrado. Acabo de pegar un trompo.",
+    "hablante": "UBIETOO",
+    "campana": "",
+    "duracion_s": 15.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/ubietoo",
+    "id_origen": "PlainBreakableFerretYee-CfNtpn6-JtL--QiU",
+    "claves": [
+     "PlainBreakableFerretYee-CfNtpn6-JtL--QiU"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 015. Ubietoo descubre que presumir antes de tiempo en GTA 6 siempre termina mal.\n\n🎥 twitch.tv/ubietoo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/ubietoo",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 015. Ubietoo descubre que presumir antes de tiempo en GTA 6 siempre termina mal.\n\n🎥 twitch.tv/ubietoo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 141
+   },
+   "ficha_id": "t-ubietoo"
   }
  }
 ]
