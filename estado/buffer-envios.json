@@ -3371,7 +3371,8 @@
     "largo": 129
    },
    "ficha_id": "t-aaronjaureguii"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|23|2026-11-26T19:00:00.000Z",
@@ -3424,6 +3425,113 @@
     "largo": 132
    },
    "ficha_id": "t-aaronjaureguii"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|24|2026-11-26T22:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 24,
+  "dueAt": "2026-11-26T22:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-26/toma-024-80f6c0d2.mp4",
+  "estado": "creado",
+  "post_id": "6b089eaece64081689f29f92",
+  "intento": "f499065513b9464d9abe617d857e0e01",
+  "registrado": true,
+  "texto": "Toma 024. JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.\n\n🎥 twitch.tv/jennsanli\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 24,
+    "gancho": "Caballero abre puerta en cita",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-jennsanli",
+    "caption": "JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.",
+    "frase": "¡No!",
+    "hablante": "JENNSANLI",
+    "campana": "",
+    "duracion_s": 13.27,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/jennsanli",
+    "id_origen": "MoldyLivelyAlpacaWOOP-QV9QVsizR1m4FD08",
+    "claves": [
+     "MoldyLivelyAlpacaWOOP-QV9QVsizR1m4FD08"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 024. JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.\n\n🎥 twitch.tv/jennsanli\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/jennsanli",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 024. JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.\n\n🎥 twitch.tv/jennsanli\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 158
+   },
+   "ficha_id": "t-jennsanli"
+  }
+ },
+ {
+  "id": "reels|24|2026-11-26T22:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 24,
+  "dueAt": "2026-11-26T22:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-26/toma-024-80f6c0d2.mp4",
+  "estado": "creado",
+  "post_id": "6b089eaf1fa40915829b05e9",
+  "intento": "0b489abc34094b42bb311fe0c8df4ffd",
+  "registrado": true,
+  "texto": "Toma 024. JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.\n\n🎥 twitch.tv/jennsanli\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 24,
+    "gancho": "Caballero abre puerta en cita",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-jennsanli",
+    "caption": "JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.",
+    "frase": "¡No!",
+    "hablante": "JENNSANLI",
+    "campana": "",
+    "duracion_s": 13.27,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/jennsanli",
+    "id_origen": "MoldyLivelyAlpacaWOOP-QV9QVsizR1m4FD08",
+    "claves": [
+     "MoldyLivelyAlpacaWOOP-QV9QVsizR1m4FD08"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 024. JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.\n\n🎥 twitch.tv/jennsanli\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/jennsanli",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 024. JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.\n\n🎥 twitch.tv/jennsanli\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 161
+   },
+   "ficha_id": "t-jennsanli"
   }
  }
 ]
