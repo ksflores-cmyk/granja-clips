@@ -3263,7 +3263,8 @@
     "largo": 136
    },
    "ficha_id": "t-srserpiente"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|22|2026-11-26T17:30:00.000Z",
@@ -3316,6 +3317,113 @@
     "largo": 139
    },
    "ficha_id": "t-srserpiente"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|23|2026-11-26T19:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 23,
+  "dueAt": "2026-11-26T19:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-26/toma-023-7824dfe0.mp4",
+  "estado": "creado",
+  "post_id": "6b087514c81617797dcf5ef7",
+  "intento": "0d770e14537b4d1d9cd88badd0f9aef2",
+  "registrado": true,
+  "texto": "Toma 023. AARONJAUREGUII confiesa que aprendería inglés por una mujer\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 23,
+    "gancho": "Aprender inglés por amor",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-aaronjaureguii",
+    "caption": "AARONJAUREGUII confiesa que aprendería inglés por una mujer",
+    "frase": "Yo sí aprendería...",
+    "hablante": "AARONJAUREGUII",
+    "campana": "",
+    "duracion_s": 21.87,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/aaronjaureguii",
+    "id_origen": "TenaciousAverageRaisinKippa-ZCkiO8j71EZs1V0U",
+    "claves": [
+     "TenaciousAverageRaisinKippa-ZCkiO8j71EZs1V0U"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 023. AARONJAUREGUII confiesa que aprendería inglés por una mujer\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/aaronjaureguii",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 023. AARONJAUREGUII confiesa que aprendería inglés por una mujer\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 129
+   },
+   "ficha_id": "t-aaronjaureguii"
+  }
+ },
+ {
+  "id": "reels|23|2026-11-26T19:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 23,
+  "dueAt": "2026-11-26T19:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-26/toma-023-7824dfe0.mp4",
+  "estado": "creado",
+  "post_id": "6b0875151fa4091582870d55",
+  "intento": "8a381955825d4092a5fd4bd0cc9b5d96",
+  "registrado": true,
+  "texto": "Toma 023. AARONJAUREGUII confiesa que aprendería inglés por una mujer\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 23,
+    "gancho": "Aprender inglés por amor",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-aaronjaureguii",
+    "caption": "AARONJAUREGUII confiesa que aprendería inglés por una mujer",
+    "frase": "Yo sí aprendería...",
+    "hablante": "AARONJAUREGUII",
+    "campana": "",
+    "duracion_s": 21.87,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/aaronjaureguii",
+    "id_origen": "TenaciousAverageRaisinKippa-ZCkiO8j71EZs1V0U",
+    "claves": [
+     "TenaciousAverageRaisinKippa-ZCkiO8j71EZs1V0U"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 023. AARONJAUREGUII confiesa que aprendería inglés por una mujer\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/aaronjaureguii",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 023. AARONJAUREGUII confiesa que aprendería inglés por una mujer\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 132
+   },
+   "ficha_id": "t-aaronjaureguii"
   }
  }
 ]
