@@ -3103,5 +3103,111 @@
    "ficha_id": "t-josefattv"
   },
   "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|21|2026-11-26T15:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 21,
+  "dueAt": "2026-11-26T15:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-26/toma-021-d5a4eada.mp4",
+  "estado": "creado",
+  "post_id": "6b083d00e1a214b89bdd87fe",
+  "intento": "189df57383854379898cd7397948cb75",
+  "registrado": true,
+  "texto": "Toma 021. AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 21,
+    "gancho": "Lucia busca algo para robar",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-aaronjaureguii",
+    "caption": "AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.",
+    "frase": "Hacer clip de eso.",
+    "hablante": "AARONJAUREGUII",
+    "campana": "",
+    "duracion_s": 16.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/aaronjaureguii",
+    "id_origen": "OddShinySnoodKappa-TL-UZXEnJsQuye7l",
+    "claves": [
+     "OddShinySnoodKappa-TL-UZXEnJsQuye7l"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 021. AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/aaronjaureguii",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 021. AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 142
+   },
+   "ficha_id": "t-aaronjaureguii"
+  }
+ },
+ {
+  "id": "reels|21|2026-11-26T15:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 21,
+  "dueAt": "2026-11-26T15:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-26/toma-021-d5a4eada.mp4",
+  "estado": "creado",
+  "post_id": "6b083d0080ee2e8b66824dc4",
+  "intento": "b70d82c2355a4c45a3f9b3d8a9a4540f",
+  "registrado": true,
+  "texto": "Toma 021. AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 21,
+    "gancho": "Lucia busca algo para robar",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-aaronjaureguii",
+    "caption": "AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.",
+    "frase": "Hacer clip de eso.",
+    "hablante": "AARONJAUREGUII",
+    "campana": "",
+    "duracion_s": 16.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/aaronjaureguii",
+    "id_origen": "OddShinySnoodKappa-TL-UZXEnJsQuye7l",
+    "claves": [
+     "OddShinySnoodKappa-TL-UZXEnJsQuye7l"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 021. AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/aaronjaureguii",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 021. AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 145
+   },
+   "ficha_id": "t-aaronjaureguii"
+  }
  }
 ]
