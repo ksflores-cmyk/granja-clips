@@ -5,7 +5,7 @@ import pytest
 
 from conftest import RAIZ_REAL
 from fabrica import fuentes
-from fabrica.editar import muestras
+from fabrica.editar import placas, muestras
 from fabrica.editar.marca import Marca
 
 HOY = date(2026, 11, 17)
@@ -215,7 +215,9 @@ def test_cuerpo_de_otra_fuente_con_cierre_valido_sale_en_rojo(vertical, marca):
     m = malos(estilo.revisar(mp4, plan, marca))
     assert "[fotograma] Cuerpo coincide con el origen" in m
     # lo demás (cabecera, diálogo, cierre, audio) sigue en verde: sólo la imagen de fondo es de otra fuente
-    assert set(m) <= {"[fotograma] Cuerpo coincide con el origen", "[fotograma] Bordes coinciden con la fuente (sin franjas)"}, m
+    # (desde el cierre v3 la cabecera también mira la fuente junto a la fila, así que puede salir en rojo)
+    assert set(m) <= {"[fotograma] Cuerpo coincide con el origen", "[fotograma] Bordes coinciden con la fuente (sin franjas)",
+                      "[fotograma] Cabecera en el video"}, m
 
 
 @necesita_ffmpeg
@@ -248,6 +250,8 @@ def test_la_fuente_del_plan_debe_coincidir_con_marca(marca, vertical):
 @pytest.mark.slow
 @necesita_ffmpeg
 def test_cierre_correcto_pasa_corte_sin_credito_falla_y_credito_distinto_falla(vertical, marca, tmp_path):
+    if not placas.cierre_con_placa(marca):
+        pytest.skip("estilo v3: el cierre es un destello, sin placa CORTE. (ver test_cierre_destello_*)")
     plan = vertical["plan"]
     assert estilo.cierre_visible(vertical["mp4"], plan, marca)[0]
     # CORTE. sin crédito: se compone el mismo video con crédito vacío
@@ -469,8 +473,29 @@ def test_credito_con_texto_extra_sale_en_rojo(vertical, marca, tmp_path):
                       mp4, duracion=4.0, trabajo=tmp_path / "w", fuente_video=vertical["fuente"], inicio=0.0)
     corto = json.loads(json.dumps(vertical["plan"]))
     corto["toma"]["credito"] = "Con: Blender"
+    if not placas.cierre_con_placa(marca):       # v3: el crédito sólo va en la fila de arriba, que mira la cabecera
+        ok, det = estilo.cabecera_visible(mp4, corto, marca)
+        assert not ok and "junto a la fila" in det
+        return
     ok, det = estilo.cierre_visible(mp4, corto, marca)
     assert not ok and "crédito" in det.split("falla:")[1]
+
+
+@pytest.mark.slow
+@necesita_ffmpeg
+def test_cierre_destello_presente_pasa_y_sin_destello_falla(vertical, marca, tmp_path):
+    if placas.cierre_con_placa(marca):
+        pytest.skip("cierre con placa")
+    plan = vertical["plan"]
+    assert plan["cierre"]["estilo"] == "destello"
+    ok, det = estilo.cierre_visible(vertical["mp4"], plan, marca)
+    assert ok, det
+    # el mismo video sin el destello (la fuente tal cual, recortada a la duración): falla
+    sin = tmp_path / "sin.mp4"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(vertical["fuente"]), "-t", "4",
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", str(sin)], check=True)
+    ok, det = estilo.cierre_visible(sin, plan, marca)
+    assert not ok, det
 
 
 # ---------------------------------------------------------------- una sola letra (ronda 2, punto 8)
@@ -486,13 +511,16 @@ def _con_cambio(vertical, marca, tmp_path, toma=None, frase=None):
 
 @necesita_ffmpeg
 @pytest.mark.parametrize("cambio,punto", [
-    ({"toma": {"credito": "Con: Blender Foundation (CC BY 4.0)"}}, "[fotograma] Cierre visible en el video (CORTE. y crédito)"),
+    ({"toma": {"credito": "Con: Blender Foundation (CC BY 4.0)"}}, "CIERRE_O_CABECERA"),
     ({"toma": {"escena": "INT. CABAÑA — NOCHF"}}, "[fotograma] Cabecera en el video"),
     ({"toma": {"gancho": "Ella buscs a un dragón"}}, "[fotograma] Cabecera en el video"),
     ({"frase": "¿Qué te trae por aquí!"}, "[fotograma] Diálogo en el video"),
 ])
 @pytest.mark.slow
 def test_un_cambio_de_una_letra_sale_en_rojo(vertical, marca, tmp_path, cambio, punto):
+    if punto == "CIERRE_O_CABECERA":         # v3 (destello): el crédito sólo va en la fila, que mira la cabecera
+        punto = ("[fotograma] Cierre visible en el video (CORTE. y crédito)" if placas.cierre_con_placa(marca)
+                 else "[fotograma] Cabecera en el video")
     mp4 = _con_cambio(vertical, marca, tmp_path, **cambio)
     assert punto in malos(estilo.revisar(mp4, vertical["plan"], marca))
 

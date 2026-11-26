@@ -92,7 +92,7 @@ def test_las_placas_de_una_toma_con_subtitulos_del_clip_no_llevan_dialogo(marca)
     sin = placas.construir(marca, toma_sub(), lineas, 10.0)
     assert [p.tipo for p in con if p.tipo.startswith("dialogo")] == ["dialogo_1"]
     assert not [p.tipo for p in sin if p.tipo.startswith("dialogo")]
-    assert {"fila", "cabecera", "mosca", "cierre"} <= {p.tipo for p in sin}          # lo demás sí va
+    assert {"fila", "cabecera", "mosca"} <= {p.tipo for p in sin}                     # lo demás sí va
 
 
 def test_la_orden_de_ffmpeg_sin_subtitulos_no_lleva_el_bloque_de_dialogo(marca):

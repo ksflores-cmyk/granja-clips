@@ -263,7 +263,7 @@ def _comparar_placa(real: Image.Image, placa: placas.Placa, papel: Image.Image) 
     esperado = real.copy()
     img = placa.imagen
     mascara = None
-    if img.mode == "RGBA" and img.getextrema()[3][0] < 255:     # placa con transparencia (diálogo con contorno, v3)
+    if placa.tipo.startswith("dialogo") and img.mode == "RGBA" and img.getextrema()[3][0] < 255:   # diálogo v3
         alfa = img.getchannel("A")
         esperado.paste(img.convert("RGB"), (placa.x, placa.y), alfa)
         mascara = np.zeros((real.height, real.width), dtype=bool)
@@ -578,6 +578,31 @@ def _gancho_se_va(video: Path, plan: dict, marca: Marca, cabecera: list[placas.P
     return d < UMBRAL_LOGO_EXTRA, f"gancho fuera a los {t:.1f} s: diferencia con la fuente {d:.1f} (máximo {UMBRAL_LOGO_EXTRA:g})"
 
 
+FRANJA_FILA_PX = 48
+
+
+def _fila_sin_texto_de_mas(video: Path, plan: dict, marca: Marca, fila: list[placas.Placa]) -> tuple[bool, str]:
+    """Junto al borde interior de la fila (TOMA y crédito) se ve la fuente, no más placa: un crédito con texto de más
+    se nota aunque su principio coincida. Desde el cierre v3 (sin CORTE.) es el único sitio del crédito en el video."""
+    if not fila or _historia(plan) is not None:
+        return True, ""
+    p = fila[0]
+    x0 = p.x + p.ancho if p.x + p.ancho / 2 < marca.ancho / 2 else max(0, p.x - FRANJA_FILA_PX)
+    ancho = min(FRANJA_FILA_PX, marca.ancho - x0)
+    if ancho <= 4:
+        return True, ""
+    t = _instante_medio(plan, marca, 0.5)
+    real = _fotograma(Path(video), t)
+    if real is None:
+        return False, f"no se pudo leer el fotograma en {t:.2f} s"
+    caja = {"x": x0, "y": p.y, "ancho": ancho, "alto": p.alto}
+    cuerpo = {"x": 0, "y": 0, "ancho": marca.ancho, "alto": marca.alto}
+    d = _mejor_contra_fuente(plan, marca, t, lambda f: _diff_region(real, f, cuerpo, caja), UMBRAL_LOGO_EXTRA)
+    if d is None:
+        return True, "junto a la fila: sin fuente para comparar"
+    return d < UMBRAL_LOGO_EXTRA, f"junto a la fila: diferencia con la fuente {d:.1f} (máximo {UMBRAL_LOGO_EXTRA:g})"
+
+
 def mosca_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     """[fotograma] La mosca GUION VIVO está en su esquina, dentro de su placa, a mitad de la toma."""
     try:
@@ -651,7 +676,8 @@ def cabecera_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
         ok2, det2 = _placas_visibles(Path(video), plan, marca,
                                      [(p, _instante_medio(plan, marca, f)) for p in fila for f in (0.3, 0.7)])
         ok3, det3 = _gancho_se_va(Path(video), plan, marca, _del_tipo(esperadas, "cabecera"))
-        return ok and ok2 and ok3, "; ".join(x for x in (det, det2, det3) if x)
+        ok4, det4 = _fila_sin_texto_de_mas(Path(video), plan, marca, fila)
+        return ok and ok2 and ok3 and ok4, "; ".join(x for x in (det, det2, det3, det4) if x)
     try:
         esperado, y_cont = lienzo.cabecera(marca, _toma(plan))
     except ValueError as e:

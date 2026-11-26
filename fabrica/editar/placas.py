@@ -262,7 +262,7 @@ def placa_dialogo(marca: Marca, indice: int, linea) -> Placa:
 def _dialogo_contorno(marca: Marca, indice: int, nombre, frase, acotacion, t0, t1, voz, cfg: dict) -> Placa:
     """Estilo v3, punto 1 (Kevin, 25 nov: «Sin caja, con contorno»): sin placa de papel; texto con contorno de tinta y
     sombra suave sobre el video, más abajo. La voz del streamer va en papel; la otra, en lápiz rojo (como hasta ahora);
-    el nombre del hablante, pequeño y en lápiz rojo."""
+    el nombre del hablante, pequeño, del color de su voz."""
     lineas = mod_dialogo.validar_bloque(marca, nombre, frase, acotacion, cfg)
     c = cfg["contorno"]
     borde, sx, sy = int(c["grosor"]), int(c["sombra_px"]), int(c["sombra_px"])
@@ -273,10 +273,10 @@ def _dialogo_contorno(marca: Marca, indice: int, nombre, frase, acotacion, t0, t
     color = marca.color_voz(voz)
     if color == marca.color("tinta"):
         color = marca.color("papel")                 # sobre el video, la voz principal va clara
-    rojo, tinta = marca.color("lapiz_rojo"), marca.color("tinta")
+    tinta = marca.color("tinta")
     filas: list[tuple[str, object, int, tuple]] = []
     if nombre:
-        filas.append((nombre.upper(), fn, cfg["alto_nombre"], rojo))
+        filas.append((nombre.upper(), fn, cfg["alto_nombre"], color))
     if acotacion:
         filas.append((mod_dialogo.texto_acotacion(acotacion), fa, cfg["alto_acotacion"], color))
     filas += [(ln, ff, cfg["alto_linea_frase"], color) for ln in lineas]

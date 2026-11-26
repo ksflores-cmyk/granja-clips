@@ -11,7 +11,7 @@ PR, nunca se apaga.
 Hoy: placa de papel de 2 a 4 filas con el borde de abajo en y = 1560 (toma 017: tapa casi un tercio del panel).
 
 - [x] Sin placa de papel: Courier Prime en color papel (`#F2EDE3`) con contorno de tinta de 3 px y sombra suave
-      (desplazamiento 2 px, 40 % de opacidad). Nombre del hablante pequeño (24 px), en `lapiz_rojo` con contorno, encima.
+      (desplazamiento 2 px, 40 % de opacidad). Nombre del hablante pequeño (28 px), del color de su voz, con contorno, encima.
 - [x] Frase de 44 px, como mucho 2 líneas; borde de abajo del bloque en **y = 1590** (sobre la franja de las apps, de
       1600 a 1920). En pantalla dividida, igual: dentro del panel del juego.
 - [x] El color por voz (`voces:`) sigue: la otra voz va en `lapiz_rojo`.
