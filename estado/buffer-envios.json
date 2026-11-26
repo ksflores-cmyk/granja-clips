@@ -2779,5 +2779,164 @@
    },
    "ficha_id": "t-jucaviapri"
   }
+ },
+ {
+  "id": "shorts|19|2026-11-26T01:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 19,
+  "dueAt": "2026-11-26T01:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-25/toma-019-07699411.mp4",
+  "estado": "creado",
+  "post_id": "6b077803b96dd8d35172cabf",
+  "intento": "e6d041526f67460ab27381eaee208b66",
+  "registrado": true,
+  "texto": "Toma 019. Cuando decides ignorar las normas de tráfico en el puente.\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 19,
+    "gancho": "Choque frontal en el puente",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-elvisayomastercard",
+    "caption": "Cuando decides ignorar las normas de tráfico en el puente.",
+    "frase": "¡Los intermitentes, gilipollas!",
+    "hablante": "ELVISAYOMASTERCARD",
+    "campana": "",
+    "duracion_s": 20.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/elvisayomastercard",
+    "id_origen": "SuccessfulCarefulNightingaleDeIlluminati-T4vE_gspXHTNHh3L",
+    "claves": [
+     "SuccessfulCarefulNightingaleDeIlluminati-T4vE_gspXHTNHh3L"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 019. Cuando decides ignorar las normas de tráfico en el puente.\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 019. Cuando decides ignorar las normas de tráfico en el puente.",
+    "credito": "🎥 twitch.tv/elvisayomastercard",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 019. Cuando decides ignorar las normas de tráfico en el puente.\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 132
+   },
+   "ficha_id": "t-elvisayomastercard"
+  }
+ },
+ {
+  "id": "tiktok|19|2026-11-26T01:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 19,
+  "dueAt": "2026-11-26T01:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-25/toma-019-07699411.mp4",
+  "estado": "creado",
+  "post_id": "6b0778039f6dda31ccaa35c4",
+  "intento": "db4ce46afa0d4f549b07caaae58d83ea",
+  "registrado": true,
+  "texto": "Toma 019. Cuando decides ignorar las normas de tráfico en el puente.\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 19,
+    "gancho": "Choque frontal en el puente",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-elvisayomastercard",
+    "caption": "Cuando decides ignorar las normas de tráfico en el puente.",
+    "frase": "¡Los intermitentes, gilipollas!",
+    "hablante": "ELVISAYOMASTERCARD",
+    "campana": "",
+    "duracion_s": 20.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/elvisayomastercard",
+    "id_origen": "SuccessfulCarefulNightingaleDeIlluminati-T4vE_gspXHTNHh3L",
+    "claves": [
+     "SuccessfulCarefulNightingaleDeIlluminati-T4vE_gspXHTNHh3L"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 019. Cuando decides ignorar las normas de tráfico en el puente.\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/elvisayomastercard",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 019. Cuando decides ignorar las normas de tráfico en el puente.\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 132
+   },
+   "ficha_id": "t-elvisayomastercard"
+  }
+ },
+ {
+  "id": "reels|19|2026-11-26T01:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 19,
+  "dueAt": "2026-11-26T01:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-25/toma-019-07699411.mp4",
+  "estado": "creado",
+  "post_id": "6b077804a791bea1b23a5dcb",
+  "intento": "c0262e96aec745ffa18e03be8705a64d",
+  "registrado": true,
+  "texto": "Toma 019. Cuando decides ignorar las normas de tráfico en el puente.\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 19,
+    "gancho": "Choque frontal en el puente",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-elvisayomastercard",
+    "caption": "Cuando decides ignorar las normas de tráfico en el puente.",
+    "frase": "¡Los intermitentes, gilipollas!",
+    "hablante": "ELVISAYOMASTERCARD",
+    "campana": "",
+    "duracion_s": 20.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/elvisayomastercard",
+    "id_origen": "SuccessfulCarefulNightingaleDeIlluminati-T4vE_gspXHTNHh3L",
+    "claves": [
+     "SuccessfulCarefulNightingaleDeIlluminati-T4vE_gspXHTNHh3L"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 019. Cuando decides ignorar las normas de tráfico en el puente.\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/elvisayomastercard",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 019. Cuando decides ignorar las normas de tráfico en el puente.\n\n🎥 twitch.tv/elvisayomastercard\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 135
+   },
+   "ficha_id": "t-elvisayomastercard"
+  }
  }
 ]
