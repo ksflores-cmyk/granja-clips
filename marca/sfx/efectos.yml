@@ -122,5 +122,5 @@ efectos:
     licencia: CC0
     tipo: claqueta
     asset: "claqueta.ogg"
-    sha256: null
-    estado: candidata
+    sha256: "81e976532565f4372abd14e83d2684195fa548d0a28d345de221e56052454f32"
+    estado: verificada
