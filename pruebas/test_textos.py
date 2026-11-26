@@ -44,8 +44,8 @@ TOMA_P = {"numero": 12, "gancho": "Primera vez en el mapa", "pilar": "momentos",
 
 def test_t_shorts():
     r = textos(TOMA_T, ficha_t(), "shorts")
-    assert r["texto"] == "Toma 005. El NPC le contesta al streamer\n\n🎥 twitch.tv/ibai\n#GTA6 #Gaming #Clips"
-    assert r["titulo"] == "Toma 005. El NPC le contesta al streamer"
+    assert r["texto"] == "El NPC le contesta al streamer\n\n🎥 twitch.tv/ibai\n#GTA6 #Gaming #Clips"
+    assert r["titulo"] == "El NPC le contesta al streamer"
     assert r["credito"] == "🎥 twitch.tv/ibai" and r["descripcion"] == r["texto"]
     assert r["hashtags"] == ["#GTA6", "#Gaming", "#Clips"]
     assert r["largo"] == mod.utf16(r["texto"])
@@ -53,13 +53,13 @@ def test_t_shorts():
 
 def test_t_tiktok():
     r = textos(TOMA_T, ficha_t(), "tiktok")
-    assert r["texto"] == "Toma 005. El NPC le contesta al streamer\n\n🎥 twitch.tv/ibai\n#GTA6 #Gaming #Clips"
+    assert r["texto"] == "El NPC le contesta al streamer\n\n🎥 twitch.tv/ibai\n#GTA6 #Gaming #Clips"
     assert r["titulo"] is None
 
 
 def test_t_reels():
     r = textos(TOMA_T, ficha_t(), "reels")
-    assert r["texto"] == ("Toma 005. El NPC le contesta al streamer\n\n"
+    assert r["texto"] == ("El NPC le contesta al streamer\n\n"
                           "Nadie esperaba esa respuesta. Pasó en directo.\n\n"
                           "🎥 twitch.tv/ibai\n#GTA6 #Gaming #Clips #Extra")
     assert r["titulo"] is None and len(r["hashtags"]) == 4
@@ -69,7 +69,7 @@ def test_t_reels():
 @pytest.mark.parametrize("red,tag", [("shorts", "@sebasberon"), ("tiktok", "@sebasclips"), ("reels", "@sebasberon")])
 def test_a_con_la_ficha_real_de_fm27(red, tag):
     r = textos(TOMA_A, ficha_fm27(), red)
-    assert r["texto"] == ("Toma 007. Sebas ficha al delantero\n\n@footballmanager\n" + tag +
+    assert r["texto"] == ("Sebas ficha al delantero\n\n@footballmanager\n" + tag +
                           "\n#Publicidad\n#FootballManager #FM27 #FootballManager27")
     assert r["credito"] == tag and (r["titulo"] is not None) == (red == "shorts")
     assert r["hashtags"][0] == "#Publicidad"
@@ -158,21 +158,21 @@ def test_palabra_evitada_de_la_ficha_se_descarta():
 
 def test_mayusculas_pasan_a_oracion_conservando_siglas():
     t = textos({**TOMA_P, "gancho": "EL NPC LE CONTESTA"}, FICHA_PROPIA, "tiktok")["texto"]
-    assert t.startswith("Toma 012. El NPC le contesta\n")
+    assert t.startswith("El NPC le contesta\n")
     t = textos({**TOMA_P, "gancho": "SALE EN PS5 CON DLC Y FIFA"}, FICHA_PROPIA, "tiktok")["texto"]
-    assert t.startswith("Toma 012. Sale en PS5 con DLC y FIFA\n")
+    assert t.startswith("Sale en PS5 con DLC y FIFA\n")
 
 
 def test_el_juego_es_gta_6_pero_el_hashtag_no_cambia():
     r = textos({**TOMA_P, "gancho": "El mejor tiroteo de GTA VI y gta6 #GTA6"}, FICHA_PROPIA, "shorts")
-    assert r["texto"].startswith("Toma 012. El mejor tiroteo de GTA 6 y GTA 6\n")
+    assert r["texto"].startswith("El mejor tiroteo de GTA 6 y GTA 6\n")
     assert "#GTA6" in r["texto"] and "#GTA 6" not in r["texto"]
 
 
 def test_hashtags_incrustados_en_el_gancho_se_quitan():
     r = textos({**TOMA_P, "gancho": "Primera vez #Gaming en el mapa #Otro"}, FICHA_PROPIA, "shorts")
-    assert r["texto"].startswith("Toma 012. Primera vez en el mapa\n")
-    assert r["titulo"] == "Toma 012. Primera vez en el mapa"
+    assert r["texto"].startswith("Primera vez en el mapa\n")
+    assert r["titulo"] == "Primera vez en el mapa"
 
 
 # ---------------------------------------------------------------- emojis, < >, título
@@ -191,7 +191,7 @@ def test_emoji_del_gancho_se_quita_y_queda_uno_solo():
 def test_shorts_titulo_sin_emoji_ni_hashtags_ni_menor_mayor():
     toma = {**TOMA_P, "gancho": "Primera <vez> 🔥 en el mapa #GTA6", "valor": ["<b>hola</b>"]}
     r = textos(toma, FICHA_PROPIA, "shorts")
-    assert r["titulo"] == "Toma 012. Primera vez en el mapa"
+    assert r["titulo"] == "Primera vez en el mapa"
     assert "<" not in r["texto"] and ">" not in r["texto"]
     r = textos(toma, FICHA_PROPIA, "reels")
     assert "<" not in r["texto"] and "bhola/b" in r["texto"]
@@ -199,7 +199,7 @@ def test_shorts_titulo_sin_emoji_ni_hashtags_ni_menor_mayor():
 
 def test_titulo_de_100_o_menos_en_utf16():
     r = textos({**TOMA_P, "gancho": "tiroteo " * 40}, FICHA_PROPIA, "shorts")
-    assert mod.utf16(r["titulo"]) <= 100 and r["titulo"].startswith("Toma 012.") and r["titulo"].endswith("…")
+    assert mod.utf16(r["titulo"]) <= 100 and r["titulo"].lower().startswith("toma") is False and r["titulo"].endswith("…")
 
 
 def test_armar_carga_de_shorts_manda_categoria_gaming(tmp_path):
@@ -336,7 +336,7 @@ def test_r2_ganchos_vacios_siguen_fuera(gancho):
 # 3. Sólo se ignora el creador de la toma, su login o etiqueta, el credito de T y el juego.
 def test_r2_el_texto_libre_de_ficha_creador_de_campana_no_se_ignora():
     r = textos({**TOMA_A, "gancho": "Fichaje oficial"}, ficha_fm27(), "tiktok")    # «oficial» está en ficha.creador
-    assert r["texto"].startswith("Toma 007. Fichaje oficial\n")
+    assert r["texto"].startswith("Fichaje oficial\n")
     with pytest.raises(Descartada, match="sin contenido"):
         textos({**TOMA_A, "gancho": "Sebasberon Sebasclips"}, ficha_fm27(), "tiktok")     # creador y etiqueta
 
@@ -370,16 +370,16 @@ def test_r2_titulo_se_recorta_por_utf16():
 # 7. Tipo oración con puntuación y nombre del creador.
 def test_r2_oracion_tras_signos_y_con_nombre_del_creador():
     t = textos({**TOMA_P, "gancho": "¡NO PUEDE SER! EL NPC TROLEA. ¿QUÉ PASA?"}, FICHA_PROPIA, "tiktok")["texto"]
-    assert t.startswith("Toma 012. ¡No puede ser! El NPC trolea. ¿Qué pasa?\n")
+    assert t.startswith("¡No puede ser! El NPC trolea. ¿Qué pasa?\n")
     t = textos({**TOMA_P, "gancho": "SE ASUSTA IBAILLANOS CON EL NPC", "creador": "twitch.tv/IbaiLlanos"},
                ficha_t("IbaiLlanos"), "tiktok")["texto"]
-    assert t.startswith("Toma 012. Se asusta IbaiLlanos con el NPC\n")
+    assert t.startswith("Se asusta IbaiLlanos con el NPC\n")
 
 
 # 8. Hashtags incrustados: sólo los que empiezan con letra.
 def test_r2_hashtag_numerico_en_el_gancho_se_queda():
     r = textos({**TOMA_P, "gancho": "El top #1 de Latam"}, FICHA_PROPIA, "tiktok")
-    assert r["texto"].startswith("Toma 012. El top #1 de Latam\n")
+    assert r["texto"].startswith("El top #1 de Latam\n")
     r = textos({**TOMA_A, "gancho": "El top #1 de Latam"}, ficha_fm27(), "tiktok")      # no es el # de la divulgación
     assert r["hashtags"][0] == "#Publicidad"
 
@@ -388,7 +388,7 @@ def test_r2_hashtag_numerico_en_el_gancho_se_queda():
 def test_r2_emojis_cuadrados_y_banderas_de_etiqueta():
     escocia = "🏴\U000e0067\U000e0062\U000e0073\U000e0063\U000e0074\U000e007f"
     r = textos({**TOMA_P, "gancho": f"Primera ⬛ vez ⬜ en {escocia} el mapa ️‍"}, FICHA_PROPIA, "tiktok")
-    assert r["texto"].startswith("Toma 012. Primera vez en el mapa\n")
+    assert r["texto"].startswith("Primera vez en el mapa\n")
     assert not any(0xE0020 <= ord(c) <= 0xE007F or c in "⬛⬜️‍" for c in r["texto"])
     assert publicar.contar_emojis(r["texto"]) == 1 and publicar.contar_emojis(escocia) == 1
 

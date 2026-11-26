@@ -1,0 +1,79 @@
+name: auto-fusion
+
+# Decisión de Kevin «Auto-fusión» (25 nov 2026): una PR de una rama `claude/*` de este mismo repo se fusiona sola
+# cuando su puerta sale en verde y el revisor en la nube (fabrica/revisor.py: reglas fijas + Gemini) aprueba.
+# Seguridad: corre desde `main` (workflow_run), nunca hace checkout del código de la PR (sólo lee el diff por la
+# API), y lo que toca `.github/`, PAUSA, retiros o la divulgación de campañas queda para Kevin.
+on:
+  workflow_run:
+    workflows: [puerta]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-fusion-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  fusionar:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      startsWith(github.event.workflow_run.head_branch, 'claude/') &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      RAMA: ${{ github.event.workflow_run.head_branch }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4          # main: el revisor y su config, nunca el código de la PR
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install pyyaml
+      - name: Buscar la PR
+        id: pr
+        run: |
+          n=$(gh api "repos/$REPO/pulls?state=open&head=${REPO%%/*}:$RAMA" --jq '.[0].number // empty')
+          if [ -z "$n" ]; then echo "sin PR abierta para $RAMA"; echo "n=" >> "$GITHUB_OUTPUT"; exit 0; fi
+          cabeza=$(gh api "repos/$REPO/pulls/$n" --jq '.head.sha')
+          borrador=$(gh api "repos/$REPO/pulls/$n" --jq '.draft')
+          if [ "$cabeza" != "$SHA" ] || [ "$borrador" = "true" ]; then
+            echo "la PR #$n cambió después de la puerta o es borrador: no se fusiona ahora"; echo "n=" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "n=$n" >> "$GITHUB_OUTPUT"
+      - name: Revisor en la nube
+        id: revisor
+        if: steps.pr.outputs.n != ''
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          N: ${{ steps.pr.outputs.n }}
+        run: |
+          gh api --paginate "repos/$REPO/pulls/$N/files" --jq '.[] | {filename, additions, deletions}' | python -c 'import sys,json; print(json.dumps([json.loads(l) for l in sys.stdin if l.strip()]))' > "$RUNNER_TEMP/archivos.json"
+          gh api "repos/$REPO/pulls/$N" -H "Accept: application/vnd.github.v3.diff" > "$RUNNER_TEMP/pr.diff"
+          set +e
+          python -m fabrica.revisor --archivos "$RUNNER_TEMP/archivos.json" --diff "$RUNNER_TEMP/pr.diff" --salida "$RUNNER_TEMP/veredicto.json"
+          echo "aprobado=$([ $? -eq 0 ] && echo si || echo no)" >> "$GITHUB_OUTPUT"
+      - name: Fusionar
+        if: steps.pr.outputs.n != '' && steps.revisor.outputs.aprobado == 'si'
+        env:
+          N: ${{ steps.pr.outputs.n }}
+        run: |
+          gh pr comment "$N" --repo "$REPO" --body "Auto-fusión: puerta en verde y revisor en la nube aprobó ($(python -c 'import json,sys; print(json.load(open(sys.argv[1])).get("modelo",""))' "$RUNNER_TEMP/veredicto.json"))."
+          gh pr merge "$N" --repo "$REPO" --squash --match-head-commit "$SHA" --delete-branch
+      - name: Dejarla para Kevin
+        if: steps.pr.outputs.n != '' && steps.revisor.outputs.aprobado != 'si'
+        env:
+          N: ${{ steps.pr.outputs.n }}
+        run: |
+          motivos=$(python -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["veredicto"] + ": " + "; ".join(d["motivos"])[:1500])' "$RUNNER_TEMP/veredicto.json")
+          gh pr comment "$N" --repo "$REPO" --body "Auto-fusión detenida — $motivos. La fusiona Kevin si está de acuerdo."

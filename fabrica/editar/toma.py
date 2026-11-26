@@ -47,6 +47,40 @@ class Resultado:
     gastar: bool = False                # el fallo es del MATERIAL: la fuente se anota en estado/vistos.txt
 
 
+def motivo_quemados(datos) -> str | None:
+    """Estilo v3, punto 4: un clip con subtítulos quemados sólo se usa si se pueden tapar (franja fiable de Gemini)."""
+    if isinstance(datos, dict) and datos.get("subtitulos_quemados") is True and ojos.franja_quemados(datos) is None:
+        return ("el clip trae subtítulos quemados y Gemini no dio una franja fiable para taparlos "
+                f"(falta, o mide más del {ojos.FRANJA_MAX:.0%} del alto)")
+    return None
+
+
+def dur_fuente(datos) -> float:
+    """Segundos de la fuente que usa la toma (el recorte de Gemini) más un margen para el tapado."""
+    return float(datos["recorte"]["fin"]) - float(datos["recorte"]["inicio"]) + 1.0
+
+
+def orden_tapar(fuente, inicio: float, duracion: float, franja: tuple[float, float], destino) -> list[str]:
+    """ffmpeg (función pura): el tramo [inicio, inicio + duracion] de la fuente con la franja horizontal `franja`
+    (fracción del alto) muy difuminada, a lo ancho; el audio, tal cual."""
+    y0, y1 = franja
+    return ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{inicio:g}", "-t", f"{duracion:g}",
+            "-i", str(fuente), "-filter_complex",
+            f"[0:v]split[a][b];[b]crop=iw:trunc(ih*{y1 - y0:g}/2)*2:0:trunc(ih*{y0:g}/2)*2,"
+            f"boxblur=luma_radius=min(h\\,w)/4:luma_power=3:chroma_radius=min(cw\\,ch)/4:chroma_power=3[t];"
+            f"[a][t]overlay=0:trunc(H*{y0:g}/2)*2,format=yuv420p[v]",
+            "-map", "[v]", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "16",
+            "-c:a", "copy", "-movflags", "+faststart", str(destino)]
+
+
+def tapar_franja(fuente, inicio: float, duracion: float, franja: tuple[float, float], destino: Path) -> Path:
+    destino = Path(destino)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(orden_tapar(fuente, inicio, duracion, franja, destino), check=True, capture_output=True,
+                   timeout=plazo.tiempo_para(120))
+    return destino
+
+
 def _nombre_seguro(id_origen: str) -> str:
     """El id del origen como parte de un nombre de archivo. Una URL (material del brief) no sirve tal cual."""
     if re.fullmatch(r"[A-Za-z0-9_-]{1,60}", str(id_origen)):
@@ -95,7 +129,9 @@ def armar(datos: dict, marca: Marca, ficha: dict, numero: int,
     nombre = nombres.nombre_para_mostrar(creador, ficha, raiz)   # el que se ve en el video: apodo > nombre visible > login
     ini, fin = float(datos["recorte"]["inicio"]), float(datos["recorte"]["fin"])
     dur = round(fin - ini, 3)
-    quemados = datos.get("subtitulos_quemados") is True       # el clip ya trae sus subtítulos: sin nuestro bloque de diálogo
+    # El clip ya trae sus subtítulos. Estilo v3 (punto 4): si Gemini dio la franja, se tapa y van los nuestros encima;
+    # sin franja fiable, sin nuestro bloque (y la producción descarta la toma: ver `motivo_quemados`).
+    quemados = datos.get("subtitulos_quemados") is True and ojos.franja_quemados(datos) is None
     toma = Toma(numero=numero, gancho=datos["gancho"].strip(), palabra_lapiz=datos["palabra_lapiz"].strip(),
                 lapiz=lapiz_de(numero),
                 escena=nombres.escena_segura(datos["escena"], nombre, marca, temporada, raiz),
@@ -401,6 +437,10 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                     mirada = replace(mirada, datos={**mirada.datos, "recorte": {"inicio": aj[0], "fin": aj[1]}})
             numero = contador_toma(raiz)
             toma, lineas, inicio, dur = armar(mirada.datos, marca, ficha, numero, creador, temporada, raiz)
+            motivo_q = motivo_quemados(mirada.datos)
+            if motivo_q:
+                return Resultado(False, [motivo_q], gemini=mirada.datos, modelo=mirada.modelo, gastar=True)
+            franja = ojos.franja_quemados(mirada.datos)       # subtítulos del clip que se tapan (estilo v3, punto 4)
             motivos_nombres = nombres.revisar_nombres(toma, lineas, nombre, raiz, tambien=(creador,))
             if motivos_nombres:
                 return Resultado(False, [f"puerta de nombres: {m}" for m in motivos_nombres],
@@ -408,10 +448,6 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
             mp4 = salida / f"toma-{numero:03d}-{_nombre_seguro(candidato.id_origen)}.mp4"
             plan_ruta = mp4.with_suffix(".plan.json")
             ev = _etapa_voces(raiz, marca, d.ruta, inicio, dur, lineas, mirada.datos, nombre, recorte[0])
-            if mirada.datos.get("subtitulos_quemados") is True:      # ni las voces de Whisper se ponen: los subtítulos ya vienen en el clip
-                ev.lineas = []
-                if ev.alterno is not None:
-                    ev.alterno = ([], *ev.alterno[1:])
             # Puerta de nombres (#24) también para lo que ponen las voces (#19): el hablante sólo sale de la ficha
             # (el creador) o es OTRA VOZ, y ni las frases transcritas ni el rótulo llevan un nombre vetado. Si las
             # voces no pasan, se vuelve a las líneas de Gemini (ya limpias, sin cortes); si tampoco, se descarta.
@@ -436,13 +472,24 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                         aviso_musica = ("la fuente no trae audio y no hay pista de música CC0 disponible "
                                         f"(GRANJA_MUSICA_DIR={mod_musica.carpeta() or ''}): sigue en silencio")
                         print(f"AVISO: {aviso_musica}")
+                fuente_c, inicio_c = d.ruta, inicio
+                if franja is not None:         # una sola pasada de ffmpeg: el tramo de la fuente con la franja difuminada
+                    with plazo.etapa("tapar subtítulos del clip"):
+                        fuente_c = tapar_franja(d.ruta, inicio, dur_fuente(mirada.datos), franja,
+                                                salida / f"tapado-{numero:03d}.mp4")
+                        inicio_c = 0.0
+
                 def compuesta(lineas_, dur_, tramos_, h=None):
                     marcar_avisos(toma, mirada.datos, temporada, lineas_)     # con las líneas que de verdad salen
                     with tempfile.TemporaryDirectory(prefix="trabajo-toma-") as trabajo:
                         with plazo.etapa("componer"):
                             plan_ = componer(marca, toma, lineas_, mp4, duracion=dur_, trabajo=Path(trabajo),
-                                             fuente_video=d.ruta, inicio=inicio, plan_salida=plan_ruta, ficha=ficha,
+                                             fuente_video=fuente_c, inicio=inicio_c, plan_salida=plan_ruta, ficha=ficha,
                                              musica=pista, tramos=tramos_, historia=h, sfx=sfx_d, config_historia=cfg_h)
+                    if franja is not None:
+                        plan_["subtitulos"] = "tapados"
+                        plan_["franja_tapada"] = list(franja)
+                        plan_ruta.write_text(json.dumps(plan_, ensure_ascii=False, indent=2), encoding="utf-8")
                     # La puerta técnica (sin LLM) corre antes que la de estilo: si sale roja se ahorra la de estilo.
                     with plazo.etapa("puerta técnica"):
                         puntos_t = tecnica.revisar(mp4, tecnica.con_originales(plan_, lineas_), tecnica.cargar(raiz))
@@ -455,7 +502,11 @@ def _hacer_toma(raiz, candidato, ficha, ahora, salida: Path, abrir, ejecutor, tr
                 # con ella, la toma se renderiza como siempre y el plan dice por qué. Con silencios cortados (#19) la
                 # línea de tiempo ya no es la del recorte: ahí manda el corte de voces y la historia se apaga.
                 plan_h, plan, puntos = None, None, None
-                if con_historia and tramos:
+                if con_historia and franja is not None:     # la historia lee tiempos de la fuente original, no del tramo tapado
+                    plan_h = mod_historia.Planificacion(
+                        None, None, ["historia: subtítulos del clip tapados"],
+                        "subtítulos del clip tapados (tramo aparte): historia apagada")
+                elif con_historia and tramos:
                     plan_h = mod_historia.Planificacion(
                         None, None, ["historia: hay silencios cortados (voces)"],
                         "hay silencios cortados (voces): historia apagada")

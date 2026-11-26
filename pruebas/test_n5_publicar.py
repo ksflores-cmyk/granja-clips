@@ -180,7 +180,7 @@ def test_createpost_correcto_con_la_forma_documentada(tmp_path):
     assert carga["mode"] == "customScheduled" and carga["schedulingType"] == "automatic"
     assert carga["dueAt"] == "2026-11-18T17:00:00.000Z" and carga["channelId"] == "canal-yt-001"
     assert carga["metadata"]["youtube"]["categoryId"] == "20"
-    assert carga["metadata"]["youtube"]["title"].startswith("Toma 012.")
+    assert carga["metadata"]["youtube"]["title"].lower().startswith("toma") is False
     assert "saveToDraft" not in carga
     assert not any("addToQueue" in q for q in sim.consultas)
 
@@ -323,7 +323,7 @@ def test_shorts_y_tiktok_gancho_credito_y_pocas_etiquetas():
     for plat in ("shorts", "tiktok"):
         r = textos(TOMA, FICHA, plat)
         t = r["texto"]
-        assert t.startswith("Toma 012. Primera vez en el mapa\n")
+        assert t.startswith("Primera vez en el mapa\n")
         assert "🎥 @ejemplo" in t and "Frase uno" not in t
         assert len([x for x in r["etiquetas"] if x.startswith("#")]) <= 3
         assert r["etiquetas"] == ["@marcaejemplo", "#Ejemplo", "#GTA6", "#Gaming"]
@@ -364,7 +364,7 @@ def test_el_juego_se_escribe_gta_6():
 def test_un_emoji_como_maximo():
     # Cambia con la tarea #8: el emoji del gancho se quita (antes descartaba la toma).
     t = textos({**TOMA, "gancho": "Primera vez en el mapa 🔥"}, FICHA_LIMPIA, "shorts")["texto"]
-    assert "🔥" not in t and t.startswith("Toma 012. Primera vez en el mapa\n")
+    assert "🔥" not in t and t.startswith("Primera vez en el mapa\n")
     assert publicar.contar_emojis(textos(TOMA, FICHA_LIMPIA, "shorts")["texto"]) == 1
 
 
@@ -376,7 +376,7 @@ def test_nunca_sin_credito():
 def test_titulo_de_youtube_de_100_o_menos():
     larga = {**TOMA, "gancho": "palabra " * 40}
     t = textos(larga, FICHA_LIMPIA, "shorts")
-    assert len(t["titulo"]) <= 100 and t["titulo"].startswith("Toma 012.")
+    assert len(t["titulo"]) <= 100 and t["titulo"].lower().startswith("toma") is False
 
 
 def test_texto_repetido_en_7_dias_se_descarta(tmp_path):

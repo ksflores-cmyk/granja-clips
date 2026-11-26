@@ -62,7 +62,16 @@ def r(repo):
     with open(repo / "fuentes.yml", "a", encoding="utf-8") as f:
         f.write(FICHA)
     cambiar_shorts(repo, desde="00:00", max_24h=99)   # pruebas de la fábrica y del ritmo, no del cupo de Shorts (A-20261125-1)
+    cambiar_divulgacion(repo, True)       # ni de la divulgación nativa de campañas (A-20261125-4): FICHA es tipo A
     return repo
+
+
+def cambiar_divulgacion(repo, automatica: bool):
+    ruta = repo / "config" / "divulgacion.yml"
+    d = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    for r in d["redes"].values():
+        r["automatica"] = automatica
+    ruta.write_text(yaml.safe_dump(d, allow_unicode=True), encoding="utf-8")
 
 
 def cambiar_shorts(repo, **valores):
@@ -491,6 +500,14 @@ def test_shorts_con_el_cupo_lleno_no_crea_post(r):
     (r / "estado" / "buffer-envios.json").write_text(json.dumps(envios), encoding="utf-8")
     cod, sal = correr(r, cands=[cand("c1")], hacer=Hacer(r))
     assert "shorts: no se crea el post (cupo lleno: 2 de 2" in sal
+    assert filas(r) == []
+
+
+def test_campana_sin_divulgacion_nativa_no_se_publica(r):
+    # A-20261125-4: Buffer no activa el aviso de contenido comercial; la toma de campaña no sale en esa red.
+    cambiar_divulgacion(r, False)
+    cod, sal = correr(r, cands=[cand("c1")], hacer=Hacer(r))
+    assert "shorts: toma de campaña sin divulgación nativa (Buffer no marca la casilla" in sal
     assert filas(r) == []
 
 
@@ -1143,3 +1160,53 @@ def test_workflow_la_marca_de_inicio_se_escribe_al_empezar_y_el_cierre_la_cierra
 def test_workflow_el_artefacto_falla_si_no_hay_archivos(wf):
     subir = next(p for p in wf["jobs"]["fabrica"]["steps"] if p.get("uses", "").startswith("actions/upload-artifact"))
     assert subir["with"]["if-no-files-found"] == "error"
+
+
+# ---------------------------------------------------------------- estilo v3, punto 4: subtítulos quemados
+
+class HacerTapados(Hacer):
+    """Como Hacer, pero los candidatos de `tapados` salen con los subtítulos del clip tapados."""
+
+    def __init__(self, repo, tapados, **kw):
+        super().__init__(repo, **kw)
+        self.tapados = set(tapados)
+
+    def __call__(self, raiz, c, ficha, ahora, salida=None, **kw):
+        r = super().__call__(raiz, c, ficha, ahora, salida, **kw)
+        if r.ok and c.id_origen in self.tapados:
+            r.plan = {"subtitulos": "tapados", "franja_tapada": [0.8, 0.9]}
+        return r
+
+
+def test_clip_con_subtitulos_tapados_queda_de_reserva_si_hay_otro(r):
+    hacer = HacerTapados(r, {"c0"})
+    cod, sal = correr(r, cands=[cand("c0"), cand("c1")], hacer=hacer)
+    assert hacer.llamadas == ["c0", "c1"]
+    assert "c0 trae subtítulos quemados: queda de reserva" in sal
+    assert "se usa la reserva" not in sal
+    assert len(filas(r)) == 1
+
+
+def test_sin_otro_clip_se_usa_la_reserva_tapada(r):
+    hacer = HacerTapados(r, {"c0"}, oks=(True, False))
+    cod, sal = correr(r, cands=[cand("c0"), cand("c1")], hacer=hacer)
+    assert hacer.llamadas == ["c0", "c1"]
+    assert "se usa la reserva (c0)" in sal
+    assert len(filas(r)) == 1
+
+
+def test_clip_tapado_solo_se_usa_sin_reserva(r):
+    hacer = HacerTapados(r, {"c0"})
+    cod, sal = correr(r, cands=[cand("c0")], hacer=hacer)
+    assert hacer.llamadas == ["c0"] and "queda de reserva" not in sal
+    assert len(filas(r)) == 1
+
+
+def test_los_clips_quemados_van_al_final(r, monkeypatch):
+    ciclo.anotar_quemado(r, ["c0"])
+    assert ciclo.ids_quemados(r) == {"c0"}
+    vistos = []
+    monkeypatch.setattr(ciclo.puertas, "filtrar", lambda raiz, cands, ahora, plat, cliente: (list(cands), []))
+    orden = ciclo.elegir_candidatos(r, AHORA, ["shorts"], vistos.append,
+                                    detectar_fn=lambda raiz, a, c: ([cand("c0"), cand("c1")], []))
+    assert [c.id_origen for c in orden] == ["c1", "c0"]

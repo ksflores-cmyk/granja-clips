@@ -54,6 +54,18 @@ def repo(tmp_path):
         import re
         voces.write_text(re.sub(r"(?m)^activo: true", "activo: false", voces.read_text(encoding="utf-8")),
                          encoding="utf-8")
+    # Sin el cupo de Shorts (A-20261125-1) ni el freno de divulgación de campañas (A-20261125-4): las pruebas de esas
+    # reglas los vuelven a poner (test_shorts, test_n6_ciclo).
+    import yaml
+    hor = destino / "config" / "horarios.yml"
+    d = yaml.safe_load(hor.read_text(encoding="utf-8"))
+    d["shorts"] = {**(d.get("shorts") or {}), "desde": "00:00", "max_24h": 99}
+    hor.write_text(yaml.safe_dump(d, allow_unicode=True), encoding="utf-8")
+    div = destino / "config" / "divulgacion.yml"
+    d = yaml.safe_load(div.read_text(encoding="utf-8"))
+    for r in d["redes"].values():
+        r["automatica"] = True
+    div.write_text(yaml.safe_dump(d, allow_unicode=True), encoding="utf-8")
     return destino
 
 
@@ -139,9 +151,9 @@ def repo_con_musica(repo, raiz_musica, monkeypatch):
 
 @pytest.fixture
 def primera_linea_con_gancho(monkeypatch):
-    """Aísla pruebas viejas que miden la limpieza del gancho y los límites por red con la primera línea `Toma nnn. <gancho>`.
-    Desde el 22 nov 2026 esa línea lleva el `caption` (distinto del gancho): su regla y sus respaldos se prueban en
-    `test_pedidos_22nov.py`; aquí se vuelve a la forma anterior."""
+    """Aísla pruebas viejas que miden la limpieza del gancho y los límites por red con el gancho como primera línea.
+    Desde el 22 nov 2026 esa línea lleva el `caption` (distinto del gancho) y desde el 25 nov va sin `Toma nnn.`: la
+    regla y sus respaldos se prueban en `test_pedidos_22nov.py`; aquí la primera línea es el gancho."""
     from fabrica import textos as mod_textos
     monkeypatch.setattr(mod_textos, "_primera_linea",
-                        lambda toma, ficha, cfg, gancho, plataforma: f"Toma {mod_textos._numero(toma)}. {gancho}")
+                        lambda toma, ficha, cfg, gancho, plataforma: gancho)
