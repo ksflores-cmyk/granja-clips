@@ -3155,7 +3155,8 @@
     "largo": 142
    },
    "ficha_id": "t-aaronjaureguii"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|21|2026-11-26T15:00:00.000Z",
@@ -3208,6 +3209,113 @@
     "largo": 145
    },
    "ficha_id": "t-aaronjaureguii"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|22|2026-11-26T17:30:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 22,
+  "dueAt": "2026-11-26T17:30:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-26/toma-022-5464fd08.mp4",
+  "estado": "creado",
+  "post_id": "6b086762ce64081689d8787b",
+  "intento": "98189b0a5ae241d081bfb9c57deef2f7",
+  "registrado": true,
+  "texto": "Toma 022. A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.\n\n🎥 twitch.tv/srserpiente\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 22,
+    "gancho": "Explorando el horizonte de Leonida",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-srserpiente",
+    "caption": "A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.",
+    "frase": "Hay un pantano",
+    "hablante": "SRSERPIENTE",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/srserpiente",
+    "id_origen": "SneakyCrepuscularSpiderSSSsss-YImljuwDFjIBTExv",
+    "claves": [
+     "SneakyCrepuscularSpiderSSSsss-YImljuwDFjIBTExv"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 022. A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.\n\n🎥 twitch.tv/srserpiente\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/srserpiente",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 022. A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.\n\n🎥 twitch.tv/srserpiente\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 136
+   },
+   "ficha_id": "t-srserpiente"
+  }
+ },
+ {
+  "id": "reels|22|2026-11-26T17:30:00.000Z",
+  "plataforma": "reels",
+  "toma": 22,
+  "dueAt": "2026-11-26T17:30:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-26/toma-022-5464fd08.mp4",
+  "estado": "creado",
+  "post_id": "6b086762c81617797dc8a7f2",
+  "intento": "ba4f6a72429c41eb9b22c020193fd380",
+  "registrado": true,
+  "texto": "Toma 022. A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.\n\n🎥 twitch.tv/srserpiente\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 22,
+    "gancho": "Explorando el horizonte de Leonida",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-srserpiente",
+    "caption": "A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.",
+    "frase": "Hay un pantano",
+    "hablante": "SRSERPIENTE",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/srserpiente",
+    "id_origen": "SneakyCrepuscularSpiderSSSsss-YImljuwDFjIBTExv",
+    "claves": [
+     "SneakyCrepuscularSpiderSSSsss-YImljuwDFjIBTExv"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 022. A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.\n\n🎥 twitch.tv/srserpiente\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/srserpiente",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 022. A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.\n\n🎥 twitch.tv/srserpiente\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 139
+   },
+   "ficha_id": "t-srserpiente"
   }
  }
 ]

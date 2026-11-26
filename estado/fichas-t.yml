@@ -128,7 +128,7 @@
   origen: twitch
   twitch_login: taisontv
   broadcaster_id: '115156753'
-  seguidores: 165621
+  seguidores: 165622
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -169,7 +169,7 @@
   origen: twitch
   twitch_login: zyrpesland
   broadcaster_id: '512025628'
-  seguidores: 160102
+  seguidores: 160106
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -251,7 +251,7 @@
   origen: twitch
   twitch_login: lamejorclase
   broadcaster_id: '598808171'
-  seguidores: 66856
+  seguidores: 66861
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -333,7 +333,7 @@
   origen: twitch
   twitch_login: srserpiente
   broadcaster_id: '30805171'
-  seguidores: 169044
+  seguidores: 169042
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -374,7 +374,7 @@
   origen: twitch
   twitch_login: flowstreetvi
   broadcaster_id: '175772774'
-  seguidores: 18778
+  seguidores: 18782
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -576,7 +576,7 @@
   origen: twitch
   twitch_login: aaronjaureguii
   broadcaster_id: '1382351624'
-  seguidores: 38343
+  seguidores: 38354
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -1143,8 +1143,8 @@
   origen: twitch
   twitch_login: ishika
   broadcaster_id: '157248383'
-  seguidores: 30241
-  seguidores_leidos: '2026-11-24'
+  seguidores: 30253
+  seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1170,7 +1170,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-26'
+  vence: '2026-11-28'
   estado: vigente
   uso: produccion
   publicable: true
@@ -1184,7 +1184,7 @@
   origen: twitch
   twitch_login: agustinitita
   broadcaster_id: '547214346'
-  seguidores: 35878
+  seguidores: 35885
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -1225,8 +1225,8 @@
   origen: twitch
   twitch_login: suzyroxx
   broadcaster_id: '417684519'
-  seguidores: 182899
-  seguidores_leidos: '2026-11-25'
+  seguidores: 182889
+  seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1252,7 +1252,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-27'
+  vence: '2026-11-28'
   estado: vigente
   uso: produccion
   publicable: true
@@ -2163,7 +2163,7 @@
   origen: twitch
   twitch_login: ikiimartin
   broadcaster_id: '484249913'
-  seguidores: 110942
+  seguidores: 110946
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -2853,7 +2853,7 @@
   origen: twitch
   twitch_login: franbeuve
   broadcaster_id: '1132877357'
-  seguidores: 54419
+  seguidores: 54418
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -3140,7 +3140,7 @@
   origen: twitch
   twitch_login: knooby
   broadcaster_id: '276541628'
-  seguidores: 19965
+  seguidores: 19970
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -3386,7 +3386,7 @@
   origen: twitch
   twitch_login: donangelillo
   broadcaster_id: '513440587'
-  seguidores: 33981
+  seguidores: 33984
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -4452,7 +4452,7 @@
   origen: twitch
   twitch_login: mysticentwitch
   broadcaster_id: '661542274'
-  seguidores: 43333
+  seguidores: 43332
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -4493,8 +4493,8 @@
   origen: twitch
   twitch_login: gordoliv
   broadcaster_id: '126394685'
-  seguidores: 24838
-  seguidores_leidos: '2026-11-25'
+  seguidores: 24837
+  seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -4520,7 +4520,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-27'
+  vence: '2026-11-28'
   estado: vigente
   uso: produccion
   publicable: true
@@ -6666,7 +6666,7 @@
   origen: twitch
   twitch_login: xurreriaivette
   broadcaster_id: '522351847'
-  seguidores: 11089
+  seguidores: 11091
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -6748,7 +6748,7 @@
   origen: twitch
   twitch_login: eljosecilloo
   broadcaster_id: '925133545'
-  seguidores: 3263
+  seguidores: 3267
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
