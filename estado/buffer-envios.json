@@ -2831,7 +2831,8 @@
     "largo": 132
    },
    "ficha_id": "t-elvisayomastercard"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|19|2026-11-26T01:00:00.000Z",
@@ -2884,7 +2885,8 @@
     "largo": 132
    },
    "ficha_id": "t-elvisayomastercard"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|19|2026-11-26T01:00:00.000Z",
@@ -2937,6 +2939,166 @@
     "largo": 135
    },
    "ficha_id": "t-elvisayomastercard"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "shorts|20|2026-11-26T04:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 20,
+  "dueAt": "2026-11-26T04:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-25/toma-020-05e02f12.mp4",
+  "estado": "creado",
+  "post_id": "6b07a1bbd4eda4b659d1ad8d",
+  "intento": "5b02b2e809e24a478d15a6c9564f049c",
+  "registrado": true,
+  "texto": "Toma 020. Un susto inesperado entra por los audífonos en plena misión de GTA 6.\n\n🎥 twitch.tv/josefattv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 20,
+    "gancho": "Sticker ruidoso asusta al streamer",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-josefattv",
+    "caption": "Un susto inesperado entra por los audífonos en plena misión de GTA 6.",
+    "frase": "El Emmy me mandó...",
+    "hablante": "JOSEFATTV",
+    "campana": "",
+    "duracion_s": 11.5,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/josefattv",
+    "id_origen": "DignifiedHelpfulWatermelonPogChamp-w-j59cJ4rSNeimRM",
+    "claves": [
+     "DignifiedHelpfulWatermelonPogChamp-w-j59cJ4rSNeimRM"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 020. Un susto inesperado entra por los audífonos en plena misión de GTA 6.\n\n🎥 twitch.tv/josefattv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 020. Un susto inesperado entra por los audífonos en plena misión de GTA 6.",
+    "credito": "🎥 twitch.tv/josefattv",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 020. Un susto inesperado entra por los audífonos en plena misión de GTA 6.\n\n🎥 twitch.tv/josefattv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 134
+   },
+   "ficha_id": "t-josefattv"
+  }
+ },
+ {
+  "id": "tiktok|20|2026-11-26T04:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 20,
+  "dueAt": "2026-11-26T04:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-25/toma-020-05e02f12.mp4",
+  "estado": "creado",
+  "post_id": "6b07a1bcb8e2338b858586c3",
+  "intento": "5e8786c2bfd34856becf3d7376a0cd68",
+  "registrado": true,
+  "texto": "Toma 020. Un susto inesperado entra por los audífonos en plena misión de GTA 6.\n\n🎥 twitch.tv/josefattv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 20,
+    "gancho": "Sticker ruidoso asusta al streamer",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-josefattv",
+    "caption": "Un susto inesperado entra por los audífonos en plena misión de GTA 6.",
+    "frase": "El Emmy me mandó...",
+    "hablante": "JOSEFATTV",
+    "campana": "",
+    "duracion_s": 11.5,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/josefattv",
+    "id_origen": "DignifiedHelpfulWatermelonPogChamp-w-j59cJ4rSNeimRM",
+    "claves": [
+     "DignifiedHelpfulWatermelonPogChamp-w-j59cJ4rSNeimRM"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 020. Un susto inesperado entra por los audífonos en plena misión de GTA 6.\n\n🎥 twitch.tv/josefattv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/josefattv",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 020. Un susto inesperado entra por los audífonos en plena misión de GTA 6.\n\n🎥 twitch.tv/josefattv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 134
+   },
+   "ficha_id": "t-josefattv"
+  }
+ },
+ {
+  "id": "reels|20|2026-11-26T04:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 20,
+  "dueAt": "2026-11-26T04:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-25/toma-020-05e02f12.mp4",
+  "estado": "creado",
+  "post_id": "6b07a1bcb8e2338b858586f4",
+  "intento": "997f8519c9384a30a6544e36be9d82a4",
+  "registrado": true,
+  "texto": "Toma 020. Un susto inesperado entra por los audífonos en plena misión de GTA 6.\n\n🎥 twitch.tv/josefattv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 20,
+    "gancho": "Sticker ruidoso asusta al streamer",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-josefattv",
+    "caption": "Un susto inesperado entra por los audífonos en plena misión de GTA 6.",
+    "frase": "El Emmy me mandó...",
+    "hablante": "JOSEFATTV",
+    "campana": "",
+    "duracion_s": 11.5,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/josefattv",
+    "id_origen": "DignifiedHelpfulWatermelonPogChamp-w-j59cJ4rSNeimRM",
+    "claves": [
+     "DignifiedHelpfulWatermelonPogChamp-w-j59cJ4rSNeimRM"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 020. Un susto inesperado entra por los audífonos en plena misión de GTA 6.\n\n🎥 twitch.tv/josefattv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/josefattv",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 020. Un susto inesperado entra por los audífonos en plena misión de GTA 6.\n\n🎥 twitch.tv/josefattv\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 137
+   },
+   "ficha_id": "t-josefattv"
   }
  }
 ]

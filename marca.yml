@@ -22,7 +22,7 @@ fuente:
     italic: marca/fuentes/CourierPrime-Italic.ttf
     bolditalic: marca/fuentes/CourierPrime-BoldItalic.ttf
 toma:
-  contador: 20                   # sube en 1 con cada clip publicado
+  contador: 21                   # sube en 1 con cada clip publicado
 movimiento:
   transiciones: ninguna         # sólo corte seco
   zoom_automatico: false
