@@ -31,7 +31,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from . import detectar as mod_detectar
-from . import informativa, plazo, publicar, puertas, red, registro, retiros
+from . import informativa, plazo, publicar, puertas, red, registro, retiros, shorts
 from . import validar as mod_validar
 from .almacen import Almacen, ErrorAlmacen
 from .config import cargar_yaml, raiz_repo
@@ -737,6 +737,14 @@ def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer
         for plat in destinos:            # todo se valida ANTES de subir
             try:
                 publicar.validar_futuro(cuando, reloj())
+                if plat == "shorts":       # A-20261125-1: Buffer gratis, 2 Shorts por canal cada 24 h
+                    ok, motivo = shorts.admite(_libro(raiz), toma.ficha, cuando, reloj(), shorts.config(raiz),
+                                               lambda pid: pub.estado(pid, pub.orgs.get("shorts")))
+                    if not ok:
+                        out(f"shorts: no se crea el post ({motivo}); esta toma sale sólo en las otras redes")
+                        fallo(plat)
+                        continue
+                    out(f"shorts: {motivo}")
                 claves = set(toma.toma.get("claves") or []) | ({toma.toma["id_origen"]} if toma.toma.get("id_origen") else set())
                 choque = claves & claves_recientes(raiz, plat, cuando, hz["no_repetir_horas"])
                 if choque:

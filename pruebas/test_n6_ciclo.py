@@ -61,7 +61,15 @@ def r(repo):
     cambiar_modo(repo, "vivo", ["shorts"])
     with open(repo / "fuentes.yml", "a", encoding="utf-8") as f:
         f.write(FICHA)
+    cambiar_shorts(repo, desde="00:00", max_24h=99)   # pruebas de la fábrica y del ritmo, no del cupo de Shorts (A-20261125-1)
     return repo
+
+
+def cambiar_shorts(repo, **valores):
+    ruta = repo / "config" / "horarios.yml"
+    d = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    d["shorts"] = {**(d.get("shorts") or {}), **valores}
+    ruta.write_text(yaml.safe_dump(d, allow_unicode=True), encoding="utf-8")
 
 
 def cambiar_modo(repo, modo, activas):
@@ -463,6 +471,27 @@ def test_prueba_hasta_3_candidatos_y_cae_al_respaldo(r, monkeypatch):
     cod, sal = correr(r, cands=[cand(f"c{i}") for i in range(5)], hacer=hacer)
     assert len(hacer.llamadas) == 3
     assert filas(r)[0]["pilar"] == "informativa"
+
+
+def test_shorts_de_manana_sin_campana_no_crea_post(r, monkeypatch):
+    # A-20261125-1: antes de las 13:00 sólo las tomas de campaña van a Shorts; la informativa no lo es.
+    cambiar_shorts(r, desde="13:00")
+    monkeypatch.setattr(ciclo.informativa, "armar", armar_falso)
+    cod, sal = correr(r, cands=[], hacer=Hacer(r))
+    assert "shorts: no se crea el post (antes de las 13:00" in sal
+    assert filas(r) == []
+
+
+def test_shorts_con_el_cupo_lleno_no_crea_post(r):
+    # A-20261125-1: 2 Shorts en las últimas 24 h (ventana móvil) -> la toma no va a Shorts.
+    cambiar_shorts(r, max_24h=2)
+    (r / "estado").mkdir(exist_ok=True)
+    envios = [{"id": f"shorts|{n}|x", "plataforma": "shorts", "toma": n, "estado": "creado", "post_id": None,
+               "dueAt": f"2026-11-18T{h}:00:00.000Z", "registrado": True} for n, h in ((1, "02"), (2, "14"))]
+    (r / "estado" / "buffer-envios.json").write_text(json.dumps(envios), encoding="utf-8")
+    cod, sal = correr(r, cands=[cand("c1")], hacer=Hacer(r))
+    assert "shorts: no se crea el post (cupo lleno: 2 de 2" in sal
+    assert filas(r) == []
 
 
 def test_el_primer_candidato_ok_es_la_toma_y_no_se_siguen_probando(r):

@@ -63,7 +63,7 @@ class Lista:
 def test_la_config_real_pone_primero_el_modelo_que_respondio_en_4_s():
     assert CFG_REAL["modelo"] == "gemini-3-flash-preview"
     assert CFG_REAL["modelos_respaldo"] == ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.7-flash"]
-    assert (CFG_REAL["tiempo_por_intento_s"], CFG_REAL["tope_ojos_s"], CFG_REAL["respaldos_por_falla"]) == (90, 300, 4)
+    assert (CFG_REAL["tiempo_por_intento_s"], CFG_REAL["tope_ojos_s"], CFG_REAL["respaldos_por_falla"]) == (60, 180, 4)
     assert CFG_REAL["listar_modelos"] is True and CFG_REAL["sin_ia"] == {"activo": True, "max_por_ciclo": 1, "duracion_objetivo_s": 20}
 
 

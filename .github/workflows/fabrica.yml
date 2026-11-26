@@ -254,17 +254,8 @@ jobs:
       - name: Enviar enlaces a Content Rewards
         if: ${{ steps.hay.outputs.hay == 'si' }}
         timeout-minutes: 18
-        env:
-          CR_CAPTURAS: ${{ runner.temp }}/cr
+        # Sin capturas (25 nov): el repo es público y una captura con la sesión de Kevin no puede ir a un artefacto.
         run: python -m fabrica.enviar_cr
-      - name: Capturas del robot
-        if: ${{ always() && steps.hay.outputs.hay == 'si' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: capturas-cr
-          path: ${{ runner.temp }}/cr
-          retention-days: 1
-          if-no-files-found: ignore
       - name: Guardar resultado (y alerta si la sesión venció)
         if: ${{ always() && steps.hay.outputs.hay == 'si' }}
         run: |

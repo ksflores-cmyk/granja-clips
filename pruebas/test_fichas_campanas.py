@@ -15,7 +15,9 @@ CAMPANAS = {
     "sega-black-friday": ("1391fb95-e8a3-4f0b-b146-d0d786e6aee0", "SEGA - Steam Black Friday Sale Clipping"),
     "cod-mw4-dmz-intel": ("a1cefc3b-4533-438f-8e70-a7299550f1cf", "Call of Duty - MW4 DMZ Intel Briefing Clipping"),
     "reach-expedia-speed": ("03bda4fd-3474-4b1e-a914-88aaf3ac8372", "$8,000 IShowSpeed x Expedia Clipping Campaign"),
+    "yourrage-pool": ("2064cdb1-4357-4380-b99c-119c5b320d31", "YourRAGE $7,500 Pool Campaign"),     # 25 nov
 }
+LEIDO = {"sega-black-friday": "2026-11-25", "yourrage-pool": "2026-11-25"}     # brief completo del 25 nov
 
 
 def fichas() -> dict:
@@ -36,11 +38,12 @@ def test_ficha_nueva_con_id_nombre_exacto_y_pagina(reales, fid):
     assert f["tipo"] == "A" and f["uso"] == "produccion"
     assert f["cr_campaign_id"] == cr_id and f["campana"] == nombre
     assert f["permiso_url"] == enviar_cr.BASE + cr_id
-    assert str(f["permiso_leido"]) == "2026-11-21"
+    assert str(f["permiso_leido"]) == LEIDO.get(fid, "2026-11-21")
     for c in ("tarifa_usd_por_mil", "minimo_por_clip_usd", "tope_por_clip_usd", "presupuesto_restante",
               "presupuesto_total", "vence"):
         assert f.get(c) is not None, c
     assert 0 <= f["presupuesto_restante"] <= f["presupuesto_total"]
+    assert date.fromisoformat(str(f["vence"])) >= HOY
     r = f["reglas"]
     for c in ("duracion_s", "plataformas", "divulgacion", "idioma", "audiencia", "contenido"):
         assert r.get(c), c
@@ -63,7 +66,9 @@ def test_sega_reglas_del_brief(reales):
     assert r["plataformas"] == ["shorts", "tiktok", "reels"]
     assert r["divulgacion"] in ("#Ad", "#Advertisement", "#Sponsored")
     assert r["etiquetas_por_red"] == {"tiktok": ["@sega_west"], "shorts": ["@sega_west"], "reels": ["@sega"]}
-    assert f["tarifa_por_red"] == {"reels": 3.5, "tiktok": 2.0, "shorts": 2.0}
+    assert f["tarifa_por_red"] == {"reels": 4.5, "tiktok": 5.0, "shorts": 5.0}     # página con la sesión, 25 nov
+    assert str(f["vence"]) == "2026-11-30"                                          # fin de la oferta de Steam
+    assert r["sin_musica"] is True and r["sin_voz_ia"] is True and "Frame.io" in f["motivo_pausa"]
     assert (f["tope_por_clip_usd"], f["presupuesto_total"]) == (800, 12000)
     assert "Steam" in r["contenido"] and "tiempo limitado" in r["contenido"]
     assert "Pakistán" in r["audiencia"]
@@ -91,7 +96,7 @@ def test_expedia_pausada_por_presupuesto_y_choques_con_la_marca(reales):
 def test_ids_y_nombres_de_campana_unicos(reales):
     ids = [f["cr_campaign_id"] for f in reales.values() if f.get("cr_campaign_id")]
     nombres = [f["campana"] for f in reales.values() if f.get("cr_campaign_id")]
-    assert len(ids) == len(set(ids)) == 4 and len(nombres) == len(set(nombres))
+    assert len(ids) == len(set(ids)) == 5 and len(nombres) == len(set(nombres))
     assert all(re.fullmatch(r"[0-9a-f-]{36}", i) for i in ids)
 
 
@@ -279,5 +284,26 @@ def test_workflow_brief_cr_pasa_el_secreto_por_env_y_lee_las_tres():
 
 def test_brief_cr_no_sube_nada_publico():
     # Repo público (revisión de Codex, 22 nov): una página abierta con la sesión de Kevin no deja artefactos.
-    texto = (RAIZ_REAL / ".github" / "workflows" / "brief-cr.yml").read_text(encoding="utf-8")
-    assert "upload-artifact" not in texto
+    # Desde el 25 nov sólo se admite UN artefacto, cifrado con la llave pública de quien lanza la corrida.
+    import yaml
+    wf = yaml.safe_load((RAIZ_REAL / ".github" / "workflows" / "brief-cr.yml").read_text(encoding="utf-8"))
+    pasos = wf["jobs"]["leer"]["steps"]
+    subidas = [p for p in pasos if str(p.get("uses", "")).startswith("actions/upload-artifact")]
+    assert len(subidas) <= 1
+    for p in subidas:
+        assert p.get("if") == "inputs.llave_publica != ''"
+        assert p["with"]["path"].endswith("/cifrado")
+        assert int(p["with"]["retention-days"]) <= 1
+    if subidas:
+        cifrar = next(p for p in pasos if p.get("name") == "Cifrar")
+        assert cifrar.get("if") == "inputs.llave_publica != ''"
+        assert pasos.index(cifrar) < pasos.index(subidas[0])
+        assert "rm -rf briefs" in cifrar["run"] and "shred -u clave.bin briefs.tgz" in cifrar["run"]
+        assert "rsa_padding_mode:oaep" in cifrar["run"]
+
+
+def test_robot_cr_no_sube_capturas():
+    # 25 nov: una captura con la sesión de Kevin no puede ir a un artefacto (repo público).
+    for wf in ("fabrica.yml", "enviar-cr.yml"):
+        texto = (RAIZ_REAL / ".github" / "workflows" / wf).read_text(encoding="utf-8")
+        assert "capturas-cr" not in texto and "CR_CAPTURAS" not in texto and "--capturas" not in texto

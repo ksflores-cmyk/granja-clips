@@ -142,36 +142,72 @@
 - id: sega-black-friday
   tipo: A
   creador: "SEGA (venta Black Friday en Steam)"
-  origen: drive              # el «1 file» del brief (bloqueado hasta unirse); por confirmar si es Drive o YouTube
+  origen: web                # carpeta oficial del brief en Frame.io (12 archivos, 515,89 MB; 9x16, 16x9 y 1x1 de 15 y 30 s)
   canal_id: null
-  permiso_url: "https://contentrewards.com/c/campaigns/1391fb95-e8a3-4f0b-b146-d0d786e6aee0"
+  permiso_url: "https://contentrewards.com/c/campaigns/1391fb95-e8a3-4f0b-b146-d0d786e6aee0"   # Kevin se unió el 25 nov 2026, 7:14 p. m. GT
   cr_campaign_id: 1391fb95-e8a3-4f0b-b146-d0d786e6aee0
-  permiso_leido: 2026-11-21
+  permiso_leido: 2026-11-25   # brief y carpeta oficial: sólo para miembros; no se anotan aquí (repo público). Se leen con brief-cr cifrado
   juego: "SEGA Steam Black Friday Sale"
   reglas:
-    duracion_s: [10, 60]     # la página pública no da duración; confirmar en el documento del brief
+    duracion_s: [10, 30]     # el brief pide 10 s como mínimo; el material oficial dura 15 o 30 s
     plataformas: [shorts, tiktok, reels]
     etiquetas_obligatorias: []
     etiquetas_por_red: {tiktok: ["@sega_west"], shorts: ["@sega_west"], reels: ["@sega"]}
-    divulgacion: "#Ad"       # el brief acepta #Ad, #Advertisement o #Sponsored
-    idioma: en               # inglés vale dentro de la misma marca Guion Vivo
-    audiencia: "TikTok y YouTube: no pagan vistas de Pakistán, India, Bangladesh ni sin dato de país; Instagram sin regla de país"
-    contenido: "Clip del video oficial «SEGA Black Friday Sale»: mostrar los juegos prioritarios y dejar claro que la venta es en Steam y por tiempo limitado"
+    divulgacion: "#Ad"       # en su propia línea, justo después del texto, y como primer hashtag (también valen #Advertisement o #Sponsored)
+    max_hashtags_extra: 3    # relacionados con el contenido, después de #Ad
+    idioma: en               # «English content only»: texto en pantalla y caption en inglés
+    sin_musica: true         # sólo el audio del material oficial
+    sin_voz_ia: true
+    audiencia: "Al menos 50 % de audiencia de EE. UU. y Canadá (la página o la publicación). TikTok y YouTube no pagan vistas de Pakistán, India, Bangladés ni sin dato de país"
+    contenido: "Sólo metraje de la carpeta oficial (lo de fuera se rechaza). Mostrar los juegos prioritarios y dejar claro que la venta es en Steam por tiempo limitado. Precios o descuentos sólo si salen en el video oficial. Nada de datos, cifras o fechas inventadas; un tráiler no es «gameplay»"
+    rendimiento: "0,50 % de interacción como mínimo (5 likes por cada 1.000 vistas); likes visibles; la publicación sigue arriba 30 días; el mismo video no más de 5 veces"
   pilares: [momentos]
   campana: "SEGA - Steam Black Friday Sale Clipping"
-  tarifa_usd_por_mil: 2.0
-  tarifa_por_red: {reels: 3.5, tiktok: 2.0, shorts: 2.0}   # TikTok y YouTube «hasta» US$2 según país
-  minimo_por_clip_usd: 4     # Instagram US$3,50
+  tarifa_usd_por_mil: 5.0
+  tarifa_por_red: {reels: 4.5, tiktok: 5.0, shorts: 5.0}   # TikTok y YouTube «hasta» US$5 según país
+  minimo_por_clip_usd: 4.5   # TikTok y YouTube US$5
   tope_por_clip_usd: 800
   presupuesto_total: 12000
-  presupuesto_restante: 11933   # 21 nov 2026, 3:40 GMT
-  vence: 2026-12-31          # sin fecha de cierre publicada; la venta es por tiempo limitado: revisar cada semana
+  presupuesto_restante: 5657    # 26 nov 2026, 1:53 GMT (página con la sesión)
+  vence: 2026-11-30          # la oferta de Steam termina el 30 nov a las 12:00 p. m. GT (aviso A-20261125-2)
   estado: pausada
-  motivo_pausa: "El único material permitido (el video oficial, «1 file» del brief) está bloqueado tras la sesión de Kevin y no se pudo leer ni copiar: la página pública no trae enlaces y Para reanudar: correr el workflow brief-cr, copiar el video del enlace oficial al release fuentes-sega-black-friday, añadir material y poner estado vigente y publicable true."
+  motivo_pausa: "Brief completo leído el 25 nov (brief-cr cifrado). Choca con lo que la fábrica sabe hacer hoy: exige contenido sólo en inglés (texto en pantalla y caption) y la fábrica escribe en español (la puerta de textos descarta ganchos en inglés); exige 50 % de audiencia de EE. UU. y Canadá (Guion Vivo es latinoamericana) y el material vive en Frame.io (falta copiarlo). Para reanudar: modo inglés de campaña, copia del material oficial 9x16 y estado vigente con publicable true antes del 30 nov 12:00 GT."
   uso: produccion
   publicable: false
   envio: manual
-  notas: "Clipping Culture. Página pública leída el 21 nov 2026: «Accepting clips», 8 creadores, US$67 de US$12,000 usados. Brief: «Clip the official SEGA Black Friday Sale video. Show the priority games. Make it clear the sale is on Steam for a limited time.» Caption con #Ad/#Advertisement/#Sponsored; @sega_west en TikTok y YouTube, @sega en Instagram (reglas de texto que el jefe vio con la sesión de Kevin el 20 nov; el enlace del video no quedó anotado)."
+  notas: "Clipping Culture. Página con la sesión (25 nov): «Se unió», 41 clippers, US$6.343 de US$12.000 usados. Carpeta oficial en Frame.io (enlace del brief, «Download All» activo; no se anota: repo público). Prohibido: música añadida, voces IA, profanidad, ganchos exagerados o rage bait, promoción pagada (expulsión permanente), borrar antes de 30 días, likes ocultos. Dudas: equipo de Clipping Culture, no SEGA."
+
+- id: yourrage-pool
+  tipo: A
+  creador: "YourRAGE (Reach)"
+  origen: twitch
+  canal_id: null
+  permiso_url: "https://contentrewards.com/c/campaigns/2064cdb1-4357-4380-b99c-119c5b320d31"   # Kevin se unió el 25 nov 2026, 7:14 p. m. GT
+  cr_campaign_id: 2064cdb1-4357-4380-b99c-119c5b320d31
+  permiso_leido: 2026-11-25   # reglas completas en el material de referencia de la campaña (brief-cr cifrado)
+  juego: "YourRAGE (streams y redes)"
+  reglas:
+    duracion_s: [10, 60]     # la página no da duración; confirmar en «Rules & requirements» de Reach
+    plataformas: [shorts, tiktok, reels]
+    etiquetas_obligatorias: ["#YourRAGE"]
+    divulgacion: "por confirmar"
+    idioma: en
+    audiencia: "por confirmar en las reglas de Reach"
+    contenido: "Clips de las redes de YourRAGE (Twitch yourragegaming, YouTube @YourRAGEGaming, Instagram yourrage, X YourRAGEz)"
+  pilares: [momentos]
+  campana: "YourRAGE $7,500 Pool Campaign"
+  tarifa_usd_por_mil: 0      # bolsa de US$7.500 repartida por vistas al cerrar la marca
+  minimo_por_clip_usd: 0
+  tope_por_clip_usd: 0       # bolsa: no hay tope por clip
+  presupuesto_total: 7500
+  presupuesto_restante: 7500
+  vence: 2026-12-31          # sin fecha publicada
+  estado: pausada
+  motivo_pausa: "Bolsa: cada clip necesita 500 vistas para contar y hay que sumar 250.000 vistas aprobadas para entrar al reparto (página con la sesión, 25 nov). Con el alcance de hoy (cientos de vistas por toma) no se llega: no gastar tomas aquí (aviso A-20261125-2). Reabrir si una toma pasa de 50.000 vistas."
+  uso: produccion
+  publicable: false
+  envio: manual
+  notas: "Reach. Página leída el 25 nov 2026 con la sesión: «Se unió», 0 clippers, lanzada hace 3 días; resumen: el caption debe llevar #YourRAGE. Las reglas completas («Rules & requirements» de Reach) siguen sin leer."
 
 - id: cod-mw4-dmz-intel
   tipo: A

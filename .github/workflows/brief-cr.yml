@@ -9,7 +9,11 @@ on:
       campanas:
         description: "cr_campaign_id separados por espacios"
         required: true
-        default: "1391fb95-e8a3-4f0b-b146-d0d786e6aee0 a1cefc3b-4533-438f-8e70-a7299550f1cf 03bda4fd-3474-4b1e-a914-88aaf3ac8372"
+        default: "1391fb95-e8a3-4f0b-b146-d0d786e6aee0 a1cefc3b-4533-438f-8e70-a7299550f1cf 03bda4fd-3474-4b1e-a914-88aaf3ac8372 2064cdb1-4357-4380-b99c-119c5b320d31"
+      llave_publica:
+        description: "Opcional: llave pública RSA (PEM en base64, una línea). Con ella el brief completo sale CIFRADO en el artefacto briefs-cr-cifrado (1 día); sin ella, sólo conteos"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -29,12 +33,42 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt playwright==1.65.2 && python -m playwright install --with-deps chromium
       - name: Leer briefs
-        env:
-          CAMPANAS: ${{ inputs.campanas }}
         run: |
           printf '| campaña | título | enlaces | documentos | pausada | bloqueada |\n|---|---|---|---|---|---|\n' >> "$GITHUB_STEP_SUMMARY"
           args=""; for c in $CAMPANAS; do args="$args --campana $c"; done
-          python -m fabrica.brief_cr $args --salida "$RUNNER_TEMP/briefs"
-      # Sin artefacto (revisión de Codex, 22 nov): el repo es público y los enlaces de una página abierta con la
+          extra=""; [ -n "$LLAVE" ] && extra="--texto-pagina"
+          python -m fabrica.brief_cr $args --salida "$RUNNER_TEMP/briefs" $extra
+        env:
+          CAMPANAS: ${{ inputs.campanas }}
+          LLAVE: ${{ inputs.llave_publica }}
+      # Cifrado (25 nov): el repo es público, así que el texto y los enlaces del brief sólo salen cifrados con la
+      # llave pública de quien lanzó la corrida (AES-256 con llave aleatoria, envuelta con RSA-OAEP). Sin la
+      # llave privada el artefacto no se puede leer. El texto en claro se borra antes de subir nada.
+      - name: Cifrar
+        if: inputs.llave_publica != ''
+        env:
+          LLAVE: ${{ inputs.llave_publica }}
+        run: |
+          set -euo pipefail
+          umask 077
+          cd "$RUNNER_TEMP"
+          printf '%s' "$LLAVE" | base64 -d > llave.pem
+          openssl pkey -pubin -in llave.pem -noout
+          tar czf briefs.tgz briefs && rm -rf briefs
+          mkdir cifrado
+          openssl rand -hex 32 > clave.bin
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in briefs.tgz -out cifrado/briefs.tgz.enc -pass file:clave.bin
+          openssl pkeyutl -encrypt -pubin -inkey llave.pem -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 -in clave.bin -out cifrado/clave.bin.enc
+          shred -u clave.bin briefs.tgz
+          # También en el log, sólo el texto cifrado (la sesión de la nube no alcanza el almacén de artefactos).
+          for f in clave.bin.enc briefs.tgz.enc; do echo "==CIFRADO $f=="; base64 -w0 "cifrado/$f"; echo; echo "==FIN $f=="; done
+      - uses: actions/upload-artifact@v4
+        if: inputs.llave_publica != ''
+        with:
+          name: briefs-cr-cifrado
+          path: ${{ runner.temp }}/cifrado
+          retention-days: 1
+          if-no-files-found: error
+      # Sin llave no hay artefacto (revisión de Codex, 22 nov): el repo es público y los enlaces de una página abierta con la
       # sesión de Kevin pueden llevar parámetros de acceso o materiales sólo para miembros. Aquí sólo queda el
       # resumen con conteos; leer el material del brief se hace desde la PC de Kevin (herramientas/).
