@@ -238,8 +238,9 @@ def test_ninguna_placa_toca_la_zona_de_accion_ni_pasa_el_tope(marca):
     assert placas.problemas_capas(capas, marca) == []
     # dialogo: su borde de abajo queda sobre la franja de las apps; el cierre va en el tercio inferior
     assert all(c["y"] + c["alto"] <= 1920 - marca.m("margen_inferior") for c in capas if c["tipo"].startswith("dialogo"))
-    cierre = next(c for c in capas if c["tipo"] == "cierre")
-    assert cierre["y"] >= acc["y1"] and (cierre["t0"], cierre["t1"]) == (7.5, 8.0)
+    if placas.cierre_con_placa(marca):          # estilo v3: con destello no hay placa de cierre
+        cierre = next(c for c in capas if c["tipo"] == "cierre")
+        assert cierre["y"] >= acc["y1"] and (cierre["t0"], cierre["t1"]) == (7.5, 8.0)
 
 
 def test_tiempos_de_las_placas(marca):

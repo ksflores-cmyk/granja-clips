@@ -494,7 +494,8 @@ def test_ninguna_placa_toca_la_cara_ni_la_zona_de_accion_de_la_division(div, mar
         assert not (c["x"] < accion["x1"] and c["x"] + c["ancho"] > accion["x0"]
                     and c["y"] < accion["y1"] and c["y"] + c["alto"] > accion["y0"]), c["tipo"]
     # los textos de siempre
-    assert geo["capas"][1]["tipo"] == "cabecera" and any(c["tipo"] == "cierre" for c in geo["capas"])
+    assert geo["capas"][1]["tipo"] == "cabecera" and \
+        any(c["tipo"] == "cierre" for c in geo["capas"]) == placas.cierre_con_placa(marca)   # estilo v3: destello
     assert div["plan"]["toma"]["gancho"] == TOMA["gancho"]
 
 
