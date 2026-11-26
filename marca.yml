@@ -108,7 +108,10 @@ pantalla_completa:              # plantilla v2 de las tomas con video: todas las
     relleno_x: 6
     relleno_y: 4
     borde_inferior: 1590        # el borde de abajo del bloque queda sobre la franja de las apps (1600 a 1920)
-  cierre: {tam_corte: 56, alto_corte: 68, tam_credito: 26, alto_credito: 36, relleno_x: 28, relleno_y: 18, borde_inferior: 1560}
+  cierre: {tam_corte: 56, alto_corte: 68, tam_credito: 26, alto_credito: 36, relleno_x: 28, relleno_y: 18, borde_inferior: 1560,
+           estilo: destello,       # estilo v3, punto 2 (Kevin, 25 nov: «Claqueta + destello»): sin placa CORTE., el clip corre entero
+           destello: {duracion_s: 0.2, opacidad: 0.7},     # el cuadro sube a color papel en los últimos 0,2 s
+           sonido: {efecto: claqueta, ganancia_db: -6}}   # nunca en fichas con reglas.sin_musica
   agua: {y: 216}                # el logo de campaña va bajo la mosca, pegado al borde de la zona segura
   lapiz:                        # trazos del lápiz rojo a la escala del gancho compacto
     reserva: 24                 # aire a cada lado del gancho para que el trazo no se salga de la placa

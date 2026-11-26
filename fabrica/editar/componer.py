@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import shutil
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -277,6 +278,59 @@ def orden_ffmpeg_pantalla_completa(*, salida: str, duracion: float, ancho: int, 
         entradas += ["-f", "lavfi", "-t", d, "-i", "anullsrc=r=48000:cl=stereo"]
         mapa_audio = f"{1 + len(placas)}:a"
     return _orden(entradas, filtros, mapa_audio, d, salida)
+
+
+def orden_cierre(*, entrada: str, salida: str, duracion: float, ancho: int, alto: int, color: str,
+                 destello_s: float, opacidad: float, sfx: str | None = None, ganancia_db: float = -6.0,
+                 sonido_s: float = 0.35) -> list[str]:
+    """ffmpeg (función pura) del cierre v3: el cuadro sube a `color` hasta `opacidad` en los últimos `destello_s`
+    segundos (sin cortar ni alargar el clip) y, con `sfx`, el efecto entra `sonido_s` antes del final, mezclado sin
+    normalizar a `ganancia_db`."""
+    d = f"{duracion:g}"
+    st = max(0.0, duracion - destello_s)
+    entradas = ["-i", entrada]
+    filtros = [f"color=c={color}:s={ancho}x{alto}:r=30:d={d},format=rgba,colorchannelmixer=aa={opacidad:g},"
+               f"fade=t=in:st={st:g}:d={destello_s:g}:alpha=1[f]",
+               "[0:v][f]overlay=shortest=1,format=yuv420p[out]"]
+    mapa_audio = "0:a:0"
+    if sfx:
+        entradas += ["-i", sfx]
+        ms = int(round(max(0.0, duracion - sonido_s) * 1000))
+        filtros.append(f"[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume={ganancia_db:g}dB,"
+                       f"adelay={ms}|{ms}[cl]")
+        filtros.append("[0:a:0]aformat=sample_rates=48000:channel_layouts=stereo[ab]")
+        filtros.append("[ab][cl]amix=inputs=2:normalize=0:duration=first[aout]")
+        mapa_audio = "[aout]"
+    return _orden(entradas, filtros, mapa_audio, d, salida)
+
+
+def aplicar_cierre(marca: Marca, mp4: Path, duracion: float, ficha: dict | None, sfx: dict | None,
+                   trabajo: Path) -> dict:
+    """Pasa el MP4 por `orden_cierre` y devuelve lo que va en `plan["cierre"]`. Sin el efecto verificado, o en una
+    ficha con `reglas.sin_musica` (campañas), sólo el destello."""
+    cfg = marca.pc["cierre"]
+    des, son = cfg["destello"], cfg.get("sonido") or {}
+    efecto, motivo = None, None
+    if ((ficha or {}).get("reglas") or {}).get("sin_musica"):
+        motivo = "la ficha tiene sin_musica: sin sonido de cierre"
+    else:
+        disponibles = sfx if sfx is not None else mod_sfx.disponibles(marca.raiz)
+        efecto = disponibles.get(str(son.get("efecto")))
+        if efecto is None:
+            motivo = f"el efecto {son.get('efecto')!r} no está verificado o no se bajó: sólo el destello"
+    tmp = Path(trabajo) / "cierre.mp4"
+    cmd = orden_cierre(entrada=str(mp4), salida=str(tmp), duracion=duracion, ancho=marca.ancho, alto=marca.alto,
+                       color="0x" + marca.datos["colores"]["papel"].lstrip("#"),
+                       destello_s=float(des["duracion_s"]), opacidad=float(des["opacidad"]),
+                       sfx=efecto["ruta"] if efecto else None, ganancia_db=float(son.get("ganancia_db", -6)))
+    subprocess.run(cmd, check=True, timeout=plazo.tiempo_para(180))
+    shutil.move(str(tmp), str(mp4))
+    out = {"estilo": "destello", "duracion_s": float(des["duracion_s"]), "opacidad": float(des["opacidad"]),
+           "sonido": ({"id": efecto["id"], "sha256": efecto["sha256"], "ganancia_db": float(son.get("ganancia_db", -6))}
+                      if efecto else None)}
+    if motivo:
+        out["motivo_sin_sonido"] = motivo
+    return out
 
 
 def _filtros_paneles(paneles: list[dict], ancho: int, alto: int, quitar: str = "") -> list[str]:
@@ -605,6 +659,9 @@ def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], sali
                                              tramos=tramos)
     salida.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(cmd, check=True, timeout=plazo.tiempo_para(300))
+    cierre_plan = None
+    if not placas.cierre_con_placa(marca):         # estilo v3, punto 2: destello y claqueta sobre el final
+        cierre_plan = aplicar_cierre(marca, salida, dur_sal, ficha, sfx if sfx is not None else None, trabajo)
     origen = {"archivo": str(fuente_video), "sha256": sha256_archivo(fuente_video),
               "inicio": inicio, "duracion": duracion, "audio": "original" if info["audio"] else "silencio"}
     if tramos:
@@ -622,6 +679,8 @@ def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], sali
         audio_plan = {**audio_plan, "efectos": efectos}
     plan = plan_json(marca, t, lineas_p, dur_sal, geometria=geo, origen=origen, campana=campana,
                      plantilla=PLANTILLA_V2, audio=audio_plan)
+    if cierre_plan is not None:
+        plan["cierre"] = cierre_plan
     if historia is not None:
         plan["historia"] = (historia.resumen(tramos_h) if tramos_h else
                             {"proveedor": None, "motivo": motivo_h, "intentos": list(historia.intentos)})

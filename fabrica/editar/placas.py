@@ -371,8 +371,14 @@ def construir(marca: Marca, t: Toma, lineas: list, duracion: float, logo: Path |
         if p.t0 >= p.t1:
             raise ValueError(f"el diálogo {i} empieza en {p.t0:g} s, dentro del cierre (desde {tope:g} s)")
         placas.append(p)
-    placas.append(placa_cierre(marca, t, duracion))
+    if cierre_con_placa(marca):
+        placas.append(placa_cierre(marca, t, duracion))
     return placas
+
+
+def cierre_con_placa(marca: Marca) -> bool:
+    """Estilo v3, punto 2: con `pantalla_completa.cierre.estilo: destello` ya no va la placa «CORTE.»."""
+    return marca.pc["cierre"].get("estilo", "placa") != "destello"
 
 
 def problemas_capas(capas: list[dict], marca: Marca, accion: dict | None = None) -> list[str]:

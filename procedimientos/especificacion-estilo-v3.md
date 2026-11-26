@@ -23,12 +23,12 @@ Hoy: placa de papel de 2 a 4 filas con el borde de abajo en y = 1560 (toma 017: 
 
 Hoy: placa «CORTE. / Con: …» encima del último medio segundo (toma 016).
 
-- [ ] Se quita la placa de cierre. El video corre hasta su último cuadro; el crédito ya está en la fila de arriba
+- [x] Se quita la placa de cierre. El video corre hasta su último cuadro; el crédito ya está en la fila de arriba
       («TOMA nnn Con: …») y en el texto de la publicación.
-- [ ] Último 0,2 s: destello color papel que sube de 0 a 70 % y baja (no corta el clip ni lo alarga).
+- [x] Último 0,2 s: destello color papel que sube de 0 a 70 % y baja (no corta el clip ni lo alarga).
 - [ ] Sonido corto de claqueta (< 0,4 s, CC0, verificado como los de `marca/sfx/`) mezclado en el final, a −6 dB bajo
       el audio del clip. Nunca en fichas con `reglas.sin_musica` (campañas): ahí sólo el destello.
-- [ ] Puerta: `cierre_visible` pasa a comprobar el destello y el sonido; ya no exige «CORTE.».
+- [x] Puerta: `cierre_visible` pasa a comprobar el destello y el sonido; ya no exige «CORTE.».
 - [ ] `marca.yml`: `movimiento.transiciones` admite `destello_final`; `sonido.sello_sonoro: claqueta`.
 
 ## 3. Menos zoom y «movimientos de cámara» horizontales
@@ -56,6 +56,10 @@ palabra por palabra en la 013, que además son un estilo que `marca.yml` prohíb
       subtítulos del punto 1 encima, con la transcripción de Whisper o de Gemini.
 - [x] Sin franja fiable (falta, o mide más del 25 % del alto): el clip se descarta y se anota el motivo.
 - [ ] Prueba con la toma 013 como caso de regresión (clip y veredicto guardados sin el video en el repo).
+
+Punto 2 en la PR `claude/clips-estilo-v3b` (26 nov): el destello sube hasta el último cuadro (no baja: funciona como
+fundido a papel); una pasada extra de ffmpeg sobre el MP4 terminado, así vale también con historia. Claqueta: efecto
+`claqueta` (Kenney, CC0) en candidata hasta que el workflow `sfx` lo verifique; mientras, sólo el destello.
 
 Punto 1 en la PR `claude/clips-estilo-v3b` (26 nov): nombre a 28 px (a 24 se leía poco sobre fondo oscuro); la puerta
 de estilo compara la placa con transparencia. Falta la medida de contraste por muestras.
