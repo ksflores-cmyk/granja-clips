@@ -279,5 +279,19 @@ def test_workflow_brief_cr_pasa_el_secreto_por_env_y_lee_las_tres():
 
 def test_brief_cr_no_sube_nada_publico():
     # Repo público (revisión de Codex, 22 nov): una página abierta con la sesión de Kevin no deja artefactos.
-    texto = (RAIZ_REAL / ".github" / "workflows" / "brief-cr.yml").read_text(encoding="utf-8")
-    assert "upload-artifact" not in texto
+    # Desde el 25 nov sólo se admite UN artefacto, cifrado con la llave pública de quien lanza la corrida.
+    import yaml
+    wf = yaml.safe_load((RAIZ_REAL / ".github" / "workflows" / "brief-cr.yml").read_text(encoding="utf-8"))
+    pasos = wf["jobs"]["leer"]["steps"]
+    subidas = [p for p in pasos if str(p.get("uses", "")).startswith("actions/upload-artifact")]
+    assert len(subidas) <= 1
+    for p in subidas:
+        assert p.get("if") == "inputs.llave_publica != ''"
+        assert p["with"]["path"].endswith("/cifrado")
+        assert int(p["with"]["retention-days"]) <= 1
+    if subidas:
+        cifrar = next(p for p in pasos if p.get("name") == "Cifrar")
+        assert cifrar.get("if") == "inputs.llave_publica != ''"
+        assert pasos.index(cifrar) < pasos.index(subidas[0])
+        assert "rm -rf briefs" in cifrar["run"] and "shred -u clave.bin briefs.tgz" in cifrar["run"]
+        assert "rsa_padding_mode:oaep" in cifrar["run"]
