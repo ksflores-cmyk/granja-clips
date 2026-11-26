@@ -39,11 +39,5 @@ jobs:
           REAL: ${{ inputs.real }}
         run: |
           extra=""; [ "$REAL" = "true" ] && extra="--real"
-          python -m fabrica.enviar_cr --url "$URL" --campana "$CAMPANA" --capturas "$RUNNER_TEMP/cr" $extra
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: capturas-cr-prueba
-          path: ${{ runner.temp }}/cr
-          retention-days: 1
-          if-no-files-found: ignore
+          python -m fabrica.enviar_cr --url "$URL" --campana "$CAMPANA" $extra
+      # Sin capturas (25 nov): el repo es público y una captura con la sesión de Kevin no puede ir a un artefacto.

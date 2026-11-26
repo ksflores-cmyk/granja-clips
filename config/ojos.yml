@@ -5,8 +5,8 @@ modelo: gemini-3-flash-preview
 modelos_respaldo: [gemini-3.8-flash, gemini-3.5-flash-lite, gemini-3.1-flash-lite, gemini-3.7-flash]   # los -lite dan 500 llamadas/día (los Flash, 20); listar_modelos salta los que no existan; se prueban en orden si el modelo da 404 o se cae
 max_mb_en_linea: 14      # el video se envía en línea (base64 lo infla un tercio; la API admite 20 MB); si pesa más, se descarta
 temperatura: 0.2
-tiempo_por_intento_s: 90     # tope de cada petición a Gemini (se recorta a lo que quede del presupuesto)
-tope_ojos_s: 300             # presupuesto total de `mirar`: intentos, esperas y todos los modelos
+tiempo_por_intento_s: 60     # tope de cada petición a Gemini (se recorta a lo que quede del presupuesto); 25 nov: 90 -> 60
+tope_ojos_s: 180             # presupuesto total de `mirar`: intentos, esperas y todos los modelos; 25 nov: 300 -> 180 (ojos de 231 y 288 s dejaron el ciclo de las 8:00 sin tiempo)
 respaldos_por_falla: 4       # ante 429/5xx/red persistentes se prueban hasta N modelos más (22 nov: con 2 nunca llegaba a los -lite y gemini-3.7-flash daba 503)
 listar_modelos: true         # antes de mirar, ListModels: se saltan los modelos que no aparecen (nunca bloquea)
 sin_ia:                      # corte sin IA cuando Gemini no está disponible (fabrica/editar/sin_ia.py)

@@ -9,7 +9,7 @@ on:
       campanas:
         description: "cr_campaign_id separados por espacios"
         required: true
-        default: "1391fb95-e8a3-4f0b-b146-d0d786e6aee0 a1cefc3b-4533-438f-8e70-a7299550f1cf 03bda4fd-3474-4b1e-a914-88aaf3ac8372"
+        default: "1391fb95-e8a3-4f0b-b146-d0d786e6aee0 a1cefc3b-4533-438f-8e70-a7299550f1cf 03bda4fd-3474-4b1e-a914-88aaf3ac8372 2064cdb1-4357-4380-b99c-119c5b320d31"
       llave_publica:
         description: "Opcional: llave pública RSA (PEM en base64, una línea). Con ella el brief completo sale CIFRADO en el artefacto briefs-cr-cifrado (1 día); sin ella, sólo conteos"
         required: false

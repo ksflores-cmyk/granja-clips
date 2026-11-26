@@ -13,3 +13,11 @@ cola_buffer_max: 10         # plan gratis de Buffer: 10 programados por canal
 no_repetir_horas: 24
 actions:
   tope_minutos_dia: 300     # repo público desde el 20 nov 2026 (minutos sin tope): alcanza para 6 tomas al día; freno ante un bucle
+# A-20261125-1 (Kevin, 25 nov: «2 Shorts»): Buffer gratis deja 2 Shorts por canal cada 24 h (ventana móvil).
+# Pasado el cupo no se crea el post de Shorts. Criterio de «mejor» en fabrica/shorts.py.
+shorts:
+  max_24h: 2
+  margen_minutos: 10            # holgura sobre las 24 h (Buffer publica con segundos de retraso)
+  desde: "13:00"                # antes, sólo tomas de campaña
+  campana_cualquier_hora: true
+  max_consultas: 4              # estados de Buffer que se piden por toma para descontar los posts en error
