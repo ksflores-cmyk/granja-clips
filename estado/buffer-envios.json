@@ -2993,7 +2993,8 @@
     "largo": 134
    },
    "ficha_id": "t-josefattv"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|20|2026-11-26T04:00:00.000Z",
@@ -3046,7 +3047,8 @@
     "largo": 134
    },
    "ficha_id": "t-josefattv"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|20|2026-11-26T04:00:00.000Z",
@@ -3099,6 +3101,7 @@
     "largo": 137
    },
    "ficha_id": "t-josefattv"
-  }
+  },
+  "ruta_borrada": true
  }
 ]
