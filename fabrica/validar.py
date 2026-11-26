@@ -609,6 +609,10 @@ def _positivos(dato, ruta: str, inf: Informe) -> None:
     rel = "marca.yml: maqueta"
     if isinstance(dato, dict):
         for k, v in dato.items():
+            if k == "estilo" and ruta.endswith(".dialogo"):      # estilo v3: contorno o papel (no es una medida)
+                if v not in ("contorno", "papel"):
+                    inf.error(f"{rel}: {ruta}.estilo debe ser contorno o papel")
+                continue
             _positivos(v, f"{ruta}.{k}", inf)
     elif isinstance(dato, list):
         if not dato:

@@ -10,11 +10,11 @@ PR, nunca se apaga.
 
 Hoy: placa de papel de 2 a 4 filas con el borde de abajo en y = 1560 (toma 017: tapa casi un tercio del panel).
 
-- [ ] Sin placa de papel: Courier Prime en color papel (`#F2EDE3`) con contorno de tinta de 3 px y sombra suave
+- [x] Sin placa de papel: Courier Prime en color papel (`#F2EDE3`) con contorno de tinta de 3 px y sombra suave
       (desplazamiento 2 px, 40 % de opacidad). Nombre del hablante pequeño (24 px), en `lapiz_rojo` con contorno, encima.
-- [ ] Frase de 44 px, como mucho 2 líneas; borde de abajo del bloque en **y = 1590** (sobre la franja de las apps, de
+- [x] Frase de 44 px, como mucho 2 líneas; borde de abajo del bloque en **y = 1590** (sobre la franja de las apps, de
       1600 a 1920). En pantalla dividida, igual: dentro del panel del juego.
-- [ ] El color por voz (`voces:`) sigue: la otra voz va en `lapiz_rojo`.
+- [x] El color por voz (`voces:`) sigue: la otra voz va en `lapiz_rojo`.
 - [ ] Puerta: contraste medido (contorno visible sobre fondo claro y oscuro con 2 muestras), bloque dentro de la zona
       segura y fuera de la zona de acción, área del bloque ≤ 8 % del cuadro.
 - [ ] Muestras nuevas en `marca/muestras/` para que Kevin las vea antes de producción.
@@ -56,6 +56,9 @@ palabra por palabra en la 013, que además son un estilo que `marca.yml` prohíb
       subtítulos del punto 1 encima, con la transcripción de Whisper o de Gemini.
 - [x] Sin franja fiable (falta, o mide más del 25 % del alto): el clip se descarta y se anota el motivo.
 - [ ] Prueba con la toma 013 como caso de regresión (clip y veredicto guardados sin el video en el repo).
+
+Punto 1 en la PR `claude/clips-estilo-v3b` (26 nov): nombre a 28 px (a 24 se leía poco sobre fondo oscuro); la puerta
+de estilo compara la placa con transparencia. Falta la medida de contraste por muestras.
 
 Punto 4 en la PR `claude/clips-estilo-v3a` (26 nov): además, si el primer candidato trae subtítulos quemados queda de
 reserva y se prueba otro; la historia se apaga en las tomas tapadas (lee tiempos de la fuente original).

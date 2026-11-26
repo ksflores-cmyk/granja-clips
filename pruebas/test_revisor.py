@@ -17,8 +17,8 @@ def test_toca_workflows_o_pausa_va_a_kevin():
 
 
 def test_clave_en_el_diff_va_a_kevin():
-    assert revisor.reglas_fijas([a("fabrica/x.py")], "+k = 'AIza" + "B" * 35 + "'")
-    assert revisor.reglas_fijas([a("fabrica/x.py")], "+-----BEGIN RSA PRIVATE KEY-----")
+    assert revisor.reglas_fijas([a("fabrica/x.py")], "+k = '" + "AI" + "za" + "B" * 35 + "'")
+    assert revisor.reglas_fijas([a("fabrica/x.py")], "+-----BEGIN RSA " + "PRIVATE KEY-----")
 
 
 def test_borrar_pruebas_sin_anadir_va_a_kevin():

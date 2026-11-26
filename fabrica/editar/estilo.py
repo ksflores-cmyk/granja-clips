@@ -259,7 +259,11 @@ def _placas_del_plan(plan: dict, marca: Marca) -> list[placas.Placa]:
 def _comparar_placa(real: Image.Image, placa: placas.Placa, papel: Image.Image) -> dict[str, int]:
     """Discrepancia por región (la placa entera, o sus regiones con nombre) entre el fotograma y la placa esperada."""
     esperado = real.copy()
-    esperado.paste(placa.imagen.convert("RGB"), (placa.x, placa.y))
+    img = placa.imagen
+    if img.mode == "RGBA" and img.getextrema()[3][0] < 255:     # placa con transparencia (diálogo con contorno, v3)
+        esperado.paste(img.convert("RGB"), (placa.x, placa.y), img.getchannel("A"))
+    else:
+        esperado.paste(img.convert("RGB"), (placa.x, placa.y))
     regiones = placa.regiones or {"placa": placa.caja()}
     return {n: discrepancia_local(real, esperado, papel, caja) for n, caja in regiones.items()}
 

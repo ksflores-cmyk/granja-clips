@@ -95,17 +95,19 @@ pantalla_completa:              # plantilla v2 de las tomas con video: todas las
   fila: {tam_toma: 28, tam_credito: 24, separacion: 16}            # TOMA nnn y crédito, siempre en pantalla
   cabecera: {tam_gancho: 44, alto_linea_gancho: 54, tam_escena: 24, alto_escena: 32, espacio_escena: 8}
   mosca: {tam: 24, relleno: 12}
-  dialogo:
+  dialogo:                      # estilo v3, punto 1 (Kevin, 25 nov: «Sin caja, con contorno»): más abajo y sin placa de papel
+    estilo: contorno              # contorno (texto con contorno y sombra sobre el video) o papel (la placa de antes)
+    contorno: {grosor: 3, sombra_px: 2, sombra_opacidad: 0.4}
     columna_dialogo: [120, 960]
-    tam_nombre: 34
-    alto_nombre: 44
+    tam_nombre: 28
+    alto_nombre: 36
     tam_acotacion: 30
     alto_acotacion: 40
-    tam_frase: 38
-    alto_linea_frase: 50
-    relleno_x: 24
-    relleno_y: 18
-    borde_inferior: 1560        # el borde de abajo de la placa queda sobre la franja de las apps (1600 a 1920)
+    tam_frase: 44
+    alto_linea_frase: 54
+    relleno_x: 6
+    relleno_y: 4
+    borde_inferior: 1590        # el borde de abajo del bloque queda sobre la franja de las apps (1600 a 1920)
   cierre: {tam_corte: 56, alto_corte: 68, tam_credito: 26, alto_credito: 36, relleno_x: 28, relleno_y: 18, borde_inferior: 1560}
   agua: {y: 216}                # el logo de campaña va bajo la mosca, pegado al borde de la zona segura
   lapiz:                        # trazos del lápiz rojo a la escala del gancho compacto
