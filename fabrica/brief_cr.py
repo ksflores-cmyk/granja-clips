@@ -60,7 +60,7 @@ def bajar_doc(url: str, abrir=urllib.request.urlopen) -> str:
         return r.read(TOPE_DOC).decode("utf-8", "replace")
 
 
-def leer(page, campaign_id: str, salida: Path, abrir=urllib.request.urlopen) -> dict:
+def leer(page, campaign_id: str, salida: Path, abrir=urllib.request.urlopen, texto_pagina: bool = False) -> dict:
     page.goto(BASE + campaign_id, wait_until="domcontentloaded", timeout=45000)
     page.wait_for_timeout(5000)
     if re.search(r"/(login|sign-?in|auth)", page.url) or "whop.com/login" in page.url:
@@ -72,6 +72,9 @@ def leer(page, campaign_id: str, salida: Path, abrir=urllib.request.urlopen) -> 
     # Repo público (21 nov): ni captura ni texto completo de la página (pueden traer datos de la cuenta de Kevin).
     # Al artefacto sólo van los enlaces útiles y el texto de los Google Docs públicos del brief.
     enlaces = enlaces_utiles(hrefs)
+    if texto_pagina:           # sólo con --texto-pagina, y el workflow lo cifra antes de subirlo (nunca en claro)
+        (salida / f"{campaign_id}-pagina.txt").write_text(cuerpo[:TOPE_DOC], encoding="utf-8")
+        (salida / f"{campaign_id}-enlaces.txt").write_text("\n".join(enlaces) + "\n", encoding="utf-8")
     docs = {}
     for u in enlaces:
         ex = url_texto_doc(u)
@@ -102,6 +105,8 @@ def principal(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="fabrica.brief_cr")
     ap.add_argument("--campana", action="append", required=True)
     ap.add_argument("--salida", required=True)
+    ap.add_argument("--texto-pagina", action="store_true",
+                    help="guarda también el texto de la página y los enlaces (sólo si el workflow cifra la salida)")
     a = ap.parse_args(argv)
     ids = [c.strip().lower() for c in a.campana if c.strip()]
     malos = [c for c in ids if not RE_UUID.match(c)]
@@ -124,7 +129,7 @@ def principal(argv=None) -> int:
             for cid in ids:
                 page = ctx.new_page()
                 try:
-                    r = leer(page, cid, salida)
+                    r = leer(page, cid, salida, texto_pagina=a.texto_pagina)
                     resumen.append(r)
                     print(f"{cid}: {r['titulo'][:80]} — {len(r['enlaces'])} enlaces, {len(r['docs'])} documentos"
                           + (" — PAUSADA" if r["pausada"] else "") + (" — BLOQUEADA" if r["bloqueada"] else ""))
