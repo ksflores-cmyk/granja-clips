@@ -334,7 +334,8 @@ HOLGURA_PANEO_S = (0.0, -0.02, 0.02, -0.04, 0.04)
 
 
 def _x_paneo(recorte: dict, t_rel: float) -> int:
-    return int(math.floor(encuadre.x_en(recorte, t_rel))) // 2 * 2   # como el crop de ffmpeg en yuv420
+    # como el crop de ffmpeg: redondea al entero más cercano (lrint) y baja a par en yuv420
+    return int(round(encuadre.x_en(recorte, t_rel))) // 2 * 2
 
 
 def _xs_candidatas(plan: dict, t: float) -> list[int | None]:

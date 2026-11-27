@@ -462,8 +462,10 @@ def test_la_orden_con_tramos_usa_select_y_atrim_concat():
     o = componer.orden_ffmpeg_pantalla_completa(salida="s.mp4", duracion=3.0, ancho=1080, alto=1920, video=VIDEO,
                                                 placas=[("p.png", 60, 150, 0.0, 2.5)], tramos=tramos)
     filtro = o[o.index("-filter_complex") + 1]
-    assert filtro.startswith("[0:v]fps=30,select='gte(t,-0.016)*lt(t,1.484)+gte(t,2.484)*lt(t,3.984)',"
-                             "setpts=N/FRAME_RATE/TB,crop=")
+    # el crop va antes de quitar los silencios: su `t` es el de la fuente (el paneo del estilo v3 se calcula ahí)
+    assert filtro.startswith("[0:v]fps=30,crop=")
+    assert (",select='gte(t,-0.016)*lt(t,1.484)+gte(t,2.484)*lt(t,3.984)',setpts=N/FRAME_RATE/TB,"
+            in filtro.split(";")[0])
     assert ("[0:a]asplit=2[s0][s1];[s0]atrim=start=0:end=1.5,asetpts=PTS-STARTPTS[x0];"
             "[s1]atrim=start=2.5:end=4,asetpts=PTS-STARTPTS[x1];[x0][x1]concat=n=2:v=0:a=1[a0]") in filtro
     assert o[o.index("[out]") + 1:o.index("[out]") + 3] == ["-map", "[a0]"]
