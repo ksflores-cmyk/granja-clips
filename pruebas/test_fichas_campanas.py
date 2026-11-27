@@ -68,7 +68,7 @@ def test_sega_reglas_del_brief(reales):
     assert r["etiquetas_por_red"] == {"tiktok": ["@sega_west"], "shorts": ["@sega_west"], "reels": ["@sega"]}
     assert f["tarifa_por_red"] == {"reels": 4.5, "tiktok": 5.0, "shorts": 5.0}     # página con la sesión, 25 nov
     assert str(f["vence"]) == "2026-11-30"                                          # fin de la oferta de Steam
-    assert r["sin_musica"] is True and r["sin_voz_ia"] is True and "Frame.io" in f["motivo_pausa"]
+    assert r["sin_musica"] is True and r["sin_voz_ia"] is True and "Kevin la soltó" in f["motivo_pausa"]
     assert (f["tope_por_clip_usd"], f["presupuesto_total"]) == (800, 12000)
     assert "Steam" in r["contenido"] and "tiempo limitado" in r["contenido"]
     assert "Pakistán" in r["audiencia"]

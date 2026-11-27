@@ -1,5 +1,8 @@
 # Especificación: modo inglés de campaña + material de SEGA Black Friday
 
+> **Cancelada el 26 nov 2026 (0:38 GT):** Kevin soltó SEGA. Ninguna de las 3 redes acepta la divulgación nativa por
+> Buffer (aviso A-20261125-4) y él no la pondrá a mano. Queda como referencia si vuelve una campaña en inglés.
+
 Diseño del Project de Clips, 25 nov 2026 (avisos A-20261125-1 y A-20261125-2). Lo construyen Codex y Antigravity;
 revisa el Project. **Plazo duro:** la oferta de Steam termina el **30 nov a las 12:00 p. m. GT**; sin esto antes del
 29 nov, la ficha `sega-black-friday` se queda en `pausada` y se cierra.

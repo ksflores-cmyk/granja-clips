@@ -222,7 +222,8 @@ def test_ninguna_placa_toca_la_zona_de_accion_ni_pasa_el_tope(marca):
     t, lineas = toma_cargada(marca)
     todas = placas.construir(marca, t, lineas, 8.0, RAIZ_REAL / "marca/campanas/fm27/logo.png")
     capas = [p.capa() for p in todas]
-    assert {c["tipo"] for c in capas} >= {"fila", "cabecera", "mosca", "dialogo_1", "dialogo_2", "cierre", "marca_agua"}
+    assert {c["tipo"] for c in capas} >= {"fila", "cabecera", "mosca", "dialogo_1", "dialogo_2", "marca_agua"}
+    assert ("cierre" in {c["tipo"] for c in capas}) == placas.cierre_con_placa(marca)   # estilo v3: destello, sin placa
     acc, seg = marca.pc["zona_accion"], marca.pc["zona_segura"]
     for c in capas:
         assert c["x"] >= seg["x0"] and c["y"] >= seg["y0"] and c["x"] + c["ancho"] <= seg["x1"] \
@@ -237,8 +238,9 @@ def test_ninguna_placa_toca_la_zona_de_accion_ni_pasa_el_tope(marca):
     assert placas.problemas_capas(capas, marca) == []
     # dialogo: su borde de abajo queda sobre la franja de las apps; el cierre va en el tercio inferior
     assert all(c["y"] + c["alto"] <= 1920 - marca.m("margen_inferior") for c in capas if c["tipo"].startswith("dialogo"))
-    cierre = next(c for c in capas if c["tipo"] == "cierre")
-    assert cierre["y"] >= acc["y1"] and (cierre["t0"], cierre["t1"]) == (7.5, 8.0)
+    if placas.cierre_con_placa(marca):          # estilo v3: con destello no hay placa de cierre
+        cierre = next(c for c in capas if c["tipo"] == "cierre")
+        assert cierre["y"] >= acc["y1"] and (cierre["t0"], cierre["t1"]) == (7.5, 8.0)
 
 
 def test_tiempos_de_las_placas(marca):
@@ -510,3 +512,16 @@ def test_el_gancho_ya_no_esta_pasado_gancho_s(marca, tmp_path):
     assert ok, det
     ok, det = estilo.cabecera_visible(mp4, plan, marca)              # este MP4 aún trae el gancho a los 3.5 s
     assert not ok and "gancho fuera" in det
+
+
+def test_orden_cierre_es_pura_y_no_alarga_el_clip():
+    from fabrica.editar import componer as mod
+    o = mod.orden_cierre(entrada="e.mp4", salida="s.mp4", duracion=12.0, ancho=1080, alto=1920, color="0xF2EDE3",
+                         destello_s=0.2, opacidad=0.7, sfx="c.ogg", ganancia_db=-6)
+    g = o[o.index("-filter_complex") + 1]
+    assert "fade=t=in:st=11.8:d=0.2:alpha=1" in g and "aa=0.7" in g and "[out]" in g
+    assert "adelay=11650|11650" in g and "amix=inputs=2:normalize=0:duration=first" in g
+    assert o[o.index("-t") + 1] == "12" and "[aout]" in o
+    sin = mod.orden_cierre(entrada="e.mp4", salida="s.mp4", duracion=12.0, ancho=1080, alto=1920, color="0xF2EDE3",
+                           destello_s=0.2, opacidad=0.7)
+    assert "0:a:0" in sin and "amix" not in sin[sin.index("-filter_complex") + 1]

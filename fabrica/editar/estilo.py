@@ -199,7 +199,7 @@ def _dilatar(mascara: np.ndarray, px: int) -> np.ndarray:
 
 
 def discrepancia_local(real: Image.Image, esperado: Image.Image, papel: Image.Image,
-                       caja: tuple[int, int, int, int]) -> int:
+                       caja: tuple[int, int, int, int], mascara: np.ndarray | None = None) -> int:
     """Máximo de píxeles discrepantes dentro de un bloque de BLOQUE_PX x BLOQUE_PX.
 
     Mapa en gris de |fotograma - esperado| tras un desenfoque de 1 px (quita el ruido de H.264),
@@ -228,6 +228,8 @@ def discrepancia_local(real: Image.Image, esperado: Image.Image, papel: Image.Im
     p = rgb(papel)
     tinta = (np.abs(rgb(esperado) - p).max(axis=2) > DIF_TINTA) | (np.abs(rgb(real) - p).max(axis=2) > DIF_TINTA)
     disc = (np.abs(a - b) > PIXEL_DISCREPANTE) & _dilatar(tinta, DILATAR_TINTA_PX)
+    if mascara is not None:      # placa transparente (diálogo v3): sólo donde la placa pinta, no el video de detrás
+        disc &= mascara[y0:y1, x0:x1]
     h, w = disc.shape
     bl = min(BLOQUE_PX, h, w)
     ii = np.pad(disc.astype(np.int64).cumsum(0).cumsum(1), ((1, 0), (1, 0)))
@@ -259,9 +261,18 @@ def _placas_del_plan(plan: dict, marca: Marca) -> list[placas.Placa]:
 def _comparar_placa(real: Image.Image, placa: placas.Placa, papel: Image.Image) -> dict[str, int]:
     """Discrepancia por región (la placa entera, o sus regiones con nombre) entre el fotograma y la placa esperada."""
     esperado = real.copy()
-    esperado.paste(placa.imagen.convert("RGB"), (placa.x, placa.y))
+    img = placa.imagen
+    mascara = None
+    if placa.tipo.startswith("dialogo") and img.mode == "RGBA" and img.getextrema()[3][0] < 255:   # diálogo v3
+        alfa = img.getchannel("A")
+        esperado.paste(img.convert("RGB"), (placa.x, placa.y), alfa)
+        mascara = np.zeros((real.height, real.width), dtype=bool)
+        a = np.asarray(alfa) > 128              # el trazo de la letra y su contorno, sin la sombra suave
+        mascara[placa.y:placa.y + a.shape[0], placa.x:placa.x + a.shape[1]] = a
+    else:
+        esperado.paste(img.convert("RGB"), (placa.x, placa.y))
     regiones = placa.regiones or {"placa": placa.caja()}
-    return {n: discrepancia_local(real, esperado, papel, caja) for n, caja in regiones.items()}
+    return {n: discrepancia_local(real, esperado, papel, caja, mascara) for n, caja in regiones.items()}
 
 
 def _placas_visibles(video: Path, plan: dict, marca: Marca, pedidas: list[tuple[placas.Placa, float]]) -> tuple[bool, str]:
@@ -488,6 +499,24 @@ def bordes_coinciden(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     return peor < TOL_BORDE, f"franja más distinta {peor:.1f} ({donde or 'ninguna'}; máximo {TOL_BORDE:g})"
 
 
+def _cierre_destello(video: Path, plan: dict, marca: Marca, dur_real: float) -> tuple[bool, str]:
+    """Estilo v3, punto 2: el último fotograma está claramente más cerca del color papel que uno de 0,5 s antes (el
+    destello sube sobre el final sin cortar el clip). Sin placa «CORTE.». El sonido, si va, queda en el plan."""
+    antes = _fotograma(Path(video), max(0.0, dur_real - 0.5))
+    ultimo = _ultimo_fotograma(Path(video))
+    if antes is None or ultimo is None:
+        return False, "no se pudo leer el final del video"
+    papel = np.array(marca.color("papel"), dtype=np.float32)
+    dist = lambda img: float(np.abs(np.asarray(img.convert("RGB"), dtype=np.float32) - papel).mean())  # noqa: E731
+    d0, d1 = dist(antes), dist(ultimo)
+    op = float((plan.get("cierre") or {}).get("opacidad") or 0.7)
+    esperado = d0 * (1 - op)            # con la opacidad completa la distancia al papel baja en esa proporción
+    ok = d1 <= max(esperado * 1.6, d0 * 0.75)
+    son = (plan.get("cierre") or {}).get("sonido")
+    return ok, (f"distancia al papel {d0:.1f} a 0,5 s del final y {d1:.1f} en el último cuadro "
+                f"(esperado ≈ {esperado:.1f}); sonido: {son['id'] if son else 'ninguno'}")
+
+
 def _cierre_v2(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     dur = float(plan.get("duracion") or 0)
     if dur <= 0:
@@ -495,6 +524,8 @@ def _cierre_v2(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
     dur_real = sondear(Path(video))["duracion"]
     if abs(dur_real - dur) > TOL_DURACION_S:
         return False, f"el MP4 dura {dur_real:.2f} s y el plan {dur:.2f} s (tolerancia {TOL_DURACION_S:.2f})"
+    if (plan.get("cierre") or {}).get("estilo") == "destello":
+        return _cierre_destello(video, plan, marca, dur_real)
     try:
         cierre = _del_tipo(_placas_del_plan(plan, marca), "cierre")[0]
     except ValueError as e:
@@ -545,6 +576,31 @@ def _gancho_se_va(video: Path, plan: dict, marca: Marca, cabecera: list[placas.P
     if d is None:
         return False, f"no se pudo leer la fuente en {t:.2f} s"
     return d < UMBRAL_LOGO_EXTRA, f"gancho fuera a los {t:.1f} s: diferencia con la fuente {d:.1f} (máximo {UMBRAL_LOGO_EXTRA:g})"
+
+
+FRANJA_FILA_PX = 48
+
+
+def _fila_sin_texto_de_mas(video: Path, plan: dict, marca: Marca, fila: list[placas.Placa]) -> tuple[bool, str]:
+    """Junto al borde interior de la fila (TOMA y crédito) se ve la fuente, no más placa: un crédito con texto de más
+    se nota aunque su principio coincida. Desde el cierre v3 (sin CORTE.) es el único sitio del crédito en el video."""
+    if not fila or _historia(plan) is not None:
+        return True, ""
+    p = fila[0]
+    x0 = p.x + p.ancho if p.x + p.ancho / 2 < marca.ancho / 2 else max(0, p.x - FRANJA_FILA_PX)
+    ancho = min(FRANJA_FILA_PX, marca.ancho - x0)
+    if ancho <= 4:
+        return True, ""
+    t = _instante_medio(plan, marca, 0.5)
+    real = _fotograma(Path(video), t)
+    if real is None:
+        return False, f"no se pudo leer el fotograma en {t:.2f} s"
+    caja = {"x": x0, "y": p.y, "ancho": ancho, "alto": p.alto}
+    cuerpo = {"x": 0, "y": 0, "ancho": marca.ancho, "alto": marca.alto}
+    d = _mejor_contra_fuente(plan, marca, t, lambda f: _diff_region(real, f, cuerpo, caja), UMBRAL_LOGO_EXTRA)
+    if d is None:
+        return True, "junto a la fila: sin fuente para comparar"
+    return d < UMBRAL_LOGO_EXTRA, f"junto a la fila: diferencia con la fuente {d:.1f} (máximo {UMBRAL_LOGO_EXTRA:g})"
 
 
 def mosca_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
@@ -620,7 +676,8 @@ def cabecera_visible(video: Path, plan: dict, marca: Marca) -> tuple[bool, str]:
         ok2, det2 = _placas_visibles(Path(video), plan, marca,
                                      [(p, _instante_medio(plan, marca, f)) for p in fila for f in (0.3, 0.7)])
         ok3, det3 = _gancho_se_va(Path(video), plan, marca, _del_tipo(esperadas, "cabecera"))
-        return ok and ok2 and ok3, "; ".join(x for x in (det, det2, det3) if x)
+        ok4, det4 = _fila_sin_texto_de_mas(Path(video), plan, marca, fila)
+        return ok and ok2 and ok3 and ok4, "; ".join(x for x in (det, det2, det3, det4) if x)
     try:
         esperado, y_cont = lienzo.cabecera(marca, _toma(plan))
     except ValueError as e:

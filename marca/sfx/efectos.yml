@@ -113,3 +113,14 @@ efectos:
     asset: "laser-corto.ogg"
     sha256: "72b589eadd41781257ac859e4f4d030222e623390e4a1a83f6d05329a6e026f1"
     estado: verificada
+  - id: claqueta            # estilo v3, punto 2 (Kevin, 25 nov: «Claqueta + destello»): golpe seco de libro, suena a claqueta
+    titulo: "Libro que se cierra (claqueta)"
+    autor: "Kenney"
+    pagina: "https://opengameart.org/node/21999"
+    archivo: "RPGsounds_Kenney.zip"
+    zip_miembro: "OGG/bookClose.ogg"
+    licencia: CC0
+    tipo: claqueta
+    asset: "claqueta.ogg"
+    sha256: "81e976532565f4372abd14e83d2684195fa548d0a28d345de221e56052454f32"
+    estado: verificada

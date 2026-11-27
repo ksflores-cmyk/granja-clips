@@ -500,7 +500,9 @@ def test_la_placa_de_la_otra_voz_pinta_en_lapiz_rojo_y_sin_voz_sale_igual_que_an
     assert sin.imagen.tobytes() == objeto.imagen.tobytes() == streamer.imagen.tobytes()
     assert pixeles_de(sin.imagen, marca.color("lapiz_rojo")) == 0
     assert pixeles_de(otra.imagen, marca.color("lapiz_rojo")) > 200
-    assert pixeles_de(otra.imagen, marca.color("tinta")) < pixeles_de(sin.imagen, marca.color("tinta")) // 4
+    # el texto principal: tinta sobre papel (placa) o papel con contorno de tinta (v3, contorno)
+    principal = "papel" if marca.pc["dialogo"].get("estilo") == "contorno" else "tinta"
+    assert pixeles_de(otra.imagen, marca.color(principal)) < pixeles_de(sin.imagen, marca.color(principal)) // 4
     assert otra.caja() == sin.caja()                                       # misma caja y mismos tiempos
     con_objeto = placas.placa_dialogo(marca, 1, Linea(0.5, 2.5, "CHAMÁN", "¿Qué te trae por aquí?", voz="otra"))
     assert con_objeto.imagen.tobytes() == otra.imagen.tobytes()

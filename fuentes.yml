@@ -171,7 +171,7 @@
   presupuesto_restante: 5657    # 26 nov 2026, 1:53 GMT (página con la sesión)
   vence: 2026-11-30          # la oferta de Steam termina el 30 nov a las 12:00 p. m. GT (aviso A-20261125-2)
   estado: pausada
-  motivo_pausa: "Brief completo leído el 25 nov (brief-cr cifrado). Choca con lo que la fábrica sabe hacer hoy: exige contenido sólo en inglés (texto en pantalla y caption) y la fábrica escribe en español (la puerta de textos descarta ganchos en inglés); exige 50 % de audiencia de EE. UU. y Canadá (Guion Vivo es latinoamericana) y el material vive en Frame.io (falta copiarlo). Para reanudar: modo inglés de campaña, copia del material oficial 9x16 y estado vigente con publicable true antes del 30 nov 12:00 GT."
+  motivo_pausa: "Kevin la soltó el 26 nov 2026 (0:38 GT): la divulgación nativa que exigen TikTok, Instagram y YouTube no se puede activar por Buffer y él no la pondrá a mano; sólo YouTube Studio se podría automatizar y no compensa (2 Shorts al día, 50 % de audiencia EE. UU./Canadá, oferta hasta el 30 nov). Además exigía sólo inglés. No reabrir."
   uso: produccion
   publicable: false
   envio: manual
