@@ -31,7 +31,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from . import detectar as mod_detectar
-from . import divulgacion, informativa, plazo, publicar, puertas, red, registro, retiros, shorts
+from . import divulgacion, informativa, plazo, publicar, puertas, recetas, red, registro, retiros, shorts
 from . import validar as mod_validar
 from .almacen import Almacen, ErrorAlmacen
 from .config import cargar_yaml, raiz_repo
@@ -1136,6 +1136,11 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
                 if toma.entrada is not None:
                     informativa.marcar_usada(raiz, toma.entrada["id"])
                 registro.avanzar_toma(raiz)
+                try:          # la receta sirve para rehacer la toma en el video largo semanal
+                    recetas.guardar(raiz, recetas.receta_de(toma.toma, toma.ficha, toma.resultado.plan,
+                                                            toma.candidato, hueco.fecha))
+                except Exception as e:  # noqa: BLE001 (nunca frena la publicación)
+                    out(f"AVISO: no se guardó la receta de la toma ({type(e).__name__})")
             elif estado != "fallada" and toma.entrada is not None:
                 informativa.marcar_usada(raiz, toma.entrada["id"])
 

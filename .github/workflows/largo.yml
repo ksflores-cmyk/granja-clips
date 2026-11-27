@@ -1,0 +1,118 @@
+name: largo
+
+# Video largo semanal de YouTube (Kevin, 27 nov 2026): las tomas de la semana que no salieron como Short, en
+# horizontal, con intro, cuenta atrás, memes de la semana y outro. Se arma y se sube con la API de YouTube.
+# El cron de GitHub falla a menudo: hay 4 intentos el domingo (10:17, 12:17, 15:17 y 18:17 GT) y el código no repite
+# un episodio si ya salió uno en los últimos 5 días. También se puede correr a mano (workflow_dispatch).
+on:
+  schedule:
+    - cron: "17 16,18,21 * * 0"
+    - cron: "17 0 * * 1"
+  workflow_dispatch:
+    inputs:
+      subir:
+        description: "Subir a YouTube si la puerta sale en verde"
+        type: boolean
+        default: true
+      desde:
+        description: "Desde (AAAA-MM-DD). Vacío: desde el último episodio"
+        required: false
+      hasta:
+        description: "Hasta (AAAA-MM-DD). Vacío: hoy"
+        required: false
+
+concurrency:
+  group: largo
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  largo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      PYTHONUNBUFFERED: "1"
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+      TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compuerta (PAUSA)
+        id: compuerta
+        run: |
+          if [ -f PAUSA ]; then
+            echo "activo=no" >> "$GITHUB_OUTPUT"
+            echo "PAUSA: $(grep -m1 '^motivo:' PAUSA || echo 'sin motivo'). No se arma nada."
+          else
+            echo "activo=si" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-python@v5
+        if: ${{ steps.compuerta.outputs.activo == 'si' }}
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+        if: ${{ steps.compuerta.outputs.activo == 'si' }}
+      - name: Instalar ffmpeg
+        if: ${{ steps.compuerta.outputs.activo == 'si' }}
+        timeout-minutes: 12
+        uses: ./.github/actions/ffmpeg
+      - name: Bajar efectos de sonido del release (claqueta)
+        if: ${{ steps.compuerta.outputs.activo == 'si' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download sfx -D "$RUNNER_TEMP/sfx" --clobber || echo "::warning::sin efectos del release"
+      - name: Armar el episodio
+        id: armar
+        if: ${{ steps.compuerta.outputs.activo == 'si' }}
+        timeout-minutes: 110
+        env:
+          GRANJA_SFX_DIR: ${{ runner.temp }}/sfx
+          DESDE: ${{ inputs.desde }}
+          HASTA: ${{ inputs.hasta }}
+        run: |
+          extra=""
+          [ -n "$DESDE" ] && extra="$extra --desde $DESDE"
+          [ -n "$HASTA" ] && extra="$extra --hasta $HASTA"
+          set +e
+          python -m fabrica.largo armar --carpeta "$RUNNER_TEMP/largo" $extra
+          codigo=$?
+          set -e
+          if [ -f "$RUNNER_TEMP/largo/episodio.json" ]; then echo "hay=si" >> "$GITHUB_OUTPUT"; fi
+          exit $codigo
+      - name: Subir a YouTube
+        if: ${{ steps.armar.outputs.hay == 'si' && github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || inputs.subir) }}
+        timeout-minutes: 30
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+        run: python -m fabrica.largo subir --carpeta "$RUNNER_TEMP/largo"
+      - name: Guardar el estado (episodios y recetas)
+        if: ${{ always() && steps.compuerta.outputs.activo == 'si' && github.ref == 'refs/heads/main' }}
+        run: |
+          fuera=$(git status --porcelain --untracked-files=all | cut -c4- | grep -Ev '^estado/(largos\.json|recetas\.jsonl|modelos-cuota\.json)$' || true)
+          if [ -n "$fuera" ]; then
+            echo "Archivos fuera de la lista permitida (no se guardan):"
+            echo "$fuera"
+          fi
+          for ruta in estado/largos.json estado/recetas.jsonl; do
+            [ -e "$ruta" ] && git add -- "$ruta"
+          done
+          if git diff --cached --quiet; then
+            echo "Nada que guardar."
+            exit 0
+          fi
+          git config user.name "fabrica"
+          git config user.email "fabrica@users.noreply.github.com"
+          git commit -q -m "[skip ci] largo $(TZ=America/Guatemala date '+%Y-%m-%d %H:%M')"
+          for intento in 1 2 3; do
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then exit 0; fi
+            git pull --rebase origin "${GITHUB_REF_NAME}" || git rebase --abort
+          done
+          echo "El push fue rechazado 3 veces."
+          exit 1
