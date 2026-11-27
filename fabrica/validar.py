@@ -621,6 +621,10 @@ def _positivos(dato, ruta: str, inf: Informe) -> None:
                 if not (isinstance(v, str) and v.strip()):
                     inf.error(f"{rel}: {ruta}.efecto debe ser el id de un efecto de marca/sfx/efectos.yml")
                 continue
+            if k == "activo":                                     # interruptores (paneo del estilo v3)
+                if not isinstance(v, bool):
+                    inf.error(f"{rel}: {ruta}.activo debe ser true o false")
+                continue
             if k == "ganancia_db" and isinstance(v, (int, float)) and not isinstance(v, bool):
                 if not -30 <= v <= 0:
                     inf.error(f"{rel}: {ruta}.ganancia_db debe ir de -30 a 0")
