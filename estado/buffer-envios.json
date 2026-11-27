@@ -3479,7 +3479,8 @@
     "largo": 158
    },
    "ficha_id": "t-jennsanli"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|24|2026-11-26T22:00:00.000Z",
@@ -3532,6 +3533,113 @@
     "largo": 161
    },
    "ficha_id": "t-jennsanli"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|25|2026-11-27T01:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 25,
+  "dueAt": "2026-11-27T01:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-26/toma-025-c8d4c4b9.mp4",
+  "estado": "creado",
+  "post_id": "6b08c92a07985b96e3f9c2a7",
+  "intento": "14c5f2279ee34d9696203044bc10bdef",
+  "registrado": true,
+  "texto": "Toma 025. Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.\n\n🎥 twitch.tv/tibsonm\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 25,
+    "gancho": "Porsche amarillo contra el tráfico",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-tibsonm",
+    "caption": "Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.",
+    "frase": "Luigi, la cuenta por favor. ¡Luigi!",
+    "hablante": "TIBSONM",
+    "campana": "",
+    "duracion_s": 24.2,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/tibsonm",
+    "id_origen": "SparklyGeniusPicklesShadyLulu-sDxgEaNq50s1rl1v",
+    "claves": [
+     "SparklyGeniusPicklesShadyLulu-sDxgEaNq50s1rl1v"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 025. Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.\n\n🎥 twitch.tv/tibsonm\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/tibsonm",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 025. Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.\n\n🎥 twitch.tv/tibsonm\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 132
+   },
+   "ficha_id": "t-tibsonm"
+  }
+ },
+ {
+  "id": "reels|25|2026-11-27T01:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 25,
+  "dueAt": "2026-11-27T01:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-26/toma-025-c8d4c4b9.mp4",
+  "estado": "creado",
+  "post_id": "6b08c92b548b6e180d445266",
+  "intento": "6997a1888b394463a822f06cdd6d3064",
+  "registrado": true,
+  "texto": "Toma 025. Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.\n\n🎥 twitch.tv/tibsonm\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 25,
+    "gancho": "Porsche amarillo contra el tráfico",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-tibsonm",
+    "caption": "Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.",
+    "frase": "Luigi, la cuenta por favor. ¡Luigi!",
+    "hablante": "TIBSONM",
+    "campana": "",
+    "duracion_s": 24.2,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/tibsonm",
+    "id_origen": "SparklyGeniusPicklesShadyLulu-sDxgEaNq50s1rl1v",
+    "claves": [
+     "SparklyGeniusPicklesShadyLulu-sDxgEaNq50s1rl1v"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 025. Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.\n\n🎥 twitch.tv/tibsonm\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/tibsonm",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 025. Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.\n\n🎥 twitch.tv/tibsonm\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 135
+   },
+   "ficha_id": "t-tibsonm"
   }
  }
 ]

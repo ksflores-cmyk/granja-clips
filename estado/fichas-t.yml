@@ -576,7 +576,7 @@
   origen: twitch
   twitch_login: aaronjaureguii
   broadcaster_id: '1382351624'
-  seguidores: 38389
+  seguidores: 38415
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -1266,7 +1266,7 @@
   origen: twitch
   twitch_login: vicesat
   broadcaster_id: '110387651'
-  seguidores: 17706
+  seguidores: 17770
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -1469,7 +1469,7 @@
   origen: twitch
   twitch_login: victoriarodrgzz
   broadcaster_id: '73577459'
-  seguidores: 45673
+  seguidores: 45686
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -1551,8 +1551,8 @@
   origen: twitch
   twitch_login: tibsonm
   broadcaster_id: '513203568'
-  seguidores: 36409
-  seguidores_leidos: '2026-11-25'
+  seguidores: 36476
+  seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1578,7 +1578,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-27'
+  vence: '2026-11-28'
   estado: vigente
   uso: produccion
   publicable: true
@@ -1755,8 +1755,8 @@
   origen: twitch
   twitch_login: josefattv
   broadcaster_id: '488087884'
-  seguidores: 45008
-  seguidores_leidos: '2026-11-25'
+  seguidores: 45020
+  seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1782,7 +1782,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-27'
+  vence: '2026-11-28'
   estado: vigente
   uso: produccion
   publicable: true
@@ -1959,8 +1959,8 @@
   origen: twitch
   twitch_login: cursedfiber78
   broadcaster_id: '231053562'
-  seguidores: 138579
-  seguidores_leidos: '2026-11-25'
+  seguidores: 138614
+  seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -1986,7 +1986,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-27'
+  vence: '2026-11-28'
   estado: vigente
   uso: produccion
   publicable: true
@@ -2082,8 +2082,8 @@
   origen: twitch
   twitch_login: elvisayomastercard
   broadcaster_id: '21565409'
-  seguidores: 233179
-  seguidores_leidos: '2026-11-25'
+  seguidores: 233228
+  seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -2109,7 +2109,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-27'
+  vence: '2026-11-28'
   estado: vigente
   uso: produccion
   publicable: true
@@ -2163,7 +2163,7 @@
   origen: twitch
   twitch_login: ikiimartin
   broadcaster_id: '484249913'
-  seguidores: 110947
+  seguidores: 110957
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -2488,7 +2488,7 @@
   origen: twitch
   twitch_login: mirreytv
   broadcaster_id: '105827290'
-  seguidores: 276234
+  seguidores: 276262
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -3386,7 +3386,7 @@
   origen: twitch
   twitch_login: donangelillo
   broadcaster_id: '513440587'
-  seguidores: 33984
+  seguidores: 33988
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -3919,8 +3919,8 @@
   origen: twitch
   twitch_login: alexploylives
   broadcaster_id: '734849560'
-  seguidores: 12587
-  seguidores_leidos: '2026-11-25'
+  seguidores: 12591
+  seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -3946,7 +3946,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-27'
+  vence: '2026-11-28'
   estado: vigente
   uso: produccion
   publicable: true
@@ -3960,8 +3960,8 @@
   origen: twitch
   twitch_login: elstronk
   broadcaster_id: '101648176'
-  seguidores: 38731
-  seguidores_leidos: '2026-11-23'
+  seguidores: 38786
+  seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -3987,7 +3987,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-25'
+  vence: '2026-11-28'
   estado: vigente
   uso: produccion
   publicable: true
@@ -4083,8 +4083,8 @@
   origen: twitch
   twitch_login: elultimocirculo
   broadcaster_id: '558806680'
-  seguidores: 229493
-  seguidores_leidos: '2026-11-25'
+  seguidores: 229545
+  seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -4110,7 +4110,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-27'
+  vence: '2026-11-28'
   estado: vigente
   uso: produccion
   publicable: true
@@ -4903,8 +4903,8 @@
   origen: twitch
   twitch_login: pacodelmazo
   broadcaster_id: '471077270'
-  seguidores: 1967
-  seguidores_leidos: '2026-11-24'
+  seguidores: 2049
+  seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -4930,7 +4930,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-26'
+  vence: '2026-11-28'
   estado: vigente
   uso: produccion
   publicable: true
@@ -5108,7 +5108,7 @@
   origen: twitch
   twitch_login: jennsanli
   broadcaster_id: '547235609'
-  seguidores: 171838
+  seguidores: 171878
   seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
@@ -6420,8 +6420,8 @@
   origen: twitch
   twitch_login: jade_hanami
   broadcaster_id: '140612076'
-  seguidores: 5138
-  seguidores_leidos: '2026-11-25'
+  seguidores: 5155
+  seguidores_leidos: '2026-11-26'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -6447,7 +6447,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-27'
+  vence: '2026-11-28'
   estado: vigente
   uso: produccion
   publicable: true
@@ -7151,3 +7151,208 @@
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
   nombre_visible: och8bits
+- id: t-densitta
+  tipo: T
+  creador: twitch.tv/densitta
+  credito: twitch.tv/densitta
+  origen: twitch
+  twitch_login: densitta
+  broadcaster_id: '727834726'
+  seguidores: 23167
+  seguidores_leidos: '2026-11-26'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-28'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: densitta
+- id: t-juakynen
+  tipo: T
+  creador: twitch.tv/juakynen
+  credito: twitch.tv/juakynen
+  origen: twitch
+  twitch_login: juakynen
+  broadcaster_id: '164798747'
+  seguidores: 16521
+  seguidores_leidos: '2026-11-26'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-28'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: Juakynen
+- id: t-miquelserrano
+  tipo: T
+  creador: twitch.tv/miquelserrano
+  credito: twitch.tv/miquelserrano
+  origen: twitch
+  twitch_login: miquelserrano
+  broadcaster_id: '186540924'
+  seguidores: 57033
+  seguidores_leidos: '2026-11-26'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-28'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: miquelserrano
+- id: t-choiairi
+  tipo: T
+  creador: twitch.tv/choiairi
+  credito: twitch.tv/choiairi
+  origen: twitch
+  twitch_login: choiairi
+  broadcaster_id: '691679620'
+  seguidores: 21540
+  seguidores_leidos: '2026-11-26'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-28'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: 아이리세계
+- id: t-mariemoone
+  tipo: T
+  creador: twitch.tv/mariemoone
+  credito: twitch.tv/mariemoone
+  origen: twitch
+  twitch_login: mariemoone
+  broadcaster_id: '415006721'
+  seguidores: 164120
+  seguidores_leidos: '2026-11-26'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-28'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: MarieMoone
