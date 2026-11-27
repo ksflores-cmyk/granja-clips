@@ -2,13 +2,11 @@
  "proveedores": {
   "gemini": {
    "ventana": [
-    1795752260.181161,
-    1795752318.124251
+    1795788691.502176
    ],
-   "dia": "2026-11-26",
-   "peticiones_dia": 51,
-   "tokens_dia": 149762,
-   "pausa_hasta": 1795752918.28591
+   "dia": "2026-11-27",
+   "peticiones_dia": 13,
+   "tokens_dia": 11969
   }
  }
 }
