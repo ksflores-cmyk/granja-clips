@@ -3,7 +3,7 @@
 MP4 1080x1920 H.264 high yuv420p 30 fps, `-preset veryfast -crf 20`, AAC 128 kb/s 48 kHz, `+faststart`.
 
 Plantilla v2 (tomas con video, decisión de Kevin del 19 nov 2026): el clip cubre todo el cuadro con un recorte fijo
-(`encuadre.py`, sin zoom ni paneo), conserva su audio original, y la marca va en placas de papel encima (`placas.py`).
+(`encuadre.py`, sin zoom; desde el estilo v3 con paneo horizontal suave), conserva su audio original, y la marca va en placas de papel encima (`placas.py`).
 Tomas sin video (informativa tipográfica): la página de guion de siempre.
 Audio: el de la fuente, tal cual. Sólo una pieza sin audio propio (sin video, o video mudo) lleva `musica` (pista CC0
 de `editar.musica`), con fundidos y sonoridad normalizada; el audio de un video nunca se mezcla con música. Sin video
@@ -256,8 +256,9 @@ def orden_ffmpeg_pantalla_completa(*, salida: str, duracion: float, ancho: int, 
         filtros = _filtros_paneles(video["paneles"], ancho, alto, quitar)
     else:
         r = video["recorte"]
-        filtros = [f"[0:v]fps=30,{quitar}crop={r['ancho']}:{r['alto']}:{r['x']}:{r['y']},scale={ancho}:{alto}:flags=lanczos,"
-                   f"setsar=1[c0]"]
+        # el crop va antes de quitar los silencios: su `t` es el de la fuente (el paneo se calcula en ese tiempo)
+        filtros = [f"[0:v]fps=30,crop={r['ancho']}:{r['alto']}:{encuadre.expresion_x(r)}:{r['y']},{quitar}"
+                   f"scale={ancho}:{alto}:flags=lanczos,setsar=1[c0]"]
     actual = "c0"
     for i, (ruta, x, y, t0, t1) in enumerate(placas):
         entradas += ["-loop", "1", "-framerate", "30", "-t", d, "-i", ruta]
@@ -684,6 +685,8 @@ def _componer_pantalla_completa(marca: Marca, t: Toma, lineas: list[Linea], sali
         ruta = trabajo / f"placa_{i:02d}_{p.tipo}.png"
         p.imagen.save(ruta)
         rutas.append((str(ruta), p.x, p.y, p.t0, p.t1))
+    if tramos_h and recorte.get("paneo"):      # la historia lleva su propia orden de ffmpeg: encuadre fijo (sin paneo)
+        recorte = {k: v for k, v in recorte.items() if k != "paneo"}
     video = {"ruta": str(fuente_video), "inicio": inicio, "recorte": recorte, "audio": info["audio"]}
     if paneles is not None:
         video["paneles"] = [{"recorte": p["recorte"], "destino": p["destino"]} for p in paneles]

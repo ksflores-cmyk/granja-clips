@@ -36,13 +36,24 @@ Hoy: placa «CORTE. / Con: …» encima del último medio segundo (toma 016).
 Hoy: encuadre fijo por toma (`fabrica/editar/encuadre.py`, «sin zoom ni paneo»): de un 16:9 se ve un 32 % del ancho.
 Lo vertical ya va entero (la escala cubre el alto); en la toma 014 el zoom viene además del propio clip de Twitch.
 
-- [ ] Paneo horizontal suave: la ventana sigue el centro de la acción (energía de movimiento y bordes, como hoy), con
+- [x] Paneo horizontal suave: la ventana sigue el centro de la acción (energía de movimiento y bordes, como hoy), con
       posiciones cada 0,5 s suavizadas (media móvil de 2 s) y velocidad máxima de 4 % del ancho de la fuente por
       segundo. En el cuadro 0, la mejor posición (centro si empata).
-- [ ] Sin zoom: la escala no cambia durante la toma; nada vertical se recorta.
-- [ ] Filtro `crop` de ffmpeg con `x` por expresión (interpolación lineal entre puntos), sin saltos.
+- [x] Sin zoom: la escala no cambia durante la toma; nada vertical se recorta.
+- [x] Filtro `crop` de ffmpeg con `x` por expresión (interpolación lineal entre puntos), sin saltos.
 - [ ] Puerta: desplazamiento entre cuadros ≤ 0,2 % del ancho y la cara de la facecam (si la hay) no sale del cuadro.
 - [ ] En pantalla dividida, el paneo sólo en el panel del juego; la facecam queda fija.
+
+Punto 3 en la PR `claude/clips-paneo` (26 nov): `encuadre.calcular_paneo` lee la fuente en gris a 1 cuadro cada
+0,5 s (192 px de ancho), busca por columna la energía de movimiento y bordes, suaviza en el tiempo, no se aleja más
+de 25 % del ancho de la ventana respecto a la posición fija, ignora cambios de menos de 8 % de ese ancho (zona
+muerta) y limita la velocidad
+a 4 % del ancho de la fuente por segundo. Si el recorrido total es menor de 8 px queda fijo, como antes. Todo en
+`marca.yml` → `recorte.paneo` (`activo: false` lo apaga). La puerta revisa el paneo del plan (`problemas_paneo`:
+≤ 0,2 % del ancho por cuadro, dentro de la fuente, x pares) y compara cuerpo y bordes contra la fuente con la x de
+cada instante (con ±40 ms de holgura, porque el crop corre sobre los cuadros de la fuente antes de pasar a 30 fps).
+Historia y pantalla dividida quedan fijas por ahora (la historia salta entre momentos; en la dividida el panel del
+juego ya va casi entero). Falta: la guarda de la facecam en pantalla completa y la muestra para Kevin.
 
 ## 4. Clips con subtítulos quemados — «Evitarlos y, si no hay otro, tapar»
 

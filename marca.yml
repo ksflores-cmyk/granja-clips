@@ -87,11 +87,19 @@ pantalla_completa:              # plantilla v2 de las tomas con video: todas las
   gancho_s: 3.0                 # segundos que se ven el gancho y la escena; luego sólo la fila mínima
   relleno_placa: 14             # aire entre el texto y el borde de la placa de papel
   ancho_max_encabezado: 700     # ancho máximo de las placas del encabezado (la mosca y el logo quedan al otro lado)
-  recorte:                      # encuadre fijo por toma (sin zoom ni paneo)
+  recorte:                      # encuadre por toma: sin zoom; desde el estilo v3 con paneo horizontal suave
     fotogramas: 12              # cuántos fotogramas se miran para seguir la acción
     ancho_analisis: 192         # ancho en píxeles de esos fotogramas en gris
     margen_accion: 0.05         # la ventana de acción debe superar a la centrada en esta fracción
     peso_bordes: 0.2            # peso de los bordes frente al movimiento
+    paneo:                      # estilo v3, punto 3 (Kevin, 25 nov): «movimientos de cámara» horizontales, muy leves
+      activo: true
+      paso_s: 0.5               # un punto del paneo cada medio segundo
+      suavizado_s: 2.0          # media móvil de la acción y de la posición
+      velocidad_max: 0.04       # fracción del ancho de la fuente por segundo (≈ 0,13 % por fotograma a 30 fps)
+      desviacion_max: 0.25      # como mucho un cuarto del ancho de la ventana lejos del encuadre fijo
+      zona_muerta: 0.08         # el objetivo sólo cambia si se aleja más que esto (sin temblores)
+      ancho_analisis: 192
   fila: {tam_toma: 28, tam_credito: 24, separacion: 16}            # TOMA nnn y crédito, siempre en pantalla
   cabecera: {tam_gancho: 44, alto_linea_gancho: 54, tam_escena: 24, alto_escena: 32, espacio_escena: 8}
   mosca: {tam: 24, relleno: 12}

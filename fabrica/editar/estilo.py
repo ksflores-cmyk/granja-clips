@@ -20,7 +20,7 @@ import numpy as np
 from PIL import Image, ImageFilter
 
 from .. import plazo
-from . import agua as mod_agua
+from . import encuadre, agua as mod_agua
 from . import cierre as mod_cierre
 from . import dialogo as mod_dialogo
 from . import dividida as mod_dividida
@@ -160,8 +160,29 @@ def _toma(plan: dict) -> Toma:
                 subtitulos_del_clip=plan.get("subtitulos") == "del clip")
 
 
+_CACHE_FOTOGRAMAS: dict[tuple, Image.Image] = {}
+_CACHE_MAX = 24
+
+
 def _fotograma(video: Path, seg: float) -> Image.Image | None:
-    """Fotograma del video en el segundo `seg` (RGB), o None si ffmpeg no lo pudo sacar."""
+    """Fotograma del video en el segundo `seg` (RGB), o None si ffmpeg no lo pudo sacar. Guarda los últimos en memoria
+    (por ruta, tamaño, fecha y milisegundo): el paneo compara varias x contra el mismo fotograma de la fuente."""
+    try:
+        st = Path(video).stat()
+        clave = (str(video), st.st_size, st.st_mtime_ns, round(max(0.0, seg), 3))
+    except OSError:
+        clave = None
+    if clave is not None and clave in _CACHE_FOTOGRAMAS:
+        return _CACHE_FOTOGRAMAS[clave].copy()
+    img = _fotograma_ffmpeg(video, seg)
+    if img is not None and clave is not None:
+        if len(_CACHE_FOTOGRAMAS) >= _CACHE_MAX:
+            _CACHE_FOTOGRAMAS.pop(next(iter(_CACHE_FOTOGRAMAS)))
+        _CACHE_FOTOGRAMAS[clave] = img.copy()
+    return img
+
+
+def _fotograma_ffmpeg(video: Path, seg: float) -> Image.Image | None:
     with tempfile.TemporaryDirectory(prefix="cuadro-") as tmp:
         png = Path(tmp) / "f.png"
         r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{max(0.0, seg):.3f}",
@@ -307,12 +328,42 @@ def _del_tipo(esperadas: list[placas.Placa], *tipos: str) -> list[placas.Placa]:
     return [p for p in esperadas if p.tipo in tipos or (p.tipo.startswith("dialogo") and "dialogo" in tipos)]
 
 
-def _fuente_encuadrada(ruta: Path, t_fuente: float, recorte: dict, marca: Marca) -> Image.Image | None:
-    """Fotograma de la fuente recortado con el recorte del plan y escalado a cuadro completo (RGBA)."""
+# Con paneo, el crop de ffmpeg corre sobre los fotogramas de la fuente (antes de pasar a 30 fps): el fotograma que
+# queda en el instante T de la toma pudo recortarse con la x de un fotograma de la fuente antes o después.
+HOLGURA_PANEO_S = (0.0, -0.02, 0.02, -0.04, 0.04)
+
+
+def _x_paneo(recorte: dict, t_rel: float) -> int:
+    return int(math.floor(encuadre.x_en(recorte, t_rel))) // 2 * 2   # como el crop de ffmpeg en yuv420
+
+
+def _xs_candidatas(plan: dict, t: float) -> list[int | None]:
+    """x del recorte que pudo usar el render en el instante `t` de la toma: [None] sin paneo (manda la x del plan)."""
+    geo, origen = plan.get("geometria") or {}, plan.get("origen") or {}
+    recorte = geo.get("recorte") or {}
+    if not recorte.get("paneo") or es_dividida(plan):        # la historia no lleva paneo (componer lo quita)
+        return [None]
+    t_rel = t_fuente(origen, t) - float(origen.get("inicio") or 0.0)
+    xs: list[int | None] = []
+    for d in HOLGURA_PANEO_S:
+        x = _x_paneo(recorte, max(0.0, t_rel + d))
+        if x not in xs:
+            xs.append(x)
+    return xs
+
+
+def _fuente_encuadrada(ruta: Path, t_fuente: float, recorte: dict, marca: Marca,
+                       inicio: float = 0.0, x_fija: int | None = None) -> Image.Image | None:
+    """Fotograma de la fuente recortado con el recorte del plan y escalado a cuadro completo (RGBA). Con paneo (estilo
+    v3) la x es la del instante `t_fuente - inicio` del tramo, o `x_fija` si se da."""
     f = _fotograma(ruta, t_fuente)
     if f is None:
         return None
     x, y, w, h = (int(recorte[k]) for k in ("x", "y", "ancho", "alto"))
+    if x_fija is not None:
+        x = int(x_fija)
+    elif recorte.get("paneo"):
+        x = _x_paneo(recorte, t_fuente - inicio)
     if w <= 0 or h <= 0 or x < 0 or y < 0 or x + w > f.width or y + h > f.height:
         return None
     return f.crop((x, y, x + w, y + h)).resize((marca.ancho, marca.alto), Image.LANCZOS).convert("RGBA")
@@ -347,8 +398,9 @@ def t_fuente(origen: dict, t: float) -> float:
     return float(origen["inicio"]) + t
 
 
-def _fuente_esperada(plan: dict, marca: Marca, t: float) -> Image.Image | None:
-    """Fotograma de la fuente en el instante `t` de la toma, tal como el plan dice que se ve (sin placas)."""
+def _fuente_esperada(plan: dict, marca: Marca, t: float, x_fija: int | None = None) -> Image.Image | None:
+    """Fotograma de la fuente en el instante `t` de la toma, tal como el plan dice que se ve (sin placas). Con paneo,
+    `x_fija` fija la x del recorte (ver `_xs_candidatas`)."""
     origen, geo = plan.get("origen") or {}, plan.get("geometria") or {}
     ruta, t_f = Path(origen["archivo"]), t_fuente(origen, t)
     tramos = _tramos(plan, marca)
@@ -358,7 +410,8 @@ def _fuente_esperada(plan: dict, marca: Marca, t: float) -> Image.Image | None:
     if es_dividida(plan):
         f = _fuente_dividida(ruta, t_f, geo.get("paneles") or [], marca)
     elif es_v2(plan):
-        f = _fuente_encuadrada(ruta, t_f, geo.get("recorte") or {}, marca)
+        f = _fuente_encuadrada(ruta, t_f, geo.get("recorte") or {}, marca, float(origen.get("inicio") or 0.0),
+                               x_fija)
     else:
         f = _fuente_en_cuerpo(ruta, t_f, geo["cuerpo"])
     if f is not None and zoom > 1.0001:       # en un tramo con zoom la imagen esperada es el centro ampliado
@@ -374,8 +427,7 @@ def _mejor_contra_fuente(plan: dict, marca: Marca, t: float, medir, tope: float)
     Se detiene en cuanto baja de `tope`. None si no se pudo leer la fuente.
     """
     mejor = None
-    for desfase in DESFASES_FUENTE_S:
-        fuente = _fuente_esperada(plan, marca, max(0.0, t + desfase))
+    for fuente in _fuentes_candidatas(plan, marca, t):
         if fuente is None:
             continue
         d = medir(fuente)
@@ -383,6 +435,15 @@ def _mejor_contra_fuente(plan: dict, marca: Marca, t: float, medir, tope: float)
         if mejor < tope:
             break
     return mejor
+
+
+def _fuentes_candidatas(plan: dict, marca: Marca, t: float):
+    """Las imágenes esperadas de la fuente para el instante `t`: un paso de fotograma antes o después y, con paneo,
+    cada x que pudo usar el render (ver `_xs_candidatas`). Rinde None si no se pudo leer la fuente."""
+    for desfase in DESFASES_FUENTE_S:
+        t_d = max(0.0, t + desfase)
+        for x in _xs_candidatas(plan, t_d):
+            yield _fuente_esperada(plan, marca, t_d, x)
 
 
 def _mascara_placas(plan: dict, t: float, marca: Marca) -> np.ndarray:
@@ -431,7 +492,11 @@ def pantalla_completa(plan: dict, marca: Marca) -> tuple[bool, str]:
         return False, f"el recorte {w:g}x{h:g} a escala {esc:.3f} no llena {marca.ancho}x{marca.alto}"
     if x < 0 or y < 0 or x + w > info["ancho"] or y + h > info["alto"]:
         return False, f"el recorte {r} se sale de la fuente {info['ancho']}x{info['alto']}"
-    return True, f"cuerpo {marca.ancho}x{marca.alto}, recorte {int(w)}x{int(h)} en ({int(x)}, {int(y)}), modo {r.get('modo')}"
+    malos = encuadre.problemas_paneo(r, info["ancho"])          # estilo v3: paneo dentro de la fuente y suave
+    if malos:
+        return False, "; ".join(malos)
+    pan = f", paneo de {len(r['paneo'])} puntos" if r.get("paneo") else ""
+    return True, f"cuerpo {marca.ancho}x{marca.alto}, recorte {int(w)}x{int(h)} en ({int(x)}, {int(y)}), modo {r.get('modo')}{pan}"
 
 
 def capas_fuera_de_la_accion(plan: dict, marca: Marca) -> tuple[bool, str]:
@@ -837,8 +902,7 @@ def marca_agua_visible(video: Path, plan: dict, marca: Marca, ficha: dict | None
         if real is None:
             return False, f"no se pudo leer el fotograma en {t:.2f} s"
         ok_t, txt = False, ""
-        for desfase in DESFASES_FUENTE_S:        # el fotograma de la fuente puede ir un paso antes o después
-            fuente = _fuente_esperada(plan, marca, max(0.0, t + desfase))
+        for fuente in _fuentes_candidatas(plan, marca, t):   # un paso de fotograma antes o después; x del paneo
             if fuente is None:
                 return False, f"no se pudo leer el fotograma de la fuente en {t:.2f} s"
             limpia = fuente.copy()
