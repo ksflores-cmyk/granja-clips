@@ -3857,7 +3857,8 @@
     "largo": 147
    },
    "ficha_id": "t-donangelillo"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|27|2026-11-27T15:30:00.000Z",
@@ -3910,6 +3911,113 @@
     "largo": 150
    },
    "ficha_id": "t-donangelillo"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|28|2026-11-27T17:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 28,
+  "dueAt": "2026-11-27T17:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-27/toma-028-c16a25b6.mp4",
+  "estado": "creado",
+  "post_id": "6b09ab7f32c212878fe4f33b",
+  "intento": "2af3837070a841cab7405d25b5a7c26b",
+  "registrado": true,
+  "texto": "SajonArco demuestra sus habilidades al volante en la autopista de Vice City.\n\n🎥 twitch.tv/sajonarco\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 28,
+    "gancho": "Choque múltiple en la autopista",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-sajonarco",
+    "caption": "SajonArco demuestra sus habilidades al volante en la autopista de Vice City.",
+    "frase": "Como piloto hermano, qué locura ¿eh?",
+    "hablante": "SAJONARCO",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "mods: Gemini marcó mods: true",
+    "creador": "twitch.tv/sajonarco",
+    "id_origen": "FragileBlitheDootLitFam-D1sxvJIRcsmRT_Nj",
+    "claves": [
+     "FragileBlitheDootLitFam-D1sxvJIRcsmRT_Nj"
+    ]
+   },
+   "textos": {
+    "texto": "SajonArco demuestra sus habilidades al volante en la autopista de Vice City.\n\n🎥 twitch.tv/sajonarco\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/sajonarco",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "SajonArco demuestra sus habilidades al volante en la autopista de Vice City.\n\n🎥 twitch.tv/sajonarco\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 131
+   },
+   "ficha_id": "t-sajonarco"
+  }
+ },
+ {
+  "id": "reels|28|2026-11-27T17:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 28,
+  "dueAt": "2026-11-27T17:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-27/toma-028-c16a25b6.mp4",
+  "estado": "creado",
+  "post_id": "6b09ab7f015034238d3eb6cc",
+  "intento": "e27f9157268345cbb9ebc0dcc89f357b",
+  "registrado": true,
+  "texto": "SajonArco demuestra sus habilidades al volante en la autopista de Vice City.\n\n🎥 twitch.tv/sajonarco\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 28,
+    "gancho": "Choque múltiple en la autopista",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-sajonarco",
+    "caption": "SajonArco demuestra sus habilidades al volante en la autopista de Vice City.",
+    "frase": "Como piloto hermano, qué locura ¿eh?",
+    "hablante": "SAJONARCO",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "mods: Gemini marcó mods: true",
+    "creador": "twitch.tv/sajonarco",
+    "id_origen": "FragileBlitheDootLitFam-D1sxvJIRcsmRT_Nj",
+    "claves": [
+     "FragileBlitheDootLitFam-D1sxvJIRcsmRT_Nj"
+    ]
+   },
+   "textos": {
+    "texto": "SajonArco demuestra sus habilidades al volante en la autopista de Vice City.\n\n🎥 twitch.tv/sajonarco\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/sajonarco",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "SajonArco demuestra sus habilidades al volante en la autopista de Vice City.\n\n🎥 twitch.tv/sajonarco\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 134
+   },
+   "ficha_id": "t-sajonarco"
   }
  }
 ]
