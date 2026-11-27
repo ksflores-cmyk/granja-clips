@@ -1,0 +1,53 @@
+# Video largo semanal en YouTube (Kevin, 27 nov 2026): recapitula SÓLO las tomas que no salieron como Short en
+# YouTube (cupo de Buffer o error), en horizontal, con cortes, memes, intro y outro.
+# Decisiones de Kevin del 27 nov: «T en largo» (las fichas T entran), memes famosos actuales (no viejos ni cringe),
+# «Sí API» (se sube con la API de YouTube desde GitHub Actions; Buffer sólo sube Shorts).
+activo: true
+tipos_fichas: [T, B, C]       # A (campañas) no: pagan formato corto y piden divulgación nativa
+min_clips: 6                  # con menos, el episodio espera a la semana siguiente
+max_clips: 30
+duracion_min_s: 150           # sin contar intro y outro
+orden: vistas                 # cuenta atrás por vistas en TikTok/Reels (la mejor al final); sin datos, por fecha
+resolucion: [1920, 1080]
+contexto_s: 1.0               # segundos extra antes y después del tramo de la toma, si la fuente los tiene
+youtube:
+  privacidad: public          # public | unlisted | private
+  categoria: 20               # Gaming
+  idioma: es
+  etiquetas: [GTA 6, GTA VI, Grand Theft Auto VI, clips, streamers, Twitch, momentos graciosos]
+  titulo: "GTA 6: los momentos de streamers que no viste esta semana #{episodio}"
+  miniatura: true             # sólo si el canal tiene la verificación de teléfono
+intro:
+  titulo: "LA SEMANA EN GTA 6"
+  avances: 3                  # avances de 1 s de los mejores clips antes del título
+  avance_s: 1.0
+  titulo_s: 3.0
+outro:
+  duracion_s: 12
+  texto: "¿Cuál fue el mejor? Déjalo en los comentarios"
+  llamado: "Suscríbete a Guion Vivo"
+memes:
+  activo: true
+  paises: [gt, mx, es, us]    # páginas «Populares en …» de Myinstants
+  max_candidatos: 80
+  max_biblioteca: 16          # los que quedan tras el filtro de Gemini
+  separacion_min_s: 20        # como mucho un meme cada 20 s
+  dur_max_s: 2.5
+  ganancia_db: -6
+  lufs: -18
+# Medidas de la plantilla horizontal (se aplican sobre `pantalla_completa` de marca.yml).
+marca:
+  pantalla_completa:
+    zona_segura: {x0: 80, y0: 48, x1: 1840, y1: 1032}
+    ancho_max_encabezado: 1000
+    fila: {tam_toma: 30, tam_credito: 26, separacion: 18}
+    mosca: {tam: 26, relleno: 12}
+    dialogo:
+      columna_dialogo: [360, 1560]
+      tam_nombre: 30
+      alto_nombre: 40
+      tam_acotacion: 32
+      alto_acotacion: 42
+      tam_frase: 52
+      alto_linea_frase: 62
+      borde_inferior: 1010
