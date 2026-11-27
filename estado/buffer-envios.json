@@ -3103,5 +3103,704 @@
    "ficha_id": "t-josefattv"
   },
   "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|21|2026-11-26T15:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 21,
+  "dueAt": "2026-11-26T15:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-26/toma-021-d5a4eada.mp4",
+  "estado": "creado",
+  "post_id": "6b083d00e1a214b89bdd87fe",
+  "intento": "189df57383854379898cd7397948cb75",
+  "registrado": true,
+  "texto": "Toma 021. AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 21,
+    "gancho": "Lucia busca algo para robar",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-aaronjaureguii",
+    "caption": "AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.",
+    "frase": "Hacer clip de eso.",
+    "hablante": "AARONJAUREGUII",
+    "campana": "",
+    "duracion_s": 16.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/aaronjaureguii",
+    "id_origen": "OddShinySnoodKappa-TL-UZXEnJsQuye7l",
+    "claves": [
+     "OddShinySnoodKappa-TL-UZXEnJsQuye7l"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 021. AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/aaronjaureguii",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 021. AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 142
+   },
+   "ficha_id": "t-aaronjaureguii"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "reels|21|2026-11-26T15:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 21,
+  "dueAt": "2026-11-26T15:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-26/toma-021-d5a4eada.mp4",
+  "estado": "creado",
+  "post_id": "6b083d0080ee2e8b66824dc4",
+  "intento": "b70d82c2355a4c45a3f9b3d8a9a4540f",
+  "registrado": true,
+  "texto": "Toma 021. AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 21,
+    "gancho": "Lucia busca algo para robar",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-aaronjaureguii",
+    "caption": "AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.",
+    "frase": "Hacer clip de eso.",
+    "hablante": "AARONJAUREGUII",
+    "campana": "",
+    "duracion_s": 16.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/aaronjaureguii",
+    "id_origen": "OddShinySnoodKappa-TL-UZXEnJsQuye7l",
+    "claves": [
+     "OddShinySnoodKappa-TL-UZXEnJsQuye7l"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 021. AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/aaronjaureguii",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 021. AARONJAUREGUII intenta encontrar algo de valor en una cabaña abandonada.\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 145
+   },
+   "ficha_id": "t-aaronjaureguii"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|22|2026-11-26T17:30:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 22,
+  "dueAt": "2026-11-26T17:30:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-26/toma-022-5464fd08.mp4",
+  "estado": "creado",
+  "post_id": "6b086762ce64081689d8787b",
+  "intento": "98189b0a5ae241d081bfb9c57deef2f7",
+  "registrado": true,
+  "texto": "Toma 022. A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.\n\n🎥 twitch.tv/srserpiente\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 22,
+    "gancho": "Explorando el horizonte de Leonida",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-srserpiente",
+    "caption": "A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.",
+    "frase": "Hay un pantano",
+    "hablante": "SRSERPIENTE",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/srserpiente",
+    "id_origen": "SneakyCrepuscularSpiderSSSsss-YImljuwDFjIBTExv",
+    "claves": [
+     "SneakyCrepuscularSpiderSSSsss-YImljuwDFjIBTExv"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 022. A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.\n\n🎥 twitch.tv/srserpiente\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/srserpiente",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 022. A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.\n\n🎥 twitch.tv/srserpiente\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 136
+   },
+   "ficha_id": "t-srserpiente"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "reels|22|2026-11-26T17:30:00.000Z",
+  "plataforma": "reels",
+  "toma": 22,
+  "dueAt": "2026-11-26T17:30:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-26/toma-022-5464fd08.mp4",
+  "estado": "creado",
+  "post_id": "6b086762c81617797dc8a7f2",
+  "intento": "ba4f6a72429c41eb9b22c020193fd380",
+  "registrado": true,
+  "texto": "Toma 022. A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.\n\n🎥 twitch.tv/srserpiente\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 22,
+    "gancho": "Explorando el horizonte de Leonida",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-srserpiente",
+    "caption": "A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.",
+    "frase": "Hay un pantano",
+    "hablante": "SRSERPIENTE",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/srserpiente",
+    "id_origen": "SneakyCrepuscularSpiderSSSsss-YImljuwDFjIBTExv",
+    "claves": [
+     "SneakyCrepuscularSpiderSSSsss-YImljuwDFjIBTExv"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 022. A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.\n\n🎥 twitch.tv/srserpiente\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/srserpiente",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 022. A veces el mapa de GTA 6 nos regala vistas que parecen de otro mundo.\n\n🎥 twitch.tv/srserpiente\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 139
+   },
+   "ficha_id": "t-srserpiente"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|23|2026-11-26T19:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 23,
+  "dueAt": "2026-11-26T19:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-26/toma-023-7824dfe0.mp4",
+  "estado": "creado",
+  "post_id": "6b087514c81617797dcf5ef7",
+  "intento": "0d770e14537b4d1d9cd88badd0f9aef2",
+  "registrado": true,
+  "texto": "Toma 023. AARONJAUREGUII confiesa que aprendería inglés por una mujer\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 23,
+    "gancho": "Aprender inglés por amor",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-aaronjaureguii",
+    "caption": "AARONJAUREGUII confiesa que aprendería inglés por una mujer",
+    "frase": "Yo sí aprendería...",
+    "hablante": "AARONJAUREGUII",
+    "campana": "",
+    "duracion_s": 21.87,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/aaronjaureguii",
+    "id_origen": "TenaciousAverageRaisinKippa-ZCkiO8j71EZs1V0U",
+    "claves": [
+     "TenaciousAverageRaisinKippa-ZCkiO8j71EZs1V0U"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 023. AARONJAUREGUII confiesa que aprendería inglés por una mujer\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/aaronjaureguii",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 023. AARONJAUREGUII confiesa que aprendería inglés por una mujer\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 129
+   },
+   "ficha_id": "t-aaronjaureguii"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "reels|23|2026-11-26T19:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 23,
+  "dueAt": "2026-11-26T19:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-26/toma-023-7824dfe0.mp4",
+  "estado": "creado",
+  "post_id": "6b0875151fa4091582870d55",
+  "intento": "8a381955825d4092a5fd4bd0cc9b5d96",
+  "registrado": true,
+  "texto": "Toma 023. AARONJAUREGUII confiesa que aprendería inglés por una mujer\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 23,
+    "gancho": "Aprender inglés por amor",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-aaronjaureguii",
+    "caption": "AARONJAUREGUII confiesa que aprendería inglés por una mujer",
+    "frase": "Yo sí aprendería...",
+    "hablante": "AARONJAUREGUII",
+    "campana": "",
+    "duracion_s": 21.87,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/aaronjaureguii",
+    "id_origen": "TenaciousAverageRaisinKippa-ZCkiO8j71EZs1V0U",
+    "claves": [
+     "TenaciousAverageRaisinKippa-ZCkiO8j71EZs1V0U"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 023. AARONJAUREGUII confiesa que aprendería inglés por una mujer\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/aaronjaureguii",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 023. AARONJAUREGUII confiesa que aprendería inglés por una mujer\n\n🎥 twitch.tv/aaronjaureguii\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 132
+   },
+   "ficha_id": "t-aaronjaureguii"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|24|2026-11-26T22:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 24,
+  "dueAt": "2026-11-26T22:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-26/toma-024-80f6c0d2.mp4",
+  "estado": "creado",
+  "post_id": "6b089eaece64081689f29f92",
+  "intento": "f499065513b9464d9abe617d857e0e01",
+  "registrado": true,
+  "texto": "Toma 024. JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.\n\n🎥 twitch.tv/jennsanli\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 24,
+    "gancho": "Caballero abre puerta en cita",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-jennsanli",
+    "caption": "JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.",
+    "frase": "¡No!",
+    "hablante": "JENNSANLI",
+    "campana": "",
+    "duracion_s": 13.27,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/jennsanli",
+    "id_origen": "MoldyLivelyAlpacaWOOP-QV9QVsizR1m4FD08",
+    "claves": [
+     "MoldyLivelyAlpacaWOOP-QV9QVsizR1m4FD08"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 024. JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.\n\n🎥 twitch.tv/jennsanli\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/jennsanli",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 024. JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.\n\n🎥 twitch.tv/jennsanli\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 158
+   },
+   "ficha_id": "t-jennsanli"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "reels|24|2026-11-26T22:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 24,
+  "dueAt": "2026-11-26T22:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-26/toma-024-80f6c0d2.mp4",
+  "estado": "creado",
+  "post_id": "6b089eaf1fa40915829b05e9",
+  "intento": "0b489abc34094b42bb311fe0c8df4ffd",
+  "registrado": true,
+  "texto": "Toma 024. JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.\n\n🎥 twitch.tv/jennsanli\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 24,
+    "gancho": "Caballero abre puerta en cita",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-jennsanli",
+    "caption": "JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.",
+    "frase": "¡No!",
+    "hablante": "JENNSANLI",
+    "campana": "",
+    "duracion_s": 13.27,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/jennsanli",
+    "id_origen": "MoldyLivelyAlpacaWOOP-QV9QVsizR1m4FD08",
+    "claves": [
+     "MoldyLivelyAlpacaWOOP-QV9QVsizR1m4FD08"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 024. JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.\n\n🎥 twitch.tv/jennsanli\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/jennsanli",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 024. JennSanli intenta ser una caballera en su primera cita pero las cosas no salen como esperaba.\n\n🎥 twitch.tv/jennsanli\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 161
+   },
+   "ficha_id": "t-jennsanli"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|25|2026-11-27T01:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 25,
+  "dueAt": "2026-11-27T01:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-26/toma-025-c8d4c4b9.mp4",
+  "estado": "creado",
+  "post_id": "6b08c92a07985b96e3f9c2a7",
+  "intento": "14c5f2279ee34d9696203044bc10bdef",
+  "registrado": true,
+  "texto": "Toma 025. Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.\n\n🎥 twitch.tv/tibsonm\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 25,
+    "gancho": "Porsche amarillo contra el tráfico",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-tibsonm",
+    "caption": "Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.",
+    "frase": "Luigi, la cuenta por favor. ¡Luigi!",
+    "hablante": "TIBSONM",
+    "campana": "",
+    "duracion_s": 24.2,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/tibsonm",
+    "id_origen": "SparklyGeniusPicklesShadyLulu-sDxgEaNq50s1rl1v",
+    "claves": [
+     "SparklyGeniusPicklesShadyLulu-sDxgEaNq50s1rl1v"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 025. Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.\n\n🎥 twitch.tv/tibsonm\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/tibsonm",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 025. Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.\n\n🎥 twitch.tv/tibsonm\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 132
+   },
+   "ficha_id": "t-tibsonm"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "reels|25|2026-11-27T01:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 25,
+  "dueAt": "2026-11-27T01:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-26/toma-025-c8d4c4b9.mp4",
+  "estado": "creado",
+  "post_id": "6b08c92b548b6e180d445266",
+  "intento": "6997a1888b394463a822f06cdd6d3064",
+  "registrado": true,
+  "texto": "Toma 025. Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.\n\n🎥 twitch.tv/tibsonm\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 25,
+    "gancho": "Porsche amarillo contra el tráfico",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-tibsonm",
+    "caption": "Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.",
+    "frase": "Luigi, la cuenta por favor. ¡Luigi!",
+    "hablante": "TIBSONM",
+    "campana": "",
+    "duracion_s": 24.2,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/tibsonm",
+    "id_origen": "SparklyGeniusPicklesShadyLulu-sDxgEaNq50s1rl1v",
+    "claves": [
+     "SparklyGeniusPicklesShadyLulu-sDxgEaNq50s1rl1v"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 025. Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.\n\n🎥 twitch.tv/tibsonm\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/tibsonm",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 025. Tibsonm descubre que su coche no se lleva bien con la arena en GTA 6.\n\n🎥 twitch.tv/tibsonm\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 135
+   },
+   "ficha_id": "t-tibsonm"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "shorts|26|2026-11-27T04:30:00.000Z",
+  "plataforma": "shorts",
+  "toma": 26,
+  "dueAt": "2026-11-27T04:30:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-26/toma-026-a648f61a.mp4",
+  "estado": "creado",
+  "post_id": "6b090182e94385a8fd7081dd",
+  "intento": "5ca08441f978448e8f8443b457c07b02",
+  "registrado": true,
+  "texto": "Toma 026. ARANDANA no esperaba que las físicas de la fauna fueran tan realistas en este encuentro accidental.\n\n🎥 twitch.tv/arandana_\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 26,
+    "gancho": "Impacto accidental contra un pelícano",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-arandana-",
+    "caption": "ARANDANA no esperaba que las físicas de la fauna fueran tan realistas en este encuentro accidental.",
+    "frase": "¡Ala! Me dolió en el alma ese pelícano. ¡Dios mío!",
+    "hablante": "ARANDANA",
+    "campana": "",
+    "duracion_s": 14.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/arandana_",
+    "id_origen": "AuspiciousHeadstrongSwordSwiftRage-KXshq6a_K8oAvXpy",
+    "claves": [
+     "AuspiciousHeadstrongSwordSwiftRage-KXshq6a_K8oAvXpy"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 026. ARANDANA no esperaba que las físicas de la fauna fueran tan realistas en este encuentro accidental.\n\n🎥 twitch.tv/arandana_\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "Toma 026. ARANDANA no esperaba que las físicas de la fauna fueran tan realistas en este encuentro…",
+    "credito": "🎥 twitch.tv/arandana_",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 026. ARANDANA no esperaba que las físicas de la fauna fueran tan realistas en este encuentro accidental.\n\n🎥 twitch.tv/arandana_\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 164
+   },
+   "ficha_id": "t-arandana-"
+  }
+ },
+ {
+  "id": "tiktok|26|2026-11-27T04:30:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 26,
+  "dueAt": "2026-11-27T04:30:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-26/toma-026-a648f61a.mp4",
+  "estado": "creado",
+  "post_id": "6b090182062ed764a8e0701d",
+  "intento": "27870e86b80f48719313db26a096ec61",
+  "registrado": true,
+  "texto": "Toma 026. ARANDANA no esperaba que las físicas de la fauna fueran tan realistas en este encuentro accidental.\n\n🎥 twitch.tv/arandana_\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 26,
+    "gancho": "Impacto accidental contra un pelícano",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-arandana-",
+    "caption": "ARANDANA no esperaba que las físicas de la fauna fueran tan realistas en este encuentro accidental.",
+    "frase": "¡Ala! Me dolió en el alma ese pelícano. ¡Dios mío!",
+    "hablante": "ARANDANA",
+    "campana": "",
+    "duracion_s": 14.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/arandana_",
+    "id_origen": "AuspiciousHeadstrongSwordSwiftRage-KXshq6a_K8oAvXpy",
+    "claves": [
+     "AuspiciousHeadstrongSwordSwiftRage-KXshq6a_K8oAvXpy"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 026. ARANDANA no esperaba que las físicas de la fauna fueran tan realistas en este encuentro accidental.\n\n🎥 twitch.tv/arandana_\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/arandana_",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 026. ARANDANA no esperaba que las físicas de la fauna fueran tan realistas en este encuentro accidental.\n\n🎥 twitch.tv/arandana_\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 164
+   },
+   "ficha_id": "t-arandana-"
+  }
+ },
+ {
+  "id": "reels|26|2026-11-27T04:30:00.000Z",
+  "plataforma": "reels",
+  "toma": 26,
+  "dueAt": "2026-11-27T04:30:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-26/toma-026-a648f61a.mp4",
+  "estado": "creado",
+  "post_id": "6b090183062ed764a8e07048",
+  "intento": "32bd58373c09483eaa612d9b1c0a2d49",
+  "registrado": true,
+  "texto": "Toma 026. ARANDANA no esperaba que las físicas de la fauna fueran tan realistas en este encuentro accidental.\n\n🎥 twitch.tv/arandana_\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 26,
+    "gancho": "Impacto accidental contra un pelícano",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-arandana-",
+    "caption": "ARANDANA no esperaba que las físicas de la fauna fueran tan realistas en este encuentro accidental.",
+    "frase": "¡Ala! Me dolió en el alma ese pelícano. ¡Dios mío!",
+    "hablante": "ARANDANA",
+    "campana": "",
+    "duracion_s": 14.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/arandana_",
+    "id_origen": "AuspiciousHeadstrongSwordSwiftRage-KXshq6a_K8oAvXpy",
+    "claves": [
+     "AuspiciousHeadstrongSwordSwiftRage-KXshq6a_K8oAvXpy"
+    ]
+   },
+   "textos": {
+    "texto": "Toma 026. ARANDANA no esperaba que las físicas de la fauna fueran tan realistas en este encuentro accidental.\n\n🎥 twitch.tv/arandana_\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/arandana_",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Toma 026. ARANDANA no esperaba que las físicas de la fauna fueran tan realistas en este encuentro accidental.\n\n🎥 twitch.tv/arandana_\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 167
+   },
+   "ficha_id": "t-arandana-"
+  }
  }
 ]
