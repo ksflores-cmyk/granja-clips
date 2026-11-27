@@ -3805,5 +3805,111 @@
    "ficha_id": "t-arandana-"
   },
   "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|27|2026-11-27T15:30:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 27,
+  "dueAt": "2026-11-27T15:30:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-27/toma-027-a87fe3ae.mp4",
+  "estado": "creado",
+  "post_id": "6b099cd5b83ec61257d92733",
+  "intento": "d67e063200224e48811ea815c80de312",
+  "registrado": true,
+  "texto": "DONANGELILLO descubre una forma muy rápida de viajar al centro de la Tierra en Vice City.\n\n🎥 twitch.tv/donangelillo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 27,
+    "gancho": "Lucía atraviesa el suelo",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-donangelillo",
+    "caption": "DONANGELILLO descubre una forma muy rápida de viajar al centro de la Tierra en Vice City.",
+    "frase": "Bueno, espera que la bugeo más todavía.",
+    "hablante": "DONANGELILLO",
+    "campana": "",
+    "duracion_s": 10.03,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/donangelillo",
+    "id_origen": "TentativeAmorphousBaguetteNononoCat-iVdrTMylaU7SHE-l",
+    "claves": [
+     "TentativeAmorphousBaguetteNononoCat-iVdrTMylaU7SHE-l"
+    ]
+   },
+   "textos": {
+    "texto": "DONANGELILLO descubre una forma muy rápida de viajar al centro de la Tierra en Vice City.\n\n🎥 twitch.tv/donangelillo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/donangelillo",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "DONANGELILLO descubre una forma muy rápida de viajar al centro de la Tierra en Vice City.\n\n🎥 twitch.tv/donangelillo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 147
+   },
+   "ficha_id": "t-donangelillo"
+  }
+ },
+ {
+  "id": "reels|27|2026-11-27T15:30:00.000Z",
+  "plataforma": "reels",
+  "toma": 27,
+  "dueAt": "2026-11-27T15:30:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-27/toma-027-a87fe3ae.mp4",
+  "estado": "creado",
+  "post_id": "6b099cd5b83ec61257d92788",
+  "intento": "166bb926408148b98ce2e2fbbc450cb7",
+  "registrado": true,
+  "texto": "DONANGELILLO descubre una forma muy rápida de viajar al centro de la Tierra en Vice City.\n\n🎥 twitch.tv/donangelillo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 27,
+    "gancho": "Lucía atraviesa el suelo",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-donangelillo",
+    "caption": "DONANGELILLO descubre una forma muy rápida de viajar al centro de la Tierra en Vice City.",
+    "frase": "Bueno, espera que la bugeo más todavía.",
+    "hablante": "DONANGELILLO",
+    "campana": "",
+    "duracion_s": 10.03,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/donangelillo",
+    "id_origen": "TentativeAmorphousBaguetteNononoCat-iVdrTMylaU7SHE-l",
+    "claves": [
+     "TentativeAmorphousBaguetteNononoCat-iVdrTMylaU7SHE-l"
+    ]
+   },
+   "textos": {
+    "texto": "DONANGELILLO descubre una forma muy rápida de viajar al centro de la Tierra en Vice City.\n\n🎥 twitch.tv/donangelillo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/donangelillo",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "DONANGELILLO descubre una forma muy rápida de viajar al centro de la Tierra en Vice City.\n\n🎥 twitch.tv/donangelillo\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 150
+   },
+   "ficha_id": "t-donangelillo"
+  }
  }
 ]
