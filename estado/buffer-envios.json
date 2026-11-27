@@ -3695,7 +3695,8 @@
     "largo": 164
    },
    "ficha_id": "t-arandana-"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|26|2026-11-27T04:30:00.000Z",
@@ -3748,7 +3749,8 @@
     "largo": 164
    },
    "ficha_id": "t-arandana-"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|26|2026-11-27T04:30:00.000Z",
@@ -3801,6 +3803,7 @@
     "largo": 167
    },
    "ficha_id": "t-arandana-"
-  }
+  },
+  "ruta_borrada": true
  }
 ]
