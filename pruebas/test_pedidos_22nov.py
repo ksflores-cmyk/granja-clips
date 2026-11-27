@@ -126,15 +126,21 @@ def test_el_plan_declara_subtitulos_del_clip_y_la_puerta_de_estilo_lo_acepta(mar
 
 
 @pytest.mark.slow
-def test_hacer_toma_con_subtitulos_quemados_sale_en_verde_sin_dialogo(repo, tmp_path, video20, carpetas):
+def test_hacer_toma_con_subtitulos_quemados_sin_franja_se_descarta(repo, tmp_path, video20, carpetas):
+    # Estilo v3, punto 4 (Kevin, 25 nov): sin franja fiable no se pueden tapar, y ya no salen tal cual.
     r = correr(repo, "subtitulos_quemados", tmp_path, video20)
+    assert not r.ok and r.gastar
+    assert any("franja fiable" in m for m in r.motivos)
+
+
+@pytest.mark.slow
+def test_hacer_toma_con_subtitulos_quemados_y_franja_los_tapa_y_pone_los_nuestros(repo, tmp_path, video20, carpetas):
+    r = correr(repo, "subtitulos_tapados", tmp_path, video20)
     assert r.ok, r.motivos
     assert all(ok for _, ok, _ in r.puntos), [(n, d) for n, ok, d in r.puntos if not ok]
-    assert r.plan["subtitulos"] == "del clip" and r.plan["lineas"] == []
-    assert not [c for c in r.plan["geometria"]["capas"] if c["tipo"].startswith("dialogo")]
-    assert any("Subtítulos del clip" in n and ok for n, ok, _ in r.puntos)
-    assert json.loads(r.mp4.with_suffix(".plan.json").read_text(encoding="utf-8"))["subtitulos"] == "del clip"
-    assert r.gemini["caption"]                                  # el caption llega para la publicación
+    assert r.plan["subtitulos"] == "tapados" and r.plan["franja_tapada"] == [0.78, 0.9] and r.plan["lineas"]
+    assert [c for c in r.plan["geometria"]["capas"] if c["tipo"].startswith("dialogo")]
+    assert json.loads(r.mp4.with_suffix(".plan.json").read_text(encoding="utf-8"))["subtitulos"] == "tapados"
 
 
 @pytest.mark.slow
@@ -162,9 +168,9 @@ def primera(toma, red="shorts", ficha=None):
 
 def test_el_caption_de_gemini_se_usa_en_lugar_del_gancho():
     t = {**TOMA_C, "caption": "¿Quién conducía ese coche?"}
-    assert primera(t) == "Toma 004. ¿Quién conducía ese coche?"
+    assert primera(t) == "¿Quién conducía ese coche?"
     r = armar_textos(t, ficha_t(), "shorts")
-    assert r["titulo"] == "Toma 004. ¿Quién conducía ese coche?" and "Pollo atropella" not in r["texto"]
+    assert r["titulo"] == "¿Quién conducía ese coche?" and "Pollo atropella" not in r["texto"]
 
 
 @pytest.mark.parametrize("caption", [
@@ -185,9 +191,9 @@ def test_sin_caption_valido_se_usa_una_frase_de_respaldo_distinta_del_gancho(cap
     t = {**TOMA_C, "pilar": pilar, "caption": caption}
     for red in ("shorts", "tiktok", "reels"):
         linea = primera(t, red)
-        assert linea.startswith("Toma 004. ") and len(linea) > len("Toma 004. ")
+        assert linea.startswith("") and len(linea) > len("")
         texto = armar_textos(t, ficha_t(), red)["texto"]
-        assert not mod_textos._casi_igual(linea[len("Toma 004. "):], t["gancho"])
+        assert not mod_textos._casi_igual(linea[len(""):], t["gancho"])
         assert "pollo atropella un coche" not in mod_textos._n(texto)       # nunca el gancho completo
 
 
@@ -199,22 +205,22 @@ def test_el_respaldo_es_determinista_y_cambia_con_el_numero():
 
 def test_el_caption_sin_emojis_ni_hashtags_y_en_tipo_oracion():
     t = {**TOMA_C, "caption": "😂 ¿Lo habías visto antes? #gta6"}
-    assert primera(t) == "Toma 004. ¿Lo habías visto antes?"
-    assert primera({**TOMA_C, "caption": "¿ESTO ES NORMAL EN EL JUEGO?"}).startswith("Toma 004. ¿Esto es normal")
+    assert primera(t) == "¿Lo habías visto antes?"
+    assert primera({**TOMA_C, "caption": "¿ESTO ES NORMAL EN EL JUEGO?"}).startswith("¿Esto es normal")
 
 
 def test_un_respaldo_que_se_parece_al_gancho_se_salta():
     t = {**TOMA_C, "gancho": "Un dato curioso del juego", "pilar": "dato_util", "caption": None, "numero": 3}
     assert mod_textos._casi_igual(mod_textos.RESPALDOS_CAPTION["dato_util"][3], t["gancho"])    # el que tocaba
     linea = primera(t)
-    assert linea.startswith("Toma 003. ") and "dato curioso del juego" not in mod_textos._n(linea)
+    assert linea.startswith("") and "dato curioso del juego" not in mod_textos._n(linea)
 
 
 def test_el_caption_sigue_en_la_campana_y_el_gancho_se_sigue_validando():
     from test_textos import TOMA_A, ficha_fm27
     t = {**TOMA_A, "caption": "¿Habrá sido una buena inversión?"}
     for red in ("shorts", "tiktok", "reels"):
-        assert armar_textos(t, ficha_fm27(), red)["texto"].startswith("Toma 007. ¿Habrá sido una buena inversión?\n\n")
+        assert armar_textos(t, ficha_fm27(), red)["texto"].startswith("¿Habrá sido una buena inversión?\n\n")
     from fabrica.publicar import Descartada
     with pytest.raises(Descartada, match="gancho genérico"):
         armar_textos({**t, "gancho": "Mira esto"}, ficha_fm27(), "shorts")
@@ -324,7 +330,7 @@ def test_la_regla_de_7_dias_es_la_de_main_y_los_respaldos_de_dialogo_no_chocan(t
          "frase": "Ya podéis perrear", "hablante": "MIRIAM PETRICOR"}
     b = {**a, "numero": 8, "gancho": "Dragón sobrevuela la ciudad", "frase": "No me lo puedo creer"}
     ta = armar_textos(a, ficha_t(), "shorts", tmp_path, hoy)
-    assert primera(a) == "Toma 001. «Ya podéis perrear», dice MIRIAM PETRICOR"
+    assert primera(a) == "«Ya podéis perrear», dice MIRIAM PETRICOR"
     ruta = tmp_path / "estado" / "buffer-textos.json"
     publicar._escribir_json(ruta, [{"fecha": "2026-11-21", "plataforma": "shorts",
                                     "huella": publicar.hashlib.sha256(publicar._cuerpo_sin_toma(ta["texto"]).encode()).hexdigest()}])
@@ -347,10 +353,10 @@ def test_el_caption_de_gemini_con_palabra_vetada_de_la_ficha_usa_el_respaldo():
     for malo in ("Esto parece una filtración del juego", "Versión pirata a la vista"):
         t = {**TOMA_C, "caption": malo, "frase": "Ya podéis perrear", "hablante": "ANA"}
         linea = primera(t, ficha=ficha)
-        assert "filtraci" not in linea and "pirata" not in linea and linea == "Toma 004. «Ya podéis perrear», dice ANA"
+        assert "filtraci" not in linea and "pirata" not in linea and linea == "«Ya podéis perrear», dice ANA"
     ok = primera({**TOMA_C, "caption": "¿Quién conducía ese coche?"}, ficha=ficha)
-    assert ok == "Toma 004. ¿Quién conducía ese coche?"
-    assert primera({**TOMA_C, "caption": "Rubius lo vio venir"}, ficha=ficha) != "Toma 004. Rubius lo vio venir"
+    assert ok == "¿Quién conducía ese coche?"
+    assert primera({**TOMA_C, "caption": "Rubius lo vio venir"}, ficha=ficha) != "Rubius lo vio venir"
 
 
 def test_toma_dict_lleva_la_primera_frase_del_streamer_y_su_nombre():

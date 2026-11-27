@@ -49,13 +49,17 @@ Lo vertical ya va entero (la escala cubre el alto); en la toma 014 el zoom viene
 Hoy: Gemini marca `subtitulos_quemados` y la fábrica sólo omite su propio bloque; los subtítulos del clip (morados
 palabra por palabra en la 013, que además son un estilo que `marca.yml` prohíbe) se ven tal cual.
 
-- [ ] El buscador baja al final de la lista los candidatos marcados con subtítulos quemados (con el veredicto guardado
+- [x] El buscador baja al final de la lista los candidatos marcados con subtítulos quemados (con el veredicto guardado
       por id de clip en `estado/`); sólo se usan si no queda otro en ese hueco.
-- [ ] Gemini devuelve también la franja vertical de esos subtítulos (`subtitulos_franja: [y0, y1]` en fracción del
+- [x] Gemini devuelve también la franja vertical de esos subtítulos (`subtitulos_franja: [y0, y1]` en fracción del
       alto). Si se usa el clip: esa franja se difumina (desenfoque gaussiano fuerte, ancho completo) y van nuestros
       subtítulos del punto 1 encima, con la transcripción de Whisper o de Gemini.
-- [ ] Sin franja fiable (falta, o mide más del 25 % del alto): el clip se descarta y se anota el motivo.
+- [x] Sin franja fiable (falta, o mide más del 25 % del alto): el clip se descarta y se anota el motivo.
 - [ ] Prueba con la toma 013 como caso de regresión (clip y veredicto guardados sin el video en el repo).
+
+Punto 4 en la PR `claude/clips-estilo-v3a` (26 nov): además, si el primer candidato trae subtítulos quemados queda de
+reserva y se prueba otro; la historia se apaga en las tomas tapadas (lee tiempos de la fuente original).
+Falta la prueba de regresión con la toma 013.
 
 ## Orden y criterio de cierre
 

@@ -373,7 +373,7 @@ def test_texto_de_campana_por_red_y_por_creador(creador, red):
     tx = textos({**TOMA_FM, "creador": creador}, f, red)
     etiqueta = CREADORES[creador][RED[red]]
     lineas = tx["texto"].split("\n")
-    assert lineas[0] == "Toma 007. Sebas ficha al delantero" and lineas[1] == ""
+    assert lineas[0] == "Sebas ficha al delantero" and lineas[1] == ""
     # @footballmanager, la etiqueta del creador de esa red y #Publicidad: en ese orden, sin líneas en medio
     assert lineas[2:5] == ["@footballmanager", etiqueta, "#Publicidad"]
     assert lineas[5].split()[0].startswith("#") and 1 <= len(lineas[5].split()) <= 3

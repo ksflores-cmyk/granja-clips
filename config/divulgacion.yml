@@ -1,0 +1,11 @@
+# Divulgación nativa de los clips de campaña (aviso A-20261125-4, 25 nov 2026).
+# TikTok exige el aviso de contenido comercial («Paid partnership»), Instagram la etiqueta de colaboración pagada
+# (sólo desde la app) y YouTube la casilla «incluye promoción pagada». #Ad en el texto no los sustituye.
+# La API de Buffer (create_post, revisada el 25 nov) sólo trae `isAiGenerated` y `title` para TikTok, ni etiqueta
+# de colaboración en Instagram, ni casilla de promoción pagada en YouTube. El roadmap de Buffer tiene la divulgación
+# de TikTok como pedido, no como función.
+# `automatica: false` -> la fábrica NO manda clips de campaña a esa red por Buffer. Lo cambia sólo una decisión de Kevin.
+redes:
+  tiktok: {automatica: false, motivo: "Buffer no activa el aviso de contenido comercial de TikTok"}
+  reels: {automatica: false, motivo: "Buffer no pone la etiqueta de colaboración pagada de Instagram"}
+  shorts: {automatica: false, motivo: "Buffer no marca la casilla de promoción pagada de YouTube"}

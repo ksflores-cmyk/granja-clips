@@ -1197,8 +1197,9 @@ def test_con_historia_apagada_el_esquema_y_el_prompt_son_los_de_siempre():
     from fabrica import ojos
     e = ojos.esquema_respuesta()
     assert list(e["properties"]) == ["apto", "motivos", "spoiler", "desnudez", "cinematica", "juego_correcto", "mods",
-                                     "subtitulos_quemados", "caption", "idioma_original", "lineas", "gancho", "palabra_lapiz", "escena", "acotacion",
-                                     "recorte"] and e["required"] == list(e["properties"])
+                                     "subtitulos_quemados", "caption", "subtitulos_franja", "idioma_original", "lineas", "gancho",
+                                     "palabra_lapiz", "escena", "acotacion",
+                                     "recorte"] and e["required"] == [k for k in e["properties"] if k != "subtitulos_franja"]
     assert json.loads(ojos.cuerpo_peticion("i", b"v", 0.2))["generationConfig"]["responseSchema"] == e
     marca = Marca.cargar(RAIZ_REAL)
     temporada = yaml.safe_load((RAIZ_REAL / "temporada.yml").read_text(encoding="utf-8"))

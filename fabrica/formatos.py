@@ -294,7 +294,7 @@ def textos_compilado(compilado: Compilado, plataforma: str, temporada: dict, cfg
                      hoy: date | None = None) -> dict:
     """Texto de la publicación de un compilado: {texto, titulo, credito, etiquetas}; `Descartada` si no cumple.
 
-        Toma 012. Mejores momentos del día en GTA 6
+        Mejores momentos del día en GTA 6
         <sólo Reels: «3 momentos de hoy, de 3 streamers.»>
         🎥 twitch.tv/a · twitch.tv/b · twitch.tv/c
         <divulgación de cada ficha, si la hay>
@@ -316,9 +316,7 @@ def textos_compilado(compilado: Compilado, plataforma: str, temporada: dict, cfg
     juego = _limpio(temporada.get("nombre"))
     if not juego:
         raise Descartada("temporada sin nombre de juego")
-    numero = compilado.numero
-    num = f"{int(numero):03d}" if str(numero).isdigit() else str(numero)
-    primera = f"Toma {num}. {_limpio(formato['gancho'])} en {juego}"
+    primera = f"{_limpio(formato['gancho'])} en {juego}"     # sin «Toma nnn.» desde el 25 nov (Kevin): sólo en el video
     credito = _linea_credito(segs, plataforma)
     for s in segs:           # cada streamer debe salir en la línea del crédito
         if etiqueta_credito(s.ficha, s.creador, plataforma).lower() not in credito.lower():
@@ -374,7 +372,7 @@ def textos_compilado(compilado: Compilado, plataforma: str, temporada: dict, cfg
         # El gancho del formato se repite a propósito cada día: lo que no se repite es el compilado del mismo
         # día, así que para el control de «gancho repetido» el gancho lleva la fecha del compilado.
         _comprobar_repetido(raiz, texto, plataforma,
-                            {"numero": numero, "gancho": f"{formato['gancho']} {compilado.fecha.isoformat()}"}, hoy)
+                            {"numero": compilado.numero, "gancho": f"{formato['gancho']} {compilado.fecha.isoformat()}"}, hoy)
     return {"texto": texto, "titulo": titulo, "credito": credito, "etiquetas": etiquetas}
 
 

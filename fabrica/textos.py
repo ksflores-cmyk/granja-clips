@@ -312,8 +312,13 @@ def caption_de(toma: dict, ficha: dict, cfg: dict, gancho: str, plataforma: str 
 
 
 def _primera_linea(toma: dict, ficha: dict, cfg: dict, gancho: str, plataforma: str | None) -> str:
+    """Primera línea del texto (y título de Shorts): sólo el caption. Desde el 25 nov (Kevin) el «Toma nnn» va sólo
+    en el video, no en el texto ni en el título. Sin caption válido, el primer respaldo fijo del pilar."""
     caption = caption_de(toma, ficha, cfg, gancho, plataforma)
-    return f"Toma {_numero(toma)}." + (f" {caption}" if caption else "")
+    if caption:
+        return caption
+    pilar = str(toma.get("pilar") or "")
+    return RESPALDOS_CAPTION[pilar if pilar in RESPALDOS_CAPTION else "momentos"][0]
 
 
 # ---------------------------------------------------------------- crédito
@@ -429,7 +434,7 @@ def _titulo_de(primera: str, plataforma: str, cfg: dict) -> str | None:
 def _campana(toma: dict, ficha: dict, plataforma: str, cfg: dict) -> dict:
     """Texto de una campaña con brief (SEGA FM27). Orden fijo:
 
-        Toma nnn. <caption en español, distinta del gancho>
+        <caption en español, distinta del gancho; sin «Toma nnn» desde el 25 nov>
         <blanco>
         @footballmanager            (etiquetas_obligatorias, tal cual)
         <etiqueta del creador>      (la de su red; una línea por creador, en el orden de la toma)

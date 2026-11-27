@@ -99,6 +99,7 @@ def esquema_respuesta(historia: bool = False) -> dict:
         "motivos": {"type": "ARRAY", "items": texto},
         "spoiler": booleano, "desnudez": booleano, "cinematica": booleano, "juego_correcto": booleano, "mods": booleano,
         "subtitulos_quemados": booleano, "caption": texto,
+        "subtitulos_franja": {"type": "ARRAY", "items": numero},
         "idioma_original": texto,
         "lineas": {"type": "ARRAY", "items": {
             "type": "OBJECT",
@@ -108,10 +109,11 @@ def esquema_respuesta(historia: bool = False) -> dict:
         "recorte": {"type": "OBJECT", "properties": {"inicio": numero, "fin": numero},
                     "required": ["inicio", "fin"]},
     }
+    requeridos = [k for k in campos if k != "subtitulos_franja"]     # opcional: sólo si hay subtítulos quemados
     if historia:        # opcional (no va en `required`): el plan de edición por momentos, sin texto propio (#20)
         return {"type": "OBJECT", "properties": {**campos, "historia": mod_historia.esquema_gemini()},
-                "required": list(campos)}
-    return {"type": "OBJECT", "properties": campos, "required": list(campos)}
+                "required": requeridos}
+    return {"type": "OBJECT", "properties": campos, "required": requeridos}
 
 
 def _sin_acentos(t: str) -> str:
@@ -629,6 +631,9 @@ def validar_respuesta(datos, marca: Marca, temporada: dict, *, duracion: float |
             m.append(f"campo {c}: falta o no es texto")
     if not (isinstance(datos.get("motivos"), list) and all(isinstance(x, str) for x in datos["motivos"])):
         m.append("campo motivos: falta o no es una lista de texto")
+    fr = datos.get("subtitulos_franja")      # opcional (estilo v3, punto 4): sin ella, la franja no se puede tapar
+    if fr is not None and not (isinstance(fr, list) and all(_numero(x) for x in fr)):
+        m.append("campo subtitulos_franja: no es una lista de números")
     rec = datos.get("recorte")
     if not (isinstance(rec, dict) and _numero(rec.get("inicio")) and _numero(rec.get("fin"))):
         m.append("campo recorte: falta o no trae inicio y fin numéricos")
@@ -801,3 +806,21 @@ def partir_lineas(datos: dict, marca: Marca) -> list[dict]:
             salida.append({**ln, "t0": ini, "t1": fin, "es": t})
             ini = fin
     return salida
+
+
+FRANJA_MAX = 0.25        # estilo v3, punto 4: una franja de subtítulos más alta que esto no se tapa (se descarta)
+
+
+def franja_quemados(datos) -> tuple[float, float] | None:
+    """(y0, y1) en fracción del alto si Gemini marcó subtítulos quemados y dio una franja fiable; si no, None.
+
+    Fiable: dos números dentro de [0, 1], y0 < y1 y alto de la franja de 2 % a `FRANJA_MAX` del cuadro."""
+    if not isinstance(datos, dict) or datos.get("subtitulos_quemados") is not True:
+        return None
+    fr = datos.get("subtitulos_franja")
+    if not (isinstance(fr, list) and len(fr) == 2 and all(_numero(x) for x in fr)):
+        return None
+    y0, y1 = float(fr[0]), float(fr[1])
+    if not (0.0 <= y0 < y1 <= 1.0) or not 0.02 <= y1 - y0 <= FRANJA_MAX:
+        return None
+    return round(y0, 4), round(y1, 4)

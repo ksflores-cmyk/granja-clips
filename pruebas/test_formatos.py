@@ -243,7 +243,7 @@ def compilado_de_texto(creadores=("ibai", "auron", "grefg"), formato="mejores-mo
 def test_textos_traen_cada_creador_un_emoji_y_el_juego(cfg, temporada, plataforma):
     t = formatos.textos_compilado(compilado_de_texto(), plataforma, temporada, cfg)
     texto = t["texto"]
-    assert texto.startswith("Toma 012. Mejores momentos del día en GTA 6\n")
+    assert texto.startswith("Mejores momentos del día en GTA 6\n")
     linea = next(x for x in texto.splitlines() if x.startswith("🎥"))
     assert all(f"twitch.tv/{c}" in linea for c in ("ibai", "auron", "grefg"))
     assert contar_emojis(texto) == 1 and len(texto) <= MAX_TEXTO
@@ -319,7 +319,7 @@ def test_el_gancho_del_formato_de_ayer_no_bloquea_el_compilado_de_hoy(repo, cfg,
     with open(repo / "marcador.csv", "a", newline="", encoding="utf-8") as f:
         csv.DictWriter(f, CABECERA_MARCADOR).writerow(fila)
     t = formatos.textos_compilado(compilado_de_texto(), "tiktok", temporada, cfg, raiz=repo, hoy=HOY)
-    assert t["texto"].startswith("Toma 012. Mejores momentos del día")
+    assert t["texto"].startswith("Mejores momentos del día")
 
 
 def test_fila_del_marcador(cfg):

@@ -31,7 +31,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from . import detectar as mod_detectar
-from . import informativa, plazo, publicar, puertas, red, registro, retiros, shorts
+from . import divulgacion, informativa, plazo, publicar, puertas, red, registro, retiros, shorts
 from . import validar as mod_validar
 from .almacen import Almacen, ErrorAlmacen
 from .config import cargar_yaml, raiz_repo
@@ -569,7 +569,29 @@ def elegir_candidatos(raiz, ahora, plataformas, out, detectar_fn=None, cliente=N
         aprobados = ap if aprobados is None else [c for c in aprobados if c.id_origen in ids]
     pagadas = {fid for fid, f in fichas.items()
                if f.get("tipo") == "A" and f.get("campana") and f.get("material")}
-    return ordenar(aprobados or [], t, pagadas)
+    orden = ordenar(aprobados or [], t, pagadas)
+    quemados = ids_quemados(raiz)        # estilo v3, punto 4: los clips con subtítulos quemados van al final
+    return [c for c in orden if not set(_claves_de(c)) & quemados] + \
+        [c for c in orden if set(_claves_de(c)) & quemados]
+
+
+def _ruta_quemados(raiz) -> Path:
+    return raiz_repo(raiz) / "estado" / "quemados.json"
+
+
+def ids_quemados(raiz) -> set[str]:
+    """Claves de los clips que Gemini vio con subtítulos quemados (estilo v3, punto 4)."""
+    datos = _leer_json(_ruta_quemados(raiz), [])
+    return {str(x) for x in datos} if isinstance(datos, list) else set()
+
+
+def anotar_quemado(raiz, claves) -> None:
+    datos = _leer_json(_ruta_quemados(raiz), [])
+    datos = [str(x) for x in datos] if isinstance(datos, list) else []
+    for k in claves:
+        if k not in datos:
+            datos.append(k)
+    _escribir_json(_ruta_quemados(raiz), datos[-500:])
 
 
 # ------------------------------------------------------------------ el ciclo
@@ -737,6 +759,11 @@ def publicar_en_vivo(raiz, env, toma: Toma, hueco: Hueco, out, transporte_buffer
         for plat in destinos:            # todo se valida ANTES de subir
             try:
                 publicar.validar_futuro(cuando, reloj())
+                ok_d, motivo_d = divulgacion.permite(raiz, plat, toma.ficha)     # A-20261125-4
+                if not ok_d:
+                    out(f"{plat}: toma de campaña sin divulgación nativa ({motivo_d}): no se publica en esta red")
+                    fallo(plat)
+                    continue
                 if plat == "shorts":       # A-20261125-1: Buffer gratis, 2 Shorts por canal cada 24 h
                     ok, motivo = shorts.admite(_libro(raiz), toma.ficha, cuando, reloj(), shorts.config(raiz),
                                                lambda pid: pub.estado(pid, pub.orgs.get("shorts")))
@@ -1016,7 +1043,8 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
         horas = _cfg_horarios(raiz)["no_repetir_horas"]
         recientes = {p: claves_recientes(raiz, p, hueco.programar_en, horas) for p in hueco.plataformas}
         i = 0
-        for c in cands:
+        reserva = None                 # estilo v3, punto 4: toma con subtítulos del clip tapados, sólo si no hay otra
+        for n_c, c in enumerate(cands):
             if i >= MAX_INTENTOS:
                 break
             if set(_claves_de(c)) & set().union(*recientes.values()):
@@ -1034,6 +1062,13 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
                 if not sim:               # el intento ya había empezado: cuenta como fallo no-material
                     _sumar_fallo(raiz, c.id_origen, ahora, out)
                 raise
+            if r.ok and (r.plan or {}).get("subtitulos") == "tapados":
+                if not sim:
+                    anotar_quemado(raiz, _claves_de(c))
+                if reserva is None and i < MAX_INTENTOS and n_c + 1 < len(cands):
+                    reserva = Toma(r, _toma_dict(r, c, ficha), ficha, c)
+                    out(f"intento {i}: {c.id_origen} trae subtítulos quemados: queda de reserva y se prueba otro")
+                    continue
             if r.ok:
                 toma = Toma(r, _toma_dict(r, c, ficha), ficha, c)
                 break
@@ -1048,6 +1083,9 @@ def _producir(raiz, env, out, modo, hueco, ahora, reloj, sim, salida_dir, detect
                 out("la fuente no se gasta (red, tiempo o máquina)")
                 if not sim:
                     _sumar_fallo(raiz, c.id_origen, ahora, out)
+        if toma is None and reserva is not None:
+            out(f"se usa la reserva ({reserva.candidato.id_origen}): subtítulos del clip tapados, no hubo otra toma")
+            toma = reserva
         if toma is None:
             if plazo.queda(TIEMPO_MIN_INTENTO_S):
                 with plazo.etapa("respaldo"):
