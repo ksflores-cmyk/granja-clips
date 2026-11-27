@@ -4073,7 +4073,8 @@
     "largo": 113
    },
    "ficha_id": "t-failets"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "tiktok|29|2026-11-27T19:00:00.000Z",
@@ -4126,7 +4127,8 @@
     "largo": 113
    },
    "ficha_id": "t-failets"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|29|2026-11-27T19:00:00.000Z",
@@ -4179,6 +4181,113 @@
     "largo": 116
    },
    "ficha_id": "t-failets"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|30|2026-11-27T22:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 30,
+  "dueAt": "2026-11-27T22:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-27/toma-030-9d512e66.mp4",
+  "estado": "creado",
+  "post_id": "6b09f0f4b5cd052fe28fb62c",
+  "intento": "21cefeeba4b14c2f9c73c926fbbfe280",
+  "registrado": true,
+  "texto": "Chorifletes se indigna al descubrir que su personaje no puede ir al baño en GTA 6.\n\n🎥 twitch.tv/chorifletes\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 30,
+    "gancho": "El drama de no poder cagar",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-chorifletes",
+    "caption": "Chorifletes se indigna al descubrir que su personaje no puede ir al baño en GTA 6.",
+    "frase": "Puedes hacer lo que te dé la gana en el juego pero cagar no, ¡vaya mierda de juego!",
+    "hablante": "CHORIFLETES",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/chorifletes",
+    "id_origen": "HyperSavoryOrcaPipeHype-oJ72eE_Zg2rs1MMZ",
+    "claves": [
+     "HyperSavoryOrcaPipeHype-oJ72eE_Zg2rs1MMZ"
+    ]
+   },
+   "textos": {
+    "texto": "Chorifletes se indigna al descubrir que su personaje no puede ir al baño en GTA 6.\n\n🎥 twitch.tv/chorifletes\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/chorifletes",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Chorifletes se indigna al descubrir que su personaje no puede ir al baño en GTA 6.\n\n🎥 twitch.tv/chorifletes\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 139
+   },
+   "ficha_id": "t-chorifletes"
+  }
+ },
+ {
+  "id": "reels|30|2026-11-27T22:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 30,
+  "dueAt": "2026-11-27T22:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-27/toma-030-9d512e66.mp4",
+  "estado": "creado",
+  "post_id": "6b09f0f571e8cc12a6ce1488",
+  "intento": "811c54f984ca469bb960dc4657534b2d",
+  "registrado": true,
+  "texto": "Chorifletes se indigna al descubrir que su personaje no puede ir al baño en GTA 6.\n\n🎥 twitch.tv/chorifletes\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 30,
+    "gancho": "El drama de no poder cagar",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-chorifletes",
+    "caption": "Chorifletes se indigna al descubrir que su personaje no puede ir al baño en GTA 6.",
+    "frase": "Puedes hacer lo que te dé la gana en el juego pero cagar no, ¡vaya mierda de juego!",
+    "hablante": "CHORIFLETES",
+    "campana": "",
+    "duracion_s": 12.0,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/chorifletes",
+    "id_origen": "HyperSavoryOrcaPipeHype-oJ72eE_Zg2rs1MMZ",
+    "claves": [
+     "HyperSavoryOrcaPipeHype-oJ72eE_Zg2rs1MMZ"
+    ]
+   },
+   "textos": {
+    "texto": "Chorifletes se indigna al descubrir que su personaje no puede ir al baño en GTA 6.\n\n🎥 twitch.tv/chorifletes\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/chorifletes",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Chorifletes se indigna al descubrir que su personaje no puede ir al baño en GTA 6.\n\n🎥 twitch.tv/chorifletes\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 142
+   },
+   "ficha_id": "t-chorifletes"
   }
  }
 ]
