@@ -3965,7 +3965,8 @@
     "largo": 131
    },
    "ficha_id": "t-sajonarco"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|28|2026-11-27T17:00:00.000Z",
@@ -4018,6 +4019,166 @@
     "largo": 134
    },
    "ficha_id": "t-sajonarco"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "shorts|29|2026-11-27T19:00:00.000Z",
+  "plataforma": "shorts",
+  "toma": 29,
+  "dueAt": "2026-11-27T19:00:00.000Z",
+  "canal": "6afd248cece6dfde5f047187",
+  "ruta": "tomas/2026-11-27/toma-029-fd4f884b.mp4",
+  "estado": "creado",
+  "post_id": "6b09c7d6d5bf252ef541cb83",
+  "intento": "354dfbcf747e4b54b31494556da9e60f",
+  "registrado": true,
+  "texto": "El streamer investiga un error muy curioso en plena partida.\n\n🎥 twitch.tv/failets\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 29,
+    "gancho": "Insultando al chat por un bug",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-failets",
+    "caption": "El streamer investiga un error muy curioso en plena partida.",
+    "frase": "¿Sabes que hay un bug para verle la parte delantera a Lucía?",
+    "hablante": "FAILETS",
+    "campana": "",
+    "duracion_s": 23.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/failets",
+    "id_origen": "FrailTangibleGarlicBloodTrail-DnGV7yjCqhIQapTl",
+    "claves": [
+     "FrailTangibleGarlicBloodTrail-DnGV7yjCqhIQapTl"
+    ]
+   },
+   "textos": {
+    "texto": "El streamer investiga un error muy curioso en plena partida.\n\n🎥 twitch.tv/failets\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": "El streamer investiga un error muy curioso en plena partida.",
+    "credito": "🎥 twitch.tv/failets",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "El streamer investiga un error muy curioso en plena partida.\n\n🎥 twitch.tv/failets\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 113
+   },
+   "ficha_id": "t-failets"
+  }
+ },
+ {
+  "id": "tiktok|29|2026-11-27T19:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 29,
+  "dueAt": "2026-11-27T19:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-27/toma-029-fd4f884b.mp4",
+  "estado": "creado",
+  "post_id": "6b09c7d7c4601a3566a4abf8",
+  "intento": "c3929a83b5c4496490c0b65aa9007161",
+  "registrado": true,
+  "texto": "El streamer investiga un error muy curioso en plena partida.\n\n🎥 twitch.tv/failets\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 29,
+    "gancho": "Insultando al chat por un bug",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-failets",
+    "caption": "El streamer investiga un error muy curioso en plena partida.",
+    "frase": "¿Sabes que hay un bug para verle la parte delantera a Lucía?",
+    "hablante": "FAILETS",
+    "campana": "",
+    "duracion_s": 23.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/failets",
+    "id_origen": "FrailTangibleGarlicBloodTrail-DnGV7yjCqhIQapTl",
+    "claves": [
+     "FrailTangibleGarlicBloodTrail-DnGV7yjCqhIQapTl"
+    ]
+   },
+   "textos": {
+    "texto": "El streamer investiga un error muy curioso en plena partida.\n\n🎥 twitch.tv/failets\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/failets",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "El streamer investiga un error muy curioso en plena partida.\n\n🎥 twitch.tv/failets\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 113
+   },
+   "ficha_id": "t-failets"
+  }
+ },
+ {
+  "id": "reels|29|2026-11-27T19:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 29,
+  "dueAt": "2026-11-27T19:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-27/toma-029-fd4f884b.mp4",
+  "estado": "creado",
+  "post_id": "6b09c7d72b8a129ed818f20c",
+  "intento": "19fd99e8de3e42f8923cb574eb0f2da0",
+  "registrado": true,
+  "texto": "El streamer investiga un error muy curioso en plena partida.\n\n🎥 twitch.tv/failets\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 29,
+    "gancho": "Insultando al chat por un bug",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-failets",
+    "caption": "El streamer investiga un error muy curioso en plena partida.",
+    "frase": "¿Sabes que hay un bug para verle la parte delantera a Lucía?",
+    "hablante": "FAILETS",
+    "campana": "",
+    "duracion_s": 23.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/failets",
+    "id_origen": "FrailTangibleGarlicBloodTrail-DnGV7yjCqhIQapTl",
+    "claves": [
+     "FrailTangibleGarlicBloodTrail-DnGV7yjCqhIQapTl"
+    ]
+   },
+   "textos": {
+    "texto": "El streamer investiga un error muy curioso en plena partida.\n\n🎥 twitch.tv/failets\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/failets",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "El streamer investiga un error muy curioso en plena partida.\n\n🎥 twitch.tv/failets\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 116
+   },
+   "ficha_id": "t-failets"
   }
  }
 ]
