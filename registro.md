@@ -78,3 +78,4 @@
 - 2026-11-27 10:10 GT · ciclo: toma 28 (primeras_veces) programada en tiktok, reels; falló shorts
 - 2026-11-27 12:11 GT · ciclo: toma 29 (primeras_veces) programada en shorts, tiktok, reels
 - 2026-11-27 15:07 GT · ciclo: toma 30 (primeras_veces) programada en tiktok, reels; falló shorts
+- 2026-11-27 18:09 GT · ciclo: toma 31 (primeras_veces) programada en tiktok, reels; falló shorts

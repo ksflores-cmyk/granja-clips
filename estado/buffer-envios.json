@@ -4235,7 +4235,8 @@
     "largo": 139
    },
    "ficha_id": "t-chorifletes"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|30|2026-11-27T22:00:00.000Z",
@@ -4288,6 +4289,113 @@
     "largo": 142
    },
    "ficha_id": "t-chorifletes"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|31|2026-11-28T01:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 31,
+  "dueAt": "2026-11-28T01:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-27/toma-031-c44af20d.mp4",
+  "estado": "creado",
+  "post_id": "6b0a1bb92a2e4f66cae47bd5",
+  "intento": "61a5fedfb74444939deb1290074060d8",
+  "registrado": true,
+  "texto": "Lechu cae en la trampa más antigua de la ciudad.\n\n🎥 twitch.tv/lechu\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 31,
+    "gancho": "El truco del muro falso",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-lechu",
+    "caption": "Lechu cae en la trampa más antigua de la ciudad.",
+    "frase": "No mames. No mames.",
+    "hablante": "LECHU",
+    "campana": "",
+    "duracion_s": 28.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/lechu",
+    "id_origen": "ElatedCulturedPuppyTwitchRaid-5bx8UdfUSB_5Sjln",
+    "claves": [
+     "ElatedCulturedPuppyTwitchRaid-5bx8UdfUSB_5Sjln"
+    ]
+   },
+   "textos": {
+    "texto": "Lechu cae en la trampa más antigua de la ciudad.\n\n🎥 twitch.tv/lechu\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/lechu",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Lechu cae en la trampa más antigua de la ciudad.\n\n🎥 twitch.tv/lechu\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 99
+   },
+   "ficha_id": "t-lechu"
+  }
+ },
+ {
+  "id": "reels|31|2026-11-28T01:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 31,
+  "dueAt": "2026-11-28T01:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-27/toma-031-c44af20d.mp4",
+  "estado": "creado",
+  "post_id": "6b0a1bb9eada83daa6ad836f",
+  "intento": "3f046826b4844886aaaa1e062fe1c7ff",
+  "registrado": true,
+  "texto": "Lechu cae en la trampa más antigua de la ciudad.\n\n🎥 twitch.tv/lechu\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 31,
+    "gancho": "El truco del muro falso",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-lechu",
+    "caption": "Lechu cae en la trampa más antigua de la ciudad.",
+    "frase": "No mames. No mames.",
+    "hablante": "LECHU",
+    "campana": "",
+    "duracion_s": 28.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "",
+    "creador": "twitch.tv/lechu",
+    "id_origen": "ElatedCulturedPuppyTwitchRaid-5bx8UdfUSB_5Sjln",
+    "claves": [
+     "ElatedCulturedPuppyTwitchRaid-5bx8UdfUSB_5Sjln"
+    ]
+   },
+   "textos": {
+    "texto": "Lechu cae en la trampa más antigua de la ciudad.\n\n🎥 twitch.tv/lechu\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/lechu",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Lechu cae en la trampa más antigua de la ciudad.\n\n🎥 twitch.tv/lechu\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 102
+   },
+   "ficha_id": "t-lechu"
   }
  }
 ]
