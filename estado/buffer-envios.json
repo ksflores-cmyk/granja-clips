@@ -4343,7 +4343,8 @@
     "largo": 99
    },
    "ficha_id": "t-lechu"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|31|2026-11-28T01:00:00.000Z",
@@ -4396,6 +4397,113 @@
     "largo": 102
    },
    "ficha_id": "t-lechu"
+  },
+  "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|32|2026-11-28T04:00:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 32,
+  "dueAt": "2026-11-28T04:00:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-27/toma-032-5e410cb6.mp4",
+  "estado": "creado",
+  "post_id": "6b0a45faeada83daa6be0130",
+  "intento": "3059fc0bc1764a73ab2d33c03f72b400",
+  "registrado": true,
+  "texto": "Nadie esperaba que el chimpancé se supiera los pasos prohibidos de Fortnite.\n\n🎥 twitch.tv/lamejorclase\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 32,
+    "gancho": "Chimpancé baila Fortnite en la jaula",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-lamejorclase",
+    "caption": "Nadie esperaba que el chimpancé se supiera los pasos prohibidos de Fortnite.",
+    "frase": "¡Tú, está haciendo el baile de Fortnite!",
+    "hablante": "LAMEJORCLASE",
+    "campana": "",
+    "duracion_s": 10.5,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "mods: Gemini marcó mods: true",
+    "creador": "twitch.tv/lamejorclase",
+    "id_origen": "BreakableWittyWoodcockNotATK-tauN76u396L5t-X1",
+    "claves": [
+     "BreakableWittyWoodcockNotATK-tauN76u396L5t-X1"
+    ]
+   },
+   "textos": {
+    "texto": "Nadie esperaba que el chimpancé se supiera los pasos prohibidos de Fortnite.\n\n🎥 twitch.tv/lamejorclase\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/lamejorclase",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Nadie esperaba que el chimpancé se supiera los pasos prohibidos de Fortnite.\n\n🎥 twitch.tv/lamejorclase\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 134
+   },
+   "ficha_id": "t-lamejorclase"
+  }
+ },
+ {
+  "id": "reels|32|2026-11-28T04:00:00.000Z",
+  "plataforma": "reels",
+  "toma": 32,
+  "dueAt": "2026-11-28T04:00:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-27/toma-032-5e410cb6.mp4",
+  "estado": "creado",
+  "post_id": "6b0a45fa70e80ae8f1c9ece8",
+  "intento": "2a0cba4e6359482b8348257f69bd93e2",
+  "registrado": true,
+  "texto": "Nadie esperaba que el chimpancé se supiera los pasos prohibidos de Fortnite.\n\n🎥 twitch.tv/lamejorclase\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 32,
+    "gancho": "Chimpancé baila Fortnite en la jaula",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-lamejorclase",
+    "caption": "Nadie esperaba que el chimpancé se supiera los pasos prohibidos de Fortnite.",
+    "frase": "¡Tú, está haciendo el baile de Fortnite!",
+    "hablante": "LAMEJORCLASE",
+    "campana": "",
+    "duracion_s": 10.5,
+    "historia": "",
+    "prueba": "corta-10-14:corta",
+    "prueba_nota": "",
+    "nota_edicion": "mods: Gemini marcó mods: true",
+    "creador": "twitch.tv/lamejorclase",
+    "id_origen": "BreakableWittyWoodcockNotATK-tauN76u396L5t-X1",
+    "claves": [
+     "BreakableWittyWoodcockNotATK-tauN76u396L5t-X1"
+    ]
+   },
+   "textos": {
+    "texto": "Nadie esperaba que el chimpancé se supiera los pasos prohibidos de Fortnite.\n\n🎥 twitch.tv/lamejorclase\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/lamejorclase",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Nadie esperaba que el chimpancé se supiera los pasos prohibidos de Fortnite.\n\n🎥 twitch.tv/lamejorclase\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 137
+   },
+   "ficha_id": "t-lamejorclase"
   }
  }
 ]
