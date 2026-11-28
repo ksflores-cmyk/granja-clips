@@ -48,7 +48,7 @@
   origen: twitch
   twitch_login: stephaniemx_
   broadcaster_id: '449091900'
-  seguidores: 124865
+  seguidores: 124867
   seguidores_leidos: '2026-11-28'
   juego: GTA 6
   reglas:
@@ -130,7 +130,7 @@
   origen: twitch
   twitch_login: taisontv
   broadcaster_id: '115156753'
-  seguidores: 165640
+  seguidores: 165648
   seguidores_leidos: '2026-11-28'
   juego: GTA 6
   reglas:
@@ -171,7 +171,7 @@
   origen: twitch
   twitch_login: zyrpesland
   broadcaster_id: '512025628'
-  seguidores: 160096
+  seguidores: 160117
   seguidores_leidos: '2026-11-28'
   juego: GTA 6
   reglas:
@@ -212,7 +212,7 @@
   origen: twitch
   twitch_login: sajonarco
   broadcaster_id: '93191106'
-  seguidores: 67479
+  seguidores: 67483
   seguidores_leidos: '2026-11-28'
   juego: GTA 6
   reglas:
@@ -253,7 +253,7 @@
   origen: twitch
   twitch_login: lamejorclase
   broadcaster_id: '598808171'
-  seguidores: 66892
+  seguidores: 66910
   seguidores_leidos: '2026-11-28'
   juego: GTA 6
   reglas:
@@ -902,8 +902,8 @@
   origen: twitch
   twitch_login: l0k0hgaming
   broadcaster_id: '52642922'
-  seguidores: 28382
-  seguidores_leidos: '2026-11-22'
+  seguidores: 28441
+  seguidores_leidos: '2026-11-28'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -929,12 +929,13 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-24'
+  vence: '2026-11-30'
   estado: vigente
   uso: produccion
   publicable: true
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
+  nombre_visible: L0k0hgaming
 - id: t-joseebernaai
   tipo: T
   creador: twitch.tv/joseebernaai
@@ -2003,8 +2004,8 @@
   origen: twitch
   twitch_login: itsshay
   broadcaster_id: '109429794'
-  seguidores: 87986
-  seguidores_leidos: '2026-11-26'
+  seguidores: 88026
+  seguidores_leidos: '2026-11-28'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -2030,7 +2031,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-28'
+  vence: '2026-11-30'
   estado: vigente
   uso: produccion
   publicable: true
@@ -3062,7 +3063,7 @@
   twitch_login: angeloso93
   broadcaster_id: '498408159'
   seguidores: 10753
-  seguidores_leidos: '2026-11-27'
+  seguidores_leidos: '2026-11-28'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -3088,7 +3089,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-29'
+  vence: '2026-11-30'
   estado: vigente
   uso: produccion
   publicable: true
@@ -3348,8 +3349,8 @@
   origen: twitch
   twitch_login: wiccanatv
   broadcaster_id: '108034822'
-  seguidores: 5418
-  seguidores_leidos: '2026-11-27'
+  seguidores: 5420
+  seguidores_leidos: '2026-11-28'
   juego: GTA 6
   reglas:
     duracion_s:
@@ -3375,7 +3376,7 @@
   minimo_por_clip_usd: null
   tope_por_clip_usd: null
   presupuesto_restante: null
-  vence: '2026-11-29'
+  vence: '2026-11-30'
   estado: vigente
   uso: produccion
   publicable: true
@@ -5111,7 +5112,7 @@
   origen: twitch
   twitch_login: jennsanli
   broadcaster_id: '547235609'
-  seguidores: 172577
+  seguidores: 172580
   seguidores_leidos: '2026-11-28'
   juego: GTA 6
   reglas:
@@ -5849,7 +5850,7 @@
   origen: twitch
   twitch_login: capitanmander
   broadcaster_id: '496211308'
-  seguidores: 2492
+  seguidores: 2493
   seguidores_leidos: '2026-11-28'
   juego: GTA 6
   reglas:
@@ -6751,7 +6752,7 @@
   origen: twitch
   twitch_login: eljosecilloo
   broadcaster_id: '925133545'
-  seguidores: 3296
+  seguidores: 3305
   seguidores_leidos: '2026-11-28'
   juego: GTA 6
   reglas:
@@ -8876,3 +8877,85 @@
   notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
     de Twitch.'
   nombre_visible: LeaLopezS
+- id: t-nazabona
+  tipo: T
+  creador: twitch.tv/nazabona
+  credito: twitch.tv/nazabona
+  origen: twitch
+  twitch_login: nazabona
+  broadcaster_id: '417174890'
+  seguidores: 2438
+  seguidores_leidos: '2026-11-28'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-30'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: nazabona
+- id: t-lascosicasdejoserra
+  tipo: T
+  creador: twitch.tv/lascosicasdejoserra
+  credito: twitch.tv/lascosicasdejoserra
+  origen: twitch
+  twitch_login: lascosicasdejoserra
+  broadcaster_id: '190638727'
+  seguidores: 8694
+  seguidores_leidos: '2026-11-28'
+  juego: GTA 6
+  reglas:
+    duracion_s:
+    - 10
+    - 45
+    plataformas:
+    - shorts
+    - tiktok
+    - reels
+    permite_descarga: true
+    solo_clip: true
+    etiquetas_obligatorias:
+    - '#GTA6'
+    - '#GTAVI'
+    - '#GrandTheftAutoVI'
+    divulgacion: ninguna
+    audiencia: sin restricción
+  pilares:
+  - primeras_veces
+  - momentos
+  campana: null
+  tarifa_usd_por_mil: null
+  minimo_por_clip_usd: null
+  tope_por_clip_usd: null
+  presupuesto_restante: null
+  vence: '2026-11-30'
+  estado: vigente
+  uso: produccion
+  publicable: true
+  notas: 'Ficha T generada por el buscador: sin permiso, con crédito. Sólo el clip
+    de Twitch.'
+  nombre_visible: LasCosicasDeJoserra

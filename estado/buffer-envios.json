@@ -4507,5 +4507,111 @@
    "ficha_id": "t-lamejorclase"
   },
   "ruta_borrada": true
+ },
+ {
+  "id": "tiktok|33|2026-11-28T15:30:00.000Z",
+  "plataforma": "tiktok",
+  "toma": 33,
+  "dueAt": "2026-11-28T15:30:00.000Z",
+  "canal": "6afd2436ece6dfde5f046c7f",
+  "ruta": "tomas/2026-11-28/toma-033-9ced2b04.mp4",
+  "estado": "creado",
+  "post_id": "6b0aeed8b793a21e71f300da",
+  "intento": "21ac1650aa774abfb161f125fb4ce78e",
+  "registrado": true,
+  "texto": "Miriam Petricor se lleva un buen susto mientras busca a Dunk en un edificio abandonado.\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 33,
+    "gancho": "Emboscada en el edificio abandonado",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-miriam-petricor",
+    "caption": "Miriam Petricor se lleva un buen susto mientras busca a Dunk en un edificio abandonado.",
+    "frase": "Pues no está aquí Dunk.",
+    "hablante": "MIRIAM PETRICOR",
+    "campana": "",
+    "duracion_s": 17.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "spoiler: Gemini marcó spoiler: true",
+    "creador": "twitch.tv/miriam_petricor",
+    "id_origen": "BashfulPluckyJamSSSsss-MoyErNwqPgBMVpFQ",
+    "claves": [
+     "BashfulPluckyJamSSSsss-MoyErNwqPgBMVpFQ"
+    ]
+   },
+   "textos": {
+    "texto": "Miriam Petricor se lleva un buen susto mientras busca a Dunk en un edificio abandonado.\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/miriam_petricor",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Miriam Petricor se lleva un buen susto mientras busca a Dunk en un edificio abandonado.\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 148
+   },
+   "ficha_id": "t-miriam-petricor"
+  }
+ },
+ {
+  "id": "reels|33|2026-11-28T15:30:00.000Z",
+  "plataforma": "reels",
+  "toma": 33,
+  "dueAt": "2026-11-28T15:30:00.000Z",
+  "canal": "6afd2350ece6dfde5f045b08",
+  "ruta": "tomas/2026-11-28/toma-033-9ced2b04.mp4",
+  "estado": "creado",
+  "post_id": "6b0aeed90f9559e0ce211ccb",
+  "intento": "a807a43765014d7da41705483cb73e70",
+  "registrado": true,
+  "texto": "Miriam Petricor se lleva un buen susto mientras busca a Dunk en un edificio abandonado.\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+  "datos": {
+   "toma": {
+    "numero": 33,
+    "gancho": "Emboscada en el edificio abandonado",
+    "pilar": "primeras_veces",
+    "fuente_id": "t-miriam-petricor",
+    "caption": "Miriam Petricor se lleva un buen susto mientras busca a Dunk en un edificio abandonado.",
+    "frase": "Pues no está aquí Dunk.",
+    "hablante": "MIRIAM PETRICOR",
+    "campana": "",
+    "duracion_s": 17.0,
+    "historia": "",
+    "prueba": "corta-10-14:control",
+    "prueba_nota": "",
+    "nota_edicion": "spoiler: Gemini marcó spoiler: true",
+    "creador": "twitch.tv/miriam_petricor",
+    "id_origen": "BashfulPluckyJamSSSsss-MoyErNwqPgBMVpFQ",
+    "claves": [
+     "BashfulPluckyJamSSSsss-MoyErNwqPgBMVpFQ"
+    ]
+   },
+   "textos": {
+    "texto": "Miriam Petricor se lleva un buen susto mientras busca a Dunk en un edificio abandonado.\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "titulo": null,
+    "credito": "🎥 twitch.tv/miriam_petricor",
+    "etiquetas": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "descripcion": "Miriam Petricor se lleva un buen susto mientras busca a Dunk en un edificio abandonado.\n\n🎥 twitch.tv/miriam_petricor\n#GTA6 #GTAVI #GrandTheftAutoVI",
+    "hashtags": [
+     "#GTA6",
+     "#GTAVI",
+     "#GrandTheftAutoVI"
+    ],
+    "largo": 151
+   },
+   "ficha_id": "t-miriam-petricor"
+  }
  }
 ]
