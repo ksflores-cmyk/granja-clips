@@ -4451,7 +4451,8 @@
     "largo": 134
    },
    "ficha_id": "t-lamejorclase"
-  }
+  },
+  "ruta_borrada": true
  },
  {
   "id": "reels|32|2026-11-28T04:00:00.000Z",
@@ -4504,6 +4505,7 @@
     "largo": 137
    },
    "ficha_id": "t-lamejorclase"
-  }
+  },
+  "ruta_borrada": true
  }
 ]
